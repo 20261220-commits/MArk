@@ -86,6 +86,31 @@ ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].f
 const itemName = id => ITEMS[id] ? ITEMS[id].name : '?';
 const maxStack = id => ITEMS[id] ? ITEMS[id].stack : 64;
 
+// ---------- enchantments ----------
+// key: [name, max level, applicable kinds]
+const ENCH = {
+  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow']],
+  fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel']],
+  sharpness: ['날카로움', 5, ['sword', 'axe']], knockback: ['밀치기', 2, ['sword']], looting: ['약탈', 3, ['sword']],
+  protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']] };
+const ENCH_EXCL = [['fortune', 'silk_touch']];
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
+function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
+function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) => ENCH[k][0] + (ENCH[k][1] > 1 ? ' ' + ROMAN[l] : '')) : []; }
+// Java-like roll: modified level -> weighted pick of applicable enchantments
+function rollEnchant(id, level, seed) {
+  const r = S.rng(seed), kinds = enchKinds(id), d = ITEMS[id];
+  const ability = d.tool ? ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10 })[d.tool.mat] : d.armor ? ({ leather: 15, golden: 25, iron: 9, diamond: 10 })[d.armor.mat] : 1;
+  let L = level + 1 + r.int(Math.floor(ability / 4) + 1) + r.int(Math.floor(ability / 4) + 1);
+  L = Math.max(1, Math.round(L * (1 + (r() + r() - 1) * 0.15)));
+  const pool = Object.keys(ENCH).filter(k => ENCH[k][2].some(t => kinds.includes(t)));
+  const out = {};
+  const pick = () => { const opts = pool.filter(k => !out[k] && !ENCH_EXCL.some(g => g.includes(k) && g.some(o => out[o]))); if (!opts.length) return false; const k = opts[r.int(opts.length)]; out[k] = Math.max(1, Math.min(ENCH[k][1], Math.ceil(L / 30 * ENCH[k][1] + (r() - 0.3)))); return true; };
+  pick(); while (r.int(50) <= L) { if (!pick()) break; L = Math.floor(L / 2); }
+  return out;
+}
+
 // ---------- recipes ----------
 const TAGS = {
   planks: [BID.oak_planks, BID.spruce_planks, BID.birch_planks],
@@ -161,6 +186,7 @@ shaped('cobblestone_stairs', 4, ['#  ', '## ', '###'], { '#': 'cobblestone' });
 shaped('stone_brick_stairs', 4, ['#  ', '## ', '###'], { '#': 'stone_bricks' });
 shaped('oak_fence', 3, ['W#W', 'W#W'], { W: 'oak_planks', '#': 'stick' });
 shaped('glass_pane', 16, ['###', '###'], { '#': 'glass' });
+shaped('enchanting_table', 1, [' B ', 'DOD', 'OOO'], { B: 'book', D: 'diamond', O: 'obsidian' });
 shaped('jack_o_lantern', 1, ['P', 'T'], { P: 'pumpkin', T: 'torch' });
 shapeless('bone_meal', 3, ['bone']);
 shaped('spyglass', 1, ['A', 'C', 'C'], { A: 'amethyst_shard', C: 'copper_ingot' });
@@ -224,7 +250,7 @@ function breakTicks(b, stack, onGround, inWater) {
   if (d.hard === 0) return 0;
   const t = toolOf(stack);
   let speed = 1;
-  if (t && t.type === d.tool) speed = t.speed;
+  if (t && t.type === d.tool) { speed = t.speed; const ef = enchLv(stack, 'efficiency'); if (ef && canHarvest(b, stack)) speed += ef * ef + 1; }
   if (stack && stack.id === IID.shears && (d.leaves || b === BID.cobweb || b === BID.white_wool)) speed = b === BID.white_wool ? 5 : 15;
   if (t && t.type === TOOL.SWORD && b === BID.cobweb) speed = 15;
   if (t && t.type === TOOL.SWORD && d.leaves) speed = 1.5;
@@ -242,6 +268,11 @@ function blockDrops(b, meta, stack) {
   const add = (k, n = 1) => { if (n > 0) res.items.push([typeof k === 'number' ? k : IID[k], n]); };
   const shears = stack && stack.id === IID.shears;
   const t = toolOf(stack);
+  // silk touch keeps the block itself; fortune multiplies ore drops (applied after the switch)
+  if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(b); return res; }
+  const fortune = enchLv(stack, 'fortune');
+  const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore'].includes(d.key);
+  if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1; for (const it of r0.items) res.items.push([it[0], it[1] * mul]); res.xp = r0.xp; return res; }
   if (!canHarvest(b, stack)) {
     if (b === BID.cobweb && t && t.type === TOOL.SWORD) add('string');
     else if (b === BID.cobweb && shears) add('cobweb');

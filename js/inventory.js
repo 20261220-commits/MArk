@@ -31,6 +31,10 @@ function buildSlots(type, ctx) {
   } else if (type === 'chest') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < 27; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+  } else if (type === 'enchant') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e), max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 'elapis', accepts: st => !st || st.id === IID.lapis_lazuli }));
   } else if (type === 'furnace') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     L.push(slotRef(t.items, 0, { group: 'fin' }));
@@ -82,6 +86,7 @@ function quickMove(i) {
     const d = ITEMS[st.id];
     if (T === 'chest') targets = idx(s => s.group === 'cont');
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
+    else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
@@ -100,6 +105,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); }
 function closeScreenItems() {
+  if (GUI.type === 'enchant' && GUI.ctx.items) for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st);
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
 }

@@ -78,6 +78,7 @@ function hurtPlayer(dmg, cause, attacker) {
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
+    const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0); dmg *= 1 - Math.min(20, epf) * 0.04; // protection
     for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
@@ -115,6 +116,7 @@ function addXP(v) {
 function damageItem(arr, i, n = 1) {
   if (creative()) return;
   const s = arr[i]; if (!s) return; const d = ITEMS[s.id]; if (!d.dur) return;
+  const ub = enchLv(s, 'unbreaking'); if (ub && Math.random() > (d.armor ? 0.6 + 0.4 / (ub + 1) : 1 / (ub + 1))) return; // unbreaking
   s.d = (s.d || 0) + n;
   if (s.d >= d.dur) { arr[i] = null; play('break', { mat: 'metal' }); UI.flash(d.name + ' 부서짐'); }
   UI.hudDirty = true;
@@ -191,7 +193,7 @@ function playerTick() {
     if (web || snowB) { if (PL.vx) PL.vx = mx; if (PL.vz) PL.vz = mz; }
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround) {
-      if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil(PL.fallDist - 3); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
     PL.vy = (PL.vy - 0.08) * 0.98;
@@ -281,13 +283,13 @@ function onAttackPress() {
 }
 function attackEntity(e) {
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
-  const base = tool ? tool.dmg : 1, as = tool ? tool.as : 4;
+  const sharp = enchLv(h, 'sharpness'), base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0), as = tool ? tool.as : 4;
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = base * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { size: 0.08, vy: 1 }); }
   PL.attackT = 0;
-  const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1);
+  const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
   if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
   if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
@@ -347,8 +349,9 @@ function onUseRelease() {
     const charge = Math.min(1, USE.t / 20), f = (charge * charge + charge * 2) / 3;
     if (f >= 0.1) {
       const [dx, dy, dz] = lookDir(); const v = f * 3;
-      shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2);
-      if (!creative()) { INV.remove(IID.arrow, 1); damageItem(INV.slots, INV.sel, 1); }
+      const bowSt = PL.held(), pw = enchLv(bowSt, 'power');
+      shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
+      if (!creative()) { if (!enchLv(bowSt, 'infinity')) INV.remove(IID.arrow, 1); damageItem(INV.slots, INV.sel, 1); }
     }
   }
   if (USE.kind === 'eat') R.hand.eat = 0;
@@ -359,6 +362,7 @@ function interactBlock(t, dry) {
   const { x, y, z, id, m } = t;
   switch (id) {
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
+    case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
     case BID.chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;

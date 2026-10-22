@@ -300,7 +300,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.hp <= 0) {
     e.deathT = 20;
     if (attacker === PL || src === 'player') {
-      for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1)); if (e.fire > 0) { const cooked = { porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
+      const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
+      for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
       if (e.type === 'sheep' && !e.sheared && !e.baby) dropItem(e.x, e.y + .5, e.z, BID.white_wool, 1);
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));

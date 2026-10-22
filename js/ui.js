@@ -27,9 +27,11 @@ const SPR_HUD = {
   armorEmpty: hudSprite(['kk...kk', 'kEkkkEk', 'kEEEEEk', 'kEEEEEk', '.kEEEk.', '.kEEEk.', '..kkk..'], { k: '#2a2a2a', E: '#4a4a4a' }),
   bubble: hudSprite(['..bbb..', '.bwllb.', 'bwlllb.', 'bllllb.', '.bllb..', '..bb...', '.......'].map(r => r), { b: '#1a3a8a', w: '#ffffff', l: '#6aa8ff' }),
 };
-function icon(id, n, d) {
+function icon(id, n, d, e) {
   if (!id) return '';
-  const def = ITEMS[id]; let s = `<i class="ic" style="${iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2))}"></i>`;
+  const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
+  let s = `<i class="ic" style="${st}"></i>`;
+  if (e) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
   if (def && def.dur && d) { const f = 1 - d / def.dur; s += `<u style="--f:${f};--c:hsl(${f * 120},100%,45%)"></u>`; }
   return s;
@@ -54,7 +56,7 @@ function renderHud(dt) {
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d) : ''; }
+  for (let i = 0; i < 9; i++) { const s = INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
     for (let i = 0; i < 10; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
@@ -97,7 +99,7 @@ function renderDebug(dt, fps) {
 }
 
 // ---------- container screens ----------
-function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d) : ''}</div>`; }
+function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e) : ''}</div>`; }
 function invRows(start) { let h = '<div class="grid9">'; for (let k = 0; k < 27; k++) h += slotHtml(start + k); h += '</div><div class="grid9 hot">'; for (let k = 0; k < 9; k++) h += slotHtml(start + 27 + k); return h + '</div>'; }
 UI.openScreen = (type, ctx) => {
   if (UI.screen) UI.closeScreen();
@@ -126,13 +128,16 @@ UI.renderScreen = () => {
   } else if (T === 'furnace') {
     const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / 200;
     h = `<div class="panel"><div class="cap">화로</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'enchant') {
+    const opts = enchantOptions();
+    h = `<div class="panel"><div class="cap">마법 부여</div><div class="row top ench"><div class="col"><div class="row">${slotHtml(0)}${slotHtml(1, 'lapis')}</div><p class="tip">책장 ${opts.shelves}개</p></div><div class="eopts">${opts.list.map((o, i) => `<button class="eopt ${o.ok ? '' : 'off'}" data-ench="${i}"><span>${o.text}</span><b>${o.cost}</b><small>${i + 1} 청금석 · ${i + 1} 레벨</small></button>`).join('')}</div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
   }
   const cur = INV.cursor;
-  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d) : ''}</div>`;
+  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
   moveCursorItem(lastMouse.x, lastMouse.y);
 };
@@ -146,7 +151,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span>${d.name}</span>${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) { const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get(); if (!sl.output && !sl.takeOnly && (!s2 || same(s2, INV.cursor)) && (!sl.accepts || sl.accepts(INV.cursor))) GUI.drag.list.push(+el.dataset.i); }
 }
@@ -292,6 +297,7 @@ const ADV = [
   ['hunter', '몬스터 사냥꾼', '적대적 몬스터를 처치하세요', 'iron_sword', {}],
   ['sleep', '달콤한 꿈', '침대에서 자세요', 'red_bed', {}],
   ['glow', '빛나는 먹물', '발광 먹물 주머니를 얻으세요', 'glow_ink_sac', { item: 'glow_ink_sac' }],
+  ['enchant', '마법 부여사', '마법 부여대로 아이템에 마법을 부여하세요', 'enchanting_table', {}],
 ];
 const advQueue = [];
 UI.advance = key => {
@@ -314,3 +320,36 @@ function advScan() {
   const have = new Set(); for (const s of INV.slots) if (s) have.add(s.id); if (INV.cursor) have.add(INV.cursor.id);
   for (const a of ADV) { const t = a[4]; if (t.item && have.has(IID[t.item])) UI.advance(a[0]); if (t.armor && INV.armor.some(s => s && ITEMS[s.id].armor.mat === t.armor)) UI.advance(a[0]); }
 }
+
+// ---------- enchanting table ----------
+function bookshelves(c) {
+  let n = 0;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) {
+    if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
+    if (getBlock(c.x + dx, c.y + dy, c.z + dz) === BID.bookshelf && getBlock(c.x + Math.sign(dx), c.y + dy, c.z + Math.sign(dz)) === 0) n++;
+  }
+  return Math.min(15, n);
+}
+function enchantOptions() {
+  const c = GUI.ctx, st = c.items[0], shelves = bookshelves(c), list = [];
+  if (!st) return { shelves, list };
+  PL.enchSeed = PL.enchSeed || ((Math.random() * 2 ** 31) | 0);
+  const r = S.rng(PL.enchSeed), b = shelves;
+  const base = 1 + r.int(8) + Math.floor(b / 2) + r.int(b + 1);
+  const costs = [Math.max(Math.floor(base / 3), 1), Math.floor(base * 2 / 3) + 1, Math.max(base, b * 2)];
+  const lapis = c.items[1] ? c.items[1].n : 0;
+  costs.forEach((cost, i) => {
+    const e = rollEnchant(st.id, cost, PL.enchSeed + i * 7919), first = Object.keys(e)[0];
+    list.push({ cost, e, text: first ? ENCH[first][0] + (ENCH[first][1] > 1 ? ' ' + ROMAN[e[first]] : '') + ' . . . ?' : '?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
+  });
+  return { shelves, list };
+}
+$('screen').addEventListener('click', e => {
+  const b = e.target.closest('[data-ench]'); if (!b || UI.screen !== 'enchant') return;
+  const i = +b.dataset.ench, o = enchantOptions().list[i]; if (!o || !o.ok) return;
+  const c = GUI.ctx, st = c.items[0];
+  st.e = o.e;
+  if (!creative()) { PL.level = Math.max(0, PL.level - (i + 1)); c.items[1].n -= i + 1; if (c.items[1].n <= 0) c.items[1] = null; }
+  PL.enchSeed = (Math.random() * 2 ** 31) | 0;
+  play('levelup', { vol: 0.5 }); UI.advance('enchant'); UI.hudDirty = true; UI.renderScreen();
+});
