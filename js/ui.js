@@ -146,14 +146,30 @@ const lastMouse = { x: 0, y: 0 };
 function moveCursorItem(x, y) { const c = $('cursorItem'); if (c) { c.style.left = x + 'px'; c.style.top = y + 'px'; } }
 function screenMouse(e) {
   lastMouse.x = e.clientX; lastMouse.y = e.clientY; moveCursorItem(e.clientX, e.clientY);
-  const el = e.target.closest && e.target.closest('.sl');
+  // hit-test by position: pointer capture/touch keep e.target on the slot where the drag began
+  const hit = document.elementFromPoint(e.clientX, e.clientY), el = hit && hit.closest && hit.closest('#screen .sl');
   const tip = $('tooltip');
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
   if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
-  if (GUI.drag && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) { const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get(); if (!sl.output && !sl.takeOnly && (!s2 || same(s2, INV.cursor)) && (!sl.accepts || sl.accepts(INV.cursor))) GUI.drag.list.push(+el.dataset.i); }
+  if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
+    const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();
+    if (!sl.output && !sl.takeOnly && (!s2 || same(s2, INV.cursor)) && (!sl.accepts || sl.accepts(INV.cursor)) && GUI.drag.list.length < INV.cursor.n) { GUI.drag.list.push(+el.dataset.i); markDrag(); }
+  }
+  // shift + drag: quick-move every stack the pointer sweeps over (Java "드르륵")
+  if (GUI.shiftDrag && el && el.dataset.i != null && !GUI.shiftDrag.has(+el.dataset.i)) {
+    GUI.shiftDrag.add(+el.dataset.i); const sl = GUI.slots[+el.dataset.i];
+    if (sl && sl.get() && !sl.output) { quickMove(+el.dataset.i); afterClick(); }
+  }
+}
+// preview of a drag split: highlight slots and show how many each will get
+function markDrag() {
+  const d = GUI.drag, c = INV.cursor; if (!d || !c) return;
+  const per = d.btn === 0 ? Math.floor(c.n / d.list.length) : 1;
+  document.querySelectorAll('#screen .sl.dragsel').forEach(x => x.classList.remove('dragsel'));
+  for (const i of d.list) { const el = document.querySelector(`#screen .sl[data-i="${i}"]`); if (!el) continue; el.classList.add('dragsel'); el.dataset.prev = d.list.length > 1 ? '+' + per : ''; }
 }
 function screenDown(e) {
   e.preventDefault();
@@ -165,10 +181,12 @@ function screenDown(e) {
   if (e.button === 0 && !e.shiftKey && now - GUI.lastClick.t < 300 && GUI.lastClick.i === i && INV.cursor) { collectToCursor(); GUI.lastClick.t = 0; afterClick(); return; }
   GUI.lastClick = { t: now, i };
   const sl = GUI.slots[i];
-  if (INV.cursor && !e.shiftKey && !sl.output && !sl.takeOnly && (e.button === 0 || e.button === 2)) { GUI.drag = { btn: e.button, list: [i], start: i }; return; }
+  if (INV.cursor && !e.shiftKey && !sl.output && !sl.takeOnly && (e.button === 0 || e.button === 2)) { GUI.drag = { btn: e.button, list: [i], start: i }; markDrag(); return; }
+  if (e.shiftKey && e.button === 0 && !INV.cursor) GUI.shiftDrag = new Set([i]);
   clickSlot(i, e.button, e.shiftKey);
 }
 function screenUp(e) {
+  GUI.shiftDrag = null;
   const d = GUI.drag; if (!d) return; GUI.drag = null;
   if (d.list.length <= 1) { clickSlot(d.start, d.btn, false); return; }
   const c = INV.cursor; if (!c) return;
@@ -177,8 +195,10 @@ function screenUp(e) {
   if (c.n <= 0) INV.cursor = null;
   afterClick();
 }
-$('screen').addEventListener('mousemove', screenMouse);
-$('screen').addEventListener('pointerdown', e => { if (e.pointerType === 'touch') { screenMouse(e); } screenDown(e); });
+// pointermove, not mousemove: preventDefault() on pointerdown suppresses compatibility mouse events,
+// which is what broke drag-splitting across crafting slots
+$('screen').addEventListener('pointermove', screenMouse);
+$('screen').addEventListener('pointerdown', e => { screenMouse(e); screenDown(e); });
 addEventListener('pointerup', e => { if (UI.screen) screenUp(e); });
 $('screen').addEventListener('contextmenu', e => e.preventDefault());
 setInterval(() => { if (UI.screen === 'furnace') UI.renderScreen(); }, 250);

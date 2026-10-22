@@ -63,6 +63,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .cap{font-size:calc(8 * var(--px));color:#404040;margin:calc(1 * var(--px)) 0}
 .sl{width:calc(18 * var(--px));height:calc(18 * var(--px));background:#8b8b8b;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #fff;display:grid;place-items:center;position:relative;cursor:default}
 .sl:hover{background:#a8a8a8}
+.sl.dragsel{background:#a8a8a8;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #fff,inset 0 0 0 calc(2*var(--px)) rgba(255,255,255,.35)}
+.sl.dragsel::before{content:attr(data-prev);position:absolute;left:var(--px);top:0;font-size:calc(6*var(--px));color:#ffff80;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
 .sl.big{width:calc(26 * var(--px));height:calc(26 * var(--px))}
 .sl.ghost{position:fixed;background:none;box-shadow:none;pointer-events:none;transform:translate(-50%,-50%);z-index:30}
 .sl.armor:empty::after{content:"";width:calc(12 * var(--px));height:calc(12 * var(--px));opacity:.35;background:#373737;clip-path:polygon(15% 0,85% 0,100% 30%,85% 100%,15% 100%,0 30%)}
