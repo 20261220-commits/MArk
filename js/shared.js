@@ -19,7 +19,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'cobbled_deepslate deepslate_coal_ore deepslate_iron_ore deepslate_copper_ore deepslate_gold_ore deepslate_redstone_ore deepslate_lapis_ore ' +
   'deepslate_diamond_ore dripstone_block pointed_dripstone moss_block tinted_glass smooth_stone smooth_stone_slab_side stone_bricks granite ' +
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
-  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem').split(' ');
+  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen').split(' ');
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -145,6 +145,7 @@ const BLOCK_ROWS = [
   [115, 'stone_brick_stairs', '석재 벽돌 계단', RT.BOX, 'stone_bricks', 1.5, P, 1, { stairs: 1 }],
   [116, 'oak_fence', '참나무 울타리', RT.BOX, 'oak_planks', 2, A, 0, { connect: 1 }],
   [117, 'glass_pane', '유리판', RT.BOX, 'glass', 0.3, N, 0, { connect: 2 }],
+  [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 const NB = 256;
 const BLOCKS = new Array(NB).fill(null);
@@ -217,6 +218,7 @@ function shapes(id, meta) {
       }
       return b;
     }
+    case 118: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]]; // glow lichen: attached face
     case 117: { // glass pane
       const b = [[7, 0, 7, 9, 16, 9]];
       if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
@@ -544,6 +546,17 @@ function genChunk(seed, cx, cz) {
         if (R() < 0.5 && y > 2 && blocks[I(x, y - 1, z)] === 0) blocks[I(x, y - 1, z)] = 86;
         break;
       }
+    }
+  }
+  // glow lichen on cave walls (1.17), only well below the surface
+  const LF = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
+  const rocky = b => b === 1 || b === 76 || b === 75 || b === 91 || b === 92 || b === 93;
+  for (let z = 1; z < 15; z++) for (let x = 1; x < 15; x++) {
+    const top = Math.min(56, hgt[(z + 1) * 18 + x + 1] - 8);
+    for (let y = 8; y < top; y++) {
+      const i2 = I(x, y, z); if (blocks[i2] !== 0 || R() > 0.12) continue;
+      const f = R.int(6), [dx, dy, dz] = LF[f];
+      if (rocky(blocks[I(x + dx, y + dy, z + dz)])) { blocks[i2] = 118; meta[i2] = f; }
     }
   }
   // 7. surface features: trees (from this and neighbouring chunks), plants, snow

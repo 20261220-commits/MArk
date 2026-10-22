@@ -245,6 +245,7 @@ PAINT.ladder = r => { for (let y = 0; y < 16; y++) { P(2, y, hex(0x8a6a3b)); P(3
 PAINT.lantern = r => { for (let x = 0; x < 6; x++) for (let y = 2; y < 9; y++) P(x, y, (y === 2 || y === 8 || x === 0 || x === 5) ? hex(0x3a3d44) : (y > 3 && y < 8) ? pal(r, [hex(0xffd84a), hex(0xffa830), hex(0xfff0a0)]) : hex(0x4a4d55)); for (let x = 0; x < 6; x++) for (let y = 9; y < 15; y++) P(x, y, hex(0x3f424a)); for (let x = 1; x < 5; x++) { P(x, 10, hex(0x3a3d44)); P(x, 0, hex(0x3a3d44)); P(x, 1, hex(0x2a2d33)); } for (let y = 1; y < 7; y++) { P(11, y, hex(0x3a3d44)); P(12, y, hex(0x2a2d33)); } };
 PAINT.spawner = r => fill((x, y) => { if (x % 4 === 0 || y % 4 === 0 || x === 15 || y === 15) return shade(hex(0x2a3a4a), 1 + (r() - .5) * .3); return null; });
 PAINT.smooth_basalt = r => stoneLike(hex(0x4c4b51), r, 0.14);
+PAINT.glow_lichen = r => { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .35; return v > 0.62 ? (r() < 0.25 ? hex(0xd8ffe0) : hex(0x86c8a0)) : v > 0.5 ? hex(0x5f9478) : null; }); };
 
 function paintAtlas() {
   S.TILES.forEach((name, i) => {

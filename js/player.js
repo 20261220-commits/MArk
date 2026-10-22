@@ -453,6 +453,7 @@ function placeBlock(t, d) {
   if (id === BID.torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern) meta = t.ny === -1 ? 1 : 0;
+  if (id === BID.glow_lichen) { meta = t.ny === 1 ? 0 : t.ny === -1 ? 1 : t.nz === 1 ? 2 : t.nz === -1 ? 3 : t.nx === 1 ? 4 : 5; }
   if (b.facing) meta = (fd + 2) & 3;
   if (S.LOGAX[id]) meta = t.nx ? 1 : t.nz ? 2 : 0;
   if (b.slab) meta = t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 1 : 0;

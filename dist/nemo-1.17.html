@@ -226,7 +226,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'cobbled_deepslate deepslate_coal_ore deepslate_iron_ore deepslate_copper_ore deepslate_gold_ore deepslate_redstone_ore deepslate_lapis_ore ' +
   'deepslate_diamond_ore dripstone_block pointed_dripstone moss_block tinted_glass smooth_stone smooth_stone_slab_side stone_bricks granite ' +
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
-  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem').split(' ');
+  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen').split(' ');
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -352,6 +352,7 @@ const BLOCK_ROWS = [
   [115, 'stone_brick_stairs', '석재 벽돌 계단', RT.BOX, 'stone_bricks', 1.5, P, 1, { stairs: 1 }],
   [116, 'oak_fence', '참나무 울타리', RT.BOX, 'oak_planks', 2, A, 0, { connect: 1 }],
   [117, 'glass_pane', '유리판', RT.BOX, 'glass', 0.3, N, 0, { connect: 2 }],
+  [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 const NB = 256;
 const BLOCKS = new Array(NB).fill(null);
@@ -424,6 +425,7 @@ function shapes(id, meta) {
       }
       return b;
     }
+    case 118: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]]; // glow lichen: attached face
     case 117: { // glass pane
       const b = [[7, 0, 7, 9, 16, 9]];
       if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
@@ -751,6 +753,17 @@ function genChunk(seed, cx, cz) {
         if (R() < 0.5 && y > 2 && blocks[I(x, y - 1, z)] === 0) blocks[I(x, y - 1, z)] = 86;
         break;
       }
+    }
+  }
+  // glow lichen on cave walls (1.17), only well below the surface
+  const LF = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
+  const rocky = b => b === 1 || b === 76 || b === 75 || b === 91 || b === 92 || b === 93;
+  for (let z = 1; z < 15; z++) for (let x = 1; x < 15; x++) {
+    const top = Math.min(56, hgt[(z + 1) * 18 + x + 1] - 8);
+    for (let y = 8; y < top; y++) {
+      const i2 = I(x, y, z); if (blocks[i2] !== 0 || R() > 0.12) continue;
+      const f = R.int(6), [dx, dy, dz] = LF[f];
+      if (rocky(blocks[I(x + dx, y + dy, z + dz)])) { blocks[i2] = 118; meta[i2] = f; }
     }
   }
   // 7. surface features: trees (from this and neighbouring chunks), plants, snow
@@ -1164,7 +1177,7 @@ const IID = {};            // key -> id
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
-  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
+  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
   oak_door: 'oak_door_item', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
@@ -1438,6 +1451,7 @@ function blockDrops(b, meta, stack) {
     case 'lit_furnace': add('furnace'); break;
     case 'cobweb': add('string'); break;
     case 'powder_snow': break;
+    case 'glow_lichen': if (shears) add(b); break;
     default: if (ITEMS[b]) add(b);
   }
   return res;
@@ -1692,6 +1706,7 @@ PAINT.ladder = r => { for (let y = 0; y < 16; y++) { P(2, y, hex(0x8a6a3b)); P(3
 PAINT.lantern = r => { for (let x = 0; x < 6; x++) for (let y = 2; y < 9; y++) P(x, y, (y === 2 || y === 8 || x === 0 || x === 5) ? hex(0x3a3d44) : (y > 3 && y < 8) ? pal(r, [hex(0xffd84a), hex(0xffa830), hex(0xfff0a0)]) : hex(0x4a4d55)); for (let x = 0; x < 6; x++) for (let y = 9; y < 15; y++) P(x, y, hex(0x3f424a)); for (let x = 1; x < 5; x++) { P(x, 10, hex(0x3a3d44)); P(x, 0, hex(0x3a3d44)); P(x, 1, hex(0x2a2d33)); } for (let y = 1; y < 7; y++) { P(11, y, hex(0x3a3d44)); P(12, y, hex(0x2a2d33)); } };
 PAINT.spawner = r => fill((x, y) => { if (x % 4 === 0 || y % 4 === 0 || x === 15 || y === 15) return shade(hex(0x2a3a4a), 1 + (r() - .5) * .3); return null; });
 PAINT.smooth_basalt = r => stoneLike(hex(0x4c4b51), r, 0.14);
+PAINT.glow_lichen = r => { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .35; return v > 0.62 ? (r() < 0.25 ? hex(0xd8ffe0) : hex(0x86c8a0)) : v > 0.5 ? hex(0x5f9478) : null; }); };
 
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
@@ -2160,6 +2175,7 @@ function neighborUpdate(x, y, z) {
   if (b === BID.red_bed) { const f = m & 3, dir = DIRS[f], s = (m & 4) ? -1 : 1; if (getBlock(x + dir[0] * s, y, z + dir[2] * s) !== b) setBlock(x, y, z, 0); return; }
   if (b === BID.farmland && SOLID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] === RT.CUBE) { setBlock(x, y, z, 3); return; }
   if (b === BID.amethyst_cluster || b === BID.pointed_dripstone) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.glow_lichen) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
   if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (d.connect) updateConnections(x, y, z, b);
@@ -3085,7 +3101,7 @@ function buildModel(type) {
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.mesh.material && e.mesh.material.dispose && e.kind !== 'mob') e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) e.mesh.userData.mat.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -3257,6 +3273,12 @@ function mobTick(e) {
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
+    // goats (1.17) occasionally ram a nearby player
+    if (e.type === 'goat' && !e.baby && plVisible) {
+      if (e.ram > 0) { e.ram--; const l = Math.hypot(dx, dz) || 1; mx = dx / l; mz = dz / l; speed = 0.22; e.yawTarget = Math.atan2(-dx, -dz);
+        if (dist < 1.3) { e.ram = 0; if (hurtPlayer(1 * DIFF_MUL() + 1, 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
+      else if (dist > 4 && dist < 12 && Math.random() < 1 / 1500) { e.ram = 40; play('bleat'); }
+    }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
   }
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }
@@ -4050,6 +4072,7 @@ function placeBlock(t, d) {
   if (id === BID.torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern) meta = t.ny === -1 ? 1 : 0;
+  if (id === BID.glow_lichen) { meta = t.ny === 1 ? 0 : t.ny === -1 ? 1 : t.nz === 1 ? 2 : t.nz === -1 ? 3 : t.nx === 1 ? 4 : 5; }
   if (b.facing) meta = (fd + 2) & 3;
   if (S.LOGAX[id]) meta = t.nx ? 1 : t.nz ? 2 : 0;
   if (b.slab) meta = t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 1 : 0;
@@ -4323,7 +4346,7 @@ function showMenu(name, data) {
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
     h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐</p><div class="btncol">${btn('완료', 'optDone')}</div>`;
   } else if (name === 'controls') {
-    h = `<h2>조작법</h2><ul class="keys"><li><kbd>W A S D</kbd> 이동 · <kbd>W</kbd> 두 번 / <kbd>R</kbd> / <kbd>Ctrl</kbd> 달리기</li><li><kbd>Space</kbd> 점프 · 수영 · (크리에이티브) 두 번 눌러 비행</li><li><kbd>Shift</kbd> 웅크리기 (모서리에서 안 떨어짐) · 비행 중 하강</li><li><kbd>좌클릭</kbd> 블록 캐기 · 공격 (공격 쿨다운 1.9 전투)</li><li><kbd>우클릭</kbd> 블록 놓기 · 사용 · 먹기 · 활 당기기 · 망원경</li><li><kbd>휠 클릭</kbd> 블록 고르기 · <kbd>휠</kbd> / <kbd>1-9</kbd> 단축바</li><li><kbd>E</kbd> 인벤토리 · <kbd>Q</kbd> 버리기 (<kbd>Ctrl+Q</kbd> 묶음)</li><li><kbd>T</kbd> 채팅 · <kbd>/</kbd> 명령어 (/help)</li><li><kbd>F1</kbd>/<kbd>H</kbd> HUD 숨기기 · <kbd>F3</kbd>/<kbd>`</kbd> 디버그 · <kbd>F5</kbd>/<kbd>V</kbd> 시점 전환</li><li>크롬북: <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫으니 <kbd>W</kbd> 두 번이나 <kbd>R</kbd>로 달리세요 (설정에서 전체 화면 + 키 잠금을 켜면 안전)</li><li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
+    h = `<h2>조작법</h2><ul class="keys"><li><kbd>W A S D</kbd> 이동 · <kbd>W</kbd> 두 번 / <kbd>R</kbd> / <kbd>Ctrl</kbd> 달리기</li><li><kbd>Space</kbd> 점프 · 수영 · (크리에이티브) 두 번 눌러 비행</li><li><kbd>Shift</kbd> 웅크리기 (모서리에서 안 떨어짐) · 비행 중 하강</li><li><kbd>좌클릭</kbd> 블록 캐기 · 공격 (공격 쿨다운 1.9 전투)</li><li><kbd>우클릭</kbd> 블록 놓기 · 사용 · 먹기 · 활 당기기 · 망원경</li><li><kbd>휠 클릭</kbd> 블록 고르기 · <kbd>휠</kbd> / <kbd>1-9</kbd> 단축바</li><li><kbd>E</kbd> 인벤토리 · <kbd>Q</kbd> 버리기 (<kbd>Ctrl+Q</kbd> 묶음)</li><li><kbd>T</kbd> 채팅 · <kbd>/</kbd> 명령어 (/help)</li><li><kbd>F1</kbd>/<kbd>H</kbd> HUD 숨기기 · <kbd>F3</kbd>/<kbd>&#96;</kbd> 디버그 · <kbd>F5</kbd>/<kbd>V</kbd> 시점 전환</li><li>크롬북: <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫으니 <kbd>W</kbd> 두 번이나 <kbd>R</kbd>로 달리세요 (설정에서 전체 화면 + 키 잠금을 켜면 안전)</li><li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {

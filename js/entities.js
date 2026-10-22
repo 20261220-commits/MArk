@@ -187,7 +187,7 @@ function buildModel(type) {
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.mesh.material && e.mesh.material.dispose && e.kind !== 'mob') e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) e.mesh.userData.mat.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -359,6 +359,12 @@ function mobTick(e) {
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
+    // goats (1.17) occasionally ram a nearby player
+    if (e.type === 'goat' && !e.baby && plVisible) {
+      if (e.ram > 0) { e.ram--; const l = Math.hypot(dx, dz) || 1; mx = dx / l; mz = dz / l; speed = 0.22; e.yawTarget = Math.atan2(-dx, -dz);
+        if (dist < 1.3) { e.ram = 0; if (hurtPlayer(1 * DIFF_MUL() + 1, 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
+      else if (dist > 4 && dist < 12 && Math.random() < 1 / 1500) { e.ram = 40; play('bleat'); }
+    }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
   }
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }

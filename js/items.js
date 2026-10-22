@@ -8,7 +8,7 @@ const IID = {};            // key -> id
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
-  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
+  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
   oak_door: 'oak_door_item', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
@@ -282,6 +282,7 @@ function blockDrops(b, meta, stack) {
     case 'lit_furnace': add('furnace'); break;
     case 'cobweb': add('string'); break;
     case 'powder_snow': break;
+    case 'glow_lichen': if (shears) add(b); break;
     default: if (ITEMS[b]) add(b);
   }
   return res;
