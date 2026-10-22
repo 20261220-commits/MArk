@@ -2,14 +2,14 @@
 // Follows Java rules closely enough for ordinary circuits: strong/weak block power, wire
 // decay of 1 per block, torch inversion with a 1-tick (2 game tick) delay, repeater delays
 // of 1-4 ticks, and pistons that push up to 12 blocks.
-const RS = { dirty: new Set(), sched: new Map(), busy: false };
+const RS = { dirty: new Set(), sched: new Map(), busy: false, obs: new Set() };
 const RSB = { wire: BID.redstone_wire, torch: BID.redstone_torch, torchOff: BID.unlit_redstone_torch, lamp: BID.redstone_lamp, lampOn: BID.lit_redstone_lamp,
   lever: BID.lever, button: BID.stone_button, plate: BID.stone_pressure_plate, rep: BID.repeater, piston: BID.piston, sticky: BID.sticky_piston, head: BID.piston_head, block: BID.redstone_block };
 const rkey = (x, y, z) => x + ',' + y + ',' + z;
 // the block a torch/lever/button hangs on
 function torchAttach(x, y, z, m) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; return [x + d[0], y, z + d[2]]; } return [x, y - 1, z]; }
 function switchAttach(x, y, z, m) { const d = S.DIR6[m & 7]; return [x + d[0], y + d[1], z + d[2]]; }
-const isConductor = b => OPQ[b] && SOLID[b] && b !== RSB.piston && b !== RSB.sticky && b !== BID.redstone_block;
+const isConductor = b => OPQ[b] && SOLID[b] && b !== RSB.piston && b !== RSB.sticky && b !== BID.redstone_block && b !== BID.observer && b !== BID.target && b !== BID.daylight_detector;
 // strong power a solid block receives from sources pointing into it
 function strongPower(x, y, z) {
   for (let k = 0; k < 6; k++) {
@@ -18,6 +18,8 @@ function strongPower(x, y, z) {
     else if (b === RSB.plate) { if (dy === 1 && getMeta(nx, ny, nz) & 1) return 15; }
     else if (b === RSB.torch) { if (dy === -1) return 15; } // a torch strongly powers the block above it
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
+    else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
+    else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
   }
   return 0;
 }
@@ -32,7 +34,7 @@ function wireConn(x, y, z) { // horizontal directions the dust visually connects
   const c = [0, 0, 0, 0], above = OPQ[getBlock(x, y + 1, z)];
   DIRS.forEach(([dx, , dz], d) => {
     const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if (nd && nd.rs && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && (n !== RSB.rep || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
+    if (nd && nd.rs && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
     else if (n === BID.redstone_block) c[d] = 1;
     else if (!OPQ[n] && getBlock(x + dx, y - 1, z + dz) === RSB.wire) c[d] = 1;
     else if (!above && getBlock(x + dx, y + 1, z + dz) === RSB.wire) c[d] = 1;
@@ -56,6 +58,9 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.redstone_block: return 15;
     case RSB.torch: { const a = torchAttach(x, y, z, m); return a[0] === x + dx && a[1] === y + dy && a[2] === z + dz ? 0 : 15; }
     case RSB.rep: { if (!(m & 16) || dy) return 0; const d = DIRS[m & 3]; return d[0] === dx && d[2] === dz ? 15 : 0; }
+    case BID.comparator: { if (dy) return 0; const d = DIRS[m & 3]; return d[0] === dx && d[2] === dz ? compOut(x, y, z) : 0; }
+    case BID.observer: { if (!(m & 8)) return 0; const d = S.DIR6[m & 7]; return d[0] === -dx && d[1] === -dy && d[2] === -dz ? 15 : 0; }
+    case BID.daylight_detector: case BID.target: return m & 15;
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -135,10 +140,20 @@ function rsComponent(x, y, z, b) {
   } else if (b === RSB.piston || b === RSB.sticky) {
     const p = powerAt(x, y, z, m & 7) > 0 || powerAt(x, y + 1, z, 0) > 0; // quasi-connectivity, as in Java
     if (p !== !!(m & 8)) rsLater(x, y, z, p ? 0 : 1);
-  } else if (b === BID.oak_door) {
+  } else if (S.DOOR[b]) {
     const lo = m & 8 ? y - 1 : y, p = powerAt(x, lo, z) > 0 || powerAt(x, lo + 1, z) > 0, lm = getMeta(x, lo, z);
     const powered = !!(lm & 16);
     if (p !== powered) { const open = p; const nm = (lm & ~20) | (open ? 4 : 0) | (p ? 16 : 0); setMeta(x, lo, z, nm); if (getBlock(x, lo + 1, z) === b) setMeta(x, lo + 1, z, (getMeta(x, lo + 1, z) & ~4) | (open ? 4 : 0)); play('door'); }
+  } else if (b === BID.oak_trapdoor) {
+    const p = powerAt(x, y, z) > 0; if (p !== !!(m & 16)) { setMeta(x, y, z, (m & ~20) | (p ? 20 : 0)); play('door', { vol: 0.5 }); }
+  } else if (b === BID.comparator) {
+    if (compute(x, y, z) !== compOut(x, y, z)) rsLater(x, y, z, 2);
+  } else if (b === BID.dispenser || b === BID.dropper || b === BID.note_block) {
+    const p = powerAt(x, y, z) > 0 || (b !== BID.note_block && powerAt(x, y + 1, z) > 0), bit = b === BID.note_block ? 1 : 8;
+    if (p && !(m & bit)) { setMeta(x, y, z, m | bit); if (b === BID.note_block) { const t = getTile(x, y, z); playNote(x, y, z, t ? t.n || 0 : 0); } else rsLater(x, y, z, 4); }
+    else if (!p && (m & bit)) setMeta(x, y, z, m & ~bit);
+  } else if (b === BID.hopper) {
+    const p = powerAt(x, y, z) > 0; if (p !== !!(m & 8)) setMeta(x, y, z, p ? m | 8 : m & ~8); // powered hoppers are locked
   } else if (b === BID.tnt) {
     if (powerAt(x, y, z) > 0) { setBlock(x, y, z, 0); primeTNT(x, y, z); }
   }
@@ -157,7 +172,16 @@ function rsDelayed(x, y, z) {
   } else if (b === RSB.piston || b === RSB.sticky) {
     const p = powerAt(x, y, z, m & 7) > 0 || powerAt(x, y + 1, z, 0) > 0;
     if (p && !(m & 8)) pistonExtend(x, y, z, b, m); else if (!p && (m & 8)) pistonRetract(x, y, z, b, m);
-  } else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
+  } else if (b === BID.comparator) {
+    const v = compute(x, y, z), t = getTile(x, y, z) || { type: 'comp', out: 0 };
+    if (v !== t.out) { t.out = v; setTile(x, y, z, t); setMeta(x, y, z, v > 0 ? m | 8 : m & ~8); const d = DIRS[m & 3]; rsNotify(x + d[0], y, z + d[2]); rsNotify(x, y, z); }
+  } else if (b === BID.observer) {
+    if (RS.obs.has(rkey(x, y, z))) { RS.obs.delete(rkey(x, y, z)); setMeta(x, y, z, m | 8); rsLater(x, y, z, 2); }
+    else if (m & 8) setMeta(x, y, z, m & ~8);
+    const d = S.DIR6[m & 7]; rsNotify(x - d[0], y - d[1], z - d[2]); rsMark(x, y, z);
+  } else if (b === BID.dispenser || b === BID.dropper) { dispense(x, y, z, b, m); }
+  else if (b === BID.target && (m & 15)) { setMeta(x, y, z, m & ~15); rsNotify(x, y, z); }
+  else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);
     else { setMeta(x, y, z, 0); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
@@ -222,4 +246,81 @@ function useSwitch(x, y, z, b, m) {
   else if (b === RSB.button) { if (m & 8) return; setMeta(x, y, z, m | 8); play('click'); rsLater(x, y, z, 20); }
   else if (b === RSB.rep) { setMeta(x, y, z, (m & ~12) | ((((m >> 2) & 3) + 1) & 3) << 2); play('click'); return; }
   const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]);
+}
+
+// ---------- observers, comparators, dispensers, hoppers, daylight sensors, targets ----------
+function observerFire(x, y, z) { const k = rkey(x, y, z); if (RS.obs.has(k) || (getMeta(x, y, z) & 8)) return; RS.obs.add(k); rsLater(x, y, z, 2); }
+const compOut = (x, y, z) => { const t = getTile(x, y, z); return t && t.out || 0; };
+// comparator: rear signal (or how full the container behind is) minus/compared with the strongest side signal
+function containerSignal(x, y, z) {
+  const b = getBlock(x, y, z);
+  if (b === BID.composter) return Math.min(15, (getMeta(x, y, z) & 15) * 2 - (getMeta(x, y, z) >= 8 ? 1 : 0));
+  const t = getTile(x, y, z); if (!t || !t.items) return -1;
+  let f = 0, any = false; for (const st of t.items) if (st) { f += st.n / maxStack(st.id); any = true; }
+  return any ? Math.floor(1 + f / t.items.length * 14) : 0;
+}
+function compute(x, y, z) {
+  const m = getMeta(x, y, z), d = DIRS[m & 3], bx = x - d[0], bz = z - d[2];
+  let rear = containerSignal(bx, y, bz); if (rear < 0) rear = emitted(bx, y, bz, d[0], 0, d[2], false);
+  let side = 0;
+  for (const s of [DIRS[(m + 1) & 3], DIRS[(m + 3) & 3]]) { const sb = getBlock(x + s[0], y, z + s[2]); if (sb === RSB.wire || sb === RSB.rep || sb === BID.comparator || sb === BID.redstone_block) side = Math.max(side, emitted(x + s[0], y, z + s[2], -s[0], 0, -s[2], false)); }
+  return m & 4 ? Math.max(0, rear - side) : rear >= side ? rear : 0;
+}
+function dispense(x, y, z, b, m) {
+  const t = getTile(x, y, z); if (!t || !t.items) return;
+  const full = t.items.map((s, i) => s ? i : -1).filter(i => i >= 0); if (!full.length) { play('click', { pitch: 1.2 }); return; }
+  const i = full[Math.floor(Math.random() * full.length)], st = t.items[i], d = S.DIR6[m & 7], fx = x + d[0], fy = y + d[1], fz = z + d[2], id = st.id;
+  const take = () => { st.n--; if (st.n <= 0) t.items[i] = null; };
+  const cx = fx + .5, cy = fy + .5, cz = fz + .5;
+  if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { id, n: 1, d: st.d, e: st.e })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
+  const fb = getBlock(fx, fy, fz);
+  if (id === IID.arrow) { shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 2); take(); }
+  else if (id === IID.fire_charge) { spawnFireball(cx, cy, cz, d[0], d[1], d[2], null, true); take(); }
+  else if (id === IID.snowball || id === IID.egg) { const e = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
+  else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); t.items[i] = { id: IID.bucket, n: 1 }; }
+  else if (id === IID.bucket && FLUID[fb] && getMeta(fx, fy, fz) === 0) { setBlock(fx, fy, fz, 0); t.items[i] = { id: fb === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; }
+  else if (id === BID.tnt) { primeTNT(fx, fy, fz); take(); }
+  else if (id === IID.flint_and_steel) { if (!fb && SOLID[getBlock(fx, fy - 1, fz)]) setBlock(fx, fy, fz, BID.fire); }
+  else if (id === IID.bone_meal) { if (boneMeal(fx, fy, fz, fb)) take(); }
+  else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); }
+  play('click');
+}
+// put a stack into a container tile (furnace: input slot only); returns true when it fit completely
+function insertItem(t, st, slots) {
+  const list = slots || (t.type === 'furnace' ? [ITEMS[st.id].fuel && !SMELT[st.id] ? 1 : 0] : t.items.map((_, i) => i));
+  for (const i of list) { const s = t.items[i]; if (s && s.id === st.id && !s.e && !st.e && (s.d || 0) === (st.d || 0) && s.n < maxStack(st.id)) { const k = Math.min(st.n, maxStack(st.id) - s.n); s.n += k; st.n -= k; if (!st.n) return true; } }
+  for (const i of list) if (!t.items[i]) { t.items[i] = { ...st }; st.n = 0; return true; }
+  return false;
+}
+// hoppers move one item every 8 ticks: pull from above (container or dropped items), push into the container below
+function hopperTick(c, i, t) {
+  if (--t.cd > 0) return; t.cd = 8;
+  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+  if (c.meta[i] & 8) return;
+  let moved = false;
+  const below = getTile(x, y - 1, z);
+  if (below && below.items) { const k = t.items.findIndex(s => s); if (k >= 0) { const s = t.items[k], one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(below, one, below.type === 'furnace' ? [ITEMS[s.id].fuel && !SMELT[s.id] ? 1 : 0] : null)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(x, y - 1, z); } } }
+  const above = getTile(x, y + 1, z);
+  if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
+  else for (const e of ENT) if (e.kind === 'item' && !e.dead && Math.abs(e.x - x - .5) < 0.7 && Math.abs(e.z - z - .5) < 0.7 && e.y >= y + 0.5 && e.y < y + 2) { if (insertItem(t, e.stack)) removeEnt(e); moved = true; break; }
+  if (moved) { c.modified = c.edited = true; rsNotify(x, y, z); if (UI.screen) UI.renderScreen(); }
+}
+// generic per-tick work for tile entities that need it (hoppers, daylight sensors)
+function tileTick() {
+  const day = W.tickN % 20 === 0;
+  for (const c of W.chunks.values()) {
+    if (!c.tiles.size || c.noTicking) continue;
+    let any = false;
+    for (const [i, t] of c.tiles) {
+      if (t.type === 'hopper') { any = true; hopperTick(c, i, t); }
+      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
+    }
+    if (!any) c.noTicking = true; // re-armed by setTile
+  }
+}
+// arrows hitting a target block: signal by how close to the centre they land
+function targetHit(x, y, z, hx, hy, hz) {
+  const dx = hx - x - .5, dy = hy - y - .5, dz = hz - z - .5, d = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 2 > 0.999 ? Math.hypot(dx, dy, dz) : Math.hypot(dx, dy, dz));
+  const v = Math.max(1, Math.round(15 - d * 15 * 1.2));
+  setMeta(x, y, z, (getMeta(x, y, z) & ~15) | v); rsNotify(x, y, z); rsLater(x, y, z, 20);
 }

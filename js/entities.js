@@ -650,7 +650,7 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {

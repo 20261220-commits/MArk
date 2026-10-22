@@ -386,6 +386,7 @@ function interactBlock(t, dry) {
     case BID.barrel: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z, title: '통' }); play('door', { vol: 0.4 }); } return true;
     case BID.hopper: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 }); UI.openScreen('hopper', { x, y, z }); } return true;
     case BID.dispenser: case BID.dropper: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) }); UI.openScreen('dispenser', { x, y, z, title: BLOCKS[id].name }); } return true;
+    case BID.daylight_detector: if (!dry) { setMeta(x, y, z, m ^ 16); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'daylight' }); play('click'); } return true;
     case BID.oak_trapdoor: if (!dry) { setMeta(x, y, z, m ^ 4); play('door', { vol: 0.6 }); } return true;
     case BID.note_block: if (!dry) { const tile = getTile(x, y, z) || { type: 'note', n: 0 }; tile.n = ((tile.n || 0) + 1) % 25; setTile(x, y, z, tile); playNote(x, y, z, tile.n); } return true;
     case BID.comparator: if (!dry) { setMeta(x, y, z, m ^ 4); play('click', { pitch: 0.55 }); rsMark(x, y, z); } return true;
@@ -412,6 +413,7 @@ function trySleep(x, y, z) {
   if (ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - x) < 8 && Math.abs(e.y - y) < 5 && Math.abs(e.z - z) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
   PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0;
 }
+const BLAST_OK = id => { const k = ITEMS[id].key; return k.startsWith('raw_') || k.endsWith('_ore') || k.startsWith('iron_') || k.startsWith('golden_') || k === 'ancient_debris'; };
 function newFurnace(kind) { return { type: 'furnace', kind: kind || null, items: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 }; }
 // composter: compostable items raise the level; at 8 it yields bone meal
 const COMPOST = { wheat_seeds: 0.3, beetroot_seeds: 0.3, short_grass: 0.3, oak_leaves: 0.3, spruce_leaves: 0.3, birch_leaves: 0.3, jungle_leaves: 0.3, acacia_leaves: 0.3, dark_oak_leaves: 0.3, oak_sapling: 0.3, spruce_sapling: 0.3, birch_sapling: 0.3,
@@ -567,6 +569,7 @@ function placeBlock(t, d) {
   if (id === BID.barrel) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   if (id === BID.hopper) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 });
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
+  if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing();
@@ -594,7 +597,10 @@ function furnaceTick() {
     if (t.type !== 'furnace') continue;
     c.hasFurnace = true;
     const [inp, fuel, out] = t.items;
-    const r = inp && SMELT[inp.id];
+    let r = inp && SMELT[inp.id];
+    if (r && t.kind === 'blast' && !BLAST_OK(inp.id)) r = null;
+    if (r && t.kind === 'smoker' && !ITEMS[inp.id].food) r = null;
+    const cookT = t.kind ? 100 : 200;
     const canOut = r && (!out || (out.id === r[0] && out.n < maxStack(r[0])));
     const wasLit = t.burn > 0;
     if (t.burn > 0) t.burn--;
@@ -603,10 +609,10 @@ function furnaceTick() {
       if (fuel.n <= 0) t.items[1] = fuel.id === IID.lava_bucket ? { id: IID.bucket, n: 1 } : null;
       c.modified = c.edited = true;
     }
-    if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= 200) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
+    if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= cookT) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
     else if (t.cook > 0) t.cook = Math.max(0, t.cook - 2);
     const lit = t.burn > 0;
-    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); }
+    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
   }
 }
 

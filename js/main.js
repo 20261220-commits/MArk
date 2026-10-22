@@ -202,6 +202,7 @@ function gameTick() {
   entityTick();
   tickScheduled();
   rsTick();
+  tileTick();
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
   if (W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }

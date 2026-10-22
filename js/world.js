@@ -159,7 +159,7 @@ function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
 }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
-function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace') c.hasFurnace = true; }
+function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace') c.hasFurnace = true; c.noTicking = false; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern && id !== BID.soul_lantern && id !== BID.vine) || id === BID.glass || S.LEAF[id] || id === BID.stained_glass;
 function breakNaturally(x, y, z, b, m) {

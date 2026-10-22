@@ -125,13 +125,17 @@ UI.renderScreen = () => {
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
-    h = `<div class="panel"><div class="cap">상자</div><div class="grid9">${[...Array(27).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(27)}</div>`;
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(27).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(27)}</div>`;
   } else if (T === 'furnace') {
-    const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / 200;
-    h = `<div class="panel"><div class="cap">화로</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+    const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / (t.kind ? 100 : 200);
+    h = `<div class="panel"><div class="cap">${t.kind === 'blast' ? '용광로' : t.kind === 'smoker' ? '훈연기' : '화로'}</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'enchant') {
     const opts = enchantOptions();
     h = `<div class="panel"><div class="cap">마법 부여</div><div class="row top ench"><div class="col"><div class="row">${slotHtml(0)}${slotHtml(1, 'lapis')}</div><p class="tip">책장 ${opts.shelves}개</p></div><div class="eopts">${opts.list.map((o, i) => `<button class="eopt ${o.ok ? '' : 'off'}" data-ench="${i}"><span>${o.text}</span><b>${o.cost}</b><small>${i + 1} 청금석 · ${i + 1} 레벨</small></button>`).join('')}</div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
+  } else if (T === 'hopper') {
+    h = `<div class="panel"><div class="cap">호퍼</div><div class="row top hop">${[0, 1, 2, 3, 4].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
+  } else if (T === 'dispenser') {
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '발사기'}</div><div class="row top" style="justify-content:center"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div></div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'anvil') {
     const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
     h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
@@ -211,7 +215,7 @@ $('screen').addEventListener('pointermove', screenMouse);
 $('screen').addEventListener('pointerdown', e => { screenMouse(e); screenDown(e); });
 addEventListener('pointerup', e => { if (UI.screen) screenUp(e); });
 $('screen').addEventListener('contextmenu', e => e.preventDefault());
-setInterval(() => { if (UI.screen === 'furnace') UI.renderScreen(); }, 250);
+setInterval(() => { if (UI.screen === 'furnace' || UI.screen === 'hopper') UI.renderScreen(); }, 250);
 
 // ---------- menus ----------
 const SPLASHES = ['동굴과 절벽!', '구리도 산화돼요!', '자수정 정동 발견!', '100% 순수 자바스크립트!', '크롬북에서도 쌩쌩!', '염소가 들이받아요!', '망원경으로 멀리!', '크리퍼 조심!', '다이아몬드!', '블록 위의 블록!', '오프라인에서도 OK!', '눈가루에 빠지지 마세요!'];

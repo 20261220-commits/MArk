@@ -82,6 +82,7 @@ function play(name, opt = {}) {
     case 'growl': noiseHit(t, 1.6, 150, 0.6, 'lowpass', 0.9 * v, 0.5); tone(t, 1.4, 70, 45, 'sawtooth', 0.25 * v); break;
     case 'anvil': tone(t, 0.3, 1800, 1700, 'triangle', 0.15 * v); noiseHit(t, 0.08, 3000, 3, 'bandpass', 0.3 * v); break;
     case 'boat': noiseHit(t, 0.2, 900, 1, 'lowpass', 0.15 * v); break;
+    case 'note': { const f = 370 * (opt.pitch || 1) * (opt.inst === 'bass' ? 0.25 : 1); if (opt.inst === 'snare') noiseHit(t, 0.12, 2500, 1, 'highpass', 0.35 * v); else { tone(t, opt.inst === 'bass' ? 0.5 : 0.7, f, f, 'triangle', 0.25 * v); tone(t, 0.3, f * 2, f * 2, 'sine', 0.06 * v); } break; }
     case 'thunder': noiseHit(t, 2.5, 120, 0.4, 'lowpass', 1.0 * v, 0.3); break;
   }
 }

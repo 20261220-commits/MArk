@@ -28,9 +28,9 @@ function buildSlots(type, ctx) {
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));
     L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
     if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && st.id === BID.pumpkin), max: 1 }));
-  } else if (type === 'chest') {
+  } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
-    for (let i = 0; i < 27; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
   } else if (type === 'enchant') {
     ctx.items = ctx.items || [null, null];
     L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e), max: 1 }));
@@ -99,7 +99,7 @@ function quickMove(i) {
   const idx = f => GUI.slots.map((s, k) => f(s) ? k : -1).filter(k => k >= 0);
   if (g === 'main' || g === 'hot') {
     const d = ITEMS[st.id];
-    if (T === 'chest') targets = idx(s => s.group === 'cont');
+    if (T === 'chest' || T === 'hopper' || T === 'dispenser') targets = idx(s => s.group === 'cont');
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
     else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
@@ -121,7 +121,7 @@ function collectToCursor() {
   const c = INV.cursor; if (!c) return;
   for (const s of GUI.slots) { if (s.output) continue; const t = s.get(); if (t && same(t, c) && c.n < maxStack(c.id)) { const m = Math.min(t.n, maxStack(c.id) - c.n); c.n += m; t.n -= m; if (!t.n) s.set(null); } }
 }
-function afterClick() { UI.hudDirty = true; UI.renderScreen(); }
+function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
   if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;

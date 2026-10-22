@@ -1499,7 +1499,7 @@ function meshChunk(B, M, L, bio, opts) {
   const QU = new Uint16Array(8);
   // emits a quad; uvs given as [u0,v0,u1,v1] px within tile, rot 0..3
   const D6F = [3, 2, 5, 4, 1, 0]; // DIR6 index -> face index
-  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104;
+  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
     QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
@@ -1625,7 +1625,7 @@ function meshChunk(B, M, L, bio, opts) {
     const conn = [0, 0, 0, 0], up = [0, 0, 0, 0], above = OPQ[blk(x, y + 1, z)];
     DIRS.forEach(([dx, , dz], d) => {
       const n = blk(x + dx, y, z + dz);
-      if (isRS(n) && (n !== 128 || (((M[pidx(x + dx, y, z + dz)] & 3) & 1) === (d & 1)))) conn[d] = 1;
+      if (isRS(n) && ((n !== 128 && n !== 225) || (((M[pidx(x + dx, y, z + dz)] & 3) & 1) === (d & 1)))) conn[d] = 1;
       else if (!OPQ[n] && blk(x + dx, y - 1, z + dz) === 120) conn[d] = 1;
       else if (!above && blk(x + dx, y + 1, z + dz) === 120) { conn[d] = 1; up[d] = 1; }
     });
