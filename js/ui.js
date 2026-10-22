@@ -293,7 +293,7 @@ function runCommand(cmd) {
   if (!W.cheats && c !== 'help' && c !== 'seed') return err('이 세계에서는 명령어가 허용되지 않습니다');
   const num = (v, base) => v && v[0] === '~' ? base + (+(v.slice(1)) || 0) : +v;
   switch (c) {
-    case 'help': ok('/gamemode <survival|creative|spectator> · /time set <day|noon|night|midnight|숫자> · /weather <clear|rain> · /give <아이템> [개수] · /tp <x> <y> <z> · /summon <몹> · /kill · /seed · /difficulty <0-3> · /xp <양> · /spawnpoint · /clear · /keepinventory · /locate <village|stronghold|fortress>'); break;
+    case 'help': ok('/gamemode <survival|creative|spectator> · /time set <day|noon|night|midnight|숫자> · /weather <clear|rain> · /give <아이템> [개수] · /tp <x> <y> <z> · /summon <몹> · /kill · /seed · /difficulty <0-3> · /xp <양> · /spawnpoint · /clear · /keepinventory · /locate <village|stronghold|fortress|end_city>'); break;
     case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
     case 'time': { const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
     case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.rainTimer = 6000 + Math.random() * 12000; ok('날씨를 변경했습니다'); break;
@@ -306,7 +306,8 @@ function runCommand(cmd) {
       if (k === 'village' && W.dim === 0) { const G = S.makeGen(W.seed), rx = Math.floor((PL.x >> 4) / S.VREG), rz = Math.floor((PL.z >> 4) / S.VREG); for (let i = rx - 6; i <= rx + 6; i++) for (let j = rz - 6; j <= rz + 6; j++) { const v = S.villageAt(W.seed, G, i, j); if (v) near(v.x, v.z); } }
       else if (k === 'stronghold' && W.dim === 0) for (const p of S.strongholdsOf(W.seed)) near(p[0], p[2]);
       else if ((k === 'fortress' || k === 'nether_fortress') && W.dim === -1) { const rx = Math.floor((PL.x >> 4) / S.FREG), rz = Math.floor((PL.z >> 4) / S.FREG); for (let i = rx - 4; i <= rx + 4; i++) for (let j = rz - 4; j <= rz + 4; j++) { const f = S.fortressAt(W.seed, i, j); if (f) near(f.x, f.z); } }
-      else return err('village, stronghold (오버월드), fortress (네더) 중 하나를 입력하세요');
+      else if (k === 'end_city' && W.dim === 1) { const nA = S.makeNoise(W.seed + 201), nB = S.makeNoise(W.seed + 202), rx = Math.floor((PL.x >> 4) / 20), rz = Math.floor((PL.z >> 4) / 20); for (let i = rx - 5; i <= rx + 5; i++) for (let j = rz - 5; j <= rz + 5; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c) near(c.x, c.z); } }
+      else return err('village, stronghold (오버월드), fortress (네더), end_city (엔드) 중 하나를 입력하세요');
       if (!best) return err('가까운 구조물을 찾지 못했습니다');
       ok(`가장 가까운 ${k}: ${best[0]}, ~, ${best[1]} (${Math.round(best[2])}블록 거리)`); break;
     }

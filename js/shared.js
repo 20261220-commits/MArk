@@ -460,7 +460,7 @@ function shapes(id, meta) {
     case 134: return [[0, 0, 0, 16, 15, 16]];
     case 156: return [(meta & 1) ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10]];
     case 167: return meta & 4 ? [[0, 0, 0, 16, 13, 16], [4, 13, 4, 12, 16, 12]] : [[0, 0, 0, 16, 13, 16]];
-    case 168: return [[0, 0, 0, 16, 12, 16]];
+    case 168: return meta & 1 ? [[0, 0, 0, 16, 16, 16]] : [[0, 0, 0, 16, 12, 16]]; // meta 1: end gateway
     case 170: return [[6, 15, 6, 10, 16, 10], [4, 14, 4, 12, 15, 12], [3, 13, 3, 13, 14, 13], [2, 11, 2, 14, 13, 14], [1, 8, 1, 15, 11, 15], [2, 3, 2, 14, 8, 14], [3, 1, 3, 13, 3, 13], [5, 0, 5, 11, 1, 11]];
     case 118: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]]; // glow lichen: attached face
   }
@@ -702,6 +702,7 @@ const LOOT = {
   smith: [['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
   house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0]],
   stronghold: [['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
+  end_city: [['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
   fortress: [['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
 function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
@@ -1012,6 +1013,39 @@ function genNether(seed, cx, cz) {
 // ---------- the End ----------
 const END_PILLARS = (() => { const out = []; for (let i = 0; i < 10; i++) { const a = 2 * (-Math.PI + Math.PI / 10 * i); out.push([Math.floor(42 * Math.cos(a)), Math.floor(42 * Math.sin(a)), 2 + ((i * 7) % 10) / 3 | 0, 76 + ((i * 7) % 10) * 3, ((i * 7) % 10) < 2]); } return out; })();
 const END_PORTAL_Y = 63;
+const endIslandTop = (nA, nB, wx, wz) => { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; return v > 0.5 ? 58 + Math.floor((v - 0.5) / 0.5 * 12) : -1; };
+function endCityAt(seed, a, b, nA, nB) {
+  const r = rng(hash32(seed, a, b, 63)); if (r() > 0.55) return null;
+  const x = (a * 20 + 3 + r.int(14)) * 16 + 8, z = (b * 20 + 3 + r.int(14)) * 16 + 8;
+  if (Math.hypot(x, z) < 900) return null;
+  const top = endIslandTop(nA, nB, x, z); if (top < 60) return null;
+  return { x, z, y: top + 1, h: 18 + r.int(8) };
+}
+function stampEndCity(c, st, R, tiles) {
+  const P = 213, PIL = 214, ROD = 215, SLAB = 250, tileAt = (x, y, z) => ((y << 8) | ((z & 15) << 4) | (x & 15));
+  const { x: cx, y: by, z: cz, h } = c;
+  for (let x = cx - 4; x <= cx + 4; x++) for (let z = cz - 4; z <= cz + 4; z++) for (let y = by; y <= by + h; y++) {
+    const edge = Math.abs(x - cx) === 4 || Math.abs(z - cz) === 4, corner = Math.abs(x - cx) === 4 && Math.abs(z - cz) === 4, floor = (y - by) % 6 === 0;
+    let id = 0, m = 0;
+    if (corner) id = PIL; else if (edge) { id = P; if ((y - by) % 6 === 3 && (Math.abs(x - cx) === 1 || Math.abs(z - cz) === 1 || x === cx || z === cz)) id = 0; } else if (floor) id = P;
+    if (y === by + h) { id = edge ? SLAB : P; m = edge ? 14 << 1 : 0; }
+    st(x, y, z, id, m);
+  }
+  for (let y = by + 1; y < by + h; y += 6) { for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) st(cx + dx, y + 4, cz + dz, ROD, 1); for (let k = 0; k < 5; k++) st(cx + (k % 2 ? 1 : -1) * (k > 2 ? 2 : 1), y + k, cz + k - 2, P); }
+  for (let y = by + 1; y < by + h; y++) st(cx, y, cz - 3, 97, 2); // ladder up the inside
+  for (let f = 1; f < h; f += 6) if (st.get(cx + 2, by + f, cz + 2) >= 0) tiles.push({ t: 'mob', i: tileAt(cx + 2, by + f, cz + 2), mob: 'shulker' });
+  if (st.get(cx, by + h + 1, cz) >= 0) tiles.push({ t: 'mob', i: tileAt(cx, by + h + 1, cz), mob: 'shulker' });
+  st(cx - 2, by + 1, cz + 2, 44, 2); if (st.get(cx - 2, by + 1, cz + 2) >= 0) tiles.push({ t: 'chest', i: tileAt(cx - 2, by + 1, cz + 2), loot: rollLoot(R, 'end_city', 6) });
+  // the ship: a purpur hull floating beside the tower top
+  const sx = cx + 12, sy = by + h + 4, sz = cz;
+  for (let x = sx - 6; x <= sx + 6; x++) { const w = x === sx - 6 || x === sx + 6 ? 1 : 2; for (let z = sz - w; z <= sz + w; z++) { st(x, sy, z, P); if (Math.abs(z - sz) === w) st(x, sy + 1, z, P); } st(x, sy - 1, sz, 49); }
+  for (let y = sy + 1; y <= sy + 7; y++) st(sx, y, sz, 49);
+  st(sx - 4, sy + 1, sz, ROD, 1); st(sx + 4, sy + 1, sz, ROD, 1);
+  st(sx + 3, sy + 1, sz, 44, 3);
+  if (st.get(sx + 3, sy + 1, sz) >= 0) { const loot = rollLoot(R, 'end_city', 5).filter(l => l[0] !== 13); loot.push([13, 'elytra', 1]); tiles.push({ t: 'chest', i: tileAt(sx + 3, sy + 1, sz), loot }); tiles.push({ t: 'mob', i: tileAt(sx - 2, sy + 1, sz), mob: 'shulker' }); }
+  // a bridge from the tower roof to the ship
+  for (let x = cx + 5; x < sx - 6; x++) { const y = by + h + Math.round((x - cx - 5) / (sx - 6 - cx - 5) * 4); st(x, y, sz, P); st(x, y, sz - 1, P); }
+}
 function genEnd(seed, cx, cz) {
   const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256).fill(18), tiles = [];
   const nA = makeNoise(seed + 201), nB = makeNoise(seed + 202);
@@ -1024,7 +1058,18 @@ function genEnd(seed, cx, cz) {
     else if (d > 700) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
     for (let y = Math.max(1, bot); y <= top; y++) blocks[I(x, y, z)] = 166;
   }
-  const st = makeStamp(blocks, meta, x0, z0);
+  const st = makeStamp(blocks, meta, x0, z0), R = rng(hash32(seed, cx, cz, 61));
+  // chorus plants on the outer islands
+  if (Math.hypot(x0, z0) > 700) for (let k = 0; k < 2; k++) {
+    const x = 2 + R.int(12), z = 2 + R.int(12); let y = 120; while (y > 1 && blocks[I(x, y, z)] !== 166) y--;
+    if (y > 1 && R() < 0.5) { const h = 3 + R.int(5); for (let j = 1; j < h; j++) blocks[I(x, y + j, z)] = 216; blocks[I(x, y + h, z)] = 217; if (R() < 0.6) { const dx = R() < 0.5 ? 1 : -1; if (x + dx > 0 && x + dx < 15) { blocks[I(x + dx, y + 2, z)] = 216; blocks[I(x + dx, y + 3, z)] = 217; } } }
+  }
+  // end cities: a purpur tower with shulkers and a floating ship carrying elytra
+  const ECR = 20, erx = Math.floor(cx / ECR), erz = Math.floor(cz / ECR);
+  for (let a = erx - 1; a <= erx + 1; a++) for (let b = erz - 1; b <= erz + 1; b++) {
+    const c = endCityAt(seed, a, b, nA, nB); if (!c || !st.inside(c.x - 6, c.z - 6, c.x + 26, c.z + 6)) continue;
+    stampEndCity(c, st, rng(hash32(seed, a, b, 62)), tiles);
+  }
   // obsidian pillars with crystals (and iron-bar cages on the two smallest)
   for (const [px, pz, rad, h, cage] of END_PILLARS) {
     if (!st.inside(px - rad - 2, pz - rad - 2, px + rad + 2, pz + rad + 2)) continue;
@@ -1753,7 +1798,7 @@ function meshChunk(B, M, L, bio, opts) {
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, tileFor,
-  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {

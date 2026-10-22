@@ -436,6 +436,10 @@ function dragonDefeated(e) {
   const y = S.END_PORTAL_Y;
   for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) { const d2 = x * x + z * z; if (d2 <= 6 && (x || z)) setBlock(x, y, z, BID.end_portal, 0, { noUpdate: true }); }
   setBlock(0, y + 4, 0, BID.dragon_egg, 0, { noUpdate: true });
+  // an end gateway to the outer islands
+  const ga = Math.random() * Math.PI * 2, gx = Math.round(Math.cos(ga) * 96), gz = Math.round(Math.sin(ga) * 96);
+  for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
+  setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true });
   W.meta.dragonKilled = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
   play('levelup');
 }

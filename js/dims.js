@@ -23,6 +23,12 @@ function arriveDim() {
     const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
     if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
     PL.y = y + 1;
+  } else if (a === 'gateway' || a === 'gatehome') {
+    const x0 = Math.floor(PL.x), z0 = Math.floor(PL.z); let best = null;
+    for (let r = 0; r <= 24 && !best; r += 2) for (let dx = -r; dx <= r && !best; dx += 2) for (let dz = -r; dz <= r && !best; dz += 2) { const t = topY(x0 + dx, z0 + dz); if (t > 30 && getBlock(x0 + dx, t, z0 + dz) === BID.end_stone) best = [x0 + dx, t + 1, z0 + dz]; }
+    if (!best) { best = [x0, 71, z0]; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) setBlock(x0 + x, 70, z0 + z, BID.end_stone, 0, { noUpdate: true }); }
+    PL.x = best[0] + .5; PL.y = best[1]; PL.z = best[2] + .5;
+    if (a === 'gateway' && !hasGateway(best[0], best[1], best[2])) { const gy = best[1] + 3; setBlock(best[0] + 2, gy - 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy + 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy, best[2], BID.end_portal, 1, { noUpdate: true }); }
   } else if (a === 'portal') {
     const found = findPortalNear(Math.floor(PL.x), Math.floor(PL.z), W.dim === -1 ? 24 : 96);
     if (found) { PL.x = found[0] + .5; PL.y = found[1]; PL.z = found[2] + .5; }
@@ -66,7 +72,12 @@ function buildPortal(tx, ty, tz) {
 function portalTick() {
   if (PL.dead || spectator()) return;
   let inNether = false, inEnd = false;
-  inBlock(b => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) inEnd = true; });
+  let gate = null;
+  inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z]; else inEnd = true; } });
+  if (gate && !PL.portalLock) { // end gateway: main island <-> outer islands
+    const d = Math.hypot(gate[0], gate[1]) || 1, far = d > 500, k = far ? 100 / d : 1000 / d;
+    switchDim(1, gate[0] * k + 0.5, 90, gate[1] * k + 0.5, far ? 'gatehome' : 'gateway'); return;
+  }
   if (!inNether && !inEnd) PL.portalLock = false; // arriving in a portal: step out before it works again
   if (inEnd && !PL.portalLock) {
     if (W.dim === 1) { const sp = PL.spawn || W.worldSpawn; switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); chatMsg('엔드를 떠났습니다', '#aaaaaa'); }
@@ -86,3 +97,4 @@ function portalTick() {
 // fire burns out unless it sits on netherrack or magma
 RANDOM_TICK[BID.fire] = (x, y, z) => { const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
+function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }
