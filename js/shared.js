@@ -846,6 +846,7 @@ function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
   const pcx = ax + 5, pcz = az + 11, py = sy + 3;
   for (let x = pcx - 2; x <= pcx + 2; x++) for (let z = pcz - 2; z <= pcz + 2; z++) { st(x, py - 1, z, 90); const ex = Math.abs(x - pcx) === 2, ez = Math.abs(z - pcz) === 2; if (ex !== ez) st(x, py, z, 167, (ez ? (z < pcz ? 2 : 0) : (x < pcx ? 1 : 3)) | (r() < 0.1 ? 4 : 0)); }
   for (let x = pcx - 1; x <= pcx + 1; x++) for (let z = pcz - 1; z <= pcz + 1; z++) st(x, py - 1, z, 28);
+  st(ax + 5, sy + 1, az + 3, 108); if (st.get(ax + 5, sy + 1, az + 3) >= 0) tiles.push({ t: 'spawner', i: ((sy + 1) << 8) | (((az + 3) & 15) << 4) | ((ax + 5) & 15), mob: 'silverfish' });
   st(ax + 1, sy + 3, az + 1, 45, 0); st(ax + 9, sy + 3, az + 1, 45, 0); st(ax + 1, sy + 3, az + 14, 45, 0); st(ax + 9, sy + 3, az + 14, 45, 0);
   for (let y = sy + 1; y <= sy + 3; y++) st(sx, y, az, y === sy + 3 ? 90 : 0);
   // corridors leading away, with a library alcove, a prison cell and a chest room

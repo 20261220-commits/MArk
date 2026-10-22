@@ -304,7 +304,8 @@ function mcModelGeos(type, spec) {
 }
 function buildMCModel(type, spec, tex, opts = {}) {
   const geos = mcModelGeos(type, spec);
-  const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[spec.tex + '_e'] && packTexture(spec.tex + '_e');
+  const tk = opts.skin && PACKPX.ent[opts.skin] ? opts.skin : spec.tex;
+  const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[tk + '_e'] && packTexture(tk + '_e');
   const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
   const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
   const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
@@ -334,7 +335,7 @@ function mergeGeos(gs) {
 }
 function buildModel(type, opts = {}) {
   const spec = MCMODELS[type];
-  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer') : packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
+  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer') : packTexture(opts.skin || spec.tex) || packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
   const def = MOBDEF[type];
   if (!mobTex[type]) mobTex[type] = def.tex();
   const mat = new THREE.MeshBasicMaterial({ map: mobTex[type], vertexColors: true, alphaTest: 0.5 });
@@ -447,8 +448,10 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.sheared = !!opts.sheared; e.persistent = !d.hostile; e.idleSnd = 200 + Math.random() * 400; e.deathT = 0; e.jumpCd = 0;
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
+  if (opts.owner) { e.owner = opts.owner; e.persistent = true; } if (opts.sitting) e.sitting = 1;
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; }
-  e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof });
+  e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
+  e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5);
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
@@ -458,6 +461,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
   if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
   if (e.inv > 0) return false;
+  if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
   const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
@@ -677,12 +681,13 @@ function trySpawnHostile() {
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
     const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
+    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
     if (Math.max(sky, blk) > 7) continue;
     if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
     const types = ['zombie', 'skeleton', 'creeper', 'spider'];
-    const t = overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)];
+    const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
     if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
     const n = 1 + Math.floor(Math.random() * 2);
@@ -734,7 +739,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades } : null]);
+    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0 }]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     if (e === PL.riding) continue;
     removeEnt(e);
@@ -743,7 +748,7 @@ R.onChunkUnloaded = c => {
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
-  if (fresh) spawnAnimalsForChunk(c);
+  if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;
@@ -769,7 +774,8 @@ function entityRender(alpha, now) {
       for (const [n, s] of legs) if (P[n]) P[n].rotation.x = sw * s;
       if (P.rarm) { if (e.def.armsOut || (e.type === 'skeleton' && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
       if (P.head && e.target) { const hy = Math.atan2(-(PL.x - x), -(PL.z - z)) - yaw; P.head.rotation.y = ((hy + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.head.rotation.y = Math.max(-1, Math.min(1, P.head.rotation.y)); }
-      if (e.def.water) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
+      if (e.def.fish && P.tail) P.tail.rotation.y = Math.sin(now / 90 + e.id) * 0.6;
+      if (e.def.water && P.t0) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }
       if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; const b1 = P['leg' + i].userData.base, b2 = P['legl' + i].userData.base; P['leg' + i].rotation.y = (b1 ? b1.y : (i - 1.5) * 0.35) + s; P['legl' + i].rotation.y = (b2 ? b2.y : -(i - 1.5) * 0.35) - s; }
       if (e.def.anim) e.def.anim(e, P, now);

@@ -207,6 +207,8 @@ function gameTick() {
   furnaceTick();
   if (W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
   if (W.tickN % 40 === 0) ensureDragon();
+  if (W.tickN % 100 === 0) trySpawnStrider();
+  if (W.tickN % 200 === 50) trySpawnAmbient();
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
   if (W.tickN % 600 === 0) saveAll();
@@ -285,6 +287,7 @@ function frame(now) {
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
+  updateSkyBox();
   R.updateRain(dt, px, py, pz, W.dim ? 0 : W.rain);
   ambientParticles(dt, px, py, pz);
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;

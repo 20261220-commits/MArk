@@ -84,6 +84,7 @@ function hurtPlayer(dmg, cause, attacker) {
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
   PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
+  if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying (held anywhere in the hotbar: there is no off-hand)
     const k = INV.slots.findIndex((s, i) => i < 9 && s && s.id === IID.totem_of_undying);
@@ -208,6 +209,7 @@ function playerTick() {
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
     PL.vx *= fr; PL.vz *= fr;
   }
+  if (PL.levitate > 0) { PL.levitate--; PL.vy = Math.max(PL.vy, 0.06); PL.fallDist = 0; } // shulker bullets
   IN.jumpWas = IN.jump;
   if (USE.jumpCd > 0) USE.jumpCd--;
   if (!IN.jump) USE.jumpCd = 0;
@@ -297,6 +299,7 @@ function onAttackPress() {
 }
 function attackEntity(e) {
   if (e.kind !== 'mob') { if (e.onHit) e.onHit(e); PL.attackT = 0; return; }
+  PL.lastAttacked = e;
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0), as = tool ? tool.as : 4;
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
@@ -441,6 +444,7 @@ function useItem(first) {
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
+    if (e.kind === 'mob' && mobInteract(e, h, d)) return;
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }

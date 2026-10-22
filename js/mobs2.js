@@ -127,6 +127,7 @@ function fireballTick(e) {
 function spinRender(e, x, y, z, br, now) { e.mesh.position.set(x, y + e.h / 2, z); e.mesh.rotation.set(0, now / 200, now / 300); e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
 // thrown items: snowballs, eggs and ender pearls break on impact; eyes of ender fly toward a stronghold
 function onThrownHit(e, x, y, z, hitMob) {
+  if (e.thrown === IID.ender_pearl && Math.random() < 0.05) spawnMob('endermite', x, y, z);
   if (e.thrown === IID.ender_pearl && e.owner === PL && !PL.dead) {
     for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.5, grav: 0 });
     PL.x = x; PL.y = y + 0.05; PL.z = z; PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0;
@@ -195,6 +196,7 @@ function rideTick() {
 // ---------- spawning in each dimension ----------
 function mobsForDimension(x, y, z, b, below) {
   if (W.dim === -1) {
+    const ex = netherExtra(x, y, z); if (ex) return [ex];
     const bio = biomeAt(x, z);
     if (bio === S.NETHER_BIO.SOUL) return Math.random() < 0.7 ? ['skeleton'] : ['ghast'];
     if (bio === S.NETHER_BIO.BASALT) return Math.random() < 0.6 ? ['magma_cube'] : ['ghast'];
@@ -445,7 +447,7 @@ function ensureDragon() {
 const TRADES = {
   farmer: [[['wheat', 20], ['emerald', 1]], [['emerald', 1], ['bread', 6]], [['emerald', 1], ['apple', 4]], [['pumpkin', 6], ['emerald', 1]], [['emerald', 3], ['golden_apple', 1]], [['melon', 4], ['emerald', 1]]],
   librarian: [[['paper', 24], ['emerald', 1]], [['emerald', 9], ['bookshelf', 1]], [['book', 4], ['emerald', 1]], [['emerald', 1], ['lantern', 1]], [['emerald', 5], ['glass', 4]], [['emerald', 20], ['enchanted_book', 1]]],
-  armorer: [[['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
+  armorer: [[['emerald', 5], ['chainmail_chestplate', 1]], [['emerald', 3], ['chainmail_helmet', 1]], [['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
   toolsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 1], ['stone_axe', 1]], [['emerald', 1], ['stone_pickaxe', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 13], ['diamond_pickaxe', 1]]],
   weaponsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 3], ['iron_axe', 1]], [['emerald', 7], ['iron_sword', 1]], [['flint', 24], ['emerald', 1]], [['emerald', 13], ['diamond_sword', 1]]],
   butcher: [[['chicken', 14], ['emerald', 1]], [['porkchop', 7], ['emerald', 1]], [['emerald', 1], ['cooked_porkchop', 5]], [['emerald', 1], ['cooked_chicken', 8]], [['coal', 15], ['emerald', 1]]],
@@ -477,6 +479,7 @@ function mobExtraTick(e, dist) {
   const d = e.def;
   if (d.waterHurt && (e.inWater || (W.dim === 0 && W.rain > 0.5 && e.age % 20 === 0 && (getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15))) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   if (d.villager) villagerAIExtra(e);
+  swimAssist(e);
 }
 // slimes and magma cubes split when they die
 function slimeDeath(e) {

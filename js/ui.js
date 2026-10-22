@@ -351,6 +351,8 @@ const ADV = [
   ['end', '끝?', '엔드에 들어가세요', 'end_stone', {}],
   ['dragon', '엔드 해방', '엔더 드래곤을 물리치세요', 'dragon_egg', {}],
   ['trade', '좋은 거래!', '주민과 거래하세요', 'emerald', {}],
+  ['wolf', '최고의 친구', '늑대를 길들이세요', 'bone', {}],
+  ['elytra', '하늘은 무한대', '겉날개를 얻으세요', 'elytra', { item: 'elytra' }],
 ];
 const advQueue = [];
 UI.advance = key => {
