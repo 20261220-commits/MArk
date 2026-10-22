@@ -94,9 +94,12 @@ const TILE = {
   end_stone_bricks: 'end_stone_bricks', dragon_egg: 'dragon_egg', mossy_stone_bricks: 'mossy_stone_bricks', cracked_stone_bricks: 'cracked_stone_bricks', iron_bars: 'iron_bars',
   slime_block: 'slime_block',
 };
+// expansion tiles share the pack's names
+for (const t of 'jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3'.split(' ')) TILE[t] = t;
+TILE.soul_fire = 'soul_fire_0';
 for (let i = 0; i < 8; i++) TILE['wheat' + i] = 'wheat_stage' + i;
 const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
-const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1']);
+const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
 const ITEM = {};
 for (const k of ('stick coal charcoal iron_ingot gold_ingot iron_nugget gold_nugget diamond emerald lapis_lazuli redstone flint flint_and_steel string feather gunpowder bone ' +
@@ -109,7 +112,15 @@ for (const m of ['leather', 'iron', 'golden', 'diamond', 'netherite']) for (cons
 for (const k of ['torch', 'oak_sapling', 'spruce_sapling', 'birch_sapling', 'dandelion', 'poppy', 'cornflower', 'oxeye_daisy', 'dead_bush', 'ladder', 'cobweb',
   'brown_mushroom', 'red_mushroom', 'redstone_torch', 'lever', 'crimson_fungus', 'warped_fungus', 'crimson_roots', 'warped_roots', 'iron_bars']) ITEM[k] = 'block/' + k;
 ITEM.short_grass = 'block/grass'; ITEM.fern = 'block/fern';
-const ITEM_TINT = { leather_helmet: 0xa06540, leather_chestplate: 0xa06540, leather_leggings: 0xa06540, leather_boots: 0xa06540, short_grass: 0x7cbd6b, fern: 0x7cbd6b };
+for (const k of ('white_dye orange_dye magenta_dye light_blue_dye yellow_dye lime_dye pink_dye gray_dye light_gray_dye cyan_dye purple_dye blue_dye brown_dye green_dye red_dye black_dye ' +
+  'cookie pumpkin_pie carrot potato baked_potato poisonous_potato beetroot beetroot_seeds beetroot_soup golden_carrot cod cooked_cod salmon cooked_salmon dried_kelp ' +
+  'chainmail_helmet chainmail_chestplate chainmail_leggings chainmail_boots totem_of_undying experience_bottle spider_eye prismarine_shard prismarine_crystals shulker_shell ' +
+  'chorus_fruit popped_chorus_fruit elytra fishing_rod fishing_rod_cast cocoa_beans enchanted_book spruce_boat birch_boat jungle_boat acacia_boat dark_oak_boat ' +
+  'chain soul_lantern nether_sprouts hopper comparator glass_bottle honey_bottle sweet_berries melon_seeds pumpkin_seeds rabbit_hide lead nether_star').split(' ')) ITEM[k] = 'item/' + k;
+ITEM.clock = 'item/clock_00'; ITEM.compass = 'item/compass_16';
+for (const k of ['jungle_sapling', 'acacia_sapling', 'dark_oak_sapling', 'allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'lily_of_the_valley', 'blue_orchid', 'wither_rose',
+  'lily_pad', 'vine', 'soul_torch', 'end_rod', 'oak_trapdoor']) ITEM[k] = 'block/' + k;
+const ITEM_TINT = { lily_pad: 0x208030, vine: 0x48b518, leather_helmet: 0xa06540, leather_chestplate: 0xa06540, leather_leggings: 0xa06540, leather_boots: 0xa06540, short_grass: 0x7cbd6b, fern: 0x7cbd6b };
 const ENT = {
   zombie: 'entity/zombie/zombie', skeleton: 'entity/skeleton/skeleton', creeper: 'entity/creeper/creeper', spider: 'entity/spider/spider', pig: 'entity/pig/pig',
   cow: 'entity/cow/cow', sheep: 'entity/sheep/sheep', sheep_fur: 'entity/sheep/sheep_fur', chicken: 'entity/chicken', squid: 'entity/squid', steve: 'entity/steve',
@@ -118,6 +129,20 @@ const ENT = {
   magma_cube: 'entity/slime/magmacube', slime: 'entity/slime/slime', dragon: 'entity/enderdragon/dragon', dragon_eyes: 'entity/enderdragon/dragon_eyes',
   end_crystal: 'entity/end_crystal/end_crystal', boat: 'entity/boat/oak', chest: 'entity/chest/normal', bed: 'entity/bed/red', xp_orb: 'entity/experience_orb',
 };
+Object.assign(ENT, {
+  husk: 'entity/zombie/husk', drowned: 'entity/zombie/drowned', drowned_outer: 'entity/zombie/drowned_outer_layer', stray: 'entity/skeleton/stray', stray_overlay: 'entity/skeleton/stray_overlay',
+  wither_skeleton: 'entity/skeleton/wither_skeleton', wither_skeleton_e: 'entity/skeleton/wither_skeleton_e', piglin: 'entity/piglin/piglin', hoglin: 'entity/hoglin/hoglin', hoglin_e: 'entity/hoglin/hoglin_e',
+  zoglin: 'entity/hoglin/zoglin', zoglin_e: 'entity/hoglin/zoglin_e', strider: 'entity/strider/strider', strider_e: 'entity/strider/strider_e', strider_cold: 'entity/strider/strider_cold',
+  shulker: 'entity/shulker/shulker', shulker_e: 'entity/shulker/shulker_e', silverfish: 'entity/silverfish', endermite: 'entity/endermite', endermite_e: 'entity/endermite_e',
+  wolf: 'entity/wolf/wolf', wolf_tame: 'entity/wolf/wolf_tame', wolf_angry: 'entity/wolf/wolf_angry', wolf_angry_e: 'entity/wolf/wolf_angry_e', wolf_collar: 'entity/wolf/wolf_collar',
+  bat: 'entity/bat', cod: 'entity/fish/cod', salmon: 'entity/fish/salmon', creeper_e: 'entity/creeper/creeper_e', iron_golem_e: 'entity/iron_golem/iron_golem_e',
+  ghast_shooting_e: 'entity/ghast/ghast_shooting_e', shulker_bullet: 'entity/shulker/spark',
+  boat_spruce: 'entity/boat/spruce', boat_birch: 'entity/boat/birch', boat_jungle: 'entity/boat/jungle', boat_acacia: 'entity/boat/acacia', boat_dark_oak: 'entity/boat/dark_oak',
+});
+// OptiFine random entity skins and their emissive layers (optifine/random/entity/...)
+for (const f of ['skeleton/skeleton2', 'skeleton/skeleton3', 'skeleton/skeleton4', 'skeleton/stray2', 'skeleton/wither_skeleton2', 'skeleton/wither_skeleton3', 'zombie/zombie12', 'zombie/zombie13',
+  'zombie/husk2', 'zombie/husk3', 'zombie/husk4', 'zombie/drowned3', 'zombie/drowned4', 'creeper/creeper2', 'creeper/creeper3', 'cow/cow2'])
+  for (const e of ['', '_e']) ENT['r_' + f.split('/')[1] + e] = '../optifine/random/entity/' + f + e;
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
@@ -128,7 +153,7 @@ const allFiles = () => [...Object.values(TILE).map(f => 'block/' + f), ...Object
 if (fromIdx > 0) {
   const src = path.join(process.argv[fromIdx + 1], 'assets', 'minecraft', 'textures');
   let n = 0;
-  for (const f of new Set(allFiles())) { const s = path.join(src, f + '.png'); if (!fs.existsSync(s)) { console.warn('missing', f); continue; } const d = path.join(ASSET, f + '.png'); fs.mkdirSync(path.dirname(d), { recursive: true }); fs.copyFileSync(s, d); n++; }
+  for (const f of new Set([...allFiles(), '../optifine/sky/world0/nightbox'])) { const s = path.join(src, f + '.png'); if (!fs.existsSync(s)) { console.warn('missing', f); continue; } const d = path.join(ASSET, f + '.png'); fs.mkdirSync(path.dirname(d), { recursive: true }); fs.copyFileSync(s, d); n++; }
   console.log('copied', n, 'textures');
 }
 const load = f => { const p = path.join(ASSET, f + '.png'); return fs.existsSync(p) ? decodePNG(fs.readFileSync(p)) : null; };
@@ -181,6 +206,10 @@ for (const [k, f] of Object.entries(ITEM)) {
   out.items[k] = put(px);
 }
 for (const [k, f] of Object.entries(ENT)) { if (k === 'chest' || k === 'bed') continue; const img = load(f); if (img) out.ent[k] = [put(new Uint8Array(img.px)), img.w, img.h]; }
+{ // OptiFine custom night sky (optifine/sky/world0/nightbox.png), box-filtered to 128px faces
+  const sk = load('../optifine/sky/world0/nightbox');
+  if (sk) { const f = 4, w = sk.w / f, h = sk.h / f, px = new Uint8Array(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let a = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) a += sk.px[((y * f + j) * sk.w + x * f + i) * 4 + c]; px[(y * w + x) * 4 + c] = a / (f * f); } out.sky = [put(px), w, h]; }
+}
 const gz = zlib.gzipSync(Buffer.concat(chunks), { level: 9 });
 const js = `// Generated by tools/pack.js from Pixel Perfection CE (CC BY-SA 4.0, XSSheep and contributors). Do not edit.\n` +
   `const PACK = ${JSON.stringify(out)};\nPACK.data = '${gz.toString('base64')}';\n`;

@@ -114,7 +114,8 @@ UI.closeScreen = () => {
   if (UI.screen === 'chest') play('door', { vol: 0.5 });
   closeScreenItems(); UI.screen = null; $('screen').hidden = true; $('tooltip').hidden = true; UI.hudDirty = true; grabLock();
 };
-const ALL_ITEMS = () => ITEMS.filter(d => d && d.key !== 'name_tag' && d.key !== 'saddle').map(d => d.id);
+// creative list: colour/material variants sit right after their base block
+const ALL_ITEMS = () => ITEMS.filter(d => d && d.key !== 'name_tag' && d.key !== 'saddle').map(d => [d.id, d.block && d.place != null ? d.place * 32 + (d.vi || 0) : 1e6 + d.id]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
 UI.renderScreen = () => {
   if (!UI.screen) return;
   const T = UI.screen, el = $('screen');
@@ -161,7 +162,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : st && st.e && id === IID.book ? '마법이 부여된 책' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();

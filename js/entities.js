@@ -140,7 +140,7 @@ const MOBDEF = {
     tex: () => mobCanvas(g => { const r = r4(); const cr = () => pal(r, [hex(0x4fbf3a), hex(0x3d9a2c), hex(0x6fd05a), hex(0x2e7a22), hex(0x8cd87a)]);
       paintBox(g, 0, 0, 8, 8, 8, cr, r, .05, { front: (g, x, y) => { px(g, x + 1, y + 2, '#000', 2, 2); px(g, x + 5, y + 2, '#000', 2, 2); px(g, x + 3, y + 4, '#000', 2, 3); px(g, x + 2, y + 5, '#000', 1, 3); px(g, x + 5, y + 5, '#000', 1, 3); } });
       paintBox(g, 16, 16, 8, 12, 4, cr, r, .05); paintBox(g, 0, 16, 4, 6, 4, cr, r, .05); }) },
-  spider: { hp: 16, w: 0.7, h: 0.9, speed: 0.16, hostile: 1, dmg: 2, climb: 1, neutralDay: 1, xp: 5, snd: 'spider', drops: [['string', 0, 2]],
+  spider: { hp: 16, w: 0.7, h: 0.9, speed: 0.16, hostile: 1, dmg: 2, climb: 1, neutralDay: 1, xp: 5, snd: 'spider', drops: [['string', 0, 2], ['spider_eye', 0, 1]],
     parts: [['body', [0, 9, 3], [-5, -4, 0, 10, 8, 12], [0, 12]], ['neck', [0, 9, 0], [-3, -3, -3, 6, 6, 6], [0, 0]], ['head', [0, 9, -3], [-4, -4, -8, 8, 8, 8], [32, 4]],
       ...[0, 1, 2, 3].flatMap(i => [['leg' + i, [3, 9, -1 + i], [0, -1, -1, 16, 2, 2], [18, 0]], ['legl' + i, [-3, 9, -1 + i], [-16, -1, -1, 16, 2, 2], [18, 0]]])],
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 12, 10, 8, 12, () => hex(0x3a332e), r, .2); paintBox(g, 0, 0, 6, 6, 6, () => hex(0x2e2824), r, .2);
@@ -379,9 +379,9 @@ function spawnXP(x, y, z, amt) {
   }
 }
 // ---------- falling blocks & TNT ----------
-W.onFall = (x, y, z, id) => {
-  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.w = 0.49; e.h = 0.98;
-  e.mesh = new THREE.Mesh(R.blockGeometry(id), R.blockMaterial()); addEnt(e);
+W.onFall = (x, y, z, id, meta = 0) => {
+  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.bmeta = meta; e.w = 0.49; e.h = 0.98;
+  e.mesh = new THREE.Mesh(R.blockGeometry(itemOfBlock(id, meta)), R.blockMaterial()); addEnt(e);
 };
 function primeTNT(x, y, z, fuse = 80) {
   const e = Ent('tnt', x + .5, y, z + .5); e.kind = 'tnt'; e.fuse = fuse; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = (Math.random() - .5) * 0.04; e.vz = (Math.random() - .5) * 0.04;
@@ -631,7 +631,7 @@ function entityTick() {
       if (e.onGround || e.age > 600) {
         const bx = Math.floor(e.x), by = Math.floor(e.y + 0.5), bz = Math.floor(e.z), cur = getBlock(bx, by, bz);
         removeEnt(e);
-        if (cur === 0 || (REPL[cur])) setBlock(bx, by, bz, e.block); else dropItem(e.x, e.y + .5, e.z, e.block, 1);
+        if (cur === 0 || (REPL[cur])) setBlock(bx, by, bz, e.block, e.bmeta || 0); else dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, e.bmeta || 0), 1);
       }
       // suffocate/hit player
       if (!PL.dead && Math.abs(PL.x - e.x) < 0.8 && Math.abs(PL.z - e.z) < 0.8 && e.y > PL.y && e.y < PL.y + 1.8 && e.vy < -0.2) {}
@@ -735,7 +735,7 @@ R.onChunkUnloaded = c => {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
     if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades } : null]);
-    else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw }]);
+    else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     if (e === PL.riding) continue;
     removeEnt(e);
   }
@@ -748,7 +748,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
 };
 
 // ---------- render update (interpolated) ----------

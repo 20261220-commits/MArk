@@ -134,6 +134,7 @@ function onThrownHit(e, x, y, z, hitMob) {
   }
   if (hitMob) { if (e.thrown === IID.snowball) hurtMob(hitMob, hitMob.type === 'blaze' ? 3 : 0.001, e.owner === PL ? PL : null, e.vx, e.vz); else if (e.thrown === IID.egg) hurtMob(hitMob, 0.001, null, e.vx, e.vz); }
   if (e.thrown === IID.egg && Math.random() < 0.125) spawnMob('chicken', x, y, z, { baby: true });
+  if (e.thrown === IID.experience_bottle) { spawnXP(x, y + 0.3, z, 3 + Math.floor(Math.random() * 9)); play('break', { mat: 'glass' }); for (let i = 0; i < 10; i++) R.simpleParticle(x, y + 0.3, z, [0.4, 0.5, 1], { size: 0.1, vy: 1 }); }
   for (let i = 0; i < 6; i++) R.simpleParticle(x, y, z, e.thrown === IID.snowball ? [1, 1, 1] : [0.9, 0.85, 0.7], { size: 0.1, vy: 1 });
 }
 function throwEye() {
@@ -151,11 +152,12 @@ function eyeTick(e) {
   if (e.age > 80) { removeEnt(e); if (Math.random() < 0.8) dropItem(e.x, e.y, e.z, IID.ender_eye, 1); else play('break', { mat: 'glass' }); }
 }
 // ---------- boats ----------
-function placeBoat(x, y, z, yaw) {
-  const e = Ent('boat', x, y, z); e.kind = 'boat'; e.w = 0.69; e.h = 0.56; e.hittable = true; e.yaw = yaw; e.hp = 4;
-  e.mesh = buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
+function placeBoat(x, y, z, yaw, wood) {
+  const e = Ent('boat', x, y, z); e.kind = 'boat'; e.w = 0.69; e.h = 0.56; e.hittable = true; e.yaw = yaw; e.hp = 4; e.wood = wood || 'oak';
+  const tex = e.wood !== 'oak' && packTexture('boat_' + e.wood);
+  e.mesh = tex ? buildMCModel('boat', MCMODELS.boat, tex) : buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
 }
-function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID.oak_boat, 1); } }
+function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
 function mount(e) { if (e.rider) return; PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
 function dismount() {
   const e = PL.riding; PL.riding = null; if (!e) return; e.rider = null;
@@ -460,7 +462,7 @@ function villagerOffers(e) {
   if (!e.trades) {
     const pool = TRADES[e.prof] || TRADES.farmer, r = S.rng(e.id * 7919 + 13), picked = [];
     const idx = pool.map((_, i) => i).sort(() => r() - 0.5).slice(0, Math.min(pool.length, 4 + r.int(2)));
-    for (const i of idx) { const [[a, an], [b, bn]] = pool[i]; if (IID[a] == null || (IID[b] == null && b !== 'enchanted_book')) continue; picked.push({ a: IID[a], an, b: b === 'enchanted_book' ? IID.book : IID[b], bn, ench: b === 'enchanted_book', uses: 0, max: 12 }); }
+    for (const i of idx) { const [[a, an], [b, bn]] = pool[i]; if (IID[a] == null || IID[b] == null) continue; picked.push({ a: IID[a], an, b: IID[b], bn, ench: b === 'enchanted_book', uses: 0, max: 12 }); }
     e.trades = picked;
   }
   return e.trades;

@@ -149,14 +149,19 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!opts.noUpdate) {
     neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz);
     if ((BLOCKS[old] && BLOCKS[old].rs) || (BLOCKS[id] && BLOCKS[id].rs)) rsNotify(x, y, z);
+    observerCheck(x, y, z);
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+// an observer facing (x,y,z) fires a short pulse whenever that block changes
+function observerCheck(x, y, z) {
+  for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
+}
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
 function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace') c.hasFurnace = true; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
-const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern) || id === BID.glass || (id >= 22 && id <= 24);
+const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern && id !== BID.soul_lantern && id !== BID.vine) || id === BID.glass || S.LEAF[id] || id === BID.stained_glass;
 function breakNaturally(x, y, z, b, m) {
   setBlock(x, y, z, 0, 0);
   if (W.onDrop) { const d = blockDrops(b, m, null); W.onDrop(x, y, z, d.items, 0); }
@@ -175,23 +180,27 @@ function neighborUpdate(x, y, z) {
     else if (d.plant === 4) { ok = (below === b || below === 9) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
     else if (d.plant === 5) ok = below === BID.farmland;
     else if (d.plant === 6) ok = OPQ[below];
+    else if (d.plant === 7) ok = OPQ[below] || below === BID.soul_sand;
+    else if (d.plant === 8) ok = below === BID.soul_sand;
+    else if (d.plant === 9) ok = below === 27;
     if (!ok) breakNaturally(x, y, z, b, m);
     return;
   }
-  if (b === BID.torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!OPQ[sup] && !(m === 0 && supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.torch || b === BID.soul_torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!OPQ[sup] && !(m === 0 && supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.ladder) { const f = m & 3; if (!OPQ[getBlock(x + DIRS[f][0], y, z + DIRS[f][2])]) breakNaturally(x, y, z, b, m); return; }
-  if (b === BID.snow) { if (!OPQ[below] && !(below >= 22 && below <= 24)) setBlock(x, y, z, 0); return; }
-  if (b === BID.oak_door) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.snow) { if (!OPQ[below] && !S.LEAF[below]) setBlock(x, y, z, 0); return; }
+  if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.red_bed) { const f = m & 3, dir = DIRS[f], s = (m & 4) ? -1 : 1; if (getBlock(x + dir[0] * s, y, z + dir[2] * s) !== b) setBlock(x, y, z, 0); return; }
   if (b === BID.farmland && SOLID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] === RT.CUBE) { setBlock(x, y, z, 3); return; }
   if (b === BID.amethyst_cluster || b === BID.pointed_dripstone) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
-  if (b === BID.glow_lichen) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
-  if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.concrete_powder) { if (N6.some(([dx, dy, dz]) => dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27)) setBlock(x, y, z, BID.concrete, m); else if (below === 0 || FLUID[below] || REPL[below]) schedule(x, y, z, 2); return; }
+  if (b === BID.glow_lichen || b === BID.vine) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
+  if (b === BID.lantern || b === BID.soul_lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (b === BID.nether_portal) { if (!portalIntact(x, y, z)) setBlock(x, y, z, 0); return; }
   if (b === BID.fire) { if (!SOLID[below]) setBlock(x, y, z, 0); return; }
   if (d.connect) updateConnections(x, y, z, b);
-  if (d.rs || b === BID.oak_door || b === BID.tnt) {
+  if (d.rs || S.DOOR[b] || b === BID.tnt || b === BID.oak_trapdoor) {
     if (d.rs === 'torch' || d.rs === 'lever' || d.rs === 'button') { const a = d.rs === 'torch' ? torchAttach(x, y, z, m) : switchAttach(x, y, z, m); if (!SOLID[getBlock(a[0], a[1], a[2])] && !(d.rs === 'torch' && m === 0 && supportedBy(getBlock(a[0], a[1], a[2])))) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; } }
     else if ((d.rs === 'wire' || d.rs === 'repeater' || d.rs === 'plate') && !supportedBy(below)) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; }
     else if (d.rs === 'head') { const f = m & 7, bk = S.DIR6[f]; const base = getBlock(x - bk[0], y - bk[1], z - bk[2]); if (base !== BID.piston && base !== BID.sticky_piston) { setBlock(x, y, z, 0); return; } }
@@ -206,9 +215,9 @@ function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
   [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
     const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass)) || (kind === 1 && n === BID.oak_door)) m |= 1 << i;
+    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass || n === BID.stained_glass || (nd && nd.connect === 2)))) m |= 1 << i;
   });
-  setMeta(x, y, z, m);
+  setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
 }
 // ---------- fluids ----------
 function fluidUpdate(x, y, z) {
@@ -267,7 +276,7 @@ function fluidUpdate(x, y, z) {
 }
 function fallCheck(x, y, z, b) {
   const below = getBlock(x, y - 1, z);
-  if (y > 0 && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b); }
+  if (y > 0 && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { const m = getMeta(x, y, z); setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); }
 }
 function tickScheduled() {
   W.tickN++;
@@ -312,14 +321,16 @@ const grow = (x, y, z, b, m) => {
   if (m < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, m + 1);
 };
 RANDOM_TICK[BID.wheat] = grow;
-for (const [sap, type] of [[BID.oak_sapling, 0], [BID.birch_sapling, 2], [BID.spruce_sapling, 3]]) RANDOM_TICK[sap] = (x, y, z, b, m) => {
+// carrots / potatoes / beetroots share one block: type in meta bits 3-4, age in bits 0-2
+RANDOM_TICK[BID.crops2] = (x, y, z, b, m) => { if (lightLevelAbove(x, y - 1, z) < 9) return; const age = m & 7, wet = (getMeta(x, y - 1, z) & 7) > 0; if (age < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, (m & ~7) | (age + 1)); };
+for (const [sap, type] of [[BID.oak_sapling, 0], [BID.birch_sapling, 2], [BID.spruce_sapling, 3], [BID.jungle_sapling, 4], [BID.acacia_sapling, 5], [BID.dark_oak_sapling, 6]]) RANDOM_TICK[sap] = (x, y, z, b, m) => {
   if (lightLevelAbove(x, y - 1, z) < 9 || Math.random() > 1 / 7) return;
   if (!m) { setMeta(x, y, z, 1); return; }
   growTreeAt(x, y, z, type);
 };
 function growTreeAt(x, y, z, type) {
-  const h = type === 3 ? 10 : 7;
-  for (let k = 1; k <= h; k++) { const t = getBlock(x, y + k, z); if (t && !REPL[t] && !(t >= 22 && t <= 24)) return false; }
+  const h = type === 3 || type === 4 ? 12 : 8;
+  for (let k = 1; k <= h; k++) { const t = getBlock(x, y + k, z); if (t && !REPL[t] && !S.LEAF[t]) return false; }
   if (y + h + 2 >= CH) return false;
   setBlock(x, y, z, 0, 0, { noUpdate: true });
   S.growTree((wx, wy, wz, id, m, force) => { const cur = getBlock(wx, wy, wz); if (force || cur === 0 || REPL[cur] && !FLUID[cur]) setBlock(wx, wy, wz, id, m, { noUpdate: true }); }, x, y, z, type, Math.random(), false);
@@ -333,7 +344,7 @@ const stack = (x, y, z, b, m) => {
   if (m >= 15) { setBlock(x, y + 1, z, b, 0); setMeta(x, y, z, 0); } else setMeta(x, y, z, m + 1);
 };
 RANDOM_TICK[BID.sugar_cane] = stack; RANDOM_TICK[BID.cactus] = stack;
-for (const lv of [22, 23, 24]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
+for (const lv of [22, 23, 24, BID.jungle_leaves, BID.acacia_leaves, BID.dark_oak_leaves]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
   if (m & 1) return;
   // search for a log within 4 blocks through leaves (flat typed queue, 9x9x9 visited grid)
   if (leafSearch(x, y, z)) return;
@@ -351,7 +362,7 @@ function leafSearch(x, y, z) {
       const i = nx * 81 + ny * 9 + nz; if (LSEEN[i] === lstamp) continue; LSEEN[i] = lstamp;
       const tb = getBlock(x + nx - 4, y + ny - 4, z + nz - 4);
       if (S.LOGAX[tb] && tb !== BID.hay_block) return true;
-      if ((tb >= 22 && tb <= 24 || BLOCKS[tb] && BLOCKS[tb].leaves) && d < 4) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
+      if (S.LEAF[tb] && d < 4) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
     }
   }
   return false;

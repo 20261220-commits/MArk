@@ -129,7 +129,7 @@ function closeScreenItems() {
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
 }
 // ---------- anvil (repair, combine, rename) ----------
-const REPAIR_MAT = { wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
+const REPAIR_MAT = { chainmail: 'iron_ingot', wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
 function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null; if (!m) return []; const k = REPAIR_MAT[m]; return TAGS[k] || [IID[k]]; }
 function anvilResult(c) {
   const a = c.items && c.items[0], b = c.items && c.items[1]; if (!a) return null;
@@ -137,14 +137,14 @@ function anvilResult(c) {
   if (b) {
     if (da.dur && repairMaterial(a).includes(b.id) && (a.d || 0) > 0) { // repair with raw material: 25% per unit
       let d = a.d || 0; while (d > 0 && used < b.n) { d = Math.max(0, d - Math.floor(da.dur / 4)); used++; cost++; } out.d = d; changed = true;
-    } else if ((b.id === a.id && da.dur) || (b.id === IID.book && b.e)) { // combine: durability and enchantments
+    } else if ((b.id === a.id && da.dur) || (b.id === IID.enchanted_book && b.e)) { // combine: durability and enchantments
       if (b.id === a.id) { const keep = (da.dur - (a.d || 0)) + (da.dur - (b.d || 0)) + Math.floor(da.dur * 0.12); out.d = Math.max(0, da.dur - keep); if (out.d < (a.d || 0)) { cost += 2; changed = true; } }
       const kinds = enchKinds(a.id);
       for (const [k, lv] of Object.entries(b.e || {})) {
         if (!ENCH[k] || !(ENCH[k][2].some(t => kinds.includes(t)) || creative())) continue;
         if (out.e && ENCH_EXCL.some(g => g.includes(k) && g.some(o => o !== k && out.e[o]))) { cost++; continue; }
         const cur = (out.e && out.e[k]) || 0, nl = cur === lv ? Math.min(ENCH[k][1], lv + 1) : Math.max(cur, lv);
-        out.e = out.e || {}; out.e[k] = nl; cost += nl * (b.id === IID.book ? 1 : 2); changed = true;
+        out.e = out.e || {}; out.e[k] = nl; cost += nl * (b.id === IID.enchanted_book ? 1 : 2); changed = true;
       }
       used = 1;
     } else return null;

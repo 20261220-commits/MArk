@@ -286,6 +286,7 @@ async function loadPack() {
     for (const [k, [off, frames]] of Object.entries(PACK.anim)) if (S.T[k] != null) PACKPX.anim[k] = { off, frames };
     for (const [k, off] of Object.entries(PACK.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
     for (const [k, [off, w, h]] of Object.entries(PACK.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
+    if (PACK.sky) { const [off, w, h] = PACK.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }
     for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(D.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
     atlasCtx.putImageData(atlasImg, 0, 0);
     return true;
@@ -337,7 +338,7 @@ function maskDraw(p, pts, cols) {
 const MATC = { wooden: [hex(0xc29d62), hex(0x9c7b47), hex(0x6b5433), hex(0x46351d)], stone: [hex(0xa8a8a8), hex(0x838383), hex(0x5c5c5c), hex(0x3a3a3a)],
   iron: [hex(0xffffff), hex(0xd8d8d8), hex(0x9a9a9a), hex(0x4f4f4f)], golden: [hex(0xfffd9e), hex(0xf2d43a), hex(0xbf8f1b), hex(0x6e4e0a)],
   diamond: [hex(0xd2fff8), hex(0x4aedd9), hex(0x1aa59a), hex(0x0c5c55)], leather: [hex(0xc88a5a), hex(0xa0603a), hex(0x7a4424), hex(0x4f2a14)],
-  netherite: [hex(0x6a6266), hex(0x4d4649), hex(0x3a3436), hex(0x221e1f)] };
+  netherite: [hex(0x6a6266), hex(0x4d4649), hex(0x3a3436), hex(0x221e1f)], chainmail: [hex(0xd0d0d0), hex(0x9a9a9a), hex(0x6a6a6a), hex(0x3a3a3a)], elytra: [hex(0xa8a0c0), hex(0x7a7090), hex(0x5a5070), hex(0x3a3050)] };
 const HANDLE = [hex(0x8a6a3b), hex(0x5e4422)];
 function handle(p, x0, y0, x1, y1) { line(p, x0, y0, x1, y1, HANDLE[0]); line(p, x0 + 1, y0, x1 + 1, y1, HANDLE[1]); }
 function toolSprite(kind, m) {
@@ -432,9 +433,9 @@ function drum(c) { return sprite(p => { blob(p, 7, 7, 4.5, 4.5, [c[0], c[1], c[2
 function bowl(fillc) { return sprite(p => { for (let y = 7; y < 13; y++) for (let x = 2; x < 14; x++) if (((x - 7.5) / 6) ** 2 + ((y - 7) / 5.5) ** 2 < 1) p(x, y, y === 7 ? hex(0x5a3a1a) : hex(0x8a6a3b)); if (fillc) for (let x = 3; x < 13; x++) { p(x, 7, fillc); p(x, 6, x > 4 && x < 11 ? shade(fillc, 1.1) : null); } }); }
 function bucket(fillc) { return sprite(p => { for (let y = 4; y < 14; y++) { const w = 5 - Math.floor((y - 4) / 4); for (let x = 8 - w; x < 8 + w; x++) p(x, y, x === 8 - w ? hex(0xffffff) : x === 7 + w ? hex(0x7a7a7a) : hex(0xc8c8c8)); } for (let x = 3; x < 13; x++) p(x, 4, fillc || hex(0x4a4a4a)); for (let x = 4; x < 12; x++) p(x, 5, fillc ? shade(fillc, .85) : hex(0x6a6a6a)); for (let a = 0; a < 9; a++) p(3 + a + (a > 4 ? 0 : 0), Math.round(3 - Math.sin(a / 8 * Math.PI) * 2), hex(0x5a5a5a)); }); }
 
-function isoBlock(g, id, ox, oy, size, hgt = 1) {
-  const fts = S.FT;
-  const top = tileCanvas(fts[id * 4 + 1], DEFAULT_TINT[S.TINT[id]]), side = tileCanvas(fts[id * 4], DEFAULT_TINT[S.TINT[id]]), front = tileCanvas(S.FACING[id] ? fts[id * 4 + 3] : (id === S.BID.crafting_table ? fts[id * 4 + 3] : fts[id * 4]), DEFAULT_TINT[S.TINT[id]]);
+function isoBlock(g, iid, ox, oy, size, hgt = 1) {
+  const it = ITEMS[iid], id = it && it.place != null ? it.place : iid, meta = it && it.vi ? it.vi << S.VSH[id] : 0, tf = (slot) => S.tileFor(id, meta, slot);
+  const top = tileCanvas(tf(1), DEFAULT_TINT[S.TINT[id]]), side = tileCanvas(tf(0), DEFAULT_TINT[S.TINT[id]]), front = tileCanvas(S.FACING[id] || id === S.BID.crafting_table ? tf(3) : tf(0), DEFAULT_TINT[S.TINT[id]]);
   const k = 1 / TS;
   const tmp = document.createElement('canvas'); tmp.width = tmp.height = 32; const tg = tmp.getContext('2d'); tg.imageSmoothingEnabled = false;
   const yTop = 2 + (1 - hgt) * 18;

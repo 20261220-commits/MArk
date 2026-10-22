@@ -155,8 +155,8 @@ const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene
 const parts = []; // {x,y,z,vx,vy,vz,life,size,u,v,r,g,b,grav}
 R.particles = parts;
 function spawnParticle(p) { if (parts.length >= PMAX) parts.shift(); parts.push(p); }
-function blockParticles(x, y, z, id, n = 24, light = 1) {
-  const t = S.FT[id * 4]; const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
+function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
+  const t = S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
   const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
   for (let i = 0; i < n; i++) {
     const px = x + 0.1 + Math.random() * 0.8, py = y + 0.1 + Math.random() * 0.8, pz = z + 0.1 + Math.random() * 0.8;
@@ -236,15 +236,16 @@ function itemGeometry(id) {
   return itemGeoCache[id] = geo;
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
-const DEFAULT_META = { 116: 5, 117: 10, 99: 0 }; // fence/pane icons show their connected arms
-function blockGeometry(id) {
-  if (blockGeoCache[id]) return blockGeoCache[id];
+const DEFAULT_META = { 116: 5, 117: 10, 99: 0, 252: 5, 254: 10, 253: 5, 165: 5, 173: 10, 215: 1 }; // fence/pane icons show their connected arms
+function blockGeometry(iid) { // iid: an item id (variant items resolve to their block and meta)
+  if (blockGeoCache[iid]) return blockGeoCache[iid];
+  const it = ITEMS[iid], id = it && it.place != null && it.block ? it.place : iid, vmeta = it && it.vi ? it.vi << S.VSH[id] : 0;
   const pos = [], uv = [], shade = [], tintA = [];
-  const boxes = S.shapes(id, DEFAULT_META[id] || 0) || [[0, 0, 0, 16, 16, 16]];
+  const boxes = S.shapes(id, (DEFAULT_META[id] || 0) | vmeta) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
   for (const bx of boxes) for (let f = 0; f < 6; f++) {
     const C = [[[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]]][f];
-    let t = S.FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)];
+    let t = S.tileFor(id, vmeta, f === 2 ? 1 : f === 3 ? 2 : 0);
     if ((S.FACING[id] || id === S.BID.crafting_table) && f === 4) t = S.FT[id * 4 + 3];
     if (id === S.BID.oak_door) t = f === 2 || f === 3 ? S.T.oak_planks : S.T.oak_door_bottom;
     const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16, sh = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
@@ -258,7 +259,7 @@ function blockGeometry(id) {
   }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
-  return blockGeoCache[id] = geo;
+  return blockGeoCache[iid] = geo;
 }
 // block items use the same biome-tint mask as terrain (only tint-marked pixels take the colour)
 const itemBlockMatBase = new THREE.ShaderMaterial({

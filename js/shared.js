@@ -21,12 +21,33 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'deepslate_diamond_ore dripstone_block pointed_dripstone moss_block tinted_glass smooth_stone smooth_stone_slab_side stone_bricks granite ' +
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
-  'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block').split(' ');
+  'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ');
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
 // [id, key, name, renderType, textures, hardness, tool, harvestTier(0 = any tool or hand), extra]
 // textures: 'all' | [side, top, bottom] | [side, top, bottom, front]
+const COLORS = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+const COLKO = ['하얀색', '주황색', '자홍색', '하늘색', '노란색', '연두색', '분홍색', '회색', '회백색', '청록색', '보라색', '파란색', '갈색', '초록색', '빨간색', '검은색'];
+const COLV = s => COLORS.map(c => c + '_' + s), COLK = COLV, COLN = n => COLKO.map(c => c + ' ' + n);
+// [tile, item key, name] for the decorative stone family
+const DECO = [['polished_granite', 'polished_granite', '윤나는 화강암'], ['polished_diorite', 'polished_diorite', '윤나는 섬록암'], ['polished_andesite', 'polished_andesite', '윤나는 안산암'],
+  ['chiseled_stone_bricks', 'chiseled_stone_bricks', '조각된 석재 벽돌'], ['cut_sandstone', 'cut_sandstone', '깎은 사암'], ['chiseled_sandstone', 'chiseled_sandstone', '조각된 사암'],
+  ['quartz_bricks', 'quartz_bricks', '석영 벽돌'], ['chiseled_quartz_block', 'chiseled_quartz_block', '조각된 석영 블록'], ['red_nether_bricks', 'red_nether_bricks', '붉은 네더 벽돌'],
+  ['chiseled_nether_bricks', 'chiseled_nether_bricks', '조각된 네더 벽돌'], ['cracked_nether_bricks', 'cracked_nether_bricks', '금 간 네더 벽돌'], ['prismarine_bricks', 'prismarine_bricks', '프리즈머린 벽돌'],
+  ['dark_prismarine', 'dark_prismarine', '짙은 프리즈머린'], ['polished_blackstone', 'polished_blackstone', '윤나는 흑암'], ['polished_blackstone_bricks', 'polished_blackstone_bricks', '윤나는 흑암 벽돌'],
+  ['cut_red_sandstone', 'cut_red_sandstone', '깎은 붉은 사암']];
+// [tile, key prefix, name, full block id] for slabs; stairs/fences/walls likewise
+const SLABS = [['stone', 'stone', '돌', 1], ['sandstone', 'sandstone', '사암', 26], ['bricks', 'brick', '벽돌', 46], ['stone_bricks', 'stone_brick', '석재 벽돌', 90], ['nether_bricks', 'nether_brick', '네더 벽돌', 144],
+  ['quartz_block_side', 'quartz', '석영', 159], ['spruce_planks', 'spruce', '가문비나무', 6], ['birch_planks', 'birch', '자작나무', 7], ['jungle_planks', 'jungle', '정글나무', 176], ['acacia_planks', 'acacia', '아카시아나무', 180],
+  ['dark_oak_planks', 'dark_oak', '짙은 참나무', 184], ['crimson_planks', 'crimson', '진홍빛', 163], ['warped_planks', 'warped', '뒤틀린', 164], ['red_sandstone', 'red_sandstone', '붉은 사암', 202], ['purpur_block', 'purpur', '퍼퍼', 213], ['prismarine', 'prismarine', '프리즈머린', 209]];
+const STAIRS = [['stone', 'stone', '돌'], ['sandstone', 'sandstone', '사암'], ['bricks', 'brick', '벽돌'], ['nether_bricks', 'nether_brick', '네더 벽돌'], ['quartz_block_side', 'quartz', '석영'], ['spruce_planks', 'spruce', '가문비나무'],
+  ['birch_planks', 'birch', '자작나무'], ['jungle_planks', 'jungle', '정글나무'], ['acacia_planks', 'acacia', '아카시아나무'], ['dark_oak_planks', 'dark_oak', '짙은 참나무'], ['crimson_planks', 'crimson', '진홍빛'], ['warped_planks', 'warped', '뒤틀린'],
+  ['red_sandstone', 'red_sandstone', '붉은 사암'], ['purpur_block', 'purpur', '퍼퍼'], ['prismarine', 'prismarine', '프리즈머린'], ['mossy_cobblestone', 'mossy_cobblestone', '이끼 낀 조약돌']];
+const FENCES = [['spruce_planks', 'spruce', '가문비나무'], ['birch_planks', 'birch', '자작나무'], ['jungle_planks', 'jungle', '정글나무'], ['acacia_planks', 'acacia', '아카시아나무'], ['dark_oak_planks', 'dark_oak', '짙은 참나무'], ['crimson_planks', 'crimson', '진홍빛'], ['warped_planks', 'warped', '뒤틀린']];
+const WALLS = [['cobblestone', 'cobblestone', '조약돌'], ['mossy_cobblestone', 'mossy_cobblestone', '이끼 낀 조약돌'], ['stone_bricks', 'stone_brick', '석재 벽돌'], ['mossy_stone_bricks', 'mossy_stone_brick', '이끼 낀 석재 벽돌'],
+  ['bricks', 'brick', '벽돌'], ['sandstone', 'sandstone', '사암'], ['red_sandstone', 'red_sandstone', '붉은 사암'], ['nether_bricks', 'nether_brick', '네더 벽돌'], ['red_nether_bricks', 'red_nether_brick', '붉은 네더 벽돌'],
+  ['blackstone', 'blackstone', '흑암'], ['polished_blackstone', 'polished_blackstone', '윤나는 흑암'], ['end_stone_bricks', 'end_stone_brick', '엔드 돌 벽돌'], ['prismarine', 'prismarine', '프리즈머린'], ['granite', 'granite', '화강암'], ['diorite', 'diorite', '섬록암'], ['andesite', 'andesite', '안산암']];
 const C = RT.CUBE, X = RT.CROSS, P = TOOL.PICK, A = TOOL.AXE, S = TOOL.SHOVEL, H = TOOL.HOE, N = TOOL.NONE;
 const BLOCK_ROWS = [
   [0, 'air', '공기', RT.AIR, null, 0, N, 0],
@@ -88,7 +109,7 @@ const BLOCK_ROWS = [
   [56, 'melon', '수박', C, ['melon_side', 'melon_top', 'melon_top'], 1, A, 0],
   [57, 'farmland', '경작지', RT.BOX, ['dirt', 'farmland', 'dirt'], 0.6, S, 0],
   [58, 'wheat', '밀', RT.CROP, 'wheat0', 0, N, 0, { plant: 5 }],
-  [59, 'white_wool', '하얀색 양털', C, 'white_wool', 0.8, TOOL.SHEARS, 0],
+  [59, 'white_wool', '하얀색 양털', C, null, 0.8, TOOL.SHEARS, 0, { vars: COLV('wool'), vk: COLK('wool'), vn: COLN('양털') }],
   [60, 'iron_block', '철 블록', C, 'iron_block', 5, P, 2],
   [61, 'gold_block', '금 블록', C, 'gold_block', 3, P, 3],
   [62, 'diamond_block', '다이아몬드 블록', C, 'diamond_block', 5, P, 3],
@@ -207,6 +228,95 @@ const BLOCK_ROWS = [
   [172, 'cracked_stone_bricks', '금 간 석재 벽돌', C, 'cracked_stone_bricks', 1.5, P, 1],
   [173, 'iron_bars', '철창', RT.BOX, 'iron_bars', 5, P, 1, { connect: 2 }],
   [174, 'slime_block', '슬라임 블록', RT.TRANS, 'slime_block', 0, N, 0, { lop: 1, selfcull: 1, bounce: 1 }],
+  // ---- more woods ----
+  [175, 'jungle_log', '정글나무 원목', C, ['jungle_log', 'jungle_log_top', 'jungle_log_top'], 2, A, 0, { log: 1, scrape: 190 }],
+  [176, 'jungle_planks', '정글나무 판자', C, 'jungle_planks', 2, A, 0],
+  [177, 'jungle_leaves', '정글나무 잎', RT.CUTOUT, 'jungle_leaves', 0.2, H, 0, { tint: 2, lop: 1, leaves: 1 }],
+  [178, 'jungle_sapling', '정글나무 묘목', X, 'jungle_sapling', 0, N, 0, { plant: 1 }],
+  [179, 'acacia_log', '아카시아나무 원목', C, ['acacia_log', 'acacia_log_top', 'acacia_log_top'], 2, A, 0, { log: 1, scrape: 191 }],
+  [180, 'acacia_planks', '아카시아나무 판자', C, 'acacia_planks', 2, A, 0],
+  [181, 'acacia_leaves', '아카시아나무 잎', RT.CUTOUT, 'acacia_leaves', 0.2, H, 0, { tint: 2, lop: 1, leaves: 1 }],
+  [182, 'acacia_sapling', '아카시아나무 묘목', X, 'acacia_sapling', 0, N, 0, { plant: 1 }],
+  [183, 'dark_oak_log', '짙은 참나무 원목', C, ['dark_oak_log', 'dark_oak_log_top', 'dark_oak_log_top'], 2, A, 0, { log: 1, scrape: 192 }],
+  [184, 'dark_oak_planks', '짙은 참나무 판자', C, 'dark_oak_planks', 2, A, 0],
+  [185, 'dark_oak_leaves', '짙은 참나무 잎', RT.CUTOUT, 'dark_oak_leaves', 0.2, H, 0, { tint: 2, lop: 1, leaves: 1 }],
+  [186, 'dark_oak_sapling', '짙은 참나무 묘목', X, 'dark_oak_sapling', 0, N, 0, { plant: 1 }],
+  [187, 'stripped_oak_log', '껍질 벗긴 참나무 원목', C, ['stripped_oak_log', 'stripped_oak_log_top', 'stripped_oak_log_top'], 2, A, 0, { log: 1 }],
+  [188, 'stripped_spruce_log', '껍질 벗긴 가문비나무 원목', C, ['stripped_spruce_log', 'stripped_spruce_log_top', 'stripped_spruce_log_top'], 2, A, 0, { log: 1 }],
+  [189, 'stripped_birch_log', '껍질 벗긴 자작나무 원목', C, ['stripped_birch_log', 'stripped_birch_log_top', 'stripped_birch_log_top'], 2, A, 0, { log: 1 }],
+  [190, 'stripped_jungle_log', '껍질 벗긴 정글나무 원목', C, ['stripped_jungle_log', 'stripped_jungle_log_top', 'stripped_jungle_log_top'], 2, A, 0, { log: 1 }],
+  [191, 'stripped_acacia_log', '껍질 벗긴 아카시아나무 원목', C, ['stripped_acacia_log', 'stripped_acacia_log_top', 'stripped_acacia_log_top'], 2, A, 0, { log: 1 }],
+  [192, 'stripped_dark_oak_log', '껍질 벗긴 짙은 참나무 원목', C, ['stripped_dark_oak_log', 'stripped_dark_oak_log_top', 'stripped_dark_oak_log_top'], 2, A, 0, { log: 1 }],
+  // ---- 16-colour families (colour in meta) ----
+  [193, 'concrete', '콘크리트', C, null, 1.8, P, 1, { vars: COLV('concrete'), vk: COLK('concrete'), vn: COLN('콘크리트') }],
+  [194, 'concrete_powder', '콘크리트 가루', C, null, 0.5, S, 0, { vars: COLV('concrete_powder'), vk: COLK('concrete_powder'), vn: COLN('콘크리트 가루'), fall: 1, hardens: 193 }],
+  [195, 'terracotta', '테라코타', C, 'terracotta', 1.25, P, 1],
+  [196, 'stained_terracotta', '염색된 테라코타', C, null, 1.25, P, 1, { vars: COLV('terracotta'), vk: COLK('terracotta'), vn: COLN('테라코타') }],
+  [197, 'stained_glass', '색유리', RT.TRANS, null, 0.3, N, 0, { vars: COLV('stained_glass'), vk: COLK('stained_glass'), vn: COLN('색유리'), selfcull: 1, lop: 0 }],
+  [198, 'carpet', '카펫', RT.BOX, null, 0.1, N, 0, { vars: COLV('wool'), vk: COLK('carpet'), vn: COLN('카펫') }],
+  [199, 'flowers2', '꽃', X, null, 0, N, 0, { plant: 1, vars: ['allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'lily_of_the_valley', 'blue_orchid', 'wither_rose'],
+    vk: ['allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'lily_of_the_valley', 'blue_orchid', 'wither_rose'], vn: ['파꽃', '선애기별꽃', '빨간색 튤립', '주황색 튤립', '하얀색 튤립', '분홍색 튤립', '은방울꽃', '파란색 난초', '위더 장미'] }],
+  [200, 'deco_stone', '장식용 돌', C, null, 1.5, P, 1, { vars: DECO.map(d => d[0]), vk: DECO.map(d => d[1]), vn: DECO.map(d => d[2]) }],
+  // ---- natural ----
+  [201, 'red_sand', '붉은 모래', C, 'red_sand', 0.5, S, 0, { fall: 1 }],
+  [202, 'red_sandstone', '붉은 사암', C, ['red_sandstone', 'red_sandstone_top', 'red_sandstone_bottom'], 0.8, P, 1],
+  [203, 'podzol', '회백토', C, ['podzol_side', 'podzol_top', 'dirt'], 0.5, S, 0],
+  [204, 'mycelium', '균사체', C, ['mycelium_side', 'mycelium_top', 'dirt'], 0.6, S, 0],
+  [205, 'coarse_dirt', '거친 흙', C, 'coarse_dirt', 0.5, S, 0],
+  [206, 'packed_ice', '꽁꽁 언 얼음', C, 'packed_ice', 0.5, P, 0, { slip: 1 }],
+  [207, 'blue_ice', '푸른 얼음', C, 'blue_ice', 2.8, P, 0, { slip: 2 }],
+  [208, 'bone_block', '뼈 블록', C, ['bone_block_side', 'bone_block_top', 'bone_block_top'], 2, P, 1, { log: 1 }],
+  [209, 'prismarine', '프리즈머린', C, 'prismarine', 1.5, P, 1],
+  [210, 'sea_lantern', '바다 랜턴', C, 'sea_lantern', 0.3, N, 0, { light: 15 }],
+  [211, 'sponge', '스펀지', C, 'sponge', 0.6, H, 0],
+  [212, 'wet_sponge', '젖은 스펀지', C, 'wet_sponge', 0.6, H, 0],
+  [213, 'purpur_block', '퍼퍼 블록', C, 'purpur_block', 1.5, P, 1],
+  [214, 'purpur_pillar', '퍼퍼 기둥', C, ['purpur_pillar', 'purpur_pillar_top', 'purpur_pillar_top'], 1.5, P, 1, { log: 1 }],
+  [215, 'end_rod', '엔드 막대', RT.BOX, 'end_rod', 0, N, 0, { light: 14, nosolid: 1 }],
+  [216, 'chorus_plant', '후렴 식물', RT.BOX, 'chorus_plant', 0.4, A, 0, { chorus: 1 }],
+  [217, 'chorus_flower', '후렴 꽃', RT.CUTOUT, 'chorus_flower', 0.4, A, 0, { chorus: 1 }],
+  [218, 'brown_mushroom_block', '갈색 버섯 블록', C, 'brown_mushroom_block', 0.2, A, 0],
+  [219, 'red_mushroom_block', '빨간색 버섯 블록', C, 'red_mushroom_block', 0.2, A, 0],
+  [220, 'mushroom_stem', '버섯 자루', C, 'mushroom_stem', 0.2, A, 0],
+  [221, 'lily_pad', '수련잎', RT.BOX, 'lily_pad', 0, N, 0, { tint: 2 }],
+  [222, 'vine', '덩굴', RT.BOX, 'vine', 0.2, TOOL.SHEARS, 99, { tint: 2, nosolid: 1, repl: 1, climb: 1 }],
+  // ---- redstone & mechanisms ----
+  [223, 'observer', '관측기', C, ['observer_side', 'observer_top', 'observer_side', 'observer_front'], 3, P, 1, { rs: 'observer' }],
+  [224, 'hopper', '호퍼', RT.BOX, ['hopper_outside', 'hopper_top', 'hopper_outside'], 3, P, 1, { rs: 'hopper' }],
+  [225, 'comparator', '레드스톤 비교기', RT.BOX, ['smooth_stone', 'comparator', 'smooth_stone'], 0, N, 0, { rs: 'comparator' }],
+  [226, 'dispenser', '발사기', C, ['furnace_side', 'furnace_top', 'furnace_top', 'dispenser_front'], 3.5, P, 1, { rs: 'dispenser' }],
+  [227, 'dropper', '공급기', C, ['furnace_side', 'furnace_top', 'furnace_top', 'dropper_front'], 3.5, P, 1, { rs: 'dropper' }],
+  [228, 'daylight_detector', '햇빛 감지기', RT.BOX, ['daylight_detector_side', 'daylight_detector_top', 'daylight_detector_side'], 0.2, A, 0, { rs: 'daylight' }],
+  [229, 'target', '과녁', C, ['target_side', 'target_top', 'target_top'], 0.5, H, 0, { rs: 'target' }],
+  [230, 'note_block', '소리 블록', C, 'note_block', 0.8, A, 0, { rs: 'note' }],
+  [231, 'iron_door', '철문', RT.BOX, ['iron_door_bottom', 'iron_door_top', 'iron_door_bottom'], 5, P, 1, { door: 1, iron: 1 }],
+  [232, 'oak_trapdoor', '참나무 다락문', RT.BOX, 'oak_trapdoor', 3, A, 0, { trapdoor: 1 }],
+  // ---- villager workstations & utility ----
+  [233, 'composter', '퇴비통', RT.BOX, ['composter_side', 'composter_top', 'composter_bottom'], 0.6, A, 0],
+  [234, 'barrel', '통', C, ['barrel_side', 'barrel_top', 'barrel_bottom'], 2.5, A, 0],
+  [235, 'blast_furnace', '용광로', C, ['blast_furnace_side', 'blast_furnace_top', 'blast_furnace_top', 'blast_furnace_front'], 3.5, P, 1, { facing: 1, furnace: 'blast' }],
+  [236, 'smoker', '훈연기', C, ['smoker_side', 'smoker_top', 'smoker_bottom', 'smoker_front'], 3.5, P, 1, { facing: 1, furnace: 'smoker' }],
+  [237, 'cartography_table', '지도 제작대', C, ['cartography_table_side1', 'cartography_table_top', 'dark_oak_planks', 'cartography_table_side3'], 2.5, A, 0, { facing: 1 }],
+  [238, 'fletching_table', '화살 제작대', C, ['fletching_table_side', 'fletching_table_top', 'birch_planks', 'fletching_table_front'], 2.5, A, 0, { facing: 1 }],
+  [239, 'loom', '베틀', C, ['loom_side', 'loom_top', 'loom_bottom', 'loom_front'], 2.5, A, 0, { facing: 1 }],
+  [240, 'stonecutter', '석재 절단기', RT.BOX, ['stonecutter_side', 'stonecutter_top', 'stonecutter_bottom'], 3.5, P, 1],
+  [241, 'grindstone', '숫돌', RT.BOX, ['grindstone_side', 'grindstone_round', 'grindstone_round'], 2, P, 1, { facing: 1 }],
+  [242, 'lectern', '독서대', RT.BOX, ['lectern_sides', 'lectern_top', 'oak_planks', 'lectern_front'], 2.5, A, 0, { facing: 1 }],
+  // ---- nether extras ----
+  [243, 'soul_torch', '영혼 횃불', RT.TORCH, 'soul_torch', 0, N, 0, { light: 10, nosolid: 1 }],
+  [244, 'soul_lantern', '영혼 랜턴', RT.BOX, 'soul_lantern', 3.5, P, 0, { light: 10, lantern: 1 }],
+  [245, 'soul_fire', '영혼 불', RT.CROP, 'soul_fire', 0, N, 0, { light: 10, nosolid: 1, repl: 1 }],
+  [246, 'chain', '사슬', RT.BOX, 'chain', 5, P, 0],
+  [247, 'gilded_blackstone', '금박 흑암', C, 'gilded_blackstone', 1.5, P, 1],
+  [248, 'lodestone', '자석석', C, ['lodestone_side', 'lodestone_top', 'lodestone_top'], 3.5, P, 0],
+  [249, 'nether_sprouts', '네더 새싹', X, 'nether_sprouts', 0, N, 0, { plant: 7, repl: 1 }],
+  // ---- shape families (material in the high meta bits) ----
+  [250, 'slab2', '반 블록', RT.BOX, null, 2, P, 1, { slabv: 1, vshift: 1, vars: SLABS.map(s => s[0]), vk: SLABS.map(s => s[1] + '_slab'), vn: SLABS.map(s => s[2] + ' 반 블록'), full: SLABS.map(s => s[3]) }],
+  [251, 'stairs2', '계단', RT.BOX, null, 2, P, 1, { stairs: 1, vshift: 3, vars: STAIRS.map(s => s[0]), vk: STAIRS.map(s => s[1] + '_stairs'), vn: STAIRS.map(s => s[2] + ' 계단') }],
+  [252, 'fence2', '울타리', RT.BOX, null, 2, A, 0, { connect: 1, vshift: 4, vars: FENCES.map(s => s[0]), vk: FENCES.map(s => s[1] + '_fence'), vn: FENCES.map(s => s[2] + ' 울타리') }],
+  [253, 'wall', '담장', RT.BOX, null, 2, P, 1, { connect: 4, vshift: 4, vars: WALLS.map(s => s[0]), vk: WALLS.map(s => s[1] + '_wall'), vn: WALLS.map(s => s[2] + ' 담장') }],
+  [254, 'stained_glass_pane', '색유리판', RT.TBOX, null, 0.3, N, 0, { connect: 2, vshift: 4, vars: COLV('stained_glass'), vk: COLK('stained_glass_pane'), vn: COLN('색유리판') }],
+  [255, 'crops2', '작물', RT.CROP, 'carrots_stage0', 0, N, 0, { plant: 5, crops2: 1 }],
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 const NB = 256;
@@ -216,6 +326,8 @@ const RTYPE = new Uint8Array(NB), OPQ = new Uint8Array(NB), LOP = new Uint8Array
 const SOLID = new Uint8Array(NB), TINT = new Uint8Array(NB), FLUID = new Uint8Array(NB), REPL = new Uint8Array(NB);
 const SELFCULL = new Uint8Array(NB), FACING = new Uint8Array(NB), LOGAX = new Uint8Array(NB);
 const FT = new Int16Array(NB * 4); // side, top, bottom, front
+// variant blocks (colours, materials): tile = VT[id * 16 + ((meta >> VSH[id]) & 15)]
+const VT = new Int16Array(NB * 16), VSH = new Uint8Array(NB), HASV = new Uint8Array(NB), LEAF = new Uint8Array(NB), DOOR = new Uint8Array(NB);
 for (const r of BLOCK_ROWS) {
   const [id, key, name, rt, tx, hard, tool, tier, ex = {}] = r;
   const d = { id, key, name, rt, hard, tool, tier, ...ex };
@@ -227,7 +339,13 @@ for (const r of BLOCK_ROWS) {
   SOLID[id] = rt === RT.AIR || ex.nosolid || rt === RT.CROSS || rt === RT.CROP || rt === RT.TORCH ? 0 : 1;
   TINT[id] = ex.tint || 0; FLUID[id] = ex.fluid || 0;
   REPL[id] = rt === RT.AIR ? 1 : (ex.repl || 0);
-  SELFCULL[id] = ex.selfcull || 0; FACING[id] = ex.facing || 0; LOGAX[id] = ex.log || 0;
+  SELFCULL[id] = ex.selfcull || 0; FACING[id] = ex.facing || 0; LOGAX[id] = ex.log || 0; LEAF[id] = ex.leaves || 0; DOOR[id] = id === 96 || ex.door ? 1 : 0;
+  if (ex.vars) {
+    HASV[id] = 1; VSH[id] = ex.vshift || 0;
+    ex.vars.forEach((t, k) => { if (T[t] == null) throw new Error('tile ' + t); VT[id * 16 + k] = T[t]; });
+    for (let k = ex.vars.length; k < 16; k++) VT[id * 16 + k] = VT[id * 16];
+    if (!tx) for (let k = 0; k < 4; k++) FT[id * 4 + k] = T[ex.vars[0]];
+  }
   if (tx) {
     const a = typeof tx === 'string' ? [tx, tx, tx, tx] : [tx[0], tx[1], tx[2], tx[3] || tx[0]];
     for (let k = 0; k < 4; k++) { if (T[a[k]] == null) throw new Error('tile ' + a[k]); FT[id * 4 + k] = T[a[k]]; }
@@ -257,8 +375,12 @@ const BIOMES = [
   ['영혼 모래 골짜기', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
   ['현무암 삼각주', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
   ['디 엔드', 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0],
+  ['정글', 0x59c93c, 0x30bb0b, 0x3f76e4, 0.95, 10, 4],
+  ['사바나', 0xbfb755, 0xaea42a, 0x3f76e4, 1.2, 0.8, 5],
+  ['어두운 숲', 0x507a32, 0x59ae30, 0x3f76e4, 0.7, 12, 6],
+  ['악지', 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 0, 0],
 ];
-const BIO = { OCEAN: 0, PLAINS: 1, FOREST: 2, BIRCH: 3, TAIGA: 4, TUNDRA: 5, DESERT: 6, MOUNTAINS: 7, BEACH: 8, RIVER: 9, SWAMP: 10, SNOWY_TAIGA: 11, FROZEN_OCEAN: 12 };
+const BIO = { OCEAN: 0, PLAINS: 1, FOREST: 2, BIRCH: 3, TAIGA: 4, TUNDRA: 5, DESERT: 6, MOUNTAINS: 7, BEACH: 8, RIVER: 9, SWAMP: 10, SNOWY_TAIGA: 11, FROZEN_OCEAN: 12, JUNGLE: 19, SAVANNA: 20, DARK_FOREST: 21, BADLANDS: 22 };
 
 // ---------- shapes (pixel boxes) ----------
 const DIRS = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0]]; // facing 0 north,1 east,2 south,3 west
@@ -272,17 +394,36 @@ function shapes(id, meta) {
     case 57: return [[0, 0, 0, 16, 15, 16]];
     case 51: return [[0, 0, 0, 16, ((meta & 7) + 1) * 2, 16]];
     case 95: return [[0, 3, 0, 16, 9, 16], [0, 0, 0, 3, 3, 3], [13, 0, 0, 16, 3, 3], [0, 0, 13, 3, 3, 16], [13, 0, 13, 16, 3, 16]];
-    case 96: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
+    case 96: case 231: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
+    case 198: return [[0, 0, 0, 16, 1, 16]];
+    case 215: { const a = meta & 7; return a < 2 ? [[6, 0, 6, 10, 1, 10], [7, 1, 7, 9, 16, 9]] : a < 4 ? [[6, 6, 0, 10, 10, 1], [7, 7, 1, 9, 9, 16]] : [[0, 6, 6, 1, 10, 10], [1, 7, 7, 16, 9, 9]]; }
+    case 216: return [[3, 0, 3, 13, 16, 13]];
+    case 221: return [[0, 0, 0, 16, 0.5, 16]];
+    case 222: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]];
+    case 224: return [[0, 10, 0, 16, 16, 16], [4, 4, 4, 12, 10, 12], [6, 0, 6, 10, 4, 10]];
+    case 225: { const f = meta & 3; return [[0, 0, 0, 16, 2, 16], rotBox([4, 2, 11, 6, 7, 13], f), rotBox([10, 2, 11, 12, 7, 13], f), rotBox([7, 2, 2, 9, 6, 4], f)]; }
+    case 228: return [[0, 0, 0, 16, 6, 16]];
+    case 232: { const f = meta & 3; if (meta & 4) return [rotBox([0, 0, 13, 16, 16, 16], f)]; return [meta & 8 ? [0, 13, 0, 16, 16, 16] : [0, 0, 0, 16, 3, 16]]; }
+    case 233: { const lv = Math.min(8, meta & 15), b = [[0, 0, 0, 16, 2, 16], [0, 2, 0, 2, 16, 16], [14, 2, 0, 16, 16, 16], [2, 2, 0, 14, 16, 2], [2, 2, 14, 14, 16, 16]]; if (lv) b.push([2, 2, 2, 14, 2 + Math.ceil(lv * 13 / 8), 14]); return b; }
+    case 240: return [[0, 0, 0, 16, 9, 16]];
+    case 241: return [[4, 4, 2, 12, 16, 14], [2, 0, 6, 4, 13, 10], [12, 0, 6, 14, 13, 10]];
+    case 242: return [[0, 0, 0, 16, 2, 16], [4, 2, 4, 12, 13, 12], [0, 13, 0, 16, 16, 16]];
+    case 246: return [[6.5, 0, 6.5, 9.5, 16, 9.5]];
+    case 253: { // walls: post + arms toward N,E,S,W
+      const b = [[4, 0, 4, 12, 16, 12]];
+      if (meta & 1) b.push([5, 0, 0, 11, 14, 4]); if (meta & 2) b.push([12, 0, 5, 16, 14, 11]); if (meta & 4) b.push([5, 0, 12, 11, 14, 16]); if (meta & 8) b.push([0, 0, 5, 4, 14, 11]);
+      return b;
+    }
     case 97: return [ladderBox(meta & 3)];
-    case 99: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
-    case 109: case 110: case 111: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
-    case 113: case 114: case 115: { // stairs: meta = facing | top<<2
+    case 99: case 244: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
+    case 109: case 110: case 111: case 250: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
+    case 113: case 114: case 115: case 251: { // stairs: meta = facing | top<<2
       const f = meta & 3, top = meta & 4, ylo = top ? 0 : 8, yhi = top ? 8 : 16;
       const back = f === 0 ? [0, ylo, 0, 16, yhi, 8] : f === 1 ? [8, ylo, 0, 16, yhi, 16] : f === 2 ? [0, ylo, 8, 16, yhi, 16] : [0, ylo, 0, 8, yhi, 16];
       return [top ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16], back];
     }
     case 119: return [[0, 0, 0, 16, 12, 16]];
-    case 116: case 165: { // fences: meta bits N,E,S,W connections
+    case 116: case 165: case 252: { // fences: meta bits N,E,S,W connections
       const b = [[6, 0, 6, 10, 16, 10]];
       for (const y0 of [6, 12]) {
         if (meta & 1) b.push([7, y0, 0, 9, y0 + 3, 6]); if (meta & 2) b.push([10, y0, 7, 16, y0 + 3, 9]);
@@ -290,7 +431,7 @@ function shapes(id, meta) {
       }
       return b;
     }
-    case 117: case 173: { // glass pane / iron bars
+    case 117: case 173: case 254: { // glass pane / iron bars
       const b = [[7, 0, 7, 9, 16, 9]];
       if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
       if (meta & 4) b.push([7, 0, 9, 9, 16, 16]); if (meta & 8) b.push([0, 0, 7, 7, 16, 9]);
@@ -333,7 +474,8 @@ function collide(id, meta) {
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
   if (id === 138) return [[0, 0, 0, 16, 14, 16]]; // soul sand slows by sinking you slightly
   if (id === 128) return [[0, 0, 0, 16, 2, 16]];
-  if (id === 116 || id === 165) { // fences are 1.5 blocks tall for collision
+  if (id === 221) return [[0, 0, 0, 16, 1.5, 16]];
+  if (id === 116 || id === 165 || id === 252 || id === 253) { // fences and walls are 1.5 blocks tall for collision
     const b = [[6, 0, 6, 10, 24, 10]];
     if (meta & 1) b.push([6, 0, 0, 10, 24, 6]); if (meta & 2) b.push([10, 0, 6, 16, 24, 10]);
     if (meta & 4) b.push([6, 0, 10, 10, 24, 16]); if (meta & 8) b.push([0, 0, 6, 6, 24, 10]);
@@ -416,9 +558,11 @@ function makeGen(seed) {
     else if (mount > 0.45) b = BIO.MOUNTAINS;
     else if (temp < -0.45) b = hum > 0.05 ? BIO.SNOWY_TAIGA : BIO.TUNDRA;
     else if (temp < -0.15) b = BIO.TAIGA;
-    else if (temp > 0.45 && hum < 0.05) b = BIO.DESERT;
+    else if (temp > 0.45 && hum < 0.05) b = hum < -0.3 && nX.n2(wx / 500, wz / 500) > 0.15 ? BIO.BADLANDS : BIO.DESERT;
     else if (hum > 0.45 && temp > 0.1 && h <= SEA + 6) b = BIO.SWAMP;
-    else if (hum > 0.15) b = nX.n2(wx / 300, wz / 300) > 0.25 ? BIO.BIRCH : BIO.FOREST;
+    else if (temp > 0.3 && hum > 0.3) b = BIO.JUNGLE;
+    else if (temp > 0.3 && hum < 0.2) b = BIO.SAVANNA;
+    else if (hum > 0.15) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.25 ? BIO.BIRCH : f < -0.35 ? BIO.DARK_FOREST : BIO.FOREST; }
     else b = BIO.PLAINS;
     return [h, b];
   }
@@ -941,6 +1085,10 @@ function genChunk(seed, cx, cz, dim) {
       let id = y < dsl ? 76 : STONE;
       const d = h - y;
       if (b === BIO.DESERT) { if (d < 4) id = 9; else if (d < 7) id = 26; }
+      else if (b === BIO.BADLANDS) { // red sand over horizontal bands of coloured terracotta
+        if (d < 1 && h < 80) id = 201;
+        else if (d < 18 + (h - SEA) * 0.6) { const band = (y + Math.floor(G.nX.n2(wx / 60, wz / 60) * 3) + 64) % 12; id = band === 0 || band === 7 ? 196 : 195; meta[I(x, y, z)] = band === 0 ? 1 : band === 7 ? 14 : 0; if (band === 3 || band === 4) { id = 196; meta[I(x, y, z)] = [4, 12][band - 3]; } if (band === 9) { id = 196; meta[I(x, y, z)] = 8; } }
+      }
       else if (b === BIO.BEACH) { if (d < 4) id = 9; else if (d < 6) id = 26; }
       else if (b === BIO.OCEAN || b === BIO.FROZEN_OCEAN || b === BIO.RIVER) { if (d < 3) id = h < SEA - 12 ? 10 : (G.nX.n2(wx / 12, wz / 12) > 0.55 ? 53 : 9); }
       else if (b === BIO.MOUNTAINS) {
@@ -1124,27 +1272,36 @@ function genChunk(seed, cx, cz, dim) {
       let h, b;
       const lx = tx - x0, lz = tz - z0;
       if (lx >= -1 && lz >= -1 && lx <= 16 && lz <= 16) { h = hgt[(lz + 1) * 18 + lx + 1]; b = bpad[(lz + 1) * 18 + lx + 1]; } else { const c = G.column(tx, tz); h = c[0]; b = c[1]; }
-      if (h <= SEA || b === BIO.DESERT || b === BIO.BEACH || b === BIO.RIVER || b === BIO.OCEAN || (b === BIO.MOUNTAINS && h > 92)) continue;
+      if (h <= SEA || b === BIO.DESERT || b === BIO.BADLANDS || b === BIO.BEACH || b === BIO.RIVER || b === BIO.OCEAN || (b === BIO.MOUNTAINS && h > 92)) continue;
       if (vills.length && inVillage(tx, tz)) continue;
       if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) { const top = blocks[I(lx, h, lz)]; if (top !== 2 && top !== 3) continue; }
       let type = BIOMES[b][6];
       if (type === 1) type = kind < 0.2 ? 2 : 0;
       if (b === BIO.MOUNTAINS) type = kind < 0.6 ? 3 : 0;
+      if (b === BIO.JUNGLE && kind < 0.25) type = 0;
+      if (b === BIO.DARK_FOREST) type = kind < 0.05 ? 7 : kind < 0.1 ? 8 : kind < 0.2 ? 0 : 6;
+      if (b === BIO.SAVANNA && kind < 0.2) type = 0;
       growTree(setT, tx, h + 1, tz, type, hh, b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA);
       if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) blocks[I(lx, h, lz)] = 3;
     }
   }
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const h = hgt[(z + 1) * 18 + x + 1], b = biome[z * 16 + x], top = blocks[I(x, h, z)], above = I(x, h + 1, z);
+    if (b === BIO.SWAMP && h < SEA && blocks[I(x, SEA, z)] === WATER && blocks[I(x, SEA + 1, z)] === 0 && R() < 0.05) blocks[I(x, SEA + 1, z)] = 221; // lily pads
     if (h + 1 >= CH || blocks[above] !== 0) continue;
     const v = R();
     if (top === 2) {
-      if (b === BIO.PLAINS) { if (v < 0.22) blocks[above] = 29; else if (v < 0.235) blocks[above] = R() < 0.5 ? 31 : 32; else if (v < 0.245) blocks[above] = R() < 0.5 ? 33 : 34; else if (v < 0.2453) placePumpkins(x, h, z); }
+      if (b === BIO.PLAINS) { if (v < 0.22) blocks[above] = 29; else if (v < 0.235) blocks[above] = R() < 0.5 ? 31 : 32; else if (v < 0.245) blocks[above] = R() < 0.5 ? 33 : 34; else if (v < 0.25) { blocks[above] = 199; meta[above] = R.int(7); } else if (v < 0.2503) placePumpkins(x, h, z); }
+      else if (b === BIO.JUNGLE) { if (v < 0.25) blocks[above] = R() < 0.5 ? 30 : 29; else if (v < 0.253) blocks[above] = 56; }
+      else if (b === BIO.SAVANNA) { if (v < 0.3) blocks[above] = 29; }
+      else if (b === BIO.DARK_FOREST) { if (v < 0.04) blocks[above] = 29; else if (v < 0.05) blocks[above] = R() < .5 ? 106 : 107; }
       else if (b === BIO.FOREST || b === BIO.BIRCH) { if (v < 0.1) blocks[above] = 29; else if (v < 0.11) blocks[above] = R() < 0.6 ? 32 : 31; else if (v < 0.112) blocks[above] = R() < .5 ? 106 : 107; }
       else if (b === BIO.TAIGA || b === BIO.SNOWY_TAIGA) { if (v < 0.08) blocks[above] = 30; else if (v < 0.12) blocks[above] = 29; }
-      else if (b === BIO.SWAMP) { if (v < 0.06) blocks[above] = 29; else if (v < 0.07) blocks[above] = 107; }
+      else if (b === BIO.SWAMP) { if (v < 0.06) blocks[above] = 29; else if (v < 0.07) blocks[above] = 107; else if (v < 0.075) { blocks[above] = 199; meta[above] = 7; } }
       else if (b === BIO.MOUNTAINS) { if (v < 0.05) blocks[above] = 29; }
       else if (b === BIO.TUNDRA) { if (v < 0.01) blocks[above] = 29; }
+    } else if (b === BIO.BADLANDS && (top === 201 || top === 195 || top === 196)) {
+      if (v < 0.01) blocks[above] = 35; else if (v < 0.013 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH; k++) blocks[I(x, h + k, z)] = 37; }
     } else if (top === 9 && b === BIO.DESERT) {
       if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH; k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
@@ -1177,6 +1334,34 @@ function genChunk(seed, cx, cz, dim) {
 }
 // tree shapes; types 0 oak, 2 birch, 3 spruce
 function growTree(set, x, y, z, type, r, snowy) {
+  let h = Math.floor(r * 9973) + 7; const rnd = () => (h = (h * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  if (type === 4) { // jungle: tall trunk, round crown, vines down the trunk
+    const th = 8 + Math.floor(r * 7), top = y + th;
+    for (let yy = top - 2; yy <= top + 1; yy++) { const rad = yy > top ? 1 : 3 - (yy === top ? 1 : 0); for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) if (dx * dx + dz * dz <= rad * rad + 1) set(x + dx, yy, z + dz, 177, 0); }
+    for (let i = 0; i < th; i++) { set(x, y + i, z, 175, 0, true); if (i > 1) for (const [dx, dz, m] of [[-1, 0, 5], [1, 0, 4], [0, -1, 3], [0, 1, 2]]) if (rnd() < 0.25) set(x + dx, y + i, z + dz, 222, m); }
+    return;
+  }
+  if (type === 5) { // acacia: trunk that bends sideways, flat umbrella crown
+    const th = 4 + Math.floor(r * 3), [bx, bz] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(r * 37) & 3];
+    let cx = x, cz = z, cy = y;
+    for (let i = 0; i < th; i++, cy++) { if (i >= th - 2) { cx += bx; cz += bz; } set(cx, cy, cz, 179, 0, true); }
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (Math.abs(dx) + Math.abs(dz) <= 3) set(cx + dx, cy, cz + dz, 181, 0);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) set(cx + dx, cy + 1, cz + dz, 181, 0);
+    return;
+  }
+  if (type === 6) { // dark oak: 2x2 trunk under a wide dome
+    const th = 6 + Math.floor(r * 3), top = y + th;
+    for (let yy = top - 2; yy <= top + 1; yy++) { const rad = yy === top + 1 ? 2 : 3; for (let dx = -rad; dx <= rad + 1; dx++) for (let dz = -rad; dz <= rad + 1; dz++) { const ex = Math.abs(dx - 0.5) - rad, ez = Math.abs(dz - 0.5) - rad; if (ex + ez > 0) continue; set(x + dx, yy, z + dz, 185, 0); } }
+    for (let i = 0; i < th; i++) for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + dx, y + i, z + dz, 183, 0, true);
+    return;
+  }
+  if (type === 7 || type === 8) { // huge brown (flat) / red (dome) mushrooms
+    const th = 4 + Math.floor(r * 3), top = y + th, cap = type === 7 ? 218 : 219;
+    if (type === 7) { for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (!(Math.abs(dx) === 3 && Math.abs(dz) === 3)) set(x + dx, top, z + dz, cap, 0); }
+    else for (let yy = top - 3; yy <= top; yy++) { const rad = yy === top ? 1 : 2; for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { if (yy < top && Math.abs(dx) < rad && Math.abs(dz) < rad) continue; if (Math.abs(dx) === rad && Math.abs(dz) === rad && yy < top) continue; set(x + dx, yy, z + dz, cap, 0); } }
+    for (let i = 0; i < th; i++) set(x, y + i, z, 220, 0, true);
+    return;
+  }
   if (type === 3) {
     const th = 6 + Math.floor(r * 4), top = y + th, leafStart = 1 + Math.floor(r * 2);
     let rad = 0, maxR = 2 + (r > 0.5 ? 1 : 0), step = 0;
@@ -1192,7 +1377,7 @@ function growTree(set, x, y, z, type, r, snowy) {
     return;
   }
   const th = (type === 2 ? 5 : 4) + Math.floor(r * 3), top = y + th, leaf = type === 2 ? 24 : 22, log = type === 2 ? 21 : 19;
-  let h = Math.floor(r * 9973);
+  h = Math.floor(r * 9973);
   for (let yy = top - 3; yy <= top; yy++) {
     const d = yy - top, rad = d >= -1 ? 1 : 2;
     for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
@@ -1332,6 +1517,14 @@ function meshChunk(B, M, L, bio, opts) {
   const L4 = [[0, 0], [0, 0], [0, 0], [0, 0]], SH4 = [1, 1, 1, 1], CS = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
   function flatLight(x, y, z) { const l = lightAt(x, y, z); const s = (l >> 4) * 17, b = (l & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = s; L4[k][1] = b; } }
   function cubeTile(id, meta, f, x, y, z) {
+    if (HASV[id]) return VT[id * 16 + ((meta >> VSH[id]) & 15)];
+    if (id === 223 || id === 226 || id === 227) { // facing in all six directions (DIR6 index in meta & 7)
+      const fd = meta & 7, front = D6F[fd], back = D6F[fd ^ 1];
+      if (id === 223) return f === front ? T.observer_front : f === back ? (meta & 8 ? T.observer_back_on : T.observer_back) : (f === 2 || f === 3) && fd > 1 ? T.observer_top : T.observer_side;
+      if (f === front) return fd < 2 ? (id === 226 ? T.dispenser_front_vertical : T.dropper_front_vertical) : FT[id * 4 + 3];
+      return f === 2 || f === 3 ? T.furnace_top : T.furnace_side;
+    }
+    if ((id === 235 || id === 236) && (meta & 4) && f === DIR_FACE[meta & 3]) return id === 235 ? T.blast_furnace_front_on : T.smoker_front_on;
     const base = id * 4;
     let slot = f === 2 ? 1 : f === 3 ? 2 : 0;
     if (FACING[id] && f === DIR_FACE[meta & 3]) slot = 3;
@@ -1339,7 +1532,7 @@ function meshChunk(B, M, L, bio, opts) {
     if (LOGAX[id] && meta) { const ax = meta; if (ax === 1) slot = (f === 0 || f === 1) ? 1 : 0; else slot = (f === 4 || f === 5) ? 1 : 0; }
     let t = FT[base + slot];
     if (id === 2 && slot === 0) { const a = blk(x, y + 1, z); if (a === 51 || a === 50) t = T.grass_side_snowed; }
-    if (!fancy && RTYPE[id] === RT.CUTOUT && (id >= 22 && id <= 24)) t = T[BLOCKS[id].key + '_o'];
+    if (!fancy && LEAF[id]) t = T[BLOCKS[id].key + '_o'];
     return t;
   }
   function logRot(id, meta, f) { if (!LOGAX[id] || !meta) return 0; if (meta === 1) return (f === 2 || f === 3 || f === 4 || f === 5) ? 1 : 0; return (f === 0 || f === 1 || f === 2 || f === 3) ? 1 : 0; }
@@ -1348,14 +1541,13 @@ function meshChunk(B, M, L, bio, opts) {
     const rt = RTYPE[id], meta = M[pi];
     setTint(TINT[id], x, z, meta);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
-      const trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(id >= 22 && id <= 24 && !fancy);
+      const leaves = LEAF[id] === 1, trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(leaves && !fancy);
       const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
-      const leaves = rt === RT.CUTOUT && id >= 22 && id <= 24;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
         if (OPQ[nb]) continue;
         const F = FACES[f];
-        if (nb === id && (SELFCULL[id] || (leaves && !fancy))) continue;
+        if (nb === id && (SELFCULL[id] || (leaves && !fancy)) && (!HASV[id] || M[ni] === meta)) continue;
         if (trans && nb && RTYPE[nb] === RT.CUBE) continue;
         const tile = cubeTile(id, meta, f, x, y, z);
         let flip = false;
@@ -1379,7 +1571,8 @@ function meshChunk(B, M, L, bio, opts) {
         quad(buf, fl, CS, tile, 0, 0, 16, 16, rot, L4, SH4, flip);
       }
     } else if (rt === RT.CROSS || rt === RT.CROP) {
-      const tile = id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : FT[id * 4];
+      const age = meta & 7, stg = age >= 7 ? 3 : age >= 4 ? 2 : age >= 2 ? 1 : 0;
+      const tile = id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : id === 255 ? T[['carrots', 'potatoes', 'beetroots', 'carrots'][(meta >> 3) & 3] + '_stage' + stg] : HASV[id] ? VT[id * 16 + (meta & 15)] : FT[id * 4];
       flatLight(x, y, z);
       const sh = SH4; sh[0] = sh[1] = sh[2] = sh[3] = 1;
       const planes = rt === RT.CROSS
@@ -1463,9 +1656,9 @@ function meshChunk(B, M, L, bio, opts) {
         const atEdge = (F.n[0] > 0 && bx[3] === 16) || (F.n[0] < 0 && bx[0] === 0) || (F.n[1] > 0 && bx[4] === 16) || (F.n[1] < 0 && bx[1] === 0) || (F.n[2] > 0 && bx[5] === 16) || (F.n[2] < 0 && bx[2] === 0);
         const nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2];
         if (atEdge && OPQ[blk(nx, ny, nz)]) continue;
-        if (atEdge && (id === 156 || id === 117 || id === 173) && blk(nx, ny, nz) === id) continue;
+        if (atEdge && (id === 156 || id === 117 || id === 173 || id === 254) && blk(nx, ny, nz) === id) continue;
         if (atEdge && id === 51 && F.n[1] === 0 && blk(nx, ny, nz) === 51 && M[pidx(nx, ny, nz)] >= meta) continue;
-        if (atEdge && F.n[1] === 0 && (id >= 109 && id <= 111) && blk(nx, ny, nz) === id && (M[pidx(nx, ny, nz)] & 1) === (meta & 1)) continue;
+        if (atEdge && F.n[1] === 0 && (id >= 109 && id <= 111 || id === 250) && blk(nx, ny, nz) === id && M[pidx(nx, ny, nz)] === meta) continue;
         if (atEdge) flatLight(nx, ny, nz); else flatLight(x, y, z);
         if (atEdge && id !== 51 && id !== 57 && !(id >= 109 && id <= 111)) { const own = lightAt(x, y, z), nl = lightAt(nx, ny, nz); if (((own >> 4) + (own & 15)) > ((nl >> 4) + (nl & 15))) flatLight(x, y, z); }
         SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
@@ -1476,7 +1669,7 @@ function meshChunk(B, M, L, bio, opts) {
         if (F.n[1] > 0) { u0 = bx[0]; u1 = bx[3]; v0 = bx[2]; v1 = bx[5]; }
         else if (F.n[1] < 0) { u0 = bx[0]; u1 = bx[3]; v0 = 16 - bx[5]; v1 = 16 - bx[2]; }
         else { v0 = 16 - bx[4]; v1 = 16 - bx[1]; }
-        let tile = FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)], rot = 0;
+        let tile = HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)], rot = 0;
         if (FACING[id] && f === DIR_FACE[meta & 3]) tile = FT[id * 4 + 3];
         if (id === 95) { // bed
           const fac = meta & 3, head = meta & 4;
@@ -1484,9 +1677,9 @@ function meshChunk(B, M, L, bio, opts) {
           else if (f === 3) { tile = T.oak_planks; }
           else if (bi > 0) tile = T.oak_planks;
           else { tile = T.bed_side; v0 = 3; v1 = 9; }
-        } else if (id === 96) { tile = meta & 8 ? T.oak_door_top : T.oak_door_bottom; if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = T.oak_planks; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
+        } else if (DOOR[id]) { tile = meta & 8 ? FT[id * 4 + 1] : FT[id * 4]; if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = id === 96 ? T.oak_planks : FT[id * 4]; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
         else if (id === 97) { u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
-        else if (id === 99) { // lantern pixels
+        else if (id === 99 || id === 244) { // lantern pixels
           if (bi === 0) { if (F.n[1]) { u0 = 0; u1 = 6; v0 = 9; v1 = 15; } else { u0 = 0; u1 = 6; v0 = 2; v1 = 9; } }
           else if (bi === 1) { u0 = 1; u1 = 5; v0 = F.n[1] ? 10 : 0; v1 = F.n[1] ? 14 : 2; }
           else { u0 = 11; u1 = 13; v0 = 1; v1 = 7; }
@@ -1507,6 +1700,12 @@ function meshChunk(B, M, L, bio, opts) {
           else { tile = T.piston_side; rot = rotFor(f, DIR6[fd]) ^ 1; u0 = 0; u1 = 16; v0 = 6; v1 = 10; }
         } else if (id === 132) { tile = bi === 3 && f === 2 ? T.anvil_top : T.anvil; if (bi === 3 && f === 2) rot = rotFor(2, DIRS[meta & 3]); }
         else if (id === 167 && bi === 1) { tile = T.end_portal_frame_eye; }
+        else if (id === 225) { if (bi === 0 && f === 2) { tile = meta & 8 ? T.comparator_on : T.comparator; rot = rotFor(2, DIRS[(meta & 3) ^ 2]); } else if (bi > 0) { tile = (bi === 3 ? meta & 4 : meta & 8) ? T.redstone_torch : T.redstone_torch_off; u0 = 7; u1 = 9; if (F.n[1]) { v0 = 6; v1 = 8; } else { v0 = 6; v1 = 11; } } }
+        else if (id === 233 && bi === 5) { tile = (meta & 15) >= 8 ? T.composter_ready : T.composter_compost; }
+        else if (id === 233 && bi > 0 && F.n[1] > 0) { tile = T.composter_top; }
+        else if (id === 224 && bi === 0 && f === 2) { tile = T.hopper_top; }
+        else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
+        else if (id === 246) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; }
         if (id === 57 && f === 2 && (meta & 7) > 0) tile = T.farmland_wet;
         if (id === 51 || id === 57) setTint(0);
         quad(OUT, OFL, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
@@ -1550,7 +1749,9 @@ function meshChunk(B, M, L, bio, opts) {
   return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
+const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+  COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, tileFor,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
