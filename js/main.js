@@ -272,6 +272,7 @@ function frame(now) {
   // atlas animation (water/lava) ~8 fps
   if ((frame.anim = (frame.anim || 0) + dt) > 0.125) { animateAtlas(frame.anim); frame.anim = 0; atlasTex.needsUpdate = true; }
   R.updateRain(dt, px, py, pz, W.rain);
+  ambientParticles(dt, px, py, pz);
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;
   t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); t0 = performance.now();
   // overlays & HUD
@@ -306,6 +307,33 @@ function panoramaFrame(dt) {
   const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
   if ((panoramaFrame.anim = (panoramaFrame.anim || 0) + dt) > 0.125) { animateAtlas(panoramaFrame.anim); panoramaFrame.anim = 0; atlasTex.needsUpdate = true; }
   R.renderFrame(dt, camera.position, null); R.rd = rd;
+}
+// torch flames/smoke and lit furnaces near the player (light sources rescanned twice a second)
+let ambT = 0, ambList = [];
+function ambientParticles(dt, px, py, pz) {
+  if ((ambT -= dt) <= 0) {
+    ambT = 0.5; ambList = [];
+    const bx = Math.floor(px), by = Math.floor(py), bz = Math.floor(pz);
+    for (let x = bx - 12; x <= bx + 12; x++) for (let z = bz - 12; z <= bz + 12; z++) {
+      const c = chunkAt(x >> 4, z >> 4); if (!c) continue;
+      for (let y = Math.max(0, by - 8); y <= Math.min(CH - 1, by + 8); y++) {
+        const i = (y << 8) | ((z & 15) << 4) | (x & 15), b = c.blocks[i];
+        if (b === BID.torch || b === BID.lit_furnace) ambList.push(x, y, z, b, c.meta[i]);
+      }
+    }
+    if (ambList.length > 200) ambList.length = 200;
+  }
+  for (let k = 0; k < ambList.length; k += 5) {
+    if (Math.random() > dt * 4) continue;
+    const x = ambList[k], y = ambList[k + 1], z = ambList[k + 2], b = ambList[k + 3], m = ambList[k + 4];
+    if (b === BID.torch) {
+      let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.2; }
+      R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
+      if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
+    } else if (Math.random() < 0.3) {
+      R.simpleParticle(x + 0.3 + Math.random() * 0.4, y + 0.2 + Math.random() * 0.3, z + 0.3 + Math.random() * 0.4, [1, 0.6, 0.15], { vx: 0, vz: 0, vy: 0.1, size: 0.05, life: 0.4, grav: 0 });
+    }
+  }
 }
 // adaptive resolution: keep frame rate up on weak GPUs (e.g. Chromebooks)
 function autoRes() {
