@@ -208,6 +208,7 @@ function playerTick() {
   // eye height (sneak)
   const targetEye = PL.sneaking ? 1.27 : 1.62; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
   if (!spec) survivalTick(inWater, inLava, eyeF);
+  if (PL.onGround && !spec) plateCheck(PL);
   interactTick();
 }
 function survivalTick(inWater, inLava, eyeF) {
@@ -303,6 +304,8 @@ function breakBlock(x, y, z) {
   // multi-block
   if (id === BID.oak_door) { const oy = m & 8 ? -1 : 1; if (getBlock(x, y + oy, z) === id) setBlock(x, y + oy, z, 0, 0, { noUpdate: true }); }
   if (id === BID.red_bed) { const d = DIRS[m & 3], s = (m & 4) ? -1 : 1; if (getBlock(x + d[0] * s, y, z + d[2] * s) === id) setBlock(x + d[0] * s, y, z + d[2] * s, 0, 0, { noUpdate: true }); }
+  if ((id === BID.piston || id === BID.sticky_piston) && (m & 8)) { const d = S.DIR6[m & 7]; if (getBlock(x + d[0], y + d[1], z + d[2]) === BID.piston_head) setBlock(x + d[0], y + d[1], z + d[2], 0, 0, { noUpdate: true }); }
+  if (id === BID.piston_head) { const d = S.DIR6[m & 7], bx = x - d[0], by = y - d[1], bz = z - d[2], bb = getBlock(bx, by, bz); if (bb === BID.piston || bb === BID.sticky_piston) { setBlock(bx, by, bz, 0); if (!creative()) dropItem(bx + .5, by + .3, bz + .5, bb, 1); } }
   let repl = 0;
   if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
   setBlock(x, y, z, repl);
@@ -367,6 +370,10 @@ function interactBlock(t, dry) {
     case BID.chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
     case BID.red_bed: if (!dry) trySleep(x, y, z); return true;
+    case BID.lever: case BID.stone_button: case BID.repeater: if (!dry) useSwitch(x, y, z, id, m); return true;
+    case BID.anvil: if (!dry) UI.openScreen('anvil', { x, y, z }); return true;
+    case BID.smithing_table: if (!dry) UI.openScreen('smithing', { x, y, z }); return true;
+    case BID.end_portal_frame: { const h = PL.held(); if (h && h.id === IID.ender_eye && !(m & 4)) { if (!dry) { setMeta(x, y, z, m | 4); consume(); play('portal', { vol: 0.4 }); checkEndPortal(x, y, z); } return true; } return false; }
     case BID.tnt: { const h = PL.held(); if (h && h.id === IID.flint_and_steel) { if (!dry) { setBlock(x, y, z, 0); primeTNT(x, y, z); damageItem(INV.slots, INV.sel, 1); } return true; } return false; }
   }
   return false;
@@ -457,6 +464,12 @@ function placeBlock(t, d) {
   if (id === BID.torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern) meta = t.ny === -1 ? 1 : 0;
+  if (id === BID.redstone_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
+  if (id === BID.lever || id === BID.stone_button) { const a = S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === -t.ny && v[2] === -t.nz); if (a < 0 || !SOLID[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = a; }
+  if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate) && !supportedBy(below)) return;
+  if (id === BID.repeater) meta = fd;
+  if (id === BID.piston || id === BID.sticky_piston) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
+  if (id === BID.nether_wart && below !== BID.soul_sand) return;
   if (id === BID.glow_lichen) { meta = t.ny === 1 ? 0 : t.ny === -1 ? 1 : t.nz === 1 ? 2 : t.nz === -1 ? 3 : t.nx === 1 ? 4 : 5; }
   if (b.facing) meta = (fd + 2) & 3;
   if (S.LOGAX[id]) meta = t.nx ? 1 : t.nz ? 2 : 0;
@@ -488,7 +501,7 @@ function placeBlock(t, d) {
 }
 function pickBlock() {
   const t = TARGET; if (!t || t.type !== 'block') return;
-  let id = t.id; if (id === BID.lit_furnace) id = BID.furnace; if (id === BID.wheat) id = IID.wheat_seeds; if (id === BID.farmland) id = BID.dirt;
+  let id = t.id; if (id === BID.lit_furnace) id = BID.furnace; if (id === BID.redstone_wire) id = IID.redstone; if (id === BID.unlit_redstone_torch) id = BID.redstone_torch; if (id === BID.lit_redstone_lamp) id = BID.redstone_lamp; if (id === BID.nether_wart) id = IID.nether_wart; if (id === BID.wheat) id = IID.wheat_seeds; if (id === BID.farmland) id = BID.dirt;
   if (!ITEMS[id]) return;
   const i = INV.slots.findIndex(s => s && s.id === id);
   if (i >= 0 && i < 9) { INV.sel = i; }

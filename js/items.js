@@ -5,7 +5,8 @@ const { CH, BLOCKS, BID, RT, TOOL } = S;
 const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
-const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner']);
+const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
@@ -23,13 +24,13 @@ let nextId = 256;
 function item(key, name, o = {}) { const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
 // materials: [name prefix, harvest tier, mining speed, durability, colors]
 const MATS = {
-  wooden: ['나무', 1, 2, 59], stone: ['돌', 2, 4, 131], iron: ['철', 3, 6, 250], golden: ['금', 1, 12, 32], diamond: ['다이아몬드', 4, 8, 1561] };
+  wooden: ['나무', 1, 2, 59], stone: ['돌', 2, 4, 131], iron: ['철', 3, 6, 250], golden: ['금', 1, 12, 32], diamond: ['다이아몬드', 4, 8, 1561], netherite: ['네더라이트', 4, 9, 2031] };
 const TOOL_DMG = {
-  sword: { wooden: [4, 1.6], stone: [5, 1.6], iron: [6, 1.6], golden: [4, 1.6], diamond: [7, 1.6] },
-  axe: { wooden: [7, 0.8], stone: [9, 0.8], iron: [9, 0.9], golden: [7, 1.0], diamond: [9, 1.0] },
-  pickaxe: { wooden: [2, 1.2], stone: [3, 1.2], iron: [4, 1.2], golden: [2, 1.2], diamond: [5, 1.2] },
-  shovel: { wooden: [2.5, 1], stone: [3.5, 1], iron: [4.5, 1], golden: [2.5, 1], diamond: [5.5, 1] },
-  hoe: { wooden: [1, 1], stone: [1, 2], iron: [1, 3], golden: [1, 1], diamond: [1, 4] } };
+  sword: { wooden: [4, 1.6], stone: [5, 1.6], iron: [6, 1.6], golden: [4, 1.6], diamond: [7, 1.6], netherite: [8, 1.6] },
+  axe: { wooden: [7, 0.8], stone: [9, 0.8], iron: [9, 0.9], golden: [7, 1.0], diamond: [9, 1.0], netherite: [10, 1.0] },
+  pickaxe: { wooden: [2, 1.2], stone: [3, 1.2], iron: [4, 1.2], golden: [2, 1.2], diamond: [5, 1.2], netherite: [6, 1.2] },
+  shovel: { wooden: [2.5, 1], stone: [3.5, 1], iron: [4.5, 1], golden: [2.5, 1], diamond: [5.5, 1], netherite: [6.5, 1] },
+  hoe: { wooden: [1, 1], stone: [1, 2], iron: [1, 3], golden: [1, 1], diamond: [1, 4], netherite: [1, 4] } };
 const TOOL_NAME = { sword: '검', pickaxe: '곡괭이', axe: '도끼', shovel: '삽', hoe: '괭이' };
 const TOOL_TYPE = { sword: TOOL.SWORD, pickaxe: TOOL.PICK, axe: TOOL.AXE, shovel: TOOL.SHOVEL, hoe: TOOL.HOE };
 
@@ -68,11 +69,21 @@ item('shears', '가위', { stack: 1, dur: 238 });
 item('egg', '달걀', { stack: 16 });
 item('saddle', '안장', { stack: 1 }); item('name_tag', '이름표');
 item('ink_sac', '먹물 주머니'); item('glow_ink_sac', '발광 먹물 주머니');
+// Nether & End
+item('netherite_scrap', '네더라이트 파편'); item('netherite_ingot', '네더라이트 주괴');
+item('quartz', '네더 석영'); item('glowstone_dust', '발광석 가루'); item('nether_brick', '네더 벽돌');
+item('nether_wart', '네더 사마귀', { place: BID.nether_wart, plant: 1 });
+item('blaze_rod', '블레이즈 막대', { fuel: 2400 }); item('blaze_powder', '블레이즈 가루');
+item('ghast_tear', '가스트의 눈물'); item('magma_cream', '마그마 크림'); item('fire_charge', '화염구');
+item('ender_pearl', '엔더 진주', { stack: 16 }); item('ender_eye', '엔더의 눈');
+item('slime_ball', '슬라임볼');
+item('oak_boat', '참나무 보트', { stack: 1, fuel: 1200 });
 for (const m of Object.keys(MATS)) for (const t of ['sword', 'pickaxe', 'axe', 'shovel', 'hoe']) {
   const [pre, tier, speed, dur] = MATS[m]; const [dmg, as] = TOOL_DMG[t][m];
   item(m + '_' + t, pre + ' ' + TOOL_NAME[t], { stack: 1, dur, tool: { type: TOOL_TYPE[t], tier, speed, dmg, as, mat: m, kind: t }, fuel: m === 'wooden' ? 200 : 0 });
 }
-const ARMOR = { leather: ['가죽', [1, 3, 2, 1], [55, 80, 75, 65], 0], golden: ['금', [2, 5, 3, 1], [77, 112, 105, 91], 0], iron: ['철', [2, 6, 5, 2], [165, 240, 225, 195], 0], diamond: ['다이아몬드', [3, 8, 6, 3], [363, 528, 495, 429], 2] };
+const ARMOR = { leather: ['가죽', [1, 3, 2, 1], [55, 80, 75, 65], 0], golden: ['금', [2, 5, 3, 1], [77, 112, 105, 91], 0], iron: ['철', [2, 6, 5, 2], [165, 240, 225, 195], 0], diamond: ['다이아몬드', [3, 8, 6, 3], [363, 528, 495, 429], 2],
+  netherite: ['네더라이트', [3, 8, 6, 3], [407, 592, 555, 481], 3] };
 const ARMOR_PART = [['helmet', '헬멧'], ['chestplate', '흉갑'], ['leggings', '레깅스'], ['boots', '부츠']];
 for (const m of Object.keys(ARMOR)) ARMOR_PART.forEach(([k, nm], slot) => {
   const [pre, pts, durs, tough] = ARMOR[m];
@@ -82,6 +93,10 @@ for (const m of Object.keys(ARMOR)) ARMOR_PART.forEach(([k, nm], slot) => {
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence']) ITEMS[IID[k]].fuel = k === 'oak_slab' ? 150 : 300;
 for (const k of ['oak_sapling', 'spruce_sapling', 'birch_sapling', 'white_wool']) ITEMS[IID[k]].fuel = 100;
 ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
+// netherite floats in lava and never burns; redstone dust places wire
+for (const k in IID) if (k.startsWith('netherite') || k === 'ancient_debris') ITEMS[IID[k]].fireproof = 1;
+ITEMS[IID.redstone].place = BID.redstone_wire;
+for (const k of ['lever', 'stone_button', 'stone_pressure_plate', 'repeater', 'redstone_torch']) ITEMS[IID[k]].name = BLOCKS[BID[k]].name;
 
 const itemName = id => ITEMS[id] ? ITEMS[id].name : '?';
 const maxStack = id => ITEMS[id] ? ITEMS[id].stack : 64;
@@ -101,7 +116,7 @@ function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) =>
 // Java-like roll: modified level -> weighted pick of applicable enchantments
 function rollEnchant(id, level, seed) {
   const r = S.rng(seed), kinds = enchKinds(id), d = ITEMS[id];
-  const ability = d.tool ? ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10 })[d.tool.mat] : d.armor ? ({ leather: 15, golden: 25, iron: 9, diamond: 10 })[d.armor.mat] : 1;
+  const ability = d.tool ? ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10, netherite: 15 })[d.tool.mat] : d.armor ? ({ leather: 15, golden: 25, iron: 9, diamond: 10, netherite: 15 })[d.armor.mat] : 1;
   let L = level + 1 + r.int(Math.floor(ability / 4) + 1) + r.int(Math.floor(ability / 4) + 1);
   L = Math.max(1, Math.round(L * (1 + (r() + r() - 1) * 0.15)));
   const pool = Object.keys(ENCH).filter(k => ENCH[k][2].some(t => kinds.includes(t)));
@@ -113,7 +128,7 @@ function rollEnchant(id, level, seed) {
 
 // ---------- recipes ----------
 const TAGS = {
-  planks: [BID.oak_planks, BID.spruce_planks, BID.birch_planks],
+  planks: [BID.oak_planks, BID.spruce_planks, BID.birch_planks, BID.crimson_planks, BID.warped_planks],
   logs: [BID.oak_log, BID.spruce_log, BID.birch_log],
   stone_crafting: [BID.cobblestone, BID.cobbled_deepslate],
   coals: [IID.coal, IID.charcoal],
@@ -125,13 +140,13 @@ function shaped(out, n, pattern, keys) {
   RECIPES.push({ out: typeof out === 'number' ? out : IID[out], n, p: pattern, k });
 }
 function shapeless(out, n, ings) { RECIPES.push({ out: IID[out], n, s: ings.map(v => TAGS[v] || [IID[v]]) }); }
-[['oak_log', 'oak_planks'], ['spruce_log', 'spruce_planks'], ['birch_log', 'birch_planks']].forEach(([l, p]) => shapeless(p, 4, [l]));
+[['oak_log', 'oak_planks'], ['spruce_log', 'spruce_planks'], ['birch_log', 'birch_planks'], ['crimson_stem', 'crimson_planks'], ['warped_stem', 'warped_planks']].forEach(([l, p]) => shapeless(p, 4, [l]));
 shaped('stick', 4, ['#', '#'], { '#': 'planks' });
 shaped('crafting_table', 1, ['##', '##'], { '#': 'planks' });
 shaped('furnace', 1, ['###', '# #', '###'], { '#': 'stone_crafting' });
 shaped('chest', 1, ['###', '# #', '###'], { '#': 'planks' });
 shaped('torch', 4, ['C', 'S'], { C: 'coals', S: 'stick' });
-const HEADS = { wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond' };
+const HEADS = { wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond' }; // netherite gear comes from the smithing table
 for (const m in HEADS) {
   const X = HEADS[m];
   shaped(m + '_pickaxe', 1, ['XXX', ' S ', ' S '], { X, S: 'stick' });
@@ -148,7 +163,7 @@ for (const [m, X] of [['leather', 'leather'], ['iron', 'iron_ingot'], ['golden',
 }
 const STORAGE = [['iron_block', 'iron_ingot'], ['gold_block', 'gold_ingot'], ['diamond_block', 'diamond'], ['emerald_block', 'emerald'], ['lapis_block', 'lapis_lazuli'],
   ['redstone_block', 'redstone'], ['coal_block', 'coal'], ['raw_iron_block', 'raw_iron'], ['raw_gold_block', 'raw_gold'], ['raw_copper_block', 'raw_copper'],
-  ['copper_block', 'copper_ingot'], ['hay_block', 'wheat'], ['iron_ingot', 'iron_nugget'], ['gold_ingot', 'gold_nugget']];
+  ['copper_block', 'copper_ingot'], ['hay_block', 'wheat'], ['iron_ingot', 'iron_nugget'], ['gold_ingot', 'gold_nugget'], ['netherite_block', 'netherite_ingot'], ['slime_block', 'slime_ball']];
 for (const [b, i] of STORAGE) { shaped(b, 1, ['###', '###', '###'], { '#': i }); shapeless(i, 9, [b]); }
 shaped('melon', 1, ['###', '###', '###'], { '#': 'melon_slice' });
 shaped('bricks', 1, ['##', '##'], { '#': 'brick' });
@@ -192,6 +207,34 @@ shapeless('bone_meal', 3, ['bone']);
 shaped('spyglass', 1, ['A', 'C', 'C'], { A: 'amethyst_shard', C: 'copper_ingot' });
 shaped('tinted_glass', 2, [' A ', 'AGA', ' A '], { A: 'amethyst_shard', G: 'glass' });
 shapeless('mossy_cobblestone', 1, ['cobblestone', 'moss_block']);
+shapeless('mossy_stone_bricks', 1, ['stone_bricks', 'moss_block']);
+// redstone
+shaped('redstone_torch', 1, ['R', 'S'], { R: 'redstone', S: 'stick' });
+shaped('lever', 1, ['S', 'C'], { S: 'stick', C: 'cobblestone' });
+shapeless('stone_button', 1, ['stone']);
+shaped('stone_pressure_plate', 1, ['##'], { '#': 'stone' });
+shaped('repeater', 1, ['TRT', 'SSS'], { T: 'redstone_torch', R: 'redstone', S: 'stone' });
+shaped('piston', 1, ['PPP', 'CIC', 'CRC'], { P: 'planks', C: 'cobblestone', I: 'iron_ingot', R: 'redstone' });
+shaped('sticky_piston', 1, ['S', 'P'], { S: 'slime_ball', P: 'piston' });
+shaped('redstone_lamp', 1, [' R ', 'RGR', ' R '], { R: 'redstone', G: 'glowstone' });
+// village & utility
+shaped('anvil', 1, ['BBB', ' I ', 'III'], { B: 'iron_block', I: 'iron_ingot' });
+shaped('smithing_table', 1, ['II', '##', '##'], { I: 'iron_ingot', '#': 'planks' });
+shaped('iron_bars', 16, ['###', '###'], { '#': 'iron_ingot' });
+shaped('oak_boat', 1, ['# #', '###'], { '#': 'oak_planks' });
+// nether & end
+shaped('glowstone', 1, ['##', '##'], { '#': 'glowstone_dust' });
+shaped('quartz_block', 1, ['##', '##'], { '#': 'quartz' });
+shaped('nether_bricks', 1, ['##', '##'], { '#': 'nether_brick' });
+shaped('nether_brick_fence', 6, ['B#B', 'B#B'], { B: 'nether_bricks', '#': 'nether_brick' });
+shaped('nether_wart_block', 1, ['###', '###', '###'], { '#': 'nether_wart' });
+shaped('magma_block', 1, ['##', '##'], { '#': 'magma_cream' });
+shaped('end_stone_bricks', 4, ['##', '##'], { '#': 'end_stone' });
+shapeless('netherite_ingot', 1, ['netherite_scrap', 'netherite_scrap', 'netherite_scrap', 'netherite_scrap', 'gold_ingot', 'gold_ingot', 'gold_ingot', 'gold_ingot']);
+shapeless('blaze_powder', 2, ['blaze_rod']);
+shapeless('ender_eye', 1, ['ender_pearl', 'blaze_powder']);
+shapeless('magma_cream', 1, ['blaze_powder', 'slime_ball']);
+shapeless('fire_charge', 3, ['gunpowder', 'blaze_powder', 'coals']);
 
 function matchRecipe(grid, w) { // grid: array of item ids (0 = empty), w = width (2 or 3)
   const h = grid.length / w;
@@ -232,7 +275,8 @@ const SMELT = {};
  ['raw_iron', 'iron_ingot', 0.7], ['raw_gold', 'gold_ingot', 1], ['raw_copper', 'copper_ingot', 0.7],
  ['iron_ore', 'iron_ingot', 0.7], ['gold_ore', 'gold_ingot', 1], ['copper_ore', 'copper_ingot', 0.7],
  ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35],
- ['wet_sponge', 'sponge', 0], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
+ ['wet_sponge', 'sponge', 0], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
+ ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
   .forEach(([a, b, xp]) => { if (IID[a] != null && IID[b] != null) SMELT[IID[a]] = [IID[b], xp]; });
 
 // ---------- drops ----------
@@ -271,7 +315,7 @@ function blockDrops(b, meta, stack) {
   // silk touch keeps the block itself; fortune multiplies ore drops (applied after the switch)
   if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(b); return res; }
   const fortune = enchLv(stack, 'fortune');
-  const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore'].includes(d.key);
+  const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore', 'nether_quartz_ore', 'nether_gold_ore', 'glowstone'].includes(d.key);
   if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1; for (const it of r0.items) res.items.push([it[0], it[1] * mul]); res.xp = r0.xp; return res; }
   if (!canHarvest(b, stack)) {
     if (b === BID.cobweb && t && t.type === TOOL.SWORD) add('string');
@@ -311,6 +355,15 @@ function blockDrops(b, meta, stack) {
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
     case 'spawner': res.xp = ri(15, 43); break;
     case 'lit_furnace': add('furnace'); break;
+    case 'glowstone': add('glowstone_dust', ri(2, 4)); break;
+    case 'nether_quartz_ore': add('quartz'); res.xp = ri(2, 5); break;
+    case 'nether_gold_ore': add('gold_nugget', ri(2, 6)); res.xp = ri(0, 1); break;
+    case 'redstone_wire': add('redstone'); break;
+    case 'redstone_torch': case 'unlit_redstone_torch': add('redstone_torch'); break;
+    case 'redstone_lamp': case 'lit_redstone_lamp': add('redstone_lamp'); break;
+    case 'nether_wart': add('nether_wart', meta >= 3 ? ri(2, 4) : 1); break;
+    case 'piston_head': case 'fire': case 'nether_portal': case 'end_portal': break;
+    case 'crimson_roots': case 'warped_roots': add(b); break;
     case 'cobweb': add('string'); break;
     case 'powder_snow': break;
     case 'glow_lichen': if (shears) add(b); break;

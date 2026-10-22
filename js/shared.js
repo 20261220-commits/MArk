@@ -293,8 +293,8 @@ function shapes(id, meta) {
     case 125: { // lever: meta = attached side (DIR6 index) | on<<3
       const a = meta & 7, on = meta & 8;
       const base = [[4, 0, 5, 12, 3, 11], [4, 13, 5, 12, 16, 11], [4, 5, 0, 12, 11, 3], [4, 5, 13, 12, 11, 16], [0, 5, 4, 3, 11, 12], [13, 5, 4, 16, 11, 12]][a];
-      const h = on ? [[9, 3, 7, 11, 10, 9], [9, 6, 7, 11, 13, 9], [7, 9, 3, 9, 11, 10], [7, 9, 6, 9, 11, 13], [3, 9, 7, 10, 11, 9], [6, 9, 7, 13, 11, 9]][a]
-        : [[5, 3, 7, 7, 10, 9], [5, 6, 7, 7, 13, 9], [7, 5, 3, 9, 7, 10], [7, 5, 6, 9, 7, 13], [3, 5, 7, 10, 7, 9], [6, 5, 7, 13, 7, 9]][a];
+      const h = on ? [[9, 3, 7, 11, 10, 9], [9, 6, 7, 11, 13, 9], [7, 2, 3, 9, 8, 5], [7, 2, 11, 9, 8, 13], [3, 2, 7, 5, 8, 9], [11, 2, 7, 13, 8, 9]][a]
+        : [[5, 3, 7, 7, 10, 9], [5, 6, 7, 7, 13, 9], [7, 8, 3, 9, 14, 5], [7, 8, 11, 9, 14, 13], [3, 8, 7, 5, 14, 9], [11, 8, 7, 13, 14, 9]][a];
       return [base, h];
     }
     case 126: { const a = meta & 7, t = meta & 8 ? 1 : 2; return [[[5, 0, 6, 11, t, 10], [5, 16 - t, 6, 11, 16, 10], [5, 6, 0, 11, 10, t], [5, 6, 16 - t, 11, 10, 16], [0, 6, 5, t, 10, 11], [16 - t, 6, 5, 16, 10, 11]][a]]; }
@@ -308,7 +308,7 @@ function shapes(id, meta) {
       return [[[0, 4, 0, 16, 16, 16], [0, 0, 0, 16, 12, 16], [0, 0, 4, 16, 16, 16], [0, 0, 0, 16, 16, 12], [4, 0, 0, 16, 16, 16], [0, 0, 0, 12, 16, 16]][meta & 7]];
     }
     case 131: { const f = meta & 7; return [[[0, 0, 0, 16, 4, 16], [0, 12, 0, 16, 16, 16], [0, 0, 0, 16, 16, 4], [0, 0, 12, 16, 16, 16], [0, 0, 0, 4, 16, 16], [12, 0, 0, 16, 16, 16]][f],
-      [[6, 4, 6, 10, 16, 10], [6, 0, 6, 10, 12, 10], [6, 6, 4, 10, 10, 16], [6, 6, 0, 10, 10, 12], [4, 6, 6, 16, 10, 10], [0, 6, 6, 12, 10, 10]][f]]; }
+      [[6, 4, 6, 10, 20, 10], [6, -4, 6, 10, 12, 10], [6, 6, 4, 10, 10, 20], [6, 6, -4, 10, 10, 12], [4, 6, 6, 20, 10, 10], [-4, 6, 6, 12, 10, 10]][f]]; } // the arm reaches 4px into the base
     case 132: { const f = meta & 3; return [rotBox([2, 0, 2, 14, 4, 14], f), rotBox([4, 4, 3, 12, 5, 13], f), rotBox([6, 5, 4, 10, 10, 12], f), rotBox([3, 10, 0, 13, 16, 16], f)]; }
     case 134: return [[0, 0, 0, 16, 15, 16]];
     case 156: return [(meta & 1) ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10]];
@@ -852,6 +852,8 @@ function meshChunk(B, M, L, bio, opts) {
   findTop: for (; maxY > 0; maxY--) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) if (B[pidx(x, maxY, z)]) break findTop;
   const QU = new Uint16Array(8);
   // emits a quad; uvs given as [u0,v0,u1,v1] px within tile, rot 0..3
+  const D6F = [3, 2, 5, 4, 1, 0]; // DIR6 index -> face index
+  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
     QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
@@ -964,8 +966,6 @@ function meshChunk(B, M, L, bio, opts) {
     const du = U[0] * d[0] + U[1] * d[1] + U[2] * d[2], dr = Rt[0] * d[0] + Rt[1] * d[1] + Rt[2] * d[2];
     return du > 0.5 ? 0 : dr > 0.5 ? 1 : du < -0.5 ? 2 : dr < -0.5 ? 3 : 0;
   }
-  const D6F = [3, 2, 5, 4, 1, 0]; // DIR6 index -> face index
-  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104;
   // redstone dust: flat lines toward connections, climbing up blocks, coloured by power
   function wire(x, y, z, meta) {
     const conn = [0, 0, 0, 0], up = [0, 0, 0, 0], above = OPQ[blk(x, y + 1, z)];
@@ -1089,7 +1089,7 @@ function meshChunk(B, M, L, bio, opts) {
   return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
-return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS,
+return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 

@@ -144,7 +144,10 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (old !== id) relight(x, y, z, old, id);
   markDirty(x, z);
   if (W.onBlockChanged) W.onBlockChanged(x, y, z, old, id);
-  if (!opts.noUpdate) { neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz); }
+  if (!opts.noUpdate) {
+    neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz);
+    if ((BLOCKS[old] && BLOCKS[old].rs) || (BLOCKS[id] && BLOCKS[id].rs)) rsNotify(x, y, z);
+  }
   return true;
 }
 function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); }
@@ -184,6 +187,15 @@ function neighborUpdate(x, y, z) {
   if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (d.connect) updateConnections(x, y, z, b);
+  if (d.rs || b === BID.oak_door || b === BID.tnt) {
+    if (d.rs === 'torch' || d.rs === 'lever' || d.rs === 'button') { const a = d.rs === 'torch' ? torchAttach(x, y, z, m) : switchAttach(x, y, z, m); if (!SOLID[getBlock(a[0], a[1], a[2])] && !(d.rs === 'torch' && m === 0 && supportedBy(getBlock(a[0], a[1], a[2])))) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; } }
+    else if ((d.rs === 'wire' || d.rs === 'repeater' || d.rs === 'plate') && !supportedBy(below)) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; }
+    else if (d.rs === 'head') { const f = m & 7, bk = S.DIR6[f]; const base = getBlock(x - bk[0], y - bk[1], z - bk[2]); if (base !== BID.piston && base !== BID.sticky_piston) { setBlock(x, y, z, 0); return; } }
+    else if (d.rs === 'piston' && (m & 8)) { const f = m & 7, fw = S.DIR6[f]; if (getBlock(x + fw[0], y + fw[1], z + fw[2]) !== BID.piston_head) setMeta(x, y, z, m & ~8); }
+    rsMark(x, y, z);
+  }
+  // any block change can reroute dust next to it
+  for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === BID.redstone_wire) { rsMark(x + dx, y + dy, z + dz); break; }
 }
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {

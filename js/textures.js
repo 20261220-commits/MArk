@@ -336,7 +336,8 @@ function maskDraw(p, pts, cols) {
 }
 const MATC = { wooden: [hex(0xc29d62), hex(0x9c7b47), hex(0x6b5433), hex(0x46351d)], stone: [hex(0xa8a8a8), hex(0x838383), hex(0x5c5c5c), hex(0x3a3a3a)],
   iron: [hex(0xffffff), hex(0xd8d8d8), hex(0x9a9a9a), hex(0x4f4f4f)], golden: [hex(0xfffd9e), hex(0xf2d43a), hex(0xbf8f1b), hex(0x6e4e0a)],
-  diamond: [hex(0xd2fff8), hex(0x4aedd9), hex(0x1aa59a), hex(0x0c5c55)], leather: [hex(0xc88a5a), hex(0xa0603a), hex(0x7a4424), hex(0x4f2a14)] };
+  diamond: [hex(0xd2fff8), hex(0x4aedd9), hex(0x1aa59a), hex(0x0c5c55)], leather: [hex(0xc88a5a), hex(0xa0603a), hex(0x7a4424), hex(0x4f2a14)],
+  netherite: [hex(0x6a6266), hex(0x4d4649), hex(0x3a3436), hex(0x221e1f)] };
 const HANDLE = [hex(0x8a6a3b), hex(0x5e4422)];
 function handle(p, x0, y0, x1, y1) { line(p, x0, y0, x1, y1, HANDLE[0]); line(p, x0 + 1, y0, x1 + 1, y1, HANDLE[1]); }
 function toolSprite(kind, m) {

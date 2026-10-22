@@ -67,6 +67,21 @@ function play(name, opt = {}) {
     case 'hiss': noiseHit(t, 1.0, 6000, 0.7, 'highpass', 0.2 * v); break;
     case 'spider': for (let i = 0; i < 3; i++) noiseHit(t + i * 0.08, 0.06, 2500, 2, 'bandpass', 0.15 * v); break;
     case 'bleat': tone(t, 0.4, 400, 300, 'sawtooth', 0.1 * v); break;
+    case 'piston': noiseHit(t, 0.15, 700 * (opt.pitch || 1), 2, 'bandpass', 0.4 * v); tone(t, 0.1, 180, 120, 'square', 0.08 * v); break;
+    case 'portal': { const c = AU.ctx, o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(opt.trigger ? 900 : 260, t + (opt.trigger ? 3 : 1.5)); const lfo = c.createOscillator(); lfo.frequency.value = 7; const lg = c.createGain(); lg.gain.value = 30; lfo.connect(lg); lg.connect(o.frequency); const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.12 * v, t + 0.3); g.gain.exponentialRampToValueAtTime(0.001, t + (opt.trigger ? 3.2 : 1.6)); o.connect(g); g.connect(AU.master); o.start(t); lfo.start(t); o.stop(t + 3.3); lfo.stop(t + 3.3); break; }
+    case 'ignite': noiseHit(t, 0.25, 2500, 1, 'bandpass', 0.35 * v); break;
+    case 'fireball': noiseHit(t, 0.6, 500, 0.7, 'lowpass', 0.6 * v, 0.6); break;
+    case 'ghast': tone(t, 0.9, 700 + Math.random() * 200, 300, 'sawtooth', 0.08 * v); tone(t, 0.9, 1400, 600, 'sine', 0.05 * v); break;
+    case 'blaze': noiseHit(t, 0.5, 350, 1, 'lowpass', 0.25 * v, 0.8); tone(t, 0.4, 90, 70, 'sawtooth', 0.1 * v); break;
+    case 'slime': noiseHit(t, 0.12, 400, 2, 'lowpass', 0.3 * v); break;
+    case 'hmm': tone(t, 0.25, 210 + Math.random() * 40, 170, 'sawtooth', 0.1 * v); tone(t + 0.22, 0.2, 180, 230, 'sawtooth', 0.08 * v); break;
+    case 'trade': tone(t, 0.2, 260, 330, 'triangle', 0.15 * v); tone(t + 0.18, 0.25, 330, 300, 'triangle', 0.12 * v); break;
+    case 'golem': noiseHit(t, 0.3, 200, 1, 'lowpass', 0.5 * v); break;
+    case 'enderman': tone(t, 0.6, 140, 70, 'sawtooth', 0.12 * v); noiseHit(t, 0.4, 900, 3, 'bandpass', 0.08 * v); break;
+    case 'teleport': tone(t, 0.25, 300, 900, 'sine', 0.15 * v); break;
+    case 'growl': noiseHit(t, 1.6, 150, 0.6, 'lowpass', 0.9 * v, 0.5); tone(t, 1.4, 70, 45, 'sawtooth', 0.25 * v); break;
+    case 'anvil': tone(t, 0.3, 1800, 1700, 'triangle', 0.15 * v); noiseHit(t, 0.08, 3000, 3, 'bandpass', 0.3 * v); break;
+    case 'boat': noiseHit(t, 0.2, 900, 1, 'lowpass', 0.15 * v); break;
     case 'thunder': noiseHit(t, 2.5, 120, 0.4, 'lowpass', 1.0 * v, 0.3); break;
   }
 }

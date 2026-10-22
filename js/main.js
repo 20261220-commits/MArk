@@ -190,6 +190,7 @@ function gameTick() {
   playerTick();
   entityTick();
   tickScheduled();
+  rsTick();
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
   if (W.tickN % 10 === 0 && dayFactor() < 1.01) trySpawnHostile();
