@@ -1,31 +1,36 @@
 // Entities: shared AABB physics, mobs with box models, items, XP orbs, arrows, TNT, falling blocks.
 const ENT = [];
-const _bx = [];
+// collision boxes gathered into one reusable flat buffer (6 numbers per box) to avoid GC churn
+let BX = new Float64Array(6 * 256), NBX = 0;
 const PHYS = { snowSolid: false }; // set while moving a player in leather boots
+function pushBox(x0, y0, z0, x1, y1, z1) {
+  if ((NBX + 1) * 6 > BX.length) { const nb = new Float64Array(BX.length * 2); nb.set(BX); BX = nb; }
+  const o = NBX++ * 6; BX[o] = x0; BX[o + 1] = y0; BX[o + 2] = z0; BX[o + 3] = x1; BX[o + 4] = y1; BX[o + 5] = z1;
+}
 function gatherBoxes(x0, y0, z0, x1, y1, z1) {
-  _bx.length = 0;
+  NBX = 0;
   const ax = Math.floor(x0), bx = Math.floor(x1), ay = Math.floor(y0) - 1, by = Math.floor(y1), az = Math.floor(z0), bz = Math.floor(z1);
   for (let x = ax; x <= bx; x++) for (let z = az; z <= bz; z++) {
-    if (!isLoaded(x, z)) { _bx.push([x, ay, z, x + 1, by + 1, z + 1]); continue; }
+    if (!isLoaded(x, z)) { pushBox(x, ay, z, x + 1, by + 1, z + 1); continue; }
     for (let y = ay; y <= by; y++) {
-      if (y < 0) { _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
+      if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
-      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
+      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const bs = S.collide(id, getMeta(x, y, z));
-      if (!bs) { _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
-      for (const b of bs) _bx.push([x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16]);
+      if (!bs) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      for (const b of bs) pushBox(x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16);
     }
   }
-  return _bx;
+  return NBX;
 }
 // move an AABB entity (x,y,z = feet centre, w = half width, h = height); stepUp for players/mobs
 function physMove(e, dx, dy, dz, stepUp = 0) {
-  const w = e.w, eps = 1e-7;
-  const bx = gatherBoxes(e.x - w + Math.min(dx, 0) - 1, e.y + Math.min(dy, 0), e.z - w + Math.min(dz, 0) - 1, e.x + w + Math.max(dx, 0) + 1, e.y + e.h + Math.max(dy, 0) + stepUp, e.z + w + Math.max(dz, 0) + 1);
+  const w = e.w, h = e.h, eps = 1e-7;
+  const n = gatherBoxes(e.x - w + Math.min(dx, 0) - eps, e.y + Math.min(dy, 0), e.z - w + Math.min(dz, 0) - eps, e.x + w + Math.max(dx, 0) + eps, e.y + h + Math.max(dy, 0) + stepUp, e.z + w + Math.max(dz, 0) + eps);
   const odx = dx, ody = dy, odz = dz;
-  const clipY = (x, y, z, d) => { for (const b of bx) { if (b[3] <= x - w + eps || b[0] >= x + w - eps || b[5] <= z - w + eps || b[2] >= z + w - eps) continue; if (d > 0 && b[1] >= y + e.h - eps) d = Math.min(d, b[1] - (y + e.h)); else if (d < 0 && b[4] <= y + eps) d = Math.max(d, b[4] - y); } return d; };
-  const clipX = (x, y, z, d) => { for (const b of bx) { if (b[4] <= y + eps || b[1] >= y + e.h - eps || b[5] <= z - w + eps || b[2] >= z + w - eps) continue; if (d > 0 && b[0] >= x + w - eps) d = Math.min(d, b[0] - (x + w)); else if (d < 0 && b[3] <= x - w + eps) d = Math.max(d, b[3] - (x - w)); } return d; };
-  const clipZ = (x, y, z, d) => { for (const b of bx) { if (b[4] <= y + eps || b[1] >= y + e.h - eps || b[3] <= x - w + eps || b[0] >= x + w - eps) continue; if (d > 0 && b[2] >= z + w - eps) d = Math.min(d, b[2] - (z + w)); else if (d < 0 && b[5] <= z - w + eps) d = Math.max(d, b[5] - (z - w)); } return d; };
+  const clipY = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 3] <= x - w + eps || BX[i] >= x + w - eps || BX[i + 5] <= z - w + eps || BX[i + 2] >= z + w - eps) continue; if (d > 0 && BX[i + 1] >= y + h - eps) d = Math.min(d, BX[i + 1] - (y + h)); else if (d < 0 && BX[i + 4] <= y + eps) d = Math.max(d, BX[i + 4] - y); } return d; };
+  const clipX = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 4] <= y + eps || BX[i + 1] >= y + h - eps || BX[i + 5] <= z - w + eps || BX[i + 2] >= z + w - eps) continue; if (d > 0 && BX[i] >= x + w - eps) d = Math.min(d, BX[i] - (x + w)); else if (d < 0 && BX[i + 3] <= x - w + eps) d = Math.max(d, BX[i + 3] - (x - w)); } return d; };
+  const clipZ = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 4] <= y + eps || BX[i + 1] >= y + h - eps || BX[i + 3] <= x - w + eps || BX[i] >= x + w - eps) continue; if (d > 0 && BX[i + 2] >= z + w - eps) d = Math.min(d, BX[i + 2] - (z + w)); else if (d < 0 && BX[i + 5] <= z - w + eps) d = Math.max(d, BX[i + 5] - (z - w)); } return d; };
   let x = e.x, y = e.y, z = e.z;
   dy = clipY(x, y, z, dy); y += dy;
   dx = clipX(x, y, z, dx); x += dx;

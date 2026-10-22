@@ -123,7 +123,7 @@ function damageItem(arr, i, n = 1) {
 // ---------- movement ----------
 function blockUnder() { return getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.2), Math.floor(PL.z)); }
 function inBlock(f) { return boxBlocks(PL, f); }
-function noCollision(x, y, z) { const bx = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + PL.h, z + PL.w); for (const b of bx) if (b[3] > x - PL.w && b[0] < x + PL.w && b[4] > y && b[1] < y + PL.h && b[5] > z - PL.w && b[2] < z + PL.w) return false; return true; }
+function noCollision(x, y, z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + PL.h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y && BX[i + 1] < y + PL.h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
 function playerTick() {
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.bobPrev = PL.bob;
   if (PL.attackT < 1000) PL.attackT++;
