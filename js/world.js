@@ -348,7 +348,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m.o, m.t, m.ver]);
+    W.meshInbox.push([c, m, m.ver]);
   }
 }
 function addChunk(cx, cz, d, tiles) {
@@ -430,7 +430,7 @@ function rleEnc(a) {
 }
 function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 function saveChunk(c) {
-  if (!c.modified) return; c.modified = false;
+  if (!c.modified || W.pano) return; c.modified = false;
   const k = c.cx + ',' + c.cz; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   const rec = c.edited ? { v: 2, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
@@ -481,8 +481,8 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
 function processInbox(budgetMs, maxMeshes) {
   const t0 = performance.now(); let uploads = 0;
   while (W.meshInbox.length && uploads < maxMeshes) {
-    const [c, o, t, ver] = W.meshInbox.shift();
-    if (W.chunks.get(c.key) === c && ver === c.ver && W.onMesh) { W.onMesh(c, o, t); uploads++; }
+    const [c, m, ver] = W.meshInbox.shift();
+    if (W.chunks.get(c.key) === c && ver === c.ver && W.onMesh) { W.onMesh(c, m); uploads++; }
     if (performance.now() - t0 > budgetMs) return;
   }
   while (W.inbox.length) {

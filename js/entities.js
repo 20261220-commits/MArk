@@ -339,7 +339,7 @@ function mobTick(e) {
       else { mx = -tz * 0.5; mz = tx * 0.5; }
       if (e.attackCd <= 0 && dist < 15 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z)) {
         e.attackCd = 40 + Math.floor(Math.random() * 20);
-        const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + 1.1 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz);
+        const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + PL.h / 3 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz); // MC aims at 1/3 of target height
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
         shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, 1.2);
       }
@@ -544,6 +544,7 @@ R.onChunkUnloaded = c => {
 };
 function saveChunkMobs(c) { saveChunk(c); }
 W.onChunkLoaded = (c, fresh) => {
+  if (W.pano) return; // title screen world stays empty and is never saved
   if (fresh) spawnAnimalsForChunk(c);
   if (c.mobs) for (const [t, x, y, z, baby, sh] of c.mobs) spawnMob(t, x, y, z, { baby, sheared: sh });
 };

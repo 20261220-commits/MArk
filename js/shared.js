@@ -680,7 +680,8 @@ Buf.prototype.out = function (flip) {
 };
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
-  const O = new Buf(), Tr = new Buf(), oFlip = [], tFlip = [];
+  // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), oFlip = [], cFlip = [], tFlip = [];
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -747,7 +748,8 @@ function meshChunk(B, M, L, bio, opts) {
     const rt = RTYPE[id], meta = M[pi];
     setTint(TINT[id], x, z);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
-      const trans = rt === RT.TRANS, buf = trans ? Tr : O, fl = trans ? tFlip : oFlip;
+      const trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(id >= 22 && id <= 24 && !fancy);
+      const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
       const leaves = rt === RT.CUTOUT && id >= 22 && id <= 24;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
@@ -791,8 +793,8 @@ function meshChunk(B, M, L, bio, opts) {
         const p0 = [x + a[0] + ox, y + yo, z + a[1] + oz], p1 = [x + b[0] + ox, y + yo, z + b[1] + oz];
         const cs = [[p0[0], p0[1], p0[2]], [p1[0], p1[1], p1[2]], [p1[0], p1[1] + 1, p1[2]], [p0[0], p0[1] + 1, p0[2]]];
         const cb2 = [cs[1], cs[0], cs[3], cs[2]];
-        quad(O, oFlip, cs, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
-        quad(O, oFlip, cb2, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
+        quad(Cu, cFlip, cs, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
+        quad(Cu, cFlip, cb2, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
       }
     } else if (rt === RT.TORCH) {
       flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
@@ -804,9 +806,9 @@ function meshChunk(B, M, L, bio, opts) {
         if (f === 3 && meta) continue;
         const F = FACES[f];
         for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? bx1 : bx0); CS[k][1] = y + oy + (c[1] ? by1 : 0); CS[k][2] = z + (c[2] ? bz1 : bz0); }
-        if (f === 2) quad(O, oFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
-        else if (f === 3) quad(O, oFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
-        else quad(O, oFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
+        if (f === 2) quad(Cu, cFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
+        else if (f === 3) quad(Cu, cFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
+        else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
       }
     } else if (rt === RT.BOX) {
       const boxes = shapes(id, meta);
@@ -853,7 +855,7 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 44 && F.n[1] === 0 && f !== DIR_FACE[meta & 3]) tile = T.chest_side;
         if (id === 57 && f === 2 && (meta & 7) > 0) tile = T.farmland_wet;
         if (id === 51 || id === 57) setTint(0);
-        quad(O, oFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
+        quad(Cu, cFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
       }
     }
   }
@@ -891,7 +893,7 @@ function meshChunk(B, M, L, bio, opts) {
       if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
-  return { o: O.out(oFlip), t: Tr.out(tFlip) };
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
 return { CW, CH, SEA, CVOL, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS,
@@ -906,8 +908,9 @@ function workerMain(S) {
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
     } else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);
-      const tr = [r.o.pos.buffer, r.o.uv.buffer, r.o.lt.buffer, r.o.col.buffer, r.o.idx.buffer, r.t.pos.buffer, r.t.uv.buffer, r.t.lt.buffer, r.t.col.buffer, r.t.idx.buffer, m.B.buffer, m.M.buffer, m.L.buffer];
-      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
+      const tr = [m.B.buffer, m.M.buffer, m.L.buffer];
+      for (const k of ['o', 'c', 't']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
+      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
     }
   };
 }

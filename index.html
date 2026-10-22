@@ -94,6 +94,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #tooltip small{font-size:calc(6*var(--px));color:#aaa}#tooltip small.g{color:#5555ff}
 /* ---------- menus ---------- */
 #menu{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(6 * var(--px));padding:16px;overflow:auto;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)),var(--dirt);background-size:auto,calc(32 * var(--px));image-rendering:pixelated}
+body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.45))}
+body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
@@ -106,7 +108,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .logo{position:relative;text-align:center;margin-bottom:calc(14 * var(--px))}
 .logo span{display:block;font-size:min(calc(34 * var(--px)),15vw);line-height:1;letter-spacing:.04em;color:#cfcfcf;background:var(--stoneTex);background-size:calc(16 * var(--px));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(var(--px) var(--px) 0 #1a1a1a) drop-shadow(calc(2*var(--px)) calc(3*var(--px)) 0 #000) brightness(1.4)}
 .logo em{display:block;font-style:normal;font-size:calc(7 * var(--px));color:#e8e8e8;letter-spacing:.3em;margin-top:calc(3*var(--px));text-shadow:var(--px) var(--px) 0 #000}
-.splash{position:absolute;right:-14%;top:58%;transform:rotate(-18deg);color:#ffff00;font-style:normal;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f00;animation:spl .5s ease-in-out infinite alternate;white-space:nowrap}
+.splash{position:absolute;right:-20%;top:46%;transform:rotate(-18deg);color:#ffff00;font-style:normal;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f00;animation:spl .5s ease-in-out infinite alternate;white-space:nowrap}
 @keyframes spl{to{transform:rotate(-18deg) scale(1.1)}}
 .foot{position:fixed;bottom:calc(2 * var(--px));font-size:calc(7 * var(--px));color:#ddd;text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .foot.l{left:calc(3 * var(--px))}.foot.r{right:calc(3 * var(--px))}

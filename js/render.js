@@ -54,9 +54,11 @@ void main(){
   gl_FragColor = vec4(t.rgb * vTint * vLight, t.a);
   #include <fog_fragment>
 }`;
-const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
+// opaque terrain never discards, so tile-based GPUs keep early depth rejection; cutout geometry has its own material
+const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS.replace('if (t.a < 0.5) discard;', ''), fog: true });
+const matCutout = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
 const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: TRANS_FS, fog: true, transparent: true, depthWrite: false, side: THREE.FrontSide });
-matOpaque.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
+matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
 
 function makeChunkGeo(d) {
@@ -72,19 +74,19 @@ function makeChunkGeo(d) {
   g.boundingBox = new THREE.Box3(new THREE.Vector3(0, lo, 0), new THREE.Vector3(16, hi, 16));
   return g;
 }
-W.onMesh = (c, o, t) => {
-  if (!c.mesh) c.mesh = { o: null, t: null };
-  for (const [k, d, mat] of [['o', o, matOpaque], ['t', t, matTrans]]) {
+W.onMesh = (c, m) => {
+  if (!c.mesh) c.mesh = { o: null, c: null, t: null };
+  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans]]) {
     const old = c.mesh[k];
     if (old) { scene.remove(old); old.geometry.dispose(); c.mesh[k] = null; }
     if (!d.count) continue;
-    const m = new THREE.Mesh(makeChunkGeo(d), mat);
-    m.position.set(c.cx * 16, 0, c.cz * 16); m.matrixAutoUpdate = false; m.updateMatrix();
-    if (k === 't') m.renderOrder = 2;
-    scene.add(m); c.mesh[k] = m;
+    const mesh = new THREE.Mesh(makeChunkGeo(d), mat);
+    mesh.position.set(c.cx * 16, 0, c.cz * 16); mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+    if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
+    scene.add(mesh); c.mesh[k] = mesh;
   }
 };
-W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
+W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
 
 // ---------- sky ----------
@@ -302,7 +304,7 @@ R.updateHand = updateHand;
 // ---------- frame ----------
 const SKY_DAY = new THREE.Color(0x78a7ff), FOG_DAY = new THREE.Color(0xc0d8ff), SKY_NIGHT = new THREE.Color(0x000000), FOG_NIGHT = new THREE.Color(0x0a0c14);
 const DUSK = new THREE.Color(0xff8a3a), WATER_FOG = new THREE.Color(0x0b2a6a), LAVA_FOG = new THREE.Color(0xc04a10), RAIN_SKY = new THREE.Color(0x5a6470);
-const tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
+const tmpC = new THREE.Color(), tmpC2 = new THREE.Color(), fogCol = new THREE.Color(), sunDir = new THREE.Vector3(), lookV = new THREE.Vector3(); // reused every frame (no GC churn)
 R.rd = 6; R.fov = 70; R.fovMul = 1;
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -314,14 +316,14 @@ R.resize = resize;
 function renderFrame(dt, eye, under) {
   const day = dayFactor();
   const cel = celestial(), ang = cel * Math.PI * 2;
-  const sunDir = new THREE.Vector3(-Math.sin(ang), Math.cos(ang), 0.1).normalize();
+  sunDir.set(-Math.sin(ang), Math.cos(ang), 0.1).normalize();
   // sky colors
   tmpC.copy(SKY_NIGHT).lerp(SKY_DAY, day); tmpC2.copy(FOG_NIGHT).lerp(FOG_DAY, day);
   if (W.rain > 0) { tmpC.lerp(RAIN_SKY, W.rain * 0.6 * day); tmpC2.lerp(RAIN_SKY, W.rain * 0.6 * day); }
   const duskAmt = Math.max(0, 1 - Math.abs(sunDir.y) * 3.2) * (1 - W.rain);
   skyMat.uniforms.top.value.copy(tmpC); skyMat.uniforms.bottom.value.copy(tmpC2);
   skyMat.uniforms.glow.value.copy(DUSK); skyMat.uniforms.glowAmt.value = duskAmt * 0.85; skyMat.uniforms.glowDir.value.set(sunDir.x > 0 ? 1 : -1, 0, 0);
-  const fogCol = tmpC2.clone(); if (duskAmt > 0) { const look = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation); const f = Math.max(0, look.x * (sunDir.x > 0 ? 1 : -1)); fogCol.lerp(DUSK, duskAmt * f * 0.5); }
+  fogCol.copy(tmpC2); if (duskAmt > 0) { lookV.set(0, 0, -1).applyEuler(camera.rotation); const f = Math.max(0, lookV.x * (sunDir.x > 0 ? 1 : -1)); fogCol.lerp(DUSK, duskAmt * f * 0.5); }
   const rd = R.rd * 16;
   if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.3 + day * 0.7); fog.near = 1; fog.far = 32; }
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
@@ -338,7 +340,7 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = 0.18 + 0.82 * day;
-  for (const m of [matOpaque, matTrans]) { m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();

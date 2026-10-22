@@ -94,6 +94,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #tooltip small{font-size:calc(6*var(--px));color:#aaa}#tooltip small.g{color:#5555ff}
 /* ---------- menus ---------- */
 #menu{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(6 * var(--px));padding:16px;overflow:auto;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)),var(--dirt);background-size:auto,calc(32 * var(--px));image-rendering:pixelated}
+body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.45))}
+body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
@@ -106,7 +108,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .logo{position:relative;text-align:center;margin-bottom:calc(14 * var(--px))}
 .logo span{display:block;font-size:min(calc(34 * var(--px)),15vw);line-height:1;letter-spacing:.04em;color:#cfcfcf;background:var(--stoneTex);background-size:calc(16 * var(--px));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(var(--px) var(--px) 0 #1a1a1a) drop-shadow(calc(2*var(--px)) calc(3*var(--px)) 0 #000) brightness(1.4)}
 .logo em{display:block;font-style:normal;font-size:calc(7 * var(--px));color:#e8e8e8;letter-spacing:.3em;margin-top:calc(3*var(--px));text-shadow:var(--px) var(--px) 0 #000}
-.splash{position:absolute;right:-14%;top:58%;transform:rotate(-18deg);color:#ffff00;font-style:normal;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f00;animation:spl .5s ease-in-out infinite alternate;white-space:nowrap}
+.splash{position:absolute;right:-20%;top:46%;transform:rotate(-18deg);color:#ffff00;font-style:normal;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f00;animation:spl .5s ease-in-out infinite alternate;white-space:nowrap}
 @keyframes spl{to{transform:rotate(-18deg) scale(1.1)}}
 .foot{position:fixed;bottom:calc(2 * var(--px));font-size:calc(7 * var(--px));color:#ddd;text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .foot.l{left:calc(3 * var(--px))}.foot.r{right:calc(3 * var(--px))}
@@ -885,7 +887,8 @@ Buf.prototype.out = function (flip) {
 };
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
-  const O = new Buf(), Tr = new Buf(), oFlip = [], tFlip = [];
+  // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), oFlip = [], cFlip = [], tFlip = [];
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -952,7 +955,8 @@ function meshChunk(B, M, L, bio, opts) {
     const rt = RTYPE[id], meta = M[pi];
     setTint(TINT[id], x, z);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
-      const trans = rt === RT.TRANS, buf = trans ? Tr : O, fl = trans ? tFlip : oFlip;
+      const trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(id >= 22 && id <= 24 && !fancy);
+      const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
       const leaves = rt === RT.CUTOUT && id >= 22 && id <= 24;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
@@ -996,8 +1000,8 @@ function meshChunk(B, M, L, bio, opts) {
         const p0 = [x + a[0] + ox, y + yo, z + a[1] + oz], p1 = [x + b[0] + ox, y + yo, z + b[1] + oz];
         const cs = [[p0[0], p0[1], p0[2]], [p1[0], p1[1], p1[2]], [p1[0], p1[1] + 1, p1[2]], [p0[0], p0[1] + 1, p0[2]]];
         const cb2 = [cs[1], cs[0], cs[3], cs[2]];
-        quad(O, oFlip, cs, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
-        quad(O, oFlip, cb2, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
+        quad(Cu, cFlip, cs, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
+        quad(Cu, cFlip, cb2, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
       }
     } else if (rt === RT.TORCH) {
       flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
@@ -1009,9 +1013,9 @@ function meshChunk(B, M, L, bio, opts) {
         if (f === 3 && meta) continue;
         const F = FACES[f];
         for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? bx1 : bx0); CS[k][1] = y + oy + (c[1] ? by1 : 0); CS[k][2] = z + (c[2] ? bz1 : bz0); }
-        if (f === 2) quad(O, oFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
-        else if (f === 3) quad(O, oFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
-        else quad(O, oFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
+        if (f === 2) quad(Cu, cFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
+        else if (f === 3) quad(Cu, cFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
+        else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
       }
     } else if (rt === RT.BOX) {
       const boxes = shapes(id, meta);
@@ -1058,7 +1062,7 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 44 && F.n[1] === 0 && f !== DIR_FACE[meta & 3]) tile = T.chest_side;
         if (id === 57 && f === 2 && (meta & 7) > 0) tile = T.farmland_wet;
         if (id === 51 || id === 57) setTint(0);
-        quad(O, oFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
+        quad(Cu, cFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
       }
     }
   }
@@ -1096,7 +1100,7 @@ function meshChunk(B, M, L, bio, opts) {
       if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
-  return { o: O.out(oFlip), t: Tr.out(tFlip) };
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
 return { CW, CH, SEA, CVOL, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS,
@@ -1111,8 +1115,9 @@ function workerMain(S) {
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
     } else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);
-      const tr = [r.o.pos.buffer, r.o.uv.buffer, r.o.lt.buffer, r.o.col.buffer, r.o.idx.buffer, r.t.pos.buffer, r.t.uv.buffer, r.t.lt.buffer, r.t.col.buffer, r.t.idx.buffer, m.B.buffer, m.M.buffer, m.L.buffer];
-      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
+      const tr = [m.B.buffer, m.M.buffer, m.L.buffer];
+      for (const k of ['o', 'c', 't']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
+      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
     }
   };
 }
@@ -2291,7 +2296,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m.o, m.t, m.ver]);
+    W.meshInbox.push([c, m, m.ver]);
   }
 }
 function addChunk(cx, cz, d, tiles) {
@@ -2373,7 +2378,7 @@ function rleEnc(a) {
 }
 function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 function saveChunk(c) {
-  if (!c.modified) return; c.modified = false;
+  if (!c.modified || W.pano) return; c.modified = false;
   const k = c.cx + ',' + c.cz; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   const rec = c.edited ? { v: 2, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
@@ -2424,8 +2429,8 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
 function processInbox(budgetMs, maxMeshes) {
   const t0 = performance.now(); let uploads = 0;
   while (W.meshInbox.length && uploads < maxMeshes) {
-    const [c, o, t, ver] = W.meshInbox.shift();
-    if (W.chunks.get(c.key) === c && ver === c.ver && W.onMesh) { W.onMesh(c, o, t); uploads++; }
+    const [c, m, ver] = W.meshInbox.shift();
+    if (W.chunks.get(c.key) === c && ver === c.ver && W.onMesh) { W.onMesh(c, m); uploads++; }
     if (performance.now() - t0 > budgetMs) return;
   }
   while (W.inbox.length) {
@@ -2497,9 +2502,11 @@ void main(){
   gl_FragColor = vec4(t.rgb * vTint * vLight, t.a);
   #include <fog_fragment>
 }`;
-const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
+// opaque terrain never discards, so tile-based GPUs keep early depth rejection; cutout geometry has its own material
+const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS.replace('if (t.a < 0.5) discard;', ''), fog: true });
+const matCutout = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
 const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: TRANS_FS, fog: true, transparent: true, depthWrite: false, side: THREE.FrontSide });
-matOpaque.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
+matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
 
 function makeChunkGeo(d) {
@@ -2515,19 +2522,19 @@ function makeChunkGeo(d) {
   g.boundingBox = new THREE.Box3(new THREE.Vector3(0, lo, 0), new THREE.Vector3(16, hi, 16));
   return g;
 }
-W.onMesh = (c, o, t) => {
-  if (!c.mesh) c.mesh = { o: null, t: null };
-  for (const [k, d, mat] of [['o', o, matOpaque], ['t', t, matTrans]]) {
+W.onMesh = (c, m) => {
+  if (!c.mesh) c.mesh = { o: null, c: null, t: null };
+  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans]]) {
     const old = c.mesh[k];
     if (old) { scene.remove(old); old.geometry.dispose(); c.mesh[k] = null; }
     if (!d.count) continue;
-    const m = new THREE.Mesh(makeChunkGeo(d), mat);
-    m.position.set(c.cx * 16, 0, c.cz * 16); m.matrixAutoUpdate = false; m.updateMatrix();
-    if (k === 't') m.renderOrder = 2;
-    scene.add(m); c.mesh[k] = m;
+    const mesh = new THREE.Mesh(makeChunkGeo(d), mat);
+    mesh.position.set(c.cx * 16, 0, c.cz * 16); mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+    if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
+    scene.add(mesh); c.mesh[k] = mesh;
   }
 };
-W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
+W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
 
 // ---------- sky ----------
@@ -2745,7 +2752,7 @@ R.updateHand = updateHand;
 // ---------- frame ----------
 const SKY_DAY = new THREE.Color(0x78a7ff), FOG_DAY = new THREE.Color(0xc0d8ff), SKY_NIGHT = new THREE.Color(0x000000), FOG_NIGHT = new THREE.Color(0x0a0c14);
 const DUSK = new THREE.Color(0xff8a3a), WATER_FOG = new THREE.Color(0x0b2a6a), LAVA_FOG = new THREE.Color(0xc04a10), RAIN_SKY = new THREE.Color(0x5a6470);
-const tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
+const tmpC = new THREE.Color(), tmpC2 = new THREE.Color(), fogCol = new THREE.Color(), sunDir = new THREE.Vector3(), lookV = new THREE.Vector3(); // reused every frame (no GC churn)
 R.rd = 6; R.fov = 70; R.fovMul = 1;
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -2757,14 +2764,14 @@ R.resize = resize;
 function renderFrame(dt, eye, under) {
   const day = dayFactor();
   const cel = celestial(), ang = cel * Math.PI * 2;
-  const sunDir = new THREE.Vector3(-Math.sin(ang), Math.cos(ang), 0.1).normalize();
+  sunDir.set(-Math.sin(ang), Math.cos(ang), 0.1).normalize();
   // sky colors
   tmpC.copy(SKY_NIGHT).lerp(SKY_DAY, day); tmpC2.copy(FOG_NIGHT).lerp(FOG_DAY, day);
   if (W.rain > 0) { tmpC.lerp(RAIN_SKY, W.rain * 0.6 * day); tmpC2.lerp(RAIN_SKY, W.rain * 0.6 * day); }
   const duskAmt = Math.max(0, 1 - Math.abs(sunDir.y) * 3.2) * (1 - W.rain);
   skyMat.uniforms.top.value.copy(tmpC); skyMat.uniforms.bottom.value.copy(tmpC2);
   skyMat.uniforms.glow.value.copy(DUSK); skyMat.uniforms.glowAmt.value = duskAmt * 0.85; skyMat.uniforms.glowDir.value.set(sunDir.x > 0 ? 1 : -1, 0, 0);
-  const fogCol = tmpC2.clone(); if (duskAmt > 0) { const look = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation); const f = Math.max(0, look.x * (sunDir.x > 0 ? 1 : -1)); fogCol.lerp(DUSK, duskAmt * f * 0.5); }
+  fogCol.copy(tmpC2); if (duskAmt > 0) { lookV.set(0, 0, -1).applyEuler(camera.rotation); const f = Math.max(0, lookV.x * (sunDir.x > 0 ? 1 : -1)); fogCol.lerp(DUSK, duskAmt * f * 0.5); }
   const rd = R.rd * 16;
   if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.3 + day * 0.7); fog.near = 1; fog.far = 32; }
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
@@ -2781,7 +2788,7 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = 0.18 + 0.82 * day;
-  for (const m of [matOpaque, matTrans]) { m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();
@@ -3134,7 +3141,7 @@ function mobTick(e) {
       else { mx = -tz * 0.5; mz = tx * 0.5; }
       if (e.attackCd <= 0 && dist < 15 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z)) {
         e.attackCd = 40 + Math.floor(Math.random() * 20);
-        const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + 1.1 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz);
+        const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + PL.h / 3 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz); // MC aims at 1/3 of target height
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
         shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, 1.2);
       }
@@ -3339,6 +3346,7 @@ R.onChunkUnloaded = c => {
 };
 function saveChunkMobs(c) { saveChunk(c); }
 W.onChunkLoaded = (c, fresh) => {
+  if (W.pano) return; // title screen world stays empty and is never saved
   if (fresh) spawnAnimalsForChunk(c);
   if (c.mobs) for (const [t, x, y, z, baby, sh] of c.mobs) spawnMob(t, x, y, z, { baby, sheared: sh });
 };
@@ -4449,7 +4457,7 @@ async function startWorld(id, meta) {
   audioInit();
   if (!meta) { const all = await listWorlds(); meta = (all || []).find(w => w.id === id); if (!meta) return; }
   showMenu('loading', '세계를 불러오는 중');
-  resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
+  stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   await loadSavedKeys(meta.id);
   const p = meta.player;
@@ -4502,7 +4510,7 @@ function resumeGame() { if (PL.dead) return; UI.paused = false; showMenu(null); 
 function quitToTitle() {
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title');
+  W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
 }
 addEventListener('pagehide', saveAll);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
@@ -4569,7 +4577,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
   fpsN++; fpsT += dt; if (fpsT >= 1) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; autoRes(); }
-  if (!W.active) { renderer.setClearColor(0x000000); renderer.clear(); return; }
+  if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 4, UI.menu === 'loading' ? 50 : 6); pf('inbox', t0); t0 = performance.now();
@@ -4612,6 +4620,26 @@ function frame(now) {
   renderHud(dt); renderDebug(dt, fps); pf('hud', t0);
   if ((frame.chatT = (frame.chatT || 0) + dt) > 0.5) { frame.chatT = 0; renderChat(); }
 }
+// ---------- title screen panorama: a real generated world, slowly rotating ----------
+const PANO_SEED = 11711;
+function startPanorama() {
+  resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
+  W.pano = true; W.id = ''; W.seed = PANO_SEED; W.time = 1500; W.rain = 0; W.rainTarget = 0;
+  const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
+  document.body.classList.add('pano'); $('hud').hidden = true;
+}
+function stopPanorama() { if (!W.pano) return; W.pano = false; document.body.classList.remove('pano'); }
+function panoramaFrame(dt) {
+  if (UI.menu === 'title' || UI.menu === 'worlds' || UI.menu === 'create' || UI.menu === 'options' || UI.menu === 'controls') {
+    processInbox(4, 4); streamChunks(PL.x, PL.z, 4, { fancy: OPT.fancy, smooth: OPT.smooth }, 3);
+  }
+  PL.yaw += dt * 0.035;
+  camera.position.set(PL.x, PL.y + 1.62, PL.z); camera.rotation.set(PL.pitch, PL.yaw, 0);
+  if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix(); }
+  const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
+  if ((panoramaFrame.anim = (panoramaFrame.anim || 0) + dt) > 0.125) { animateAtlas(panoramaFrame.anim); panoramaFrame.anim = 0; atlasTex.needsUpdate = true; }
+  R.renderFrame(dt, camera.position, null); R.rd = rd;
+}
 // adaptive resolution: keep frame rate up on weak GPUs (e.g. Chromebooks)
 function autoRes() {
   if (!OPT.autoRes || !W.active || UI.paused) return;
@@ -4630,7 +4658,7 @@ function autoRes() {
   await dbOpen();
   if (isTouch) document.body.classList.add('touch');
   buildHud();
-  showMenu('title');
+  showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF };
 })();

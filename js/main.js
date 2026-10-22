@@ -116,7 +116,7 @@ async function startWorld(id, meta) {
   audioInit();
   if (!meta) { const all = await listWorlds(); meta = (all || []).find(w => w.id === id); if (!meta) return; }
   showMenu('loading', '세계를 불러오는 중');
-  resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
+  stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   await loadSavedKeys(meta.id);
   const p = meta.player;
@@ -169,7 +169,7 @@ function resumeGame() { if (PL.dead) return; UI.paused = false; showMenu(null); 
 function quitToTitle() {
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title');
+  W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
 }
 addEventListener('pagehide', saveAll);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
@@ -236,7 +236,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
   fpsN++; fpsT += dt; if (fpsT >= 1) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; autoRes(); }
-  if (!W.active) { renderer.setClearColor(0x000000); renderer.clear(); return; }
+  if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 4, UI.menu === 'loading' ? 50 : 6); pf('inbox', t0); t0 = performance.now();
@@ -279,6 +279,26 @@ function frame(now) {
   renderHud(dt); renderDebug(dt, fps); pf('hud', t0);
   if ((frame.chatT = (frame.chatT || 0) + dt) > 0.5) { frame.chatT = 0; renderChat(); }
 }
+// ---------- title screen panorama: a real generated world, slowly rotating ----------
+const PANO_SEED = 11711;
+function startPanorama() {
+  resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
+  W.pano = true; W.id = ''; W.seed = PANO_SEED; W.time = 1500; W.rain = 0; W.rainTarget = 0;
+  const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
+  document.body.classList.add('pano'); $('hud').hidden = true;
+}
+function stopPanorama() { if (!W.pano) return; W.pano = false; document.body.classList.remove('pano'); }
+function panoramaFrame(dt) {
+  if (UI.menu === 'title' || UI.menu === 'worlds' || UI.menu === 'create' || UI.menu === 'options' || UI.menu === 'controls') {
+    processInbox(4, 4); streamChunks(PL.x, PL.z, 4, { fancy: OPT.fancy, smooth: OPT.smooth }, 3);
+  }
+  PL.yaw += dt * 0.035;
+  camera.position.set(PL.x, PL.y + 1.62, PL.z); camera.rotation.set(PL.pitch, PL.yaw, 0);
+  if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix(); }
+  const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
+  if ((panoramaFrame.anim = (panoramaFrame.anim || 0) + dt) > 0.125) { animateAtlas(panoramaFrame.anim); panoramaFrame.anim = 0; atlasTex.needsUpdate = true; }
+  R.renderFrame(dt, camera.position, null); R.rd = rd;
+}
 // adaptive resolution: keep frame rate up on weak GPUs (e.g. Chromebooks)
 function autoRes() {
   if (!OPT.autoRes || !W.active || UI.paused) return;
@@ -297,7 +317,7 @@ function autoRes() {
   await dbOpen();
   if (isTouch) document.body.classList.add('touch');
   buildHud();
-  showMenu('title');
+  showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF };
 })();
