@@ -15,12 +15,14 @@ class Chunk {
 }
 
 const W = {
-  seed: 0, id: '', chunks: new Map(), time: 1000, rain: 0, rainTarget: 0, rainTimer: 12000,
+  seed: 0, id: '', dim: 0, verSeq: 0, chunks: new Map(), time: 1000, rain: 0, rainTarget: 0, rainTimer: 12000,
   last: null, lastKey: -1,
   saved: new Set(), pending: new Map(), inbox: [], meshInbox: [], pendingMobs: new Map(), // pending: key -> job id | 'load'
   sched: new Map(), tickN: 0,
   onDrop: null, onFall: null, onBlockChanged: null, onChunkLoaded: null, onChunkUnloaded: null,
 };
+const DIM_PREFIX = { 0: '', '-1': 'n', 1: 'e' };
+const dkey = (cx, cz) => DIM_PREFIX[W.dim] + cx + ',' + cz; // save key of a chunk in the current dimension
 function chunkAt(cx, cz) {
   const k = ckey(cx, cz); if (k === W.lastKey) return W.last;
   const c = W.chunks.get(k); if (c) { W.last = c; W.lastKey = k; } return c;
@@ -186,6 +188,8 @@ function neighborUpdate(x, y, z) {
   if (b === BID.glow_lichen) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
   if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
+  if (b === BID.nether_portal) { if (!portalIntact(x, y, z)) setBlock(x, y, z, 0); return; }
+  if (b === BID.fire) { if (!SOLID[below]) setBlock(x, y, z, 0); return; }
   if (d.connect) updateConnections(x, y, z, b);
   if (d.rs || b === BID.oak_door || b === BID.tnt) {
     if (d.rs === 'torch' || d.rs === 'lever' || d.rs === 'button') { const a = d.rs === 'torch' ? torchAttach(x, y, z, m) : switchAttach(x, y, z, m); if (!SOLID[getBlock(a[0], a[1], a[2])] && !(d.rs === 'torch' && m === 0 && supportedBy(getBlock(a[0], a[1], a[2])))) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; } }
@@ -384,6 +388,7 @@ function addChunk(cx, cz, d, tiles) {
   if (tiles) for (const t of tiles) {
     if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'chest', items }); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
+    else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
     else if (t.type) c.tiles.set(t.i, t);
   }
   stitchLight(c);
@@ -393,7 +398,7 @@ function addChunk(cx, cz, d, tiles) {
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
   w.busy++; const id = jobId++; W.pending.set(ckey(cx, cz), id);
-  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz });
+  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim });
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
@@ -419,7 +424,7 @@ function requestMesh(c, opts) {
       }
     }
   }
-  w.busy++; c.meshing = true; c.dirty = false; c.ver++;
+  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; // unique across chunks, so a stale job can never match a reloaded chunk
   w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
@@ -460,7 +465,7 @@ function rleEnc(a) {
 function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 function saveChunk(c) {
   if (!c.modified || W.pano) return; c.modified = false;
-  const k = c.cx + ',' + c.cz; W.saved.add(k);
+  const k = dkey(c.cx, c.cz); W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   const rec = c.edited ? { v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
   dbReq('chunks', 'readwrite', st => st.put(rec, W.id + ':' + k));
@@ -468,10 +473,11 @@ function saveChunk(c) {
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
   const wid = W.id;
-  const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + cx + ',' + cz));
-  if (W.pending.get(key) !== 'load' || wid !== W.id) return;
+  const dk = dkey(cx, cz), dim = W.dim;
+  const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + dk));
+  if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
-  if (!rec || !rec.b) { W.saved.delete(cx + ',' + cz); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
+  if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   const dec = (a, fill) => { const n = 256 * oldH, src = rec.v === 2 ? rleDec(a, n) : a, out = new Uint8Array(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
   W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
@@ -500,7 +506,7 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
   for (const [dx, dz] of spiral) {
     const cx = pcx + dx, cz = pcz + dz, k = ckey(cx, cz);
     if (W.chunks.has(k) || W.pending.has(k)) continue;
-    if (W.saved.has(cx + ',' + cz)) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
+    if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
     if (!requestGen(cx, cz)) break;
   }
   // unload far chunks
@@ -521,7 +527,8 @@ function processInbox(budgetMs, maxMeshes) {
     if (performance.now() - t0 > budgetMs) return;
   }
 }
-function resetWorld() {
+function resetWorld(keepSaved) {
   for (const c of W.chunks.values()) if (W.onChunkUnloaded) W.onChunkUnloaded(c);
-  W.chunks.clear(); W.pending.clear(); W.pendingMobs.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; W.saved = new Set();
+  W.chunks.clear(); W.pending.clear(); W.pendingMobs.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; if (!keepSaved) W.saved = new Set();
+  if (typeof RS !== 'undefined') { RS.dirty.clear(); RS.sched.clear(); }
 }

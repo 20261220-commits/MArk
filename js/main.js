@@ -118,7 +118,7 @@ async function startWorld(id, meta) {
   if (!meta) { const all = await listWorlds(); meta = (all || []).find(w => w.id === id); if (!meta) return; }
   showMenu('loading', '세계를 불러오는 중');
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
-  W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
+  W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   await loadSavedKeys(meta.id);
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
@@ -147,6 +147,7 @@ function worldReady() {
   return have >= need || (performance.now() - loadingFrom > 15000 && chunkAt(pcx, pcz));
 }
 function finishLoading() {
+  if (W.arrive) arriveDim();
   if (W.needSpawnFix) {
     W.needSpawnFix = false;
     let x = Math.floor(PL.x), z = Math.floor(PL.z), y = topY(x, z);
@@ -161,7 +162,7 @@ function saveWorldMeta() {
   if (!W.active || !W.meta) return;
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead']) s[k] = PL[k];
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel };
-  W.meta.time = W.time; W.meta.rain = W.rain; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
+  W.meta.time = W.time; W.meta.rain = W.rain; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
 function saveAll() { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c); }
@@ -193,7 +194,8 @@ function gameTick() {
   rsTick();
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
-  if (W.tickN % 10 === 0 && dayFactor() < 1.01) trySpawnHostile();
+  if (W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
+  if (W.tickN % 40 === 0) ensureDragon();
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
   if (W.tickN % 600 === 0) saveAll();
@@ -272,7 +274,7 @@ function frame(now) {
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
-  R.updateRain(dt, px, py, pz, W.rain);
+  R.updateRain(dt, px, py, pz, W.dim ? 0 : W.rain);
   ambientParticles(dt, px, py, pz);
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;
   t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); t0 = performance.now();
@@ -293,7 +295,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.seed = PANO_SEED; W.time = 1500; W.rain = 0; W.rainTarget = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.time = 1500; W.rain = 0; W.rainTarget = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }

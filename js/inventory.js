@@ -1,6 +1,6 @@
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
-const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur;
+const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name;
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
@@ -35,6 +35,20 @@ function buildSlots(type, ctx) {
     ctx.items = ctx.items || [null, null];
     L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e), max: 1 }));
     L.push(slotRef(ctx.items, 1, { group: 'elapis', accepts: st => !st || st.id === IID.lapis_lazuli }));
+  } else if (type === 'anvil') {
+    ctx.items = ctx.items || [null, null]; ctx.name = ctx.name || '';
+    L.push(slotRef(ctx.items, 0, { group: 'a0', max: 64 }));
+    L.push(slotRef(ctx.items, 1, { group: 'a1' }));
+    L.push({ group: 'result', output: true, get: () => anvilResult(ctx) && anvilResult(ctx).out, set: () => {}, canTake: () => { const r = anvilResult(ctx); return r && (creative() || (PL.level >= r.cost && r.cost < 40)); }, take: () => anvilTake(ctx) });
+  } else if (type === 'smithing') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 's0', accepts: st => !st || !!SMITH_UP[ITEMS[st.id].key], max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 's1', accepts: st => !st || st.id === IID.netherite_ingot }));
+    L.push({ group: 'result', output: true, get: () => smithResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const g = ctx.items[1]; g.n--; if (!g.n) ctx.items[1] = null; play('anvil', { vol: 0.5 }); } });
+  } else if (type === 'trade') {
+    ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
+    L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
+    L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
   } else if (type === 'furnace') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     L.push(slotRef(t.items, 0, { group: 'fin' }));
@@ -51,6 +65,7 @@ function clickSlot(i, btn, shift) {
   const max = id => Math.min(maxStack(id), sl.max || 64);
   if (sl.output) {
     const r = st; if (!r) return;
+    if (sl.canTake && !sl.canTake()) return;
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) INV.giveOrDrop({ id: rr.id, n: left }); sl.take(); break; } sl.take(); } }
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
     else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
@@ -88,6 +103,9 @@ function quickMove(i) {
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
     else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
+    else if (T === 'anvil') targets = idx(s => s.group === (GUI.ctx.items[0] ? 'a1' : 'a0'));
+    else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
+    else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
     if (T === 'creative') targets = [];
@@ -105,7 +123,80 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); }
 function closeScreenItems() {
-  if (GUI.type === 'enchant' && GUI.ctx.items) for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st);
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
+}
+// ---------- anvil (repair, combine, rename) ----------
+const REPAIR_MAT = { wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
+function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null; if (!m) return []; const k = REPAIR_MAT[m]; return TAGS[k] || [IID[k]]; }
+function anvilResult(c) {
+  const a = c.items && c.items[0], b = c.items && c.items[1]; if (!a) return null;
+  const da = ITEMS[a.id], out = { ...a, e: a.e ? { ...a.e } : undefined }; let cost = (a.rp || 0) + (b ? b.rp || 0 : 0), used = 0, changed = false;
+  if (b) {
+    if (da.dur && repairMaterial(a).includes(b.id) && (a.d || 0) > 0) { // repair with raw material: 25% per unit
+      let d = a.d || 0; while (d > 0 && used < b.n) { d = Math.max(0, d - Math.floor(da.dur / 4)); used++; cost++; } out.d = d; changed = true;
+    } else if ((b.id === a.id && da.dur) || (b.id === IID.book && b.e)) { // combine: durability and enchantments
+      if (b.id === a.id) { const keep = (da.dur - (a.d || 0)) + (da.dur - (b.d || 0)) + Math.floor(da.dur * 0.12); out.d = Math.max(0, da.dur - keep); if (out.d < (a.d || 0)) { cost += 2; changed = true; } }
+      const kinds = enchKinds(a.id);
+      for (const [k, lv] of Object.entries(b.e || {})) {
+        if (!ENCH[k] || !(ENCH[k][2].some(t => kinds.includes(t)) || creative())) continue;
+        if (out.e && ENCH_EXCL.some(g => g.includes(k) && g.some(o => o !== k && out.e[o]))) { cost++; continue; }
+        const cur = (out.e && out.e[k]) || 0, nl = cur === lv ? Math.min(ENCH[k][1], lv + 1) : Math.max(cur, lv);
+        out.e = out.e || {}; out.e[k] = nl; cost += nl * (b.id === IID.book ? 1 : 2); changed = true;
+      }
+      used = 1;
+    } else return null;
+  }
+  const nm = (c.name || '').trim();
+  if (nm && nm !== (a.name || da.name)) { out.name = nm; cost++; changed = true; }
+  if (!changed) return null;
+  out.rp = (a.rp || 0) * 2 + 1;
+  if (!out.e) delete out.e;
+  return { out, cost: Math.max(1, cost), used };
+}
+function anvilTake(c) {
+  const r = anvilResult(c); if (!r) return;
+  if (!creative()) PL.level -= r.cost;
+  c.items[0] = null; const b = c.items[1]; if (b) { b.n -= r.used; if (b.n <= 0) c.items[1] = null; }
+  c.name = '';
+  play('anvil');
+  // anvils wear out: 12% chance per use to become chipped, then damaged, then break
+  if (!creative() && Math.random() < 0.12 && c.x != null) { const m = getMeta(c.x, c.y, c.z), dmg = ((m >> 2) & 3) + 1; if (dmg >= 3) { setBlock(c.x, c.y, c.z, 0); play('break', { mat: 'stone' }); setTimeout(() => UI.closeScreen(), 0); } else setMeta(c.x, c.y, c.z, (m & 3) | (dmg << 2)); }
+  UI.hudDirty = true;
+}
+// ---------- smithing table (1.16+: diamond gear + netherite ingot) ----------
+const SMITH_UP = {};
+for (const t of ['sword', 'pickaxe', 'axe', 'shovel', 'hoe', 'helmet', 'chestplate', 'leggings', 'boots']) SMITH_UP['diamond_' + t] = 'netherite_' + t;
+function smithResult(c) {
+  const a = c.items && c.items[0], b = c.items && c.items[1]; if (!a || !b || b.id !== IID.netherite_ingot) return null;
+  const up = SMITH_UP[ITEMS[a.id].key]; if (!up) return null;
+  const nd = ITEMS[IID[up]], od = ITEMS[a.id];
+  const out = { id: IID[up], n: 1 }; if (a.e) out.e = { ...a.e }; if (a.name) out.name = a.name;
+  if (a.d) out.d = Math.round(a.d / od.dur * nd.dur);
+  return out;
+}
+// ---------- villager trading ----------
+function tradeResult(c) {
+  const o = villagerOffers(c.e)[c.sel], p = c.items[0];
+  if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < o.an) return null;
+  const out = { id: o.b, n: o.bn }; if (o.ench) { if (!o.e) { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; o.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; } out.e = { ...o.e }; }
+  return out;
+}
+function tradeTake(c) {
+  const o = villagerOffers(c.e)[c.sel], p = c.items[0];
+  p.n -= o.an; if (p.n <= 0) c.items[0] = null;
+  o.uses++; if (o.ench) o.e = null;
+  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
+  // refill the payment slot from the inventory, like Java does after a trade
+  if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
+}
+function selectTrade(i) {
+  const c = GUI.ctx, o = villagerOffers(c.e)[i]; if (!o) return;
+  c.sel = i;
+  if (c.items[0] && c.items[0].id !== o.a) { INV.giveOrDrop(c.items[0]); c.items[0] = null; }
+  const have = INV.count(o.a), cur = c.items[0] ? c.items[0].n : 0, n = Math.min(have, maxStack(o.a) - cur);
+  if (n > 0) { INV.remove(o.a, n); c.items[0] = { id: o.a, n: cur + n }; }
+  UI.renderScreen();
 }

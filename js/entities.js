@@ -61,8 +61,8 @@ function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Mat
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
-  const sky = cv((l >> 4) / 15 * (0.18 + 0.82 * dayFactor())), blk = cv((l & 15) / 15);
-  return Math.max(0.06, Math.min(1, Math.max(sky, blk * 0.95)));
+  const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv((l & 15) / 15);
+  return Math.max(W.dim === -1 ? 0.28 : 0.06, Math.min(1, Math.max(sky, blk * 0.95)));
 }
 
 // ---------- mob model textures (MC box UV layout) ----------
@@ -415,7 +415,9 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.walk = 0; e.walkAmt = 0; e.hurt = 0; e.inv = 0; e.fire = 0; e.attackCd = 0; e.target = null; e.goal = null; e.panic = 0; e.fuse = 0; e.love = 0; e.baby = opts.baby ? 24000 : 0;
   e.sheared = !!opts.sheared; e.persistent = !d.hostile; e.idleSnd = 200 + Math.random() * 400; e.deathT = 0; e.jumpCd = 0;
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
-  e.mesh = buildModel(type);
+  if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
+  if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; }
+  e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof });
   if (e.baby) e.mesh.scale.setScalar(0.5);
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
@@ -423,20 +425,32 @@ function spawnMob(type, x, y, z, opts = {}) {
 function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e.mesh.userData.parts)) if (n.startsWith('fur_') || n === 'wool' || n === 'whead') p.visible = false; }
 function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
+  if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
   if (e.inv > 0) return false;
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
-  const kl = Math.hypot(kx, kz) || 1; if (kx || kz) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = 0.36; }
+  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
+  // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
+  if (attacker === PL) {
+    if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
+    if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
+    if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
+    if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
+  } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
+  if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
   play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) e.panic = 60;
   if (attacker === PL && e.def.hostile) e.target = PL;
   if (e.hp <= 0) {
     e.deathT = 20;
+    if (e.def.slime) slimeDeath(e);
     if (attacker === PL || src === 'player') {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
-      for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
+      const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
+      if (!noDrop) for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
       if (e.type === 'sheep' && !e.sheared && !e.baby) dropItem(e.x, e.y + .5, e.z, BID.white_wool, 1);
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
-      if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
+      if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
+      if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.def.hostile) UI.advance('hunter');
     }
   }
@@ -457,16 +471,18 @@ function mobTick(e) {
   if (d.hostile && !e.persistent) { if (dist > 128 || (dist > 32 && Math.random() < 1 / 800)) { removeEnt(e); return; } }
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
-  if (e.inLava) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
-  if (e.inWater) e.fire = 0;
+  if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
+  if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
+  mobExtraTick(e, dist);
+  if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed;
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
-  const hostileNow = d.hostile && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
+  const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
   if (hostileNow && plVisible && dist < 16 && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
   if (e.target && (!plVisible || dist > 24)) e.target = null;
   if (e.target) {
@@ -483,9 +499,9 @@ function mobTick(e) {
       }
     } else if (d.explode) {
       if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); explode(e.x, e.y + 0.8, e.z, 3); return; } }
-      else { e.fuse = Math.max(0, e.fuse - 1); mx = tx; mz = tz; }
+      else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
-      mx = tx; mz = tz;
+      [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
       if (dist < (d.w + 1.2) && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
       if (d.climb && e.hitH) { e.vy = 0.2; }
     }
@@ -555,11 +571,13 @@ function attackPlayer(e, dmg, tx, tz) {
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 // ---------- per-tick update ----------
 function entityTick() {
+  PF.budget = 2; // A* searches per tick, shared by all mobs
   for (const e of ENT) {
     if (e.dead) continue;
     e.px = e.x; e.py = e.y; e.pz = e.z; e.pyaw = e.yaw; e.age++;
-    if (!isLoaded(Math.floor(e.x), Math.floor(e.z))) { if (e.kind !== 'mob') removeEnt(e); continue; }
+    if (!isLoaded(Math.floor(e.x), Math.floor(e.z))) { if (e.kind !== 'mob' && e.kind !== 'boat') removeEnt(e); continue; }
     if (e.kind === 'mob') mobTick(e);
+    else if (e.tick) e.tick(e);
     else if (e.kind === 'item' || e.kind === 'xp') {
       const fl = fluidAt(e.x, e.y + 0.1, e.z);
       if (fl) { e.vy += 0.01; e.vy *= 0.9; e.vx *= 0.9; e.vz *= 0.9; } else e.vy -= 0.04;
@@ -590,6 +608,7 @@ function entityTick() {
       e.vy -= 0.04; physMove(e, e.vx, e.vy, e.vz); e.vx *= 0.98; e.vz *= 0.98; e.vy *= 0.98; if (e.onGround) { e.vx *= 0.7; e.vz *= 0.7; }
       if (--e.fuse <= 0) { removeEnt(e); explode(e.x, e.y + 0.49, e.z, 4); }
     } else if (e.kind === 'arrow') arrowTick(e);
+    if (e.kind === 'mob' && !e.dead && e.onGround && (e.age & 3) === 0) plateCheck(e);
   }
   // compact
   if (ENT.some(e => e.dead)) { for (let i = ENT.length - 1; i >= 0; i--) if (ENT[i].dead) ENT.splice(i, 1); }
@@ -600,14 +619,16 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
-    if (e.owner !== PL && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
+    if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
       if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner); const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
+      if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
+      if (o.type === 'enderman') { endermanTeleport(o); continue; }
       hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); removeEnt(e); return;
     }
     e.x = nx; e.y = ny; e.z = nz;
@@ -630,7 +651,8 @@ function trySpawnHostile() {
     if (Math.max(sky, blk) > 7) continue;
     if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
     const types = ['zombie', 'skeleton', 'creeper', 'spider'];
-    const t = types[Math.floor(Math.random() * 4)];
+    const t = overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)];
+    if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
     const n = 1 + Math.floor(Math.random() * 2);
     for (let i = 0; i < n; i++) spawnMob(t, x + .5 + i * 0.3, y, z + .5);
@@ -681,7 +703,9 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0]);
+    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades } : null]);
+    else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw }]);
+    if (e === PL.riding) continue;
     removeEnt(e);
   }
   if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; saveChunkMobs(c); }
@@ -690,7 +714,11 @@ function saveChunkMobs(c) { saveChunk(c); }
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
   if (fresh) spawnAnimalsForChunk(c);
-  if (c.mobs) for (const [t, x, y, z, baby, sh] of c.mobs) spawnMob(t, x, y, z, { baby, sheared: sh });
+  if (c.spawns) { // villagers, golems and crystals placed by structure generation
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
+    c.spawns = null; c.modified = true;
+  }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
 };
 
 // ---------- render update (interpolated) ----------
@@ -699,7 +727,7 @@ function entityRender(alpha, now) {
     if (e.dead || !e.mesh) continue;
     const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha, z = e.pz + (e.z - e.pz) * alpha;
     const dx = x - camera.position.x, dz = z - camera.position.z;
-    const far = dx * dx + dz * dz > Math.min(R.rd * 16, 80) ** 2; // keeps draw calls low on weak GPUs
+    const far = !(e.def && e.def.boss) && dx * dx + dz * dz > Math.min(R.rd * 16, 80) ** 2; // keeps draw calls low on weak GPUs
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {
@@ -714,6 +742,7 @@ function entityRender(alpha, now) {
       if (e.def.water) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }
       if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; const b1 = P['leg' + i].userData.base, b2 = P['legl' + i].userData.base; P['leg' + i].rotation.y = (b1 ? b1.y : (i - 1.5) * 0.35) + s; P['legl' + i].rotation.y = (b2 ? b2.y : -(i - 1.5) * 0.35) - s; }
+      if (e.def.anim) e.def.anim(e, P, now);
       if (!e.matOwn) { // per-mob copies of the shared materials so each mob can be lit / flash red on its own
         const map = new Map();
         e.mesh.traverse(o => { if (o.isMesh && !o.userData.emissive) { let c = map.get(o.material); if (!c) { c = o.material.clone(); map.set(o.material, c); } o.material = c; } });
@@ -730,5 +759,6 @@ function entityRender(alpha, now) {
     else if (e.kind === 'falling') { e.mesh.position.set(x, y + 0.5, z); R.setMeshLight(e.mesh, br); }
     else if (e.kind === 'tnt') { e.mesh.position.set(x, y + 0.5, z); const fl = Math.floor(e.fuse / 5) % 2 === 0; R.setMeshLight(e.mesh, fl ? 2 : br); e.mesh.scale.setScalar(e.fuse < 10 ? 1 + (10 - e.fuse) / 50 : 1); }
     else if (e.kind === 'arrow') { e.mesh.position.set(x, y, z); if (!e.stuck) { e.mesh.lookAt(x + e.vx, y + e.vy, z + e.vz); } R.setMeshLight(e.mesh, br); }
+    else if (e.render) e.render(e, x, y, z, br, now);
   }
 }

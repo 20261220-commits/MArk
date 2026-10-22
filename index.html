@@ -54,6 +54,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #ovWater{background:rgba(20,50,140,.28)}
 #ovSnow{background:radial-gradient(ellipse at center,rgba(230,240,250,.5),rgba(240,248,255,.95))}
 #ovHurt{background:radial-gradient(ellipse at center,transparent 45%,rgba(180,0,0,.9));opacity:0}
+#ovPortal{background:radial-gradient(ellipse at center,rgba(120,40,200,.35),rgba(90,0,170,.85));opacity:0}
+#bossbar{position:fixed;top:calc(4*var(--px));left:50%;transform:translateX(-50%);width:calc(182*var(--px));text-align:center;pointer-events:none;z-index:5}
+#bossbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
+#bossbar .bb{height:calc(5*var(--px));background:#3a0a3a;border:var(--px) solid #1a001a;margin-top:var(--px)}
+#bossbar .bb i{display:block;height:100%;background:linear-gradient(#ff6aff,#c018c0)}
 #ovSleep{background:#000;opacity:0}
 #ovSpy{background:radial-gradient(circle at center,transparent 0,transparent 32vmin,#000 32.4vmin)}
 #ovFire{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}
@@ -101,6 +106,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .eopt span{font-size:calc(6.5*var(--px));white-space:nowrap;overflow:hidden}.eopt b{position:absolute;right:calc(3*var(--px));top:calc(2*var(--px));color:#80ff20;font-weight:400;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #000}
 .eopt small{font-size:calc(5.5*var(--px));color:#4a3a20}.eopt.off{background:#6a6a6a;color:#3a3a3a;cursor:default}.eopt.off b{color:#407810}
 .eopt:not(.off):hover{background:#a8956a}
+#aname{font:inherit;font-size:calc(7*var(--px));background:#000;color:#fff;border:var(--px) solid #a0a0a0;padding:var(--px) calc(3*var(--px));width:calc(110*var(--px))}
+.plus{font-size:calc(10*var(--px));color:#404040}
+.acost{color:#3a9a10}.acost.bad{color:#d03030}
+.toffers{display:flex;flex-direction:column;gap:var(--px);max-height:calc(110*var(--px));overflow-y:auto}
+.toff{display:flex;align-items:center;gap:calc(3*var(--px));background:#8b8b8b;border:var(--px) solid #000;padding:var(--px) calc(3*var(--px));cursor:pointer;font:inherit}
+.toff.on{background:#c8c8a0}.toff.off{opacity:.5}.toff:hover{background:#a0a0a0}
+.toff span{position:relative;display:block;width:calc(16*var(--px));height:calc(16*var(--px))}
+.tarr{width:calc(10*var(--px));height:calc(7*var(--px));background:#404040;clip-path:polygon(0 35%,60% 35%,60% 0,100% 50%,60% 100%,60% 65%,0 65%)}
+.tslots{align-items:flex-start}
 .sl.lapis:empty::after{content:"";width:calc(10*var(--px));height:calc(10*var(--px));background:#2357b5;opacity:.3;clip-path:polygon(50% 0,100% 40%,80% 100%,20% 100%,0 40%)}
 #tooltip small{font-size:calc(6*var(--px));color:#aaa}#tooltip small.g{color:#5555ff}
 /* ---------- menus ---------- */
@@ -174,6 +188,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <div class="ov" id="ovSnow" hidden></div>
 <div class="ov" id="ovFire" hidden></div>
 <div class="ov" id="ovHurt"></div>
+<div class="ov" id="ovPortal"></div>
 <div class="ov" id="ovSpy" hidden></div>
 <div id="hud">
   <div id="cross"></div>
@@ -216,6 +231,8 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/render.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/redstone.js"></script>
+<script src="js/mobs2.js"></script>
+<script src="js/dims.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/player.js"></script>
 <script src="js/ui.js"></script>

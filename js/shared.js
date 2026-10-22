@@ -251,6 +251,12 @@ const BIOMES = [
   ['늪', 0x6a7039, 0x6a7039, 0x617b64, 0.8, 2, 0],
   ['눈 덮인 타이가', 0x80b497, 0x60a17b, 0x3d57d6, -0.5, 6, 3],
   ['얼어붙은 바다', 0x80b497, 0x60a17b, 0x3938c9, 0.0, 0, 0],
+  ['네더 황무지', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['진홍빛 숲', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['뒤틀린 숲', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['영혼 모래 골짜기', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['현무암 삼각주', 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['디 엔드', 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0],
 ];
 const BIO = { OCEAN: 0, PLAINS: 1, FOREST: 2, BIRCH: 3, TAIGA: 4, TUNDRA: 5, DESERT: 6, MOUNTAINS: 7, BEACH: 8, RIVER: 9, SWAMP: 10, SNOWY_TAIGA: 11, FROZEN_OCEAN: 12 };
 
@@ -467,7 +473,454 @@ function caveBlobs(seed, ox, oz) {
   return data;
 }
 const ORE_SWAP = { 13: 78, 12: 79, 14: 80, 11: 81, 16: 82, 17: 83, 15: 84 };
-function genChunk(seed, cx, cz) {
+// ---------- structures ----------
+// Every structure is a pure function of the seed, so each chunk stamps only the part
+// of a structure that falls inside it and neighbouring chunks agree without talking.
+function oreVein(blocks, R, id, size, y, repl) {
+  const I = (x, y, z) => (y << 8) | (z << 4) | x;
+  const x = R() * 16, z = R() * 16, a = R() * Math.PI, s8 = size / 8;
+  const xa = x + Math.sin(a) * s8, xb = x - Math.sin(a) * s8, za = z + Math.cos(a) * s8, zb = z - Math.cos(a) * s8, ya = y + R.int(3) - 2, yb = y + R.int(3) - 2;
+  for (let i = 0; i < size; i++) {
+    const t = i / size, px = xa + (xb - xa) * t, py = ya + (yb - ya) * t, pz = za + (zb - za) * t, rr = ((Math.sin(Math.PI * t) + 1) * R() * size / 16 + 1) / 2, r2 = rr * rr;
+    for (let bx = Math.max(0, Math.floor(px - rr)); bx <= Math.min(15, Math.floor(px + rr)); bx++)
+      for (let by = Math.max(1, Math.floor(py - rr)); by <= Math.min(CH - 2, Math.floor(py + rr)); by++)
+        for (let bz = Math.max(0, Math.floor(pz - rr)); bz <= Math.min(15, Math.floor(pz + rr)); bz++) {
+          const dx = bx + .5 - px, dy = by + .5 - py, dz = bz + .5 - pz; if (dx * dx + dy * dy + dz * dz >= r2) continue;
+          const i2 = I(bx, by, bz); if (blocks[i2] === repl) blocks[i2] = id;
+        }
+  }
+}
+// a stamp writes world coordinates into one chunk, ignoring everything outside it
+function makeStamp(blocks, meta, x0, z0) {
+  const st = (wx, y, wz, id, m) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return; const i = (y << 8) | (z << 4) | x; blocks[i] = id; meta[i] = m || 0; };
+  st.get = (wx, y, wz) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return -1; return blocks[(y << 8) | (z << 4) | x]; };
+  st.inside = (ax, az, bx, bz) => bx >= x0 && ax <= x0 + 15 && bz >= z0 && az <= z0 + 15;
+  return st;
+}
+// ---- templates: layers bottom-up, rows north (front) to south, authored with the door facing north ----
+const TPL = {
+  house: { w: 5, d: 5, v: 1, L: [
+    ['#####', '#####', '#####', '#####', '#####'],
+    ['LPDPL', 'P...P', 'GB..G', 'Pbc.P', 'LPPPL'],
+    ['LPdPL', 'PT..P', 'G...G', 'P...P', 'LPGPL'],
+    ['LPPPL', 'P...P', 'P...P', 'P...P', 'LPPPL'],
+    ['vvvvv', 'PPPPP', 'PPPPP', 'PPPPP', '^^^^^'],
+    ['.....', 'vvvvv', 'PPPPP', '^^^^^', '.....'],
+    ['.....', '.....', '_____', '.....', '.....']] },
+  bighouse: { w: 7, d: 6, v: 2, L: [
+    ['#######', '#######', '#######', '#######', '#######', '#######'],
+    ['LPPDPPL', 'P.....P', 'G.....G', 'Pe...cP', 'PE...HP', 'LPPPPPL'],
+    ['LPPdPPL', 'P.T.T.P', 'G.....G', 'P.....P', 'P.....P', 'LPGGGPL'],
+    ['LPPPPPL', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'LPPPPPL'],
+    ['vvvvvvv', 'P.....P', 'P.....P', 'P.....P', 'P.....P', '^^^^^^^'],
+    ['.......', 'vvvvvvv', 'P.....P', 'P.....P', '^^^^^^^', '.......'],
+    ['.......', '.......', 'vvvvvvv', '^^^^^^^', '.......', '.......']] },
+  smith: { w: 7, d: 7, v: 1, prof: 'toolsmith', loot: 'smith', L: [
+    ['#######', '#######', '#######', '#######', '#######', '#######', '#######'],
+    ['KKKDKKK', 'K.....K', 'Kf...XK', 'Kf...aK', 'K.....K', 'KH...cK', 'KKKKKKK'],
+    ['KKKdKKK', 'K.T.T.K', 'G.....G', 'G.....G', 'K.....K', 'K.....K', 'KKGGGKK'],
+    ['KKKKKKK', 'K.....K', 'K.....K', 'K.....K', 'K.....K', 'K.....K', 'KKKKKKK'],
+    ['SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS', 'SSSSSSS']] },
+  library: { w: 7, d: 9, v: 1, prof: 'librarian', L: [
+    ['#######', '#######', '#######', '#######', '#######', '#######', '#######', '#######', '#######'],
+    ['LPPDPPL', 'P.....P', 'k.....k', 'k.....k', 'k.....k', 'k.....k', 'ke....k', 'PE...cP', 'LPPPPPL'],
+    ['LPPdPPL', 'P.T.T.P', 'G.....G', 'k.....k', 'G.....G', 'k.....k', 'G.....G', 'P.....P', 'LPPPPPL'],
+    ['LPPPPPL', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'LPPPPPL'],
+    ['vvvvvvv', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', '^^^^^^^'],
+    ['.......', 'vvvvvvv', 'P.....P', 'P.....P', 'P.....P', 'P.....P', 'P.....P', '^^^^^^^', '.......'],
+    ['.......', '.......', 'vvvvvvv', 'vvvvvvv', '_______', '^^^^^^^', '^^^^^^^', '.......', '.......']] },
+  farm: { w: 9, d: 7, v: 1, prof: 'farmer', L: [
+    ['LLLLLLLLL', 'L=======L', 'L=======L', 'LwwwwwwwL', 'L=======L', 'L=======L', 'LLLLLLLLL'],
+    ['.........', '.WWWWWWW.', '.WWWWWWW.', '.........', '.WWWWWWW.', '.WWWWWWW.', '.........']] },
+  pen: { w: 7, d: 7, v: 1, prof: 'shepherd', animals: 'sheep', L: [
+    ['ggggggg', 'ggggggg', 'ggggggg', 'ggggggg', 'ggggggg', 'ggggggg', 'ggggggg'],
+    ['FFF.FFF', 'F.....F', 'F.....F', 'F..h..F', 'F.....F', 'F.....F', 'FFFFFFF'],
+    ['.......', '.......', '.......', '.......', '.......', '.......', '.......']] },
+  lamp: { w: 1, d: 1, L: [['#'], ['F'], ['F'], ['t']] },
+  well: { w: 6, d: 6, base: -2, golem: 1, L: [
+    ['      ', ' KKKK ', ' KKKK ', ' KKKK ', ' KKKK ', '      '],
+    ['      ', ' KKKK ', ' KwwK ', ' KwwK ', ' KKKK ', '      '],
+    ['pppppp', 'pKKKKp', 'pKwwKp', 'pKwwKp', 'pKKKKp', 'pppppp'],
+    ['......', '.KKKK.', '.K..K.', '.K..K.', '.KKKK.', '......'],
+    ['......', '.F..F.', '......', '......', '.F..F.', '......'],
+    ['......', '.F..F.', '......', '......', '.F..F.', '......'],
+    ['......', '.SSSS.', '.SSSS.', '.SSSS.', '.SSSS.', '......']] },
+};
+// style palettes per village biome: [floor, planks, log, stairs, fence, slab, wall]
+const VSTYLE = {
+  plains: { '#': 4, P: 5, L: 19, st: 113, F: 116, _: 109, K: 4, roof: 1 },
+  taiga: { '#': 4, P: 6, L: 20, st: 113, F: 116, _: 109, K: 4, roof: 1 },
+  snow: { '#': 4, P: 6, L: 20, st: 113, F: 116, _: 109, K: 4, roof: 1 },
+  desert: { '#': 26, P: 26, L: 26, st: 0, F: 116, _: 111, K: 26, roof: 0 },
+};
+const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman'];
+const LOOT = {
+  smith: [['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
+  house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0]],
+  stronghold: [['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
+  fortress: [['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
+};
+function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
+// template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
+function tplPos(t, tx, tz, r) { return r === 0 ? [tx, tz] : r === 1 ? [t.d - 1 - tz, tx] : r === 2 ? [t.w - 1 - tx, t.d - 1 - tz] : [tz, t.w - 1 - tx]; }
+function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
+  const fw = r & 1 ? t.d : t.w, fd = r & 1 ? t.w : t.d, base = t.base || 0;
+  if (!st.inside(ox, oz, ox + fw - 1, oz + fd - 1)) return;
+  const rf = f => (f + r) & 3, roofL = t.L.findIndex(l => l.some(row => row.includes('v')));
+  // foundation under the footprint and clearing above it
+  if (!t.base) for (let tz = 0; tz < t.d; tz++) for (let tx = 0; tx < t.w; tx++) {
+    if (t.L[0][tz][tx] === ' ') continue;
+    const [dx, dz] = tplPos(t, tx, tz, r), wx = ox + dx, wz = oz + dz;
+    for (let y = oy - 1; y > oy - 9; y--) { const b = st.get(wx, y, wz); if (b < 0 || (b && b !== 27 && !REPL[b])) break; st(wx, y, wz, t === TPL.farm ? 3 : sty['#']); }
+    for (let y = oy + t.L.length; y < oy + t.L.length + 6; y++) { const b = st.get(wx, y, wz); if (b > 0) st(wx, y, wz, 0); }
+  }
+  for (let ly = 0; ly < t.L.length; ly++) {
+    const y = oy + base + ly, rows = t.L[ly];
+    for (let tz = 0; tz < t.d; tz++) for (let tx = 0; tx < t.w; tx++) {
+      let ch = rows[tz][tx]; if (ch === ' ') continue;
+      if (!sty.roof && roofL > 0 && ly > roofL) ch = '.'; // desert houses have flat roofs
+      const [dx, dz] = tplPos(t, tx, tz, r), wx = ox + dx, wz = oz + dz;
+      if (st.get(wx, y, wz) < 0) continue;
+      let id = 0, m = 0;
+      switch (ch) {
+        case '.': id = 0; break;
+        case '#': case 'P': case 'K': case 'F': case '_': id = sty[ch]; if (ch === '_') m = 0; break;
+        case 'L': id = sty.L; break;
+        case 'G': id = 117; break;
+        case 'D': id = 96; m = rf(0); break;
+        case 'd': id = 96; m = rf(0) | 8; break;
+        case 'B': id = 95; m = rf(2); break;
+        case 'b': id = 95; m = rf(2) | 4; break;
+        case 'E': id = 95; m = rf(0); break;
+        case 'e': id = 95; m = rf(0) | 4; break;
+        case 'T': id = 45; m = rf(0) + 1; break;
+        case 't': id = 45; break;
+        case 'c': id = 41; break;
+        case 'f': id = 42; m = rf(1); break;
+        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', 3 + R.int(4)) }); break;
+        case 'X': id = 133; break;
+        case 'a': id = 132; m = rf(1); break;
+        case 'k': id = 47; break;
+        case 'h': id = 112; break;
+        case 'w': id = 27; break;
+        case '=': id = 57; m = 7; break;
+        case 'W': id = 58; m = R.int(8); break;
+        case 'S': id = 110; break;
+        case 'p': { const b = st.get(wx, y, wz); id = b === 27 ? sty.P : 134; break; }
+        case 'g': id = 2; break;
+        case 'v': case '^': if (!sty.roof) { id = ly === roofL ? sty.P : 0; break; } id = sty.st; m = rf(ch === 'v' ? 2 : 0); break;
+        default: continue;
+      }
+      st(wx, y, wz, id, m);
+    }
+  }
+  // villagers, golems and animals spawn when the chunk holding the piece's centre loads
+  const [cxo, czo] = tplPos(t, t.w >> 1, t.d >> 1, r), sx = ox + cxo, sz = oz + czo;
+  if (st.get(sx, oy + 1, sz) >= 0) {
+    const i = ((oy + 1) << 8) | ((sz & 15) << 4) | (sx & 15);
+    for (let k = 0; k < (t.v || 0); k++) tiles.push({ t: 'mob', i, mob: 'villager', vtype: piece.vt, prof: t.prof || VPROF[R.int(VPROF.length)] });
+    if (t.golem) tiles.push({ t: 'mob', i: ((oy + 1) << 8) | (((sz + 3) & 15) << 4) | (sx & 15), mob: 'iron_golem' });
+    if (t.animals) for (let k = 0; k < 3; k++) tiles.push({ t: 'mob', i, mob: t.animals });
+  }
+}
+// ---- villages ----
+const VREG = 12;
+const villageCache = new Map();
+function villageAt(seed, G, rx, rz) {
+  const key = seed + ':' + rx + ':' + rz; if (villageCache.has(key)) return villageCache.get(key);
+  let v = null;
+  const r = rng(hash32(seed, rx, rz, 31));
+  if (r() < 0.75) {
+    const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
+    const [h, b] = G.column(vx, vz);
+    const vt = b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : null;
+    if (vt && h > SEA && h < 110) {
+      v = { x: vx, z: vz, y: h, vt, sty: VSTYLE[vt], roads: [], pieces: [] };
+      const occ = [[vx - 3, vz - 3, vx + 2, vz + 2]];
+      const free = (a) => !occ.some(o => a[0] <= o[2] + 1 && a[2] >= o[0] - 1 && a[1] <= o[3] + 1 && a[3] >= o[1] - 1);
+      v.pieces.push({ t: 'well', x: vx - 3, z: vz - 3, y: h, r: 0 });
+      const kinds = ['house', 'house', 'bighouse', 'farm', 'farm', 'smith', 'library', 'house', 'pen', 'bighouse', 'house', 'farm'];
+      DIRS.forEach(([dx, , dz], a) => {
+        const len = 14 + r.int(18);
+        const x0 = Math.min(vx + dx * 3, vx + dx * (3 + len)), x1 = Math.max(vx + dx * 3, vx + dx * (3 + len));
+        const z0 = Math.min(vz + dz * 3, vz + dz * (3 + len)), z1 = Math.max(vz + dz * 3, vz + dz * (3 + len));
+        v.roads.push(dx ? [x0, vz - 1, x1, vz + 1] : [vx - 1, z0, vx + 1, z1]);
+        for (let s = 7; s + 3 <= len + 3; s += 7 + r.int(3)) for (const side of [1, -1]) {
+          if (r() < 0.12) continue;
+          const kind = kinds[r.int(kinds.length)], t = TPL[kind];
+          const px = -dz * side, pz = dx * side; // perpendicular, away from the road
+          const front = DIRS.findIndex(d => d[0] === -px && d[2] === -pz), fw = front & 1 ? t.d : t.w, fd = front & 1 ? t.w : t.d;
+          const cx = vx + dx * s + px * (3 + ((front & 1 ? fw : fd) >> 1)), cz = vz + dz * s + pz * (3 + ((front & 1 ? fw : fd) >> 1));
+          const ax = cx - (fw >> 1), az = cz - (fd >> 1), box = [ax, az, ax + fw - 1, az + fd - 1];
+          if (!free(box)) continue;
+          const [ph] = G.column(cx, cz); if (ph <= SEA || Math.abs(ph - h) > 10) continue;
+          occ.push(box); v.pieces.push({ t: kind, x: ax, z: az, y: ph, r: front });
+          if (r() < 0.5) { const lx = vx + dx * (s - 3) + px * 2, lz = vz + dz * (s - 3) + pz * 2, lb = [lx, lz, lx, lz]; if (free(lb)) { const [lh] = G.column(lx, lz); if (lh > SEA) { occ.push(lb); v.pieces.push({ t: 'lamp', x: lx, z: lz, y: lh, r: 0 }); } } }
+        }
+      });
+      v.core = occ.reduce((a, o) => [Math.min(a[0], o[0] - 3), Math.min(a[1], o[1] - 3), Math.max(a[2], o[2] + 3), Math.max(a[3], o[3] + 3)], [vx, vz, vx, vz]);
+      for (const rd of v.roads) v.core = [Math.min(v.core[0], rd[0]), Math.min(v.core[1], rd[1]), Math.max(v.core[2], rd[2]), Math.max(v.core[3], rd[3])];
+      v.bb = occ.reduce((a, o) => [Math.min(a[0], o[0]), Math.min(a[1], o[1]), Math.max(a[2], o[2]), Math.max(a[3], o[3])], [vx, vz, vx, vz]);
+      v.bb = [Math.min(v.bb[0], vx - 32), Math.min(v.bb[1], vz - 32), Math.max(v.bb[2], vx + 32), Math.max(v.bb[3], vz + 32)];
+    }
+  }
+  if (villageCache.size > 64) villageCache.clear();
+  villageCache.set(key, v); return v;
+}
+function villagesNear(seed, G, cx, cz) {
+  const out = [], rx = Math.floor(cx / VREG), rz = Math.floor(cz / VREG);
+  for (let a = rx - 1; a <= rx + 1; a++) for (let b = rz - 1; b <= rz + 1; b++) { const v = villageAt(seed, G, a, b); if (v && v.bb[2] >= cx * 16 - 2 && v.bb[0] <= cx * 16 + 17 && v.bb[3] >= cz * 16 - 2 && v.bb[1] <= cz * 16 + 17) out.push(v); }
+  return out;
+}
+function stampVillage(v, st, blocks, meta, hgt, x0, z0, R, tiles) {
+  const I = (x, y, z) => (y << 8) | (z << 4) | x;
+  for (const [ax, az, bx, bz] of v.roads) for (let wz = Math.max(az, z0); wz <= Math.min(bz, z0 + 15); wz++) for (let wx = Math.max(ax, x0); wx <= Math.min(bx, x0 + 15); wx++) {
+    const x = wx - x0, z = wz - z0; let h = hgt[(z + 1) * 18 + x + 1];
+    while (h > 1 && !blocks[I(x, h, z)]) h--;
+    const b = blocks[I(x, h, z)];
+    if (b === 27) blocks[I(x, h, z)] = v.sty.P; else if (b === 2 || b === 3 || b === 9 || b === 10 || b === 26 || b === 1 || b === 50) blocks[I(x, h, z)] = 134;
+    for (let y = h + 1; y < h + 4; y++) { const a = blocks[I(x, y, z)]; if (a && (REPL[a] || a === 51)) { blocks[I(x, y, z)] = 0; meta[I(x, y, z)] = 0; } }
+  }
+  for (const p of v.pieces) { const t = TPL[p.t]; stampTemplate(st, t, p.x, p.y, p.z, p.r, v.sty, R, tiles, { vt: v.vt }); }
+}
+// ---- strongholds: three per world on a ring, like Java's first ring but closer ----
+function strongholdsOf(seed) {
+  const r = rng(hash32(seed, 77, 3, 9)), a0 = r() * Math.PI * 2, out = [];
+  for (let i = 0; i < 3; i++) { const a = a0 + i * Math.PI * 2 / 3, d = 700 + r() * 500; out.push([Math.round(Math.cos(a) * d / 16) * 16 + 8, 30, Math.round(Math.sin(a) * d / 16) * 16 + 8]); }
+  return out;
+}
+function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
+  const r = rng(hash32(seed, sx, sz, 41));
+  const brick = () => { const v = r(); return v < 0.2 ? 171 : v < 0.35 ? 172 : 90; };
+  const box = (ax, ay, az, bx, by, bz, hollow) => { if (!st.inside(ax, az, bx, bz)) return; for (let x = ax; x <= bx; x++) for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) { const edge = x === ax || x === bx || y === ay || y === by || z === az || z === bz; st(x, y, z, edge || !hollow ? brick() : 0); } };
+  // portal room: 11 x 8 x 16, portal on a raised platform over lava
+  const ax = sx - 5, az = sz - 8;
+  box(ax, sy, az, ax + 10, sy + 7, az + 15, true);
+  for (let x = ax + 3; x <= ax + 7; x++) for (let z = az + 9; z <= az + 13; z++) st(x, sy + 1, z, 28);
+  for (let x = ax + 3; x <= ax + 7; x++) for (let z = az + 5; z <= az + 8; z++) st(x, sy + 1, z, 90);
+  for (let x = ax + 4; x <= ax + 6; x++) st(x, sy + 2, az + 6, 115, 0);
+  const pcx = ax + 5, pcz = az + 11, py = sy + 3;
+  for (let x = pcx - 2; x <= pcx + 2; x++) for (let z = pcz - 2; z <= pcz + 2; z++) { st(x, py - 1, z, 90); const ex = Math.abs(x - pcx) === 2, ez = Math.abs(z - pcz) === 2; if (ex !== ez) st(x, py, z, 167, (ez ? (z < pcz ? 2 : 0) : (x < pcx ? 1 : 3)) | (r() < 0.1 ? 4 : 0)); }
+  for (let x = pcx - 1; x <= pcx + 1; x++) for (let z = pcz - 1; z <= pcz + 1; z++) st(x, py - 1, z, 28);
+  st(ax + 1, sy + 3, az + 1, 45, 0); st(ax + 9, sy + 3, az + 1, 45, 0); st(ax + 1, sy + 3, az + 14, 45, 0); st(ax + 9, sy + 3, az + 14, 45, 0);
+  for (let y = sy + 1; y <= sy + 3; y++) st(sx, y, az, y === sy + 3 ? 90 : 0);
+  // corridors leading away, with a library alcove, a prison cell and a chest room
+  const halls = [[0, -1, 26], [1, 0, 20], [-1, 0, 22]];
+  for (const [dx, dz, len] of halls) {
+    const hx = dx ? (dx > 0 ? ax + 10 : ax) : sx, hz = dz ? az : sz;
+    for (let s = 0; s <= len; s++) {
+      const x = hx + dx * s, z = hz + dz * s;
+      for (let o = -2; o <= 2; o++) for (let y = sy; y <= sy + 4; y++) {
+        const px = dz ? x + o : x, pz = dx ? z + o : z, edge = Math.abs(o) === 2 || y === sy || y === sy + 4;
+        if (s === 0 && !edge) { st(px, y, pz, 0); continue; }
+        st(px, y, pz, edge ? brick() : 0);
+      }
+      if (s % 6 === 3) st(dz ? x - 1 : x, sy + 3, dx ? z - 1 : z, 45, 0);
+    }
+    const ex = hx + dx * (len + 4), ez = hz + dz * (len + 4);
+    box(ex - 4, sy, ez - 4, ex + 4, sy + 6, ez + 4, true);
+    for (let y = sy + 1; y <= sy + 3; y++) st(hx + dx * (len + 0), y, hz + dz * (len + 0), 0);
+    if (dz) { for (let x = ex - 3; x <= ex + 3; x++) for (let y = sy + 1; y <= sy + 4; y++) st(x, y, ez + 3, 47); st(ex, sy + 1, ez + 2, 44, 0); if (st.get(ex, sy + 1, ez + 2) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | (((ez + 2) & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 6) }); }
+    else if (dx > 0) { for (let z = ez - 3; z <= ez + 3; z++) for (let y = sy + 1; y <= sy + 3; y++) st(ex, y, z, 173); }
+    else { st(ex, sy + 1, ez, 44, 1); if (st.get(ex, sy + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 5) }); }
+  }
+}
+// ---------- the Nether ----------
+const NETHER_BIO = { WASTES: 13, CRIMSON: 14, WARPED: 15, SOUL: 16, BASALT: 17 };
+function netherBiome(nb, wx, wz) {
+  const t = nb.fbm(wx / 260, wz / 260, 2), h = nb.fbm(wx / 260 + 40, wz / 260 - 70, 2);
+  if (t > 0.28) return h > 0 ? NETHER_BIO.CRIMSON : NETHER_BIO.BASALT;
+  if (t < -0.28) return h > 0.05 ? NETHER_BIO.WARPED : NETHER_BIO.SOUL;
+  return h > 0.42 ? NETHER_BIO.CRIMSON : h < -0.42 ? NETHER_BIO.SOUL : NETHER_BIO.WASTES;
+}
+const FREG = 14;
+function fortressAt(seed, rx, rz) {
+  const r = rng(hash32(seed, rx, rz, 53)); if (r() > 0.6) return null;
+  return { x: (rx * FREG + 2 + r.int(FREG - 4)) * 16 + 8, z: (rz * FREG + 2 + r.int(FREG - 4)) * 16 + 8, y: 64, arms: [18 + r.int(30), 18 + r.int(30), 18 + r.int(30), 18 + r.int(30)] };
+}
+function stampFortress(f, st, R, tiles) {
+  const NB = 144, FENCE = 165;
+  // bridges: 5 wide deck at y, railings, pillars down to the lava sea
+  f.arms.forEach((len, a) => {
+    const [dx, , dz] = DIRS[a];
+    for (let s = 4; s <= len; s++) {
+      const x = f.x + dx * s, z = f.z + dz * s;
+      for (let o = -2; o <= 2; o++) {
+        const px = dz ? x + o : x, pz = dx ? z + o : z;
+        st(px, f.y, pz, NB); st(px, f.y - 1, pz, Math.abs(o) === 2 || s % 2 ? NB : 0);
+        for (let y = f.y + 1; y <= f.y + 4; y++) st(px, y, pz, Math.abs(o) === 2 && y === f.y + 1 ? FENCE : 0);
+        if (s % 7 === 0 && Math.abs(o) <= 1) for (let y = f.y - 2; y > 20; y--) { const b = st.get(px, y, pz); if (b < 0) break; if (b && b !== 28) break; st(px, y, pz, NB); }
+      }
+    }
+    // a small room at the end of each arm, two of them with nether wart, one with a chest
+    const ex = f.x + dx * (len + 4), ez = f.z + dz * (len + 4);
+    for (let x = ex - 4; x <= ex + 4; x++) for (let z = ez - 4; z <= ez + 4; z++) for (let y = f.y; y <= f.y + 6; y++) {
+      const edge = Math.abs(x - ex) === 4 || Math.abs(z - ez) === 4 || y === f.y || y === f.y + 6;
+      st(x, y, z, edge ? NB : 0);
+    }
+    for (let y = f.y + 1; y <= f.y + 3; y++) for (let o = -1; o <= 1; o++) st(dz ? ex + o : ex - dx * 4, y, dx ? ez + o : ez - dz * 4, 0);
+    if (a % 2 === 0) for (let x = ex - 2; x <= ex + 2; x++) { st(x, f.y, ez + 2, 138); st(x, f.y + 1, ez + 2, 161, R.int(4)); }
+    if (a === 1) { st(ex, f.y + 1, ez, 44, 0); if (st.get(ex, f.y + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((f.y + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'fortress', 5) }); }
+  });
+  // central crossing with the blaze spawner
+  for (let x = f.x - 4; x <= f.x + 4; x++) for (let z = f.z - 4; z <= f.z + 4; z++) for (let y = f.y; y <= f.y + 7; y++) {
+    const edge = Math.abs(x - f.x) === 4 || Math.abs(z - f.z) === 4, door = (Math.abs(x - f.x) <= 1 || Math.abs(z - f.z) <= 1) && y > f.y && y < f.y + 4;
+    st(x, y, z, y === f.y || y === f.y + 7 ? NB : edge && !door ? NB : 0);
+  }
+  st(f.x, f.y + 1, f.z, 108); if (st.get(f.x, f.y + 1, f.z) >= 0) tiles.push({ t: 'spawner', i: ((f.y + 1) << 8) | ((f.z & 15) << 4) | (f.x & 15), mob: 'blaze' });
+}
+function genNether(seed, cx, cz) {
+  const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256), tiles = [];
+  const nA = makeNoise(seed + 101), nB = makeNoise(seed + 102), nb = makeNoise(seed + 103);
+  const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x, R = rng(hash32(seed, cx, cz, 7));
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) biome[z * 16 + x] = netherBiome(nb, x0 + x, z0 + z);
+  // density on a coarse 4x8x4 grid, trilinearly interpolated (as Java does) to keep generation cheap
+  const GY = 17, D = new Float32Array(5 * 5 * GY);
+  for (let gx = 0; gx < 5; gx++) for (let gz = 0; gz < 5; gz++) for (let gy = 0; gy < GY; gy++) {
+    const wx = x0 + gx * 4, wz = z0 + gz * 4, y = gy * 8;
+    let v = nA.n3(wx / 60, y / 34, wz / 60) * 0.68 + nB.n3(wx / 20, y / 15, wz / 20) * 0.32 - 0.12;
+    v += Math.max(0, (34 - y) / 14) + Math.max(0, (y - 100) / 12);
+    D[(gx * 5 + gz) * GY + gy] = v;
+  }
+  for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) {
+    const gx = x >> 2, gz = z >> 2, fx = (x & 3) / 4, fz = (z & 3) / 4;
+    for (let y = 1; y < 127; y++) {
+      const gy = y >> 3, fy = (y & 7) / 8;
+      const d = (a, b, c) => D[((gx + a) * 5 + gz + b) * GY + gy + c];
+      const v0 = (d(0, 0, 0) * (1 - fx) + d(1, 0, 0) * fx) * (1 - fz) + (d(0, 1, 0) * (1 - fx) + d(1, 1, 0) * fx) * fz;
+      const v1 = (d(0, 0, 1) * (1 - fx) + d(1, 0, 1) * fx) * (1 - fz) + (d(0, 1, 1) * (1 - fx) + d(1, 1, 1) * fx) * fz;
+      const v = v0 * (1 - fy) + v1 * fy;
+      blocks[I(x, y, z)] = v > 0 ? 135 : y <= 31 ? 28 : 0;
+    }
+    blocks[I(x, 0, z)] = 8; blocks[I(x, 127, z)] = 8;
+    for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5) blocks[I(x, y, z)] = 8;
+    for (let y = 123; y < 127; y++) if (R() < (y - 122) / 5) blocks[I(x, y, z)] = 8;
+  }
+  // biome surfaces
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const bio = biome[z * 16 + x];
+    for (let y = 32; y < 122; y++) {
+      const i = I(x, y, z), b = blocks[i]; if (b !== 135) continue;
+      const open = blocks[I(x, y + 1, z)] === 0, n = nB.n2((x0 + x) / 9, (z0 + z) / 9 + y * 0.3);
+      if (bio === NETHER_BIO.CRIMSON && open) blocks[i] = 145;
+      else if (bio === NETHER_BIO.WARPED && open) blocks[i] = 146;
+      else if (bio === NETHER_BIO.SOUL) { if (open || blocks[I(x, y + 2, z)] === 0) blocks[i] = n > 0 ? 138 : 139; }
+      else if (bio === NETHER_BIO.BASALT) { blocks[i] = n > 0.35 ? 143 : 142; if (open && n < -0.5) blocks[i] = 141; }
+      else if (bio === NETHER_BIO.WASTES && open && n > 0.55 && y < 40) blocks[i] = 138;
+    }
+  }
+  // ores and features
+  const uni = (lo, hi) => lo + R.int(hi - lo + 1);
+  for (let i = 0; i < 16; i++) oreVein(blocks, R, 136, 14, uni(10, 117), 135);
+  for (let i = 0; i < 10; i++) oreVein(blocks, R, 137, 10, uni(10, 117), 135);
+  for (let i = 0; i < 4; i++) oreVein(blocks, R, 141, 33, uni(27, 36), 135);
+  if (R() < 0.7) oreVein(blocks, R, 157, 3, uni(8, 22), 135);
+  if (R() < 0.35) oreVein(blocks, R, 157, 2, uni(8, 119), 135);
+  // glowstone hanging from ceilings
+  for (let k = 0; k < 4; k++) {
+    const x = 1 + R.int(14), z = 1 + R.int(14);
+    for (let y = 120; y > 40; y--) if (blocks[I(x, y, z)] === 0 && (blocks[I(x, y + 1, z)] === 135 || blocks[I(x, y + 1, z)] === 145 || blocks[I(x, y + 1, z)] === 146)) {
+      blocks[I(x, y, z)] = 140;
+      for (let n = 0; n < 60; n++) { const px = x + R.int(5) - 2, py = y - R.int(8), pz = z + R.int(5) - 2; if (px < 0 || pz < 0 || px > 15 || pz > 15) continue; const ii = I(px, py, pz); if (blocks[ii] !== 0) continue; let adj = 0; for (const [dx, dy, dz] of DIR6) { const ax = px + dx, az = pz + dz; if (ax >= 0 && az >= 0 && ax < 16 && az < 16 && blocks[I(ax, py + dy, az)] === 140) adj++; } if (adj === 1) blocks[ii] = 140; }
+      break;
+    }
+  }
+  // plants, fungi and fire on the floors
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const bio = biome[z * 16 + x];
+    for (let y = 32; y < 120; y++) {
+      const i = I(x, y, z), b = blocks[i]; if (!b || blocks[I(x, y + 1, z)] !== 0) continue;
+      const v = R();
+      if (b === 145 || b === 146) {
+        const crimson = b === 145;
+        if (v < 0.012 && x > 1 && z > 1 && x < 14 && z < 14) { // huge fungus
+          const h = 4 + R.int(8), stem = crimson ? 147 : 148, wart = crimson ? 149 : 150;
+          for (let k = 1; k <= h && y + k < 122; k++) blocks[I(x, y + k, z)] = stem;
+          const top = y + h, rad = 2;
+          for (let dy = -2; dy <= 1; dy++) for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
+            const ax = x + dx, az = z + dz, ay = top + dy; if (ay >= 122) continue;
+            const ring = Math.abs(dx) === rad || Math.abs(dz) === rad;
+            if (dy === 1 && ring) continue;
+            if (dy < 0 && !ring) continue;
+            const ii = I(ax, ay, az); if (blocks[ii] !== 0) continue;
+            blocks[ii] = dy < 1 && R() < 0.08 ? 151 : (dy < 0 && R() < 0.25 ? 0 : wart);
+          }
+        } else if (v < 0.1) blocks[I(x, y + 1, z)] = crimson ? (v < 0.03 ? 152 : 154) : (v < 0.03 ? 153 : 155);
+      } else if (b === 135 && bio === NETHER_BIO.WASTES && v < 0.004) { blocks[I(x, y + 1, z)] = 162; }
+      else if (b === 138 && bio === NETHER_BIO.SOUL && v < 0.002) { for (let k = 1; k < 6; k++) blocks[I(x, y + k, z)] = 142; }
+      else if (b === 135 && v < 0.002) { blocks[I(x, y + 1, z)] = R() < 0.5 ? 106 : 107; }
+    }
+  }
+  // fortresses
+  const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
+  for (let a = frx - 1; a <= frx + 1; a++) for (let b = frz - 1; b <= frz + 1; b++) {
+    const f = fortressAt(seed, a, b); if (!f) continue;
+    const reach = Math.max(...f.arms) + 9;
+    if (!st.inside(f.x - reach, f.z - reach, f.x + reach, f.z + reach)) continue;
+    stampFortress(f, st, rng(hash32(seed, a, b, 54)), tiles);
+  }
+  fixConnections(blocks, meta);
+  const light = new Uint8Array(CVOL);
+  lightChunk(blocks, light);
+  return { blocks, meta, light, biome, tiles };
+}
+// ---------- the End ----------
+const END_PILLARS = (() => { const out = []; for (let i = 0; i < 10; i++) { const a = 2 * (-Math.PI + Math.PI / 10 * i); out.push([Math.floor(42 * Math.cos(a)), Math.floor(42 * Math.sin(a)), 2 + ((i * 7) % 10) / 3 | 0, 76 + ((i * 7) % 10) * 3, ((i * 7) % 10) < 2]); } return out; })();
+const END_PORTAL_Y = 63;
+function genEnd(seed, cx, cz) {
+  const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256).fill(18), tiles = [];
+  const nA = makeNoise(seed + 201), nB = makeNoise(seed + 202);
+  const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x;
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const wx = x0 + x, wz = z0 + z, d = Math.hypot(wx, wz);
+    let top = -1, bot = 0;
+    const r = 82 + nA.n2(wx / 50, wz / 50) * 10;
+    if (d < r) { const t = 1 - d / r; top = 56 + Math.floor(t * 9 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(Math.sqrt(t) * 44 + 3 + nB.n2(wx / 13, wz / 13) * 3); }
+    else if (d > 700) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
+    for (let y = Math.max(1, bot); y <= top; y++) blocks[I(x, y, z)] = 166;
+  }
+  const st = makeStamp(blocks, meta, x0, z0);
+  // obsidian pillars with crystals (and iron-bar cages on the two smallest)
+  for (const [px, pz, rad, h, cage] of END_PILLARS) {
+    if (!st.inside(px - rad - 2, pz - rad - 2, px + rad + 2, pz + rad + 2)) continue;
+    for (let x = px - rad; x <= px + rad; x++) for (let z = pz - rad; z <= pz + rad; z++) if ((x - px) ** 2 + (z - pz) ** 2 <= rad * rad + 1) for (let y = 40; y <= h; y++) st(x, y, z, 49);
+    st(px, h + 1, pz, 8); st(px, h + 2, pz, 162);
+    if (st.get(px, h + 1, pz) >= 0) tiles.push({ t: 'mob', i: ((h + 1) << 8) | ((pz & 15) << 4) | (px & 15), mob: 'end_crystal' });
+    if (cage) for (let x = px - 2; x <= px + 2; x++) for (let z = pz - 2; z <= pz + 2; z++) for (let y = h + 1; y <= h + 4; y++) {
+      const side = Math.abs(x - px) === 2 || Math.abs(z - pz) === 2; if (side || y === h + 4) st(x, y, z, 173);
+    }
+  }
+  // the exit portal's bedrock frame (filled with portal blocks once the dragon dies)
+  if (st.inside(-4, -4, 4, 4)) {
+    const y = END_PORTAL_Y;
+    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) {
+      const d2 = x * x + z * z;
+      if (d2 <= 12) { st(x, y - 1, z, 8); for (let k = y; k < y + 5; k++) st(x, k, z, 0); }
+      if (d2 > 6 && d2 <= 12) st(x, y, z, 8);
+    }
+    for (let k = y; k < y + 4; k++) st(0, k, 0, 8);
+    st(1, y + 2, 0, 45, 2); st(-1, y + 2, 0, 45, 4); st(0, y + 2, 1, 45, 3); st(0, y + 2, -1, 45, 1);
+  }
+  // arrival platform
+  if (st.inside(98, -2, 102, 2)) for (let x = 98; x <= 102; x++) for (let z = -2; z <= 2; z++) { st(x, 48, z, 49); for (let y = 49; y <= 51; y++) st(x, y, z, 0); }
+  fixConnections(blocks, meta);
+  const light = new Uint8Array(CVOL);
+  lightChunk(blocks, light);
+  return { blocks, meta, light, biome, tiles };
+}
+// fences and panes generated by structures get their connection state here (inside the chunk)
+function fixConnections(blocks, meta) {
+  const I = (x, y, z) => (y << 8) | (z << 4) | x;
+  for (let i = 0; i < CVOL; i++) {
+    const b = blocks[i], k = BLOCKS[b] && BLOCKS[b].connect; if (!k) continue;
+    const x = i & 15, z = (i >> 4) & 15, y = i >> 8; let m = 0;
+    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const n = blocks[I(ax, y, az)], nd = BLOCKS[n]; if ((nd && nd.connect === k) || (OPQ[n] && !(nd && nd.leaves)) || (k === 2 && n === 25)) m |= 1 << d; });
+    meta[i] = m;
+  }
+}
+function genChunk(seed, cx, cz, dim) {
+  if (dim === -1) return genNether(seed, cx, cz);
+  if (dim === 1) return genEnd(seed, cx, cz);
   const G = makeGen(seed);
   const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL);
   const biome = new Uint8Array(256), hgt = new Int16Array(18 * 18), bpad = new Uint8Array(18 * 18);
@@ -658,6 +1111,8 @@ function genChunk(seed, cx, cz) {
     const i2 = I(x, y, z), cur = blocks[i2];
     if (force || cur === 0 || cur === 22 || cur === 23 || cur === 24 || REPL[cur] && !FLUID[cur]) { blocks[i2] = id; meta[i2] = m || 0; }
   };
+  const vills = villagesNear(seed, G, cx, cz);
+  const inVillage = (wx, wz) => vills.some(v => wx >= v.core[0] && wx <= v.core[2] && wz >= v.core[1] && wz <= v.core[3]);
   for (let ox = cx - 1; ox <= cx + 1; ox++) for (let oz = cz - 1; oz <= cz + 1; oz++) {
     const r = rng(hash32(seed, ox, oz, 5));
     const own = ox === cx && oz === cz;
@@ -670,6 +1125,7 @@ function genChunk(seed, cx, cz) {
       const lx = tx - x0, lz = tz - z0;
       if (lx >= -1 && lz >= -1 && lx <= 16 && lz <= 16) { h = hgt[(lz + 1) * 18 + lx + 1]; b = bpad[(lz + 1) * 18 + lx + 1]; } else { const c = G.column(tx, tz); h = c[0]; b = c[1]; }
       if (h <= SEA || b === BIO.DESERT || b === BIO.BEACH || b === BIO.RIVER || b === BIO.OCEAN || (b === BIO.MOUNTAINS && h > 92)) continue;
+      if (vills.length && inVillage(tx, tz)) continue;
       if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) { const top = blocks[I(lx, h, lz)]; if (top !== 2 && top !== 3) continue; }
       let type = BIOMES[b][6];
       if (type === 1) type = kind < 0.2 ? 2 : 0;
@@ -699,6 +1155,11 @@ function genChunk(seed, cx, cz) {
     }
   }
   function placePumpkins(x, h, z) { for (let k = 0; k < 5; k++) { const px = x + R.int(5) - 2, pz = z + R.int(5) - 2; if (px < 0 || pz < 0 || px > 15 || pz > 15) continue; const ph = hgt[(pz + 1) * 18 + px + 1]; if (blocks[I(px, ph, pz)] === 2 && blocks[I(px, ph + 1, pz)] === 0) { blocks[I(px, ph + 1, pz)] = 54; meta[I(px, ph + 1, pz)] = R.int(4); } } }
+  // structures: villages on the surface, strongholds underground
+  const stamp = makeStamp(blocks, meta, x0, z0);
+  for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
+  for (const [sx, sy, sz] of strongholdsOf(seed)) if (stamp.inside(sx - 44, sz - 44, sx + 44, sz + 44)) stampStronghold(seed, stamp, sx, sy, sz, R, tiles);
+  if (vills.length) fixConnections(blocks, meta);
   // snow cover for cold biomes
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const b = biome[z * 16 + x], cold = BIOMES[b][4] <= 0.15 || (b === BIO.MOUNTAINS && hgt[(z + 1) * 18 + x + 1] > 95);
@@ -1090,14 +1551,14 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
-  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
   self.onmessage = e => {
     const m = e.data;
     if (m.type === 'gen') {
-      const r = S.genChunk(m.seed, m.cx, m.cz);
+      const r = S.genChunk(m.seed, m.cx, m.cz, m.dim);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
     } else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);

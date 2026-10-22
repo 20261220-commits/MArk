@@ -131,6 +131,14 @@ UI.renderScreen = () => {
   } else if (T === 'enchant') {
     const opts = enchantOptions();
     h = `<div class="panel"><div class="cap">마법 부여</div><div class="row top ench"><div class="col"><div class="row">${slotHtml(0)}${slotHtml(1, 'lapis')}</div><p class="tip">책장 ${opts.shelves}개</p></div><div class="eopts">${opts.list.map((o, i) => `<button class="eopt ${o.ok ? '' : 'off'}" data-ench="${i}"><span>${o.text}</span><b>${o.cost}</b><small>${i + 1} 청금석 · ${i + 1} 레벨</small></button>`).join('')}</div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
+  } else if (T === 'anvil') {
+    const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
+    h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'smithing') {
+    h = `<div class="panel"><div class="cap">네더라이트 장비로 업그레이드</div><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">다이아몬드 장비 + 네더라이트 주괴</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'trade') {
+    const c = GUI.ctx, offers = villagerOffers(c.e);
+    h = `<div class="panel trade"><div class="cap">${PROF_NAME[c.e.prof] || '주민'}</div><div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, o.an)}</span><i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.ench ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}<div class="arrow"></div>${slotHtml(1, 'big')}</div><p class="tip">${(() => { const o = offers[c.sel]; return o ? itemName(o.a) + ' ' + o.an + '개 → ' + (o.ench ? '마법이 부여된 책' : itemName(o.b)) + ' ' + o.bn + '개' + (o.uses >= o.max ? ' (품절)' : '') : ''; })()}</p></div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
@@ -138,6 +146,7 @@ UI.renderScreen = () => {
   }
   const cur = INV.cursor;
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
+  const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
   moveCursorItem(lastMouse.x, lastMouse.y);
 };
@@ -152,7 +161,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : st && st.e && id === IID.book ? '마법이 부여된 책' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();
@@ -318,6 +327,15 @@ const ADV = [
   ['sleep', '달콤한 꿈', '침대에서 자세요', 'red_bed', {}],
   ['glow', '빛나는 먹물', '발광 먹물 주머니를 얻으세요', 'glow_ink_sac', { item: 'glow_ink_sac' }],
   ['enchant', '마법 부여사', '마법 부여대로 아이템에 마법을 부여하세요', 'enchanting_table', {}],
+  ['portal', '더 깊은 곳으로', '네더 차원문을 만들고 불을 붙이세요', 'flint_and_steel', {}],
+  ['nether', '네더', '네더에 들어가세요', 'netherrack', {}],
+  ['blaze', '불 속으로', '블레이즈 막대를 얻으세요', 'blaze_rod', { item: 'blaze_rod' }],
+  ['debris', '잔해 속에 숨겨진 것', '고대 잔해를 얻으세요', 'ancient_debris', { item: 'ancient_debris' }],
+  ['netherite', '파편으로 덮어주세요', '네더라이트 갑옷을 입으세요', 'netherite_chestplate', { armor: 'netherite' }],
+  ['eye', '눈길을 따라서', '엔더의 눈을 던지세요', 'ender_eye', {}],
+  ['end', '끝?', '엔드에 들어가세요', 'end_stone', {}],
+  ['dragon', '엔드 해방', '엔더 드래곤을 물리치세요', 'dragon_egg', {}],
+  ['trade', '좋은 거래!', '주민과 거래하세요', 'emerald', {}],
 ];
 const advQueue = [];
 UI.advance = key => {
@@ -364,6 +382,7 @@ function enchantOptions() {
   });
   return { shelves, list };
 }
+$('screen').addEventListener('click', e => { const b = e.target.closest('[data-trade]'); if (b && UI.screen === 'trade') selectTrade(+b.dataset.trade); });
 $('screen').addEventListener('click', e => {
   const b = e.target.closest('[data-ench]'); if (!b || UI.screen !== 'enchant') return;
   const i = +b.dataset.ench, o = enchantOptions().list[i]; if (!o || !o.ok) return;

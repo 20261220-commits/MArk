@@ -14,10 +14,10 @@ const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false; atlasTex.flipY = false;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 } }]);
+  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 } }]);
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
-uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma;
+uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin;
 varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
@@ -26,7 +26,7 @@ void main(){
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
-  c = max(c, vec3(0.035));
+  c = max(c, vec3(uMin));
   vLight = min(c, vec3(1.0)) * lt.z;
   vTint = col.rgb;
   vec4 mvPosition = modelViewMatrix * vec4(position / 16.0 - vec3(1.0, 0.0, 1.0), 1.0);
@@ -374,7 +374,11 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 R.resize = resize;
+const NETHER_FOG = { 13: new THREE.Color(0x330808), 14: new THREE.Color(0x330303), 15: new THREE.Color(0x1a051a), 16: new THREE.Color(0x1b4745), 17: new THREE.Color(0x685f70) };
+const END_SKY = new THREE.Color(0x0b0811), netherFog = new THREE.Color(0x330808);
 function renderFrame(dt, eye, under) {
+  if (W.dim) return renderOtherDim(dt, eye, under);
+  sun.visible = moon.visible = stars.visible = true;
   const day = dayFactor();
   const cel = celestial(), ang = cel * Math.PI * 2;
   sunDir.set(-Math.sin(ang), Math.cos(ang), 0.1).normalize();
@@ -401,11 +405,30 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = 0.18 + 0.82 * day;
-  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = 0.035; m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();
   renderer.render(scene, camera);
+  if (R.showHand) { renderer.clearDepth(); handCam.fov = 70; handCam.updateProjectionMatrix(); renderer.render(handScene, handCam); }
+}
+// the Nether: no sky, biome-coloured fog close in, a little ambient light; the End: dark purple void, fixed light
+function renderOtherDim(dt, eye, under) {
+  const nether = W.dim === -1, rd = R.rd * 16;
+  sky.visible = false; sun.visible = moon.visible = false; clouds.visible = false; stars.visible = !nether;
+  if (nether) { const b = biomeAt(Math.floor(camera.position.x), Math.floor(camera.position.z)); netherFog.lerp(NETHER_FOG[b] || NETHER_FOG[13], Math.min(1, dt * 2)); }
+  if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.4); fog.near = 1; fog.far = 24; }
+  else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
+  else if (nether) { fog.color.copy(netherFog); fog.near = Math.min(rd, 96) * 0.05; fog.far = Math.min(rd, 96) * 0.9; }
+  else { fog.color.copy(END_SKY); fog.near = rd * 0.5; fog.far = rd; stars.position.copy(camera.position); starMat.opacity = 0.35; }
+  renderer.setClearColor(fog.color);
+  for (const m of [matOpaque, matCutout, matTrans]) {
+    m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = nether ? 0.24 : 0.08;
+    m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma;
+  }
+  updateParticles(dt);
+  pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
+  renderer.clear(); renderer.render(scene, camera);
   if (R.showHand) { renderer.clearDepth(); handCam.fov = 70; handCam.updateProjectionMatrix(); renderer.render(handScene, handCam); }
 }
 R.renderFrame = renderFrame; R.updateRain = updateRain;
