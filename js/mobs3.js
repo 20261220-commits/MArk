@@ -64,12 +64,12 @@ function pickSkin(type, e) {
   return list[0];
 }
 // ---------- definitions ----------
-const Z = MOBDEF.zombie, SK = MOBDEF.skeleton;
+const ZDEF = MOBDEF.zombie, SKDEF = MOBDEF.skeleton;
 Object.assign(MOBDEF, {
-  husk: { ...Z, burn: 0, drops: [['rotten_flesh', 0, 2]] },
-  drowned: { ...Z, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2], ['copper_ingot', 0, 0]] },
-  stray: { ...SK, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
-  wither_skeleton: { ...SK, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
+  husk: { ...ZDEF, burn: 0, drops: [['rotten_flesh', 0, 2]] },
+  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2], ['copper_ingot', 0, 0]] },
+  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
+  wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
   piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [['gold_ingot', 0, 0]], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
   hoglin: { hp: 40, w: 0.7, h: 1.4, speed: 0.1, hostile: 1, dmg: 6, xp: 5, snd: 'growl', drops: [['porkchop', 2, 4], ['leather', 0, 1]], parts: BOXPARTS(16, 14, 26), tex: () => solidBox('#c08060'), food: 'crimson_fungus' },
   strider: { hp: 20, w: 0.45, h: 1.7, speed: 0.06, xp: 2, snd: 'hmm', fireproof: 1, drops: [['string', 2, 5]], parts: BOXPARTS(16, 14, 16), tex: () => solidBox('#a04040'), ai: striderAI, food: 'warped_fungus' },
