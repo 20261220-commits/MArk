@@ -273,8 +273,8 @@ function slimeAI(e, dist) {
     }
   }
   if (hostileNow && sz > 1 || (hostileNow && e.type === 'magma_cube')) { if (dist < 0.6 + sz * 0.5 && Math.abs(PL.y - e.y) < 1.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'magma_cube' ? sz * 2 + 1 : sz, 0, 0); } }
-  e.vy -= 0.08; e.vy *= 0.98;
   physMove(e, e.vx, e.vy, e.vz, 0);
+  e.vy = (e.vy - 0.08) * 0.98;
   if (!e.onGround) { e.vx *= 0.98; e.vz *= 0.98; }
   e.squish = (e.squish || 0) * 0.85;
 }
@@ -312,9 +312,10 @@ function walkPhysics(e, mx, mz, speed) {
   const inF = e.inWater || e.inLava, acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = 0.42; e.jumpCd = 10; }
-  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz) e.vy += 0.04; e.vy *= 0.8; } else { e.vy -= 0.08; e.vy *= 0.98; }
+  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz) e.vy += 0.04; e.vy *= 0.8; }
   turn(e);
   physMove(e, e.vx, e.vy, e.vz, 0.6);
+  if (!inF) e.vy = (e.vy - 0.08) * 0.98;
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
   const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
 }

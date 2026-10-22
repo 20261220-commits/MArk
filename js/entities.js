@@ -528,12 +528,12 @@ function mobTick(e) {
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = d.jumpy ? 0.6 : 0.42; e.jumpCd = 10; }
   if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz || e.target) e.vy += 0.04; e.vy *= 0.8; }
-  else { e.vy -= 0.08; e.vy *= 0.98; }
   // entity cramming: push away from the player and nearby mobs
   const push = (o, ow, oh) => { const ddx = e.x - o.x, ddz = e.z - o.z, r = e.w + ow; if (Math.abs(ddx) < r && Math.abs(ddz) < r && e.y < o.y + oh && o.y < e.y + e.h) { const l = Math.hypot(ddx, ddz) || 0.01, f = 0.05; e.vx += ddx / l * f; e.vz += ddz / l * f; return [ddx / l * f, ddz / l * f]; } return null; };
   if (!PL.dead && !spectator()) { const pp = push(PL, PL.w, PL.h); if (pp) { PL.vx -= pp[0] * 0.5; PL.vz -= pp[1] * 0.5; } }
   if ((e.age & 1) === 0) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead) push(o, o.w, o.h);
   physMove(e, e.vx, e.vy, e.vz, 0.6);
+  if (!inF) e.vy = (e.vy - 0.08) * 0.98; // Java order: move, then gravity (a 0.42 jump clears 1.25 blocks)
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
   // fall damage
   if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3), null); e.fallY = null; }
