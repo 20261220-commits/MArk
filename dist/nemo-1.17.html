@@ -347,6 +347,11 @@ const BLOCK_ROWS = [
   [110, 'cobblestone_slab', '조약돌 반 블록', RT.BOX, 'cobblestone', 2, P, 1, { slab: 4 }],
   [111, 'smooth_stone_slab', '매끄러운 돌 반 블록', RT.BOX, ['smooth_stone_slab_side', 'smooth_stone', 'smooth_stone'], 2, P, 1, { slab: 89 }],
   [112, 'hay_block', '건초 더미', C, ['hay_side', 'hay_top', 'hay_top'], 0.5, H, 0, { log: 1 }],
+  [113, 'oak_stairs', '참나무 계단', RT.BOX, 'oak_planks', 2, A, 0, { stairs: 1 }],
+  [114, 'cobblestone_stairs', '조약돌 계단', RT.BOX, 'cobblestone', 2, P, 1, { stairs: 1 }],
+  [115, 'stone_brick_stairs', '석재 벽돌 계단', RT.BOX, 'stone_bricks', 1.5, P, 1, { stairs: 1 }],
+  [116, 'oak_fence', '참나무 울타리', RT.BOX, 'oak_planks', 2, A, 0, { connect: 1 }],
+  [117, 'glass_pane', '유리판', RT.BOX, 'glass', 0.3, N, 0, { connect: 2 }],
 ];
 const NB = 256;
 const BLOCKS = new Array(NB).fill(null);
@@ -406,6 +411,25 @@ function shapes(id, meta) {
     case 97: return [ladderBox(meta & 3)];
     case 99: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
     case 109: case 110: case 111: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
+    case 113: case 114: case 115: { // stairs: meta = facing | top<<2
+      const f = meta & 3, top = meta & 4, ylo = top ? 0 : 8, yhi = top ? 8 : 16;
+      const back = f === 0 ? [0, ylo, 0, 16, yhi, 8] : f === 1 ? [8, ylo, 0, 16, yhi, 16] : f === 2 ? [0, ylo, 8, 16, yhi, 16] : [0, ylo, 0, 8, yhi, 16];
+      return [top ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16], back];
+    }
+    case 116: { // fence: meta bits N,E,S,W connections
+      const b = [[6, 0, 6, 10, 16, 10]];
+      for (const y0 of [6, 12]) {
+        if (meta & 1) b.push([7, y0, 0, 9, y0 + 3, 6]); if (meta & 2) b.push([10, y0, 7, 16, y0 + 3, 9]);
+        if (meta & 4) b.push([7, y0, 10, 9, y0 + 3, 16]); if (meta & 8) b.push([0, y0, 7, 6, y0 + 3, 9]);
+      }
+      return b;
+    }
+    case 117: { // glass pane
+      const b = [[7, 0, 7, 9, 16, 9]];
+      if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
+      if (meta & 4) b.push([7, 0, 9, 9, 16, 16]); if (meta & 8) b.push([0, 0, 7, 7, 16, 9]);
+      return b;
+    }
   }
   return null;
 }
@@ -415,6 +439,12 @@ function ladderBox(f) { return f === 0 ? [0, 0, 0, 16, 16, 1] : f === 1 ? [15, 0
 function collide(id, meta) {
   if (id === 51) { const l = meta & 7; return l === 0 ? [] : [[0, 0, 0, 16, l * 2, 16]]; }
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
+  if (id === 116) { // fences are 1.5 blocks tall for collision
+    const b = [[6, 0, 6, 10, 24, 10]];
+    if (meta & 1) b.push([6, 0, 0, 10, 24, 6]); if (meta & 2) b.push([10, 0, 6, 16, 24, 10]);
+    if (meta & 4) b.push([6, 0, 10, 10, 24, 16]); if (meta & 8) b.push([0, 0, 6, 6, 24, 10]);
+    return b;
+  }
   return shapes(id, meta);
 }
 
@@ -1205,7 +1235,7 @@ for (const m of Object.keys(ARMOR)) ARMOR_PART.forEach(([k, nm], slot) => {
   item(m + '_' + k, (m === 'leather' ? '가죽 ' : pre + ' ') + nm, { stack: 1, dur: durs[slot], armor: { slot, pts: pts[slot], tough, mat: m } });
 });
 // fuel for wooden blocks
-for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab']) ITEMS[IID[k]].fuel = k === 'oak_slab' ? 150 : 300;
+for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence']) ITEMS[IID[k]].fuel = k === 'oak_slab' ? 150 : 300;
 for (const k of ['oak_sapling', 'spruce_sapling', 'birch_sapling', 'white_wool']) ITEMS[IID[k]].fuel = 100;
 ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
 
@@ -1282,6 +1312,11 @@ shaped('oak_slab', 6, ['###'], { '#': 'oak_planks' });
 shaped('cobblestone_slab', 6, ['###'], { '#': 'cobblestone' });
 shaped('smooth_stone_slab', 6, ['###'], { '#': 'smooth_stone' });
 shaped('lantern', 1, ['NNN', 'NTN', 'NNN'], { N: 'iron_nugget', T: 'torch' });
+shaped('oak_stairs', 4, ['#  ', '## ', '###'], { '#': 'oak_planks' });
+shaped('cobblestone_stairs', 4, ['#  ', '## ', '###'], { '#': 'cobblestone' });
+shaped('stone_brick_stairs', 4, ['#  ', '## ', '###'], { '#': 'stone_bricks' });
+shaped('oak_fence', 3, ['W#W', 'W#W'], { W: 'oak_planks', '#': 'stick' });
+shaped('glass_pane', 16, ['###', '###'], { '#': 'glass' });
 shaped('jack_o_lantern', 1, ['P', 'T'], { P: 'pumpkin', T: 'torch' });
 shapeless('bone_meal', 3, ['bone']);
 shaped('spyglass', 1, ['A', 'C', 'C'], { A: 'amethyst_shard', C: 'copper_ingot' });
@@ -2127,6 +2162,16 @@ function neighborUpdate(x, y, z) {
   if (b === BID.amethyst_cluster || b === BID.pointed_dripstone) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
+  if (d.connect) updateConnections(x, y, z, b);
+}
+// fences and panes store their N/E/S/W connections in meta (like block states)
+function updateConnections(x, y, z, b) {
+  const kind = BLOCKS[b].connect; let m = 0;
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
+    const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
+    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass)) || (kind === 1 && n === BID.oak_door)) m |= 1 << i;
+  });
+  setMeta(x, y, z, m);
 }
 // ---------- fluids ----------
 function fluidUpdate(x, y, z) {
@@ -2684,36 +2729,87 @@ function itemGeometry(id) {
   return itemGeoCache[id] = geo;
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
+const DEFAULT_META = { 116: 5, 117: 10, 99: 0 }; // fence/pane icons show their connected arms
 function blockGeometry(id) {
   if (blockGeoCache[id]) return blockGeoCache[id];
-  const pos = [], uv = [], col = [];
-  const boxes = S.shapes(id, id === S.BID.lantern ? 0 : 0) || [[0, 0, 0, 16, 16, 16]];
+  const pos = [], uv = [], shade = [], tintA = [];
+  const boxes = S.shapes(id, DEFAULT_META[id] || 0) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
   for (const bx of boxes) for (let f = 0; f < 6; f++) {
-    const n = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]][f];
     const C = [[[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]]][f];
     let t = S.FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)];
-    if (S.FACING[id] && f === 4) t = S.FT[id * 4 + 3];
-    if (id === S.BID.crafting_table && f === 4) t = S.FT[id * 4 + 3];
-    const tu = (t & 15) * 16, tv = (t >> 4) * 16, shadeF = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
+    if ((S.FACING[id] || id === S.BID.crafting_table) && f === 4) t = S.FT[id * 4 + 3];
+    if (id === S.BID.oak_door) t = f === 2 || f === 3 ? S.T.oak_planks : S.T.oak_door_bottom;
+    const tu = (t & 15) * 16, tv = (t >> 4) * 16, sh = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
     const P = C.map(c => [(c[0] ? bx[3] : bx[0]) / 16 - .5, (c[1] ? bx[4] : bx[1]) / 16 - .5, (c[2] ? bx[5] : bx[2]) / 16 - .5]);
-    const U = [[tu, tv + 16], [tu + 16, tv + 16], [tu + 16, tv], [tu, tv]];
-    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / 256, U[k][1] / 256); col.push(tint[0] / 255 * shadeF, tint[1] / 255 * shadeF, tint[2] / 255 * shadeF); }
+    // texture coordinates follow the box like the terrain mesher (pixel-exact on partial blocks)
+    let u0, u1, v0, v1;
+    if (f === 0) { u0 = 16 - bx[5]; u1 = 16 - bx[2]; } else if (f === 1) { u0 = bx[2]; u1 = bx[5]; } else if (f === 4) { u0 = bx[0]; u1 = bx[3]; } else { u0 = 16 - bx[3]; u1 = 16 - bx[0]; }
+    if (f === 2) { u0 = bx[0]; u1 = bx[3]; v0 = bx[2]; v1 = bx[5]; } else if (f === 3) { u0 = bx[0]; u1 = bx[3]; v0 = 16 - bx[5]; v1 = 16 - bx[2]; } else { v0 = 16 - bx[4]; v1 = 16 - bx[1]; }
+    const U = [[tu + u0, tv + v1], [tu + u1, tv + v1], [tu + u1, tv + v0], [tu + u0, tv + v0]];
+    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / 256, U[k][1] / 256); shade.push(sh); tintA.push(tint[0] / 255, tint[1] / 255, tint[2] / 255); }
   }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
   return blockGeoCache[id] = geo;
 }
-// item materials: vertexColors only (sprites) or atlas (blocks); color = light
-const itemBlockMatBase = new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true, alphaTest: 0.5 });
+// block items use the same biome-tint mask as terrain (only tint-marked pixels take the colour)
+const itemBlockMatBase = new THREE.ShaderMaterial({
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, light: { value: 1 } }]),
+  vertexShader: `attribute float shade; attribute vec3 tint; varying vec2 vUv; varying float vShade; varying vec3 vTint;
+    #include <fog_pars_vertex>
+    void main(){ vUv = uv; vShade = shade; vTint = tint; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+    }`,
+  fragmentShader: `uniform sampler2D map; uniform float light; varying vec2 vUv; varying float vShade; varying vec3 vTint;
+    #include <fog_pars_fragment>
+    void main(){ vec4 t = texture2D(map, vUv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * mix(vec3(1.0), vTint, tm) * vShade * light, 1.0);
+    #include <fog_fragment>
+    }`, fog: true });
+itemBlockMatBase.uniforms.map.value = atlasTex;
 const itemSpriteMatBase = new THREE.MeshBasicMaterial({ vertexColors: true });
+function blockMaterial() { const m = itemBlockMatBase.clone(); m.uniforms.map.value = atlasTex; return m; }
 function itemMesh(id) {
   const d = ITEMS[id];
   const isBlock = d && d.block && !d.sprite;
-  const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), (isBlock ? itemBlockMatBase : itemSpriteMatBase).clone());
+  const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), isBlock ? blockMaterial() : itemSpriteMatBase.clone());
   m.userData.isBlock = isBlock;
   return m;
 }
-R.itemMesh = itemMesh; R.blockGeometry = blockGeometry;
+// brightness for item/block meshes regardless of material kind
+function setMeshLight(mesh, v) { const m = mesh.material; if (m.uniforms) m.uniforms.light.value = v; else m.color.setScalar(v); }
+// render true 3D inventory icons for block items once at startup (Java GUI angle)
+function renderBlockIcons() {
+  const ids = ITEMS.map((d, i) => d && d.block && !d.sprite ? i : -1).filter(i => i >= 0);
+  if (!ids.length) return;
+  const cols = 32, rows = Math.ceil(ids.length / cols), Wd = cols * ICON, Hd = rows * ICON;
+  const rt = new THREE.WebGLRenderTarget(Wd, Hd, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  const sc = new THREE.Scene(), cam = new THREE.OrthographicCamera(-0.86, 0.86, 0.86, -0.86, 0.1, 10);
+  cam.position.set(1.6, 1.3, 1.6); cam.lookAt(0, -0.02, 0);
+  const mat = blockMaterial(), mesh = new THREE.Mesh(blockGeometry(ids[0]), mat); sc.add(mesh);
+  const prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
+  renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
+  rt.scissorTest = true;
+  ids.forEach((id, i) => {
+    const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
+    rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
+    mesh.geometry = blockGeometry(id);
+    const s = id === S.BID.oak_door ? 0.55 : 1; mesh.scale.set(s, s, s);
+    renderer.setRenderTarget(rt); renderer.render(sc, cam);
+  });
+  const buf = new Uint8Array(Wd * Hd * 4);
+  renderer.readRenderTargetPixels(rt, 0, 0, Wd, Hd, buf);
+  renderer.setRenderTarget(null); renderer.setClearColor(prevClear, prevAlpha); rt.dispose(); mat.dispose();
+  const g = iconCanvas.getContext('2d');
+  ids.forEach((id, i) => {
+    const cx = (i % cols) * ICON, cy = Math.floor(i / cols) * ICON, img = new ImageData(ICON, ICON);
+    for (let y = 0; y < ICON; y++) { const sy = Hd - 1 - (cy + y); img.data.set(buf.subarray((sy * Wd + cx) * 4, (sy * Wd + cx + ICON) * 4), y * ICON * 4); }
+    let any = false; for (let k = 3; k < img.data.length; k += 4) if (img.data[k]) { any = true; break; }
+    if (!any) return; // keep the 2D fallback if WebGL produced nothing
+    const cell = iconIndex[id]; g.clearRect((cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON, ICON, ICON); g.putImageData(img, (cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON);
+  });
+}
+R.itemMesh = itemMesh; R.blockGeometry = blockGeometry; R.blockMaterial = blockMaterial; R.setMeshLight = setMeshLight; R.renderBlockIcons = renderBlockIcons;
 
 // ---------- first person hand ----------
 const handScene = new THREE.Scene();
@@ -2735,7 +2831,7 @@ function updateHand(dt, id, light, bobX, bobY) {
   const h = R.hand; h.equip = Math.min(1, h.equip + dt * 6);
   const sw = h.swing > 0 ? Math.sin((1 - h.swing) * Math.PI) : 0, sw2 = h.swing > 0 ? Math.sin(Math.sqrt(1 - h.swing) * Math.PI) : 0;
   const c = new THREE.Color(light, light, light);
-  if (heldMesh) heldMesh.material.color.copy(c); else armMat.color.copy(c);
+  if (heldMesh) setMeshLight(heldMesh, light); else armMat.color.copy(c);
   handGroup.position.set(0.5 + bobX - sw2 * 0.22, -0.44 + bobY - (1 - h.equip) * 0.6 + sw * 0.1 - h.eat * 0.05 * Math.abs(Math.sin(performance.now() / 60)), -0.85 + sw2 * -0.1);
   handGroup.rotation.set(0, 0, 0);
   if (heldMesh) {
@@ -3016,11 +3112,11 @@ function spawnXP(x, y, z, amt) {
 // ---------- falling blocks & TNT ----------
 W.onFall = (x, y, z, id) => {
   const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.w = 0.49; e.h = 0.98;
-  e.mesh = new THREE.Mesh(R.blockGeometry(id), new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true })); addEnt(e);
+  e.mesh = new THREE.Mesh(R.blockGeometry(id), R.blockMaterial()); addEnt(e);
 };
 function primeTNT(x, y, z, fuse = 80) {
   const e = Ent('tnt', x + .5, y, z + .5); e.kind = 'tnt'; e.fuse = fuse; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = (Math.random() - .5) * 0.04; e.vz = (Math.random() - .5) * 0.04;
-  e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true })); addEnt(e); play('fuse');
+  e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse');
 }
 // ---------- arrows ----------
 const arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
@@ -3381,11 +3477,11 @@ function entityRender(alpha, now) {
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
-      e.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(br); });
+      e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });
     } else if (e.kind === 'xp') { e.mesh.position.set(x, y + 0.15, z); e.mesh.material.color.setScalar(1); }
-    else if (e.kind === 'falling') { e.mesh.position.set(x, y + 0.5, z); e.mesh.material.color.setScalar(br); }
-    else if (e.kind === 'tnt') { e.mesh.position.set(x, y + 0.5, z); const fl = Math.floor(e.fuse / 5) % 2 === 0; e.mesh.material.color.setScalar(fl ? 2 : br); e.mesh.scale.setScalar(e.fuse < 10 ? 1 + (10 - e.fuse) / 50 : 1); }
-    else if (e.kind === 'arrow') { e.mesh.position.set(x, y, z); if (!e.stuck) { e.mesh.lookAt(x + e.vx, y + e.vy, z + e.vz); } e.mesh.material.color.setScalar(br); }
+    else if (e.kind === 'falling') { e.mesh.position.set(x, y + 0.5, z); R.setMeshLight(e.mesh, br); }
+    else if (e.kind === 'tnt') { e.mesh.position.set(x, y + 0.5, z); const fl = Math.floor(e.fuse / 5) % 2 === 0; R.setMeshLight(e.mesh, fl ? 2 : br); e.mesh.scale.setScalar(e.fuse < 10 ? 1 + (10 - e.fuse) / 50 : 1); }
+    else if (e.kind === 'arrow') { e.mesh.position.set(x, y, z); if (!e.stuck) { e.mesh.lookAt(x + e.vx, y + e.vy, z + e.vz); } R.setMeshLight(e.mesh, br); }
   }
 }
 
@@ -3957,6 +4053,7 @@ function placeBlock(t, d) {
   if (b.facing) meta = (fd + 2) & 3;
   if (S.LOGAX[id]) meta = t.nx ? 1 : t.nz ? 2 : 0;
   if (b.slab) meta = t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 1 : 0;
+  if (b.stairs) meta = fd | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 4 : 0);
   if (b.leaves) meta = 1;
   if (id === BID.pointed_dripstone) meta = t.ny === -1 ? 0 : 1;
   if (id === BID.oak_door) {
@@ -4024,7 +4121,7 @@ function furnaceTick() {
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -4224,9 +4321,9 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐</p><div class="btncol">${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐</p><div class="btncol">${btn('완료', 'optDone')}</div>`;
   } else if (name === 'controls') {
-    h = `<h2>조작법</h2><ul class="keys"><li><kbd>W A S D</kbd> 이동 · <kbd>W</kbd> 두 번 / <kbd>Ctrl</kbd> 달리기</li><li><kbd>Space</kbd> 점프 · 수영 · (크리에이티브) 두 번 눌러 비행</li><li><kbd>Shift</kbd> 웅크리기 (모서리에서 안 떨어짐) · 비행 중 하강</li><li><kbd>좌클릭</kbd> 블록 캐기 · 공격 (공격 쿨다운 1.9 전투)</li><li><kbd>우클릭</kbd> 블록 놓기 · 사용 · 먹기 · 활 당기기 · 망원경</li><li><kbd>휠 클릭</kbd> 블록 고르기 · <kbd>휠</kbd> / <kbd>1-9</kbd> 단축바</li><li><kbd>E</kbd> 인벤토리 · <kbd>Q</kbd> 버리기 (<kbd>Ctrl+Q</kbd> 묶음)</li><li><kbd>T</kbd> 채팅 · <kbd>/</kbd> 명령어 (/help)</li><li><kbd>F1</kbd> HUD 숨기기 · <kbd>F3</kbd> 디버그 · <kbd>F5</kbd> 시점 전환</li><li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
+    h = `<h2>조작법</h2><ul class="keys"><li><kbd>W A S D</kbd> 이동 · <kbd>W</kbd> 두 번 / <kbd>R</kbd> / <kbd>Ctrl</kbd> 달리기</li><li><kbd>Space</kbd> 점프 · 수영 · (크리에이티브) 두 번 눌러 비행</li><li><kbd>Shift</kbd> 웅크리기 (모서리에서 안 떨어짐) · 비행 중 하강</li><li><kbd>좌클릭</kbd> 블록 캐기 · 공격 (공격 쿨다운 1.9 전투)</li><li><kbd>우클릭</kbd> 블록 놓기 · 사용 · 먹기 · 활 당기기 · 망원경</li><li><kbd>휠 클릭</kbd> 블록 고르기 · <kbd>휠</kbd> / <kbd>1-9</kbd> 단축바</li><li><kbd>E</kbd> 인벤토리 · <kbd>Q</kbd> 버리기 (<kbd>Ctrl+Q</kbd> 묶음)</li><li><kbd>T</kbd> 채팅 · <kbd>/</kbd> 명령어 (/help)</li><li><kbd>F1</kbd>/<kbd>H</kbd> HUD 숨기기 · <kbd>F3</kbd>/<kbd>`</kbd> 디버그 · <kbd>F5</kbd>/<kbd>V</kbd> 시점 전환</li><li>크롬북: <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫으니 <kbd>W</kbd> 두 번이나 <kbd>R</kbd>로 달리세요 (설정에서 전체 화면 + 키 잠금을 켜면 안전)</li><li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
@@ -4360,7 +4457,7 @@ const keys = new Set();
 function updateMoveKeys() {
   IN.f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   IN.s = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  IN.jump = keys.has('Space'); IN.sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'); IN.sprintKey = keys.has('ControlLeft') || keys.has('ControlRight');
+  IN.jump = keys.has('Space'); IN.sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'); IN.sprintKey = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyR');
 }
 addEventListener('keydown', e => {
   audioInit();
@@ -4379,9 +4476,10 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyT') { e.preventDefault(); openChat(''); return; }
   if (e.code === 'Slash') { e.preventDefault(); openChat('/'); return; }
   if (e.code === 'KeyE') { UI.openScreen('inv'); return; }
-  if (e.code === 'F1') { UI.hideHud = !UI.hideHud; return; }
-  if (e.code === 'F3') { UI.debug = !UI.debug; return; }
-  if (e.code === 'F5') { view = (view + 1) % 3; return; }
+  // Chromebooks have no F-keys by default: H, ` and V are alternatives
+  if (e.code === 'F1' || e.code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
+  if (e.code === 'F3' || e.code === 'Backquote') { UI.debug = !UI.debug; return; }
+  if (e.code === 'F5' || e.code === 'KeyV') { view = (view + 1) % 3; return; }
   if (e.code === 'KeyQ') { dropHeld(e.ctrlKey); return; }
   if (/^Digit[1-9]$/.test(e.code)) { INV.sel = +e.code.slice(5) - 1; if (USE.kind) onUseRelease(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { const t = performance.now(); if ((creative() || spectator()) && t - IN.lastSpace < 300) { if (!spectator()) PL.flying = !PL.flying; PL.vy = 0; IN.lastSpace = 0; } else IN.lastSpace = t; } }
@@ -4506,13 +4604,20 @@ function saveWorldMeta() {
 }
 function saveAll() { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c); }
 function pauseGame() { if (!W.active || UI.menu) return; if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
-function resumeGame() { if (PL.dead) return; UI.paused = false; showMenu(null); grabLock(); if (isTouch) $('touch').hidden = false; }
+function resumeGame() {
+  if (PL.dead) return; UI.paused = false; showMenu(null);
+  if (OPT.fullscreen && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {}); grabLock(); }).catch(() => grabLock());
+  else grabLock();
+  if (isTouch) $('touch').hidden = false;
+}
 function quitToTitle() {
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
   W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
 }
 addEventListener('pagehide', saveAll);
+// Ctrl+W (sprint + forward in Java) closes a Chrome tab: ask before leaving a running world
+addEventListener('beforeunload', e => { if (W.active) { saveAll(); e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
 
 // ---------- game tick ----------
@@ -4652,7 +4757,8 @@ function autoRes() {
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
-  ICON_URL = (buildIcons(), iconCanvas.toDataURL());
+  buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
+  ICON_URL = iconCanvas.toDataURL();
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);
   document.documentElement.style.setProperty('--stoneTex', `url(${tileCanvas(S.T.stone, null, 4).toDataURL()})`);
   await dbOpen();

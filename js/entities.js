@@ -214,11 +214,11 @@ function spawnXP(x, y, z, amt) {
 // ---------- falling blocks & TNT ----------
 W.onFall = (x, y, z, id) => {
   const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.w = 0.49; e.h = 0.98;
-  e.mesh = new THREE.Mesh(R.blockGeometry(id), new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true })); addEnt(e);
+  e.mesh = new THREE.Mesh(R.blockGeometry(id), R.blockMaterial()); addEnt(e);
 };
 function primeTNT(x, y, z, fuse = 80) {
   const e = Ent('tnt', x + .5, y, z + .5); e.kind = 'tnt'; e.fuse = fuse; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = (Math.random() - .5) * 0.04; e.vz = (Math.random() - .5) * 0.04;
-  e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true })); addEnt(e); play('fuse');
+  e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse');
 }
 // ---------- arrows ----------
 const arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
@@ -579,10 +579,10 @@ function entityRender(alpha, now) {
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
-      e.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(br); });
+      e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });
     } else if (e.kind === 'xp') { e.mesh.position.set(x, y + 0.15, z); e.mesh.material.color.setScalar(1); }
-    else if (e.kind === 'falling') { e.mesh.position.set(x, y + 0.5, z); e.mesh.material.color.setScalar(br); }
-    else if (e.kind === 'tnt') { e.mesh.position.set(x, y + 0.5, z); const fl = Math.floor(e.fuse / 5) % 2 === 0; e.mesh.material.color.setScalar(fl ? 2 : br); e.mesh.scale.setScalar(e.fuse < 10 ? 1 + (10 - e.fuse) / 50 : 1); }
-    else if (e.kind === 'arrow') { e.mesh.position.set(x, y, z); if (!e.stuck) { e.mesh.lookAt(x + e.vx, y + e.vy, z + e.vz); } e.mesh.material.color.setScalar(br); }
+    else if (e.kind === 'falling') { e.mesh.position.set(x, y + 0.5, z); R.setMeshLight(e.mesh, br); }
+    else if (e.kind === 'tnt') { e.mesh.position.set(x, y + 0.5, z); const fl = Math.floor(e.fuse / 5) % 2 === 0; R.setMeshLight(e.mesh, fl ? 2 : br); e.mesh.scale.setScalar(e.fuse < 10 ? 1 + (10 - e.fuse) / 50 : 1); }
+    else if (e.kind === 'arrow') { e.mesh.position.set(x, y, z); if (!e.stuck) { e.mesh.lookAt(x + e.vx, y + e.vy, z + e.vz); } R.setMeshLight(e.mesh, br); }
   }
 }

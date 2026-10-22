@@ -140,6 +140,11 @@ const BLOCK_ROWS = [
   [110, 'cobblestone_slab', '조약돌 반 블록', RT.BOX, 'cobblestone', 2, P, 1, { slab: 4 }],
   [111, 'smooth_stone_slab', '매끄러운 돌 반 블록', RT.BOX, ['smooth_stone_slab_side', 'smooth_stone', 'smooth_stone'], 2, P, 1, { slab: 89 }],
   [112, 'hay_block', '건초 더미', C, ['hay_side', 'hay_top', 'hay_top'], 0.5, H, 0, { log: 1 }],
+  [113, 'oak_stairs', '참나무 계단', RT.BOX, 'oak_planks', 2, A, 0, { stairs: 1 }],
+  [114, 'cobblestone_stairs', '조약돌 계단', RT.BOX, 'cobblestone', 2, P, 1, { stairs: 1 }],
+  [115, 'stone_brick_stairs', '석재 벽돌 계단', RT.BOX, 'stone_bricks', 1.5, P, 1, { stairs: 1 }],
+  [116, 'oak_fence', '참나무 울타리', RT.BOX, 'oak_planks', 2, A, 0, { connect: 1 }],
+  [117, 'glass_pane', '유리판', RT.BOX, 'glass', 0.3, N, 0, { connect: 2 }],
 ];
 const NB = 256;
 const BLOCKS = new Array(NB).fill(null);
@@ -199,6 +204,25 @@ function shapes(id, meta) {
     case 97: return [ladderBox(meta & 3)];
     case 99: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
     case 109: case 110: case 111: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
+    case 113: case 114: case 115: { // stairs: meta = facing | top<<2
+      const f = meta & 3, top = meta & 4, ylo = top ? 0 : 8, yhi = top ? 8 : 16;
+      const back = f === 0 ? [0, ylo, 0, 16, yhi, 8] : f === 1 ? [8, ylo, 0, 16, yhi, 16] : f === 2 ? [0, ylo, 8, 16, yhi, 16] : [0, ylo, 0, 8, yhi, 16];
+      return [top ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16], back];
+    }
+    case 116: { // fence: meta bits N,E,S,W connections
+      const b = [[6, 0, 6, 10, 16, 10]];
+      for (const y0 of [6, 12]) {
+        if (meta & 1) b.push([7, y0, 0, 9, y0 + 3, 6]); if (meta & 2) b.push([10, y0, 7, 16, y0 + 3, 9]);
+        if (meta & 4) b.push([7, y0, 10, 9, y0 + 3, 16]); if (meta & 8) b.push([0, y0, 7, 6, y0 + 3, 9]);
+      }
+      return b;
+    }
+    case 117: { // glass pane
+      const b = [[7, 0, 7, 9, 16, 9]];
+      if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
+      if (meta & 4) b.push([7, 0, 9, 9, 16, 16]); if (meta & 8) b.push([0, 0, 7, 7, 16, 9]);
+      return b;
+    }
   }
   return null;
 }
@@ -208,6 +232,12 @@ function ladderBox(f) { return f === 0 ? [0, 0, 0, 16, 16, 1] : f === 1 ? [15, 0
 function collide(id, meta) {
   if (id === 51) { const l = meta & 7; return l === 0 ? [] : [[0, 0, 0, 16, l * 2, 16]]; }
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
+  if (id === 116) { // fences are 1.5 blocks tall for collision
+    const b = [[6, 0, 6, 10, 24, 10]];
+    if (meta & 1) b.push([6, 0, 0, 10, 24, 6]); if (meta & 2) b.push([10, 0, 6, 16, 24, 10]);
+    if (meta & 4) b.push([6, 0, 10, 10, 24, 16]); if (meta & 8) b.push([0, 0, 6, 6, 24, 10]);
+    return b;
+  }
   return shapes(id, meta);
 }
 

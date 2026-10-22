@@ -79,7 +79,7 @@ for (const m of Object.keys(ARMOR)) ARMOR_PART.forEach(([k, nm], slot) => {
   item(m + '_' + k, (m === 'leather' ? '가죽 ' : pre + ' ') + nm, { stack: 1, dur: durs[slot], armor: { slot, pts: pts[slot], tough, mat: m } });
 });
 // fuel for wooden blocks
-for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab']) ITEMS[IID[k]].fuel = k === 'oak_slab' ? 150 : 300;
+for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence']) ITEMS[IID[k]].fuel = k === 'oak_slab' ? 150 : 300;
 for (const k of ['oak_sapling', 'spruce_sapling', 'birch_sapling', 'white_wool']) ITEMS[IID[k]].fuel = 100;
 ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
 
@@ -156,6 +156,11 @@ shaped('oak_slab', 6, ['###'], { '#': 'oak_planks' });
 shaped('cobblestone_slab', 6, ['###'], { '#': 'cobblestone' });
 shaped('smooth_stone_slab', 6, ['###'], { '#': 'smooth_stone' });
 shaped('lantern', 1, ['NNN', 'NTN', 'NNN'], { N: 'iron_nugget', T: 'torch' });
+shaped('oak_stairs', 4, ['#  ', '## ', '###'], { '#': 'oak_planks' });
+shaped('cobblestone_stairs', 4, ['#  ', '## ', '###'], { '#': 'cobblestone' });
+shaped('stone_brick_stairs', 4, ['#  ', '## ', '###'], { '#': 'stone_bricks' });
+shaped('oak_fence', 3, ['W#W', 'W#W'], { W: 'oak_planks', '#': 'stick' });
+shaped('glass_pane', 16, ['###', '###'], { '#': 'glass' });
 shaped('jack_o_lantern', 1, ['P', 'T'], { P: 'pumpkin', T: 'torch' });
 shapeless('bone_meal', 3, ['bone']);
 shaped('spyglass', 1, ['A', 'C', 'C'], { A: 'amethyst_shard', C: 'copper_ingot' });

@@ -236,36 +236,87 @@ function itemGeometry(id) {
   return itemGeoCache[id] = geo;
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
+const DEFAULT_META = { 116: 5, 117: 10, 99: 0 }; // fence/pane icons show their connected arms
 function blockGeometry(id) {
   if (blockGeoCache[id]) return blockGeoCache[id];
-  const pos = [], uv = [], col = [];
-  const boxes = S.shapes(id, id === S.BID.lantern ? 0 : 0) || [[0, 0, 0, 16, 16, 16]];
+  const pos = [], uv = [], shade = [], tintA = [];
+  const boxes = S.shapes(id, DEFAULT_META[id] || 0) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
   for (const bx of boxes) for (let f = 0; f < 6; f++) {
-    const n = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]][f];
     const C = [[[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]]][f];
     let t = S.FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)];
-    if (S.FACING[id] && f === 4) t = S.FT[id * 4 + 3];
-    if (id === S.BID.crafting_table && f === 4) t = S.FT[id * 4 + 3];
-    const tu = (t & 15) * 16, tv = (t >> 4) * 16, shadeF = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
+    if ((S.FACING[id] || id === S.BID.crafting_table) && f === 4) t = S.FT[id * 4 + 3];
+    if (id === S.BID.oak_door) t = f === 2 || f === 3 ? S.T.oak_planks : S.T.oak_door_bottom;
+    const tu = (t & 15) * 16, tv = (t >> 4) * 16, sh = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
     const P = C.map(c => [(c[0] ? bx[3] : bx[0]) / 16 - .5, (c[1] ? bx[4] : bx[1]) / 16 - .5, (c[2] ? bx[5] : bx[2]) / 16 - .5]);
-    const U = [[tu, tv + 16], [tu + 16, tv + 16], [tu + 16, tv], [tu, tv]];
-    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / 256, U[k][1] / 256); col.push(tint[0] / 255 * shadeF, tint[1] / 255 * shadeF, tint[2] / 255 * shadeF); }
+    // texture coordinates follow the box like the terrain mesher (pixel-exact on partial blocks)
+    let u0, u1, v0, v1;
+    if (f === 0) { u0 = 16 - bx[5]; u1 = 16 - bx[2]; } else if (f === 1) { u0 = bx[2]; u1 = bx[5]; } else if (f === 4) { u0 = bx[0]; u1 = bx[3]; } else { u0 = 16 - bx[3]; u1 = 16 - bx[0]; }
+    if (f === 2) { u0 = bx[0]; u1 = bx[3]; v0 = bx[2]; v1 = bx[5]; } else if (f === 3) { u0 = bx[0]; u1 = bx[3]; v0 = 16 - bx[5]; v1 = 16 - bx[2]; } else { v0 = 16 - bx[4]; v1 = 16 - bx[1]; }
+    const U = [[tu + u0, tv + v1], [tu + u1, tv + v1], [tu + u1, tv + v0], [tu + u0, tv + v0]];
+    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / 256, U[k][1] / 256); shade.push(sh); tintA.push(tint[0] / 255, tint[1] / 255, tint[2] / 255); }
   }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
   return blockGeoCache[id] = geo;
 }
-// item materials: vertexColors only (sprites) or atlas (blocks); color = light
-const itemBlockMatBase = new THREE.MeshBasicMaterial({ map: atlasTex, vertexColors: true, alphaTest: 0.5 });
+// block items use the same biome-tint mask as terrain (only tint-marked pixels take the colour)
+const itemBlockMatBase = new THREE.ShaderMaterial({
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, light: { value: 1 } }]),
+  vertexShader: `attribute float shade; attribute vec3 tint; varying vec2 vUv; varying float vShade; varying vec3 vTint;
+    #include <fog_pars_vertex>
+    void main(){ vUv = uv; vShade = shade; vTint = tint; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+    }`,
+  fragmentShader: `uniform sampler2D map; uniform float light; varying vec2 vUv; varying float vShade; varying vec3 vTint;
+    #include <fog_pars_fragment>
+    void main(){ vec4 t = texture2D(map, vUv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * mix(vec3(1.0), vTint, tm) * vShade * light, 1.0);
+    #include <fog_fragment>
+    }`, fog: true });
+itemBlockMatBase.uniforms.map.value = atlasTex;
 const itemSpriteMatBase = new THREE.MeshBasicMaterial({ vertexColors: true });
+function blockMaterial() { const m = itemBlockMatBase.clone(); m.uniforms.map.value = atlasTex; return m; }
 function itemMesh(id) {
   const d = ITEMS[id];
   const isBlock = d && d.block && !d.sprite;
-  const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), (isBlock ? itemBlockMatBase : itemSpriteMatBase).clone());
+  const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), isBlock ? blockMaterial() : itemSpriteMatBase.clone());
   m.userData.isBlock = isBlock;
   return m;
 }
-R.itemMesh = itemMesh; R.blockGeometry = blockGeometry;
+// brightness for item/block meshes regardless of material kind
+function setMeshLight(mesh, v) { const m = mesh.material; if (m.uniforms) m.uniforms.light.value = v; else m.color.setScalar(v); }
+// render true 3D inventory icons for block items once at startup (Java GUI angle)
+function renderBlockIcons() {
+  const ids = ITEMS.map((d, i) => d && d.block && !d.sprite ? i : -1).filter(i => i >= 0);
+  if (!ids.length) return;
+  const cols = 32, rows = Math.ceil(ids.length / cols), Wd = cols * ICON, Hd = rows * ICON;
+  const rt = new THREE.WebGLRenderTarget(Wd, Hd, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  const sc = new THREE.Scene(), cam = new THREE.OrthographicCamera(-0.86, 0.86, 0.86, -0.86, 0.1, 10);
+  cam.position.set(1.6, 1.3, 1.6); cam.lookAt(0, -0.02, 0);
+  const mat = blockMaterial(), mesh = new THREE.Mesh(blockGeometry(ids[0]), mat); sc.add(mesh);
+  const prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
+  renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
+  rt.scissorTest = true;
+  ids.forEach((id, i) => {
+    const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
+    rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
+    mesh.geometry = blockGeometry(id);
+    const s = id === S.BID.oak_door ? 0.55 : 1; mesh.scale.set(s, s, s);
+    renderer.setRenderTarget(rt); renderer.render(sc, cam);
+  });
+  const buf = new Uint8Array(Wd * Hd * 4);
+  renderer.readRenderTargetPixels(rt, 0, 0, Wd, Hd, buf);
+  renderer.setRenderTarget(null); renderer.setClearColor(prevClear, prevAlpha); rt.dispose(); mat.dispose();
+  const g = iconCanvas.getContext('2d');
+  ids.forEach((id, i) => {
+    const cx = (i % cols) * ICON, cy = Math.floor(i / cols) * ICON, img = new ImageData(ICON, ICON);
+    for (let y = 0; y < ICON; y++) { const sy = Hd - 1 - (cy + y); img.data.set(buf.subarray((sy * Wd + cx) * 4, (sy * Wd + cx + ICON) * 4), y * ICON * 4); }
+    let any = false; for (let k = 3; k < img.data.length; k += 4) if (img.data[k]) { any = true; break; }
+    if (!any) return; // keep the 2D fallback if WebGL produced nothing
+    const cell = iconIndex[id]; g.clearRect((cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON, ICON, ICON); g.putImageData(img, (cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON);
+  });
+}
+R.itemMesh = itemMesh; R.blockGeometry = blockGeometry; R.blockMaterial = blockMaterial; R.setMeshLight = setMeshLight; R.renderBlockIcons = renderBlockIcons;
 
 // ---------- first person hand ----------
 const handScene = new THREE.Scene();
@@ -287,7 +338,7 @@ function updateHand(dt, id, light, bobX, bobY) {
   const h = R.hand; h.equip = Math.min(1, h.equip + dt * 6);
   const sw = h.swing > 0 ? Math.sin((1 - h.swing) * Math.PI) : 0, sw2 = h.swing > 0 ? Math.sin(Math.sqrt(1 - h.swing) * Math.PI) : 0;
   const c = new THREE.Color(light, light, light);
-  if (heldMesh) heldMesh.material.color.copy(c); else armMat.color.copy(c);
+  if (heldMesh) setMeshLight(heldMesh, light); else armMat.color.copy(c);
   handGroup.position.set(0.5 + bobX - sw2 * 0.22, -0.44 + bobY - (1 - h.equip) * 0.6 + sw * 0.1 - h.eat * 0.05 * Math.abs(Math.sin(performance.now() / 60)), -0.85 + sw2 * -0.1);
   handGroup.rotation.set(0, 0, 0);
   if (heldMesh) {

@@ -19,7 +19,7 @@ const keys = new Set();
 function updateMoveKeys() {
   IN.f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   IN.s = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  IN.jump = keys.has('Space'); IN.sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'); IN.sprintKey = keys.has('ControlLeft') || keys.has('ControlRight');
+  IN.jump = keys.has('Space'); IN.sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'); IN.sprintKey = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyR');
 }
 addEventListener('keydown', e => {
   audioInit();
@@ -38,9 +38,10 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyT') { e.preventDefault(); openChat(''); return; }
   if (e.code === 'Slash') { e.preventDefault(); openChat('/'); return; }
   if (e.code === 'KeyE') { UI.openScreen('inv'); return; }
-  if (e.code === 'F1') { UI.hideHud = !UI.hideHud; return; }
-  if (e.code === 'F3') { UI.debug = !UI.debug; return; }
-  if (e.code === 'F5') { view = (view + 1) % 3; return; }
+  // Chromebooks have no F-keys by default: H, ` and V are alternatives
+  if (e.code === 'F1' || e.code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
+  if (e.code === 'F3' || e.code === 'Backquote') { UI.debug = !UI.debug; return; }
+  if (e.code === 'F5' || e.code === 'KeyV') { view = (view + 1) % 3; return; }
   if (e.code === 'KeyQ') { dropHeld(e.ctrlKey); return; }
   if (/^Digit[1-9]$/.test(e.code)) { INV.sel = +e.code.slice(5) - 1; if (USE.kind) onUseRelease(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { const t = performance.now(); if ((creative() || spectator()) && t - IN.lastSpace < 300) { if (!spectator()) PL.flying = !PL.flying; PL.vy = 0; IN.lastSpace = 0; } else IN.lastSpace = t; } }
@@ -165,13 +166,20 @@ function saveWorldMeta() {
 }
 function saveAll() { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c); }
 function pauseGame() { if (!W.active || UI.menu) return; if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
-function resumeGame() { if (PL.dead) return; UI.paused = false; showMenu(null); grabLock(); if (isTouch) $('touch').hidden = false; }
+function resumeGame() {
+  if (PL.dead) return; UI.paused = false; showMenu(null);
+  if (OPT.fullscreen && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {}); grabLock(); }).catch(() => grabLock());
+  else grabLock();
+  if (isTouch) $('touch').hidden = false;
+}
 function quitToTitle() {
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
   W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
 }
 addEventListener('pagehide', saveAll);
+// Ctrl+W (sprint + forward in Java) closes a Chrome tab: ask before leaving a running world
+addEventListener('beforeunload', e => { if (W.active) { saveAll(); e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
 
 // ---------- game tick ----------
@@ -311,7 +319,8 @@ function autoRes() {
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
-  ICON_URL = (buildIcons(), iconCanvas.toDataURL());
+  buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
+  ICON_URL = iconCanvas.toDataURL();
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);
   document.documentElement.style.setProperty('--stoneTex', `url(${tileCanvas(S.T.stone, null, 4).toDataURL()})`);
   await dbOpen();

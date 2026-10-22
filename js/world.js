@@ -179,6 +179,16 @@ function neighborUpdate(x, y, z) {
   if (b === BID.amethyst_cluster || b === BID.pointed_dripstone) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
+  if (d.connect) updateConnections(x, y, z, b);
+}
+// fences and panes store their N/E/S/W connections in meta (like block states)
+function updateConnections(x, y, z, b) {
+  const kind = BLOCKS[b].connect; let m = 0;
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
+    const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
+    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass)) || (kind === 1 && n === BID.oak_door)) m |= 1 << i;
+  });
+  setMeta(x, y, z, m);
 }
 // ---------- fluids ----------
 function fluidUpdate(x, y, z) {

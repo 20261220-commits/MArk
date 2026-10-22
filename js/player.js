@@ -456,6 +456,7 @@ function placeBlock(t, d) {
   if (b.facing) meta = (fd + 2) & 3;
   if (S.LOGAX[id]) meta = t.nx ? 1 : t.nz ? 2 : 0;
   if (b.slab) meta = t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 1 : 0;
+  if (b.stairs) meta = fd | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 4 : 0);
   if (b.leaves) meta = 1;
   if (id === BID.pointed_dripstone) meta = t.ny === -1 ? 0 : 1;
   if (id === BID.oak_door) {
