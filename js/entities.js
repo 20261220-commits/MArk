@@ -1,6 +1,7 @@
 // Entities: shared AABB physics, mobs with box models, items, XP orbs, arrows, TNT, falling blocks.
 const ENT = [];
 const _bx = [];
+const PHYS = { snowSolid: false }; // set while moving a player in leather boots
 function gatherBoxes(x0, y0, z0, x1, y1, z1) {
   _bx.length = 0;
   const ax = Math.floor(x0), bx = Math.floor(x1), ay = Math.floor(y0) - 1, by = Math.floor(y1), az = Math.floor(z0), bz = Math.floor(z1);
@@ -8,7 +9,8 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
     if (!isLoaded(x, z)) { _bx.push([x, ay, z, x + 1, by + 1, z + 1]); continue; }
     for (let y = ay; y <= by; y++) {
       if (y < 0) { _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
-      const id = getBlock(x, y, z); if (!SOLID[id]) continue;
+      const id = getBlock(x, y, z);
+      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
       const bs = S.collide(id, getMeta(x, y, z));
       if (!bs) { _bx.push([x, y, z, x + 1, y + 1, z + 1]); continue; }
       for (const b of bs) _bx.push([x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16]);
@@ -153,6 +155,12 @@ const MOBDEF = {
   goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1,
     parts: [...QUAD(10, 15, [-4, -4, -8, 9, 8, 16], [0, 18, -7], [-3, -3, -7, 6, 6, 7], 3, -5, 6), ['horn', [0, 18, -7], [-3, 3, -3, 1, 6, 1], [22, 0]], ['horn2', [0, 18, -7], [2, 3, -3, 1, 6, 1], [22, 0]], ['beard', [0, 18, -7], [-1, -6, -7, 2, 3, 1], [24, 0]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xe8e2d6); paintBox(g, 28, 0, 9, 8, 16, w, r, .1); paintBox(g, 0, 0, 6, 6, 7, w, r, .1, { front: (g, x, y) => { px(g, x, y + 2, '#c8a83a'); px(g, x + 5, y + 2, '#c8a83a'); px(g, x + 1, y + 2, '#000'); px(g, x + 4, y + 2, '#000'); } }); paintBox(g, 0, 32, 4, 10, 4, (k, x, y) => y > 8 ? hex(0x5a5048) : w(), r, .1); paintBox(g, 22, 0, 1, 6, 1, () => hex(0xa8a294), r); paintBox(g, 24, 0, 2, 3, 1, () => hex(0xd8d0c0), r); }) },
+  squid: { hp: 10, w: 0.4, h: 0.8, speed: 0.04, xp: 2, snd: 'splash', drops: [['ink_sac', 1, 3]], water: 1,
+    parts: [['body', [0, 8, 0], [-6, -8, -6, 12, 16, 12], [0, 0]], ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => ['t' + i, [Math.round(Math.cos(i / 8 * 6.283) * 5), 0, Math.round(Math.sin(i / 8 * 6.283) * 5)], [-1, -18, -1, 2, 18, 2], [48, 0]])],
+    tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 12, 16, 12, (k, x, y) => k === 'front' && (y === 10 || y === 11) && (x === 2 || x === 9) ? hex(0x101820) : hex(y > 12 ? 0x3a5a7a : 0x2b3d5a), r, .12); paintBox(g, 48, 0, 2, 18, 2, (k, x, y) => hex(y > 14 ? 0x4a6a8a : 0x2b3d5a), r, .1); }) },
+  glow_squid: { hp: 10, w: 0.4, h: 0.8, speed: 0.04, xp: 2, snd: 'splash', drops: [['glow_ink_sac', 1, 3]], water: 1, glow: 1,
+    parts: [['body', [0, 8, 0], [-6, -8, -6, 12, 16, 12], [0, 0]], ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => ['t' + i, [Math.round(Math.cos(i / 8 * 6.283) * 5), 0, Math.round(Math.sin(i / 8 * 6.283) * 5)], [-1, -18, -1, 2, 18, 2], [48, 0]])],
+    tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 12, 16, 12, (k, x, y) => k === 'front' && (y === 10 || y === 11) && (x === 2 || x === 9) ? hex(0xffffff) : ((x * 3 + y * 5) % 7 === 0 ? hex(0x9afff0) : hex(0x1fb8a8)), r, .15); paintBox(g, 48, 0, 2, 18, 2, (k, x, y) => hex(y % 5 === 0 ? 0x9afff0 : 0x1fb8a8), r, .1); }) },
   player: { hp: 20, w: 0.3, h: 1.8, parts: HUMAN(4),
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, (k, x, y) => (k === 'top' || y < 2 || (k !== 'front' && y < 4) || k === 'back' && y < 7) ? hex(0x3b2a16) : hex(0xc98e6a), r, .1, { front: (g, x, y) => { px(g, x + 1, y + 4, '#fff'); px(g, x + 2, y + 4, '#4a3aa8'); px(g, x + 5, y + 4, '#4a3aa8'); px(g, x + 6, y + 4, '#fff'); px(g, x + 3, y + 6, '#8a4a3a', 2, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => y > 10 ? hex(0x3b3fa0) : hex(0x1fa0a8), r); paintBox(g, 40, 16, 4, 12, 4, (k, x, y) => y < 4 ? hex(0x1fa0a8) : hex(0xc98e6a), r); paintBox(g, 0, 16, 4, 12, 4, (k, x, y) => y > 10 ? hex(0x4a4a4a) : hex(0x3b3fa0), r); }) },
@@ -291,6 +299,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (e.type === 'sheep' && !e.sheared && !e.baby) dropItem(e.x, e.y + .5, e.z, BID.white_wool, 1);
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
+      if (e.def.hostile) UI.advance('hunter');
     }
   }
   return true;
@@ -315,6 +324,7 @@ function mobTick(e) {
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
+  if (d.water) { squidTick(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed;
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
@@ -345,7 +355,7 @@ function mobTick(e) {
     const food = d.food && PL.held() && PL.held().id === IID[d.food] && dist < 8 && plVisible;
     if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
-    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; spawnMob(e.type, e.x, e.y, e.z, { baby: true }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; spawnMob(e.type, e.x, e.y, e.z, { baby: true }); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -372,6 +382,27 @@ function mobTick(e) {
   const hs = Math.hypot(e.vx, e.vz);
   e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
   // spawner/despawn fuse visual
+}
+function squidTick(e) {
+  if (e.inWater) {
+    e.air = 300;
+    if (!e.goal || Math.random() < 0.02) { const a = Math.random() * 6.283; e.goal = [Math.cos(a), (Math.random() - 0.5) * 0.6, Math.sin(a)]; e.pulse = 0; }
+    if (e.panic > 0 && e.age % 10 === 0) e.goal = [(e.x - PL.x), 0.2, (e.z - PL.z)].map(v => v / (Math.hypot(e.x - PL.x, e.z - PL.z) || 1));
+    e.pulse = (e.pulse || 0) + 1;
+    const thrust = (e.pulse % 30) < 6 ? (e.panic > 0 ? 0.06 : 0.025) : 0;
+    e.vx += e.goal[0] * thrust; e.vy += e.goal[1] * thrust; e.vz += e.goal[2] * thrust;
+    if (fluidAt(e.x, e.y + e.h + 0.1, e.z) !== 1 && e.vy > 0) e.vy = -0.01; // stay under the surface
+    e.vx *= 0.9; e.vy *= 0.9; e.vz *= 0.9;
+    e.yawTarget = Math.atan2(-e.vx, -e.vz);
+  } else {
+    e.vy -= 0.08; e.vy *= 0.98; e.vx *= 0.6; e.vz *= 0.6;
+    if (e.onGround && Math.random() < 0.1) { e.vy = 0.3; e.vx = (Math.random() - .5) * 0.2; e.vz = (Math.random() - .5) * 0.2; }
+    e.air = (e.air || 300) - 1; if (e.air < -20) { e.air = 0; hurtMob(e, 2, null); }
+  }
+  if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += dy * 0.1; }
+  physMove(e, e.vx, e.vy, e.vz, 0);
+  e.walk += 0.15 + Math.hypot(e.vx, e.vy, e.vz) * 4; e.walkAmt = 1;
+  if (e.y < -40) removeEnt(e);
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
@@ -467,6 +498,11 @@ function spawnAnimalsForChunk(c) {
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 9));
   if (R0() > 0.1) return;
   let types;
+  if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
+    const t = R0() < 0.3 ? 'glow_squid' : 'squid';
+    for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
+    return;
+  }
   if (b === S.BIO.MOUNTAINS) types = ['goat'];
   else if (b === S.BIO.PLAINS || b === S.BIO.FOREST || b === S.BIO.BIRCH || b === S.BIO.TAIGA || b === S.BIO.SWAMP || b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA) types = ['pig', 'cow', 'sheep', 'chicken'];
   else return;
@@ -518,7 +554,7 @@ function entityRender(alpha, now) {
     if (e.dead || !e.mesh) continue;
     const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha, z = e.pz + (e.z - e.pz) * alpha;
     const dx = x - camera.position.x, dz = z - camera.position.z;
-    const far = dx * dx + dz * dz > (R.rd * 16) ** 2;
+    const far = dx * dx + dz * dz > Math.min(R.rd * 16, 80) ** 2; // keeps draw calls low on weak GPUs
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {
@@ -530,13 +566,15 @@ function entityRender(alpha, now) {
       for (const [n, s] of legs) if (P[n]) P[n].rotation.x = sw * s;
       if (P.rarm) { if (e.def.armsOut || (e.type === 'skeleton' && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
       if (P.head && e.target) { const hy = Math.atan2(-(PL.x - x), -(PL.z - z)) - yaw; P.head.rotation.y = ((hy + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.head.rotation.y = Math.max(-1, Math.min(1, P.head.rotation.y)); }
+      if (e.def.water) { for (let i = 0; i < 8; i++) P['t' + i].rotation.set(Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283), 0, -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1); e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }
       if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; P['leg' + i].rotation.y = (i - 1.5) * 0.35 + s; P['legl' + i].rotation.y = -(i - 1.5) * 0.35 - s; }
       const mat = e.mesh.userData.mat;
       if (!e.matOwn) { e.mesh.userData.mat = mat.clone(); e.mesh.traverse(o => { if (o.isMesh) o.material = e.mesh.userData.mat; }); e.matOwn = true; }
       const m2 = e.mesh.userData.mat;
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
-      if (e.hurt > 0 || e.deathT) m2.color.setRGB(br * 1.4, br * 0.4, br * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(br);
+      const bb = e.def.glow ? Math.max(br, 0.9) : br;
+      if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb);
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;

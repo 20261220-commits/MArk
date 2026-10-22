@@ -275,6 +275,7 @@ function tileCanvas(t, tint, scale = 1) {
     if (a === TINT_A) { const tc = tint || DEFAULT_TINT[1]; r = r * tc[0] / 255; gg = gg * tc[1] / 255; b = b * tc[2] / 255; a = 255; }
     img.data[di] = r; img.data[di + 1] = gg; img.data[di + 2] = b; img.data[di + 3] = a;
   }
+  c._px = img.data;
   if (scale === 1) { g.putImageData(img, 0, 0); return c; }
   const tmp = document.createElement('canvas'); tmp.width = tmp.height = TS; tmp.getContext('2d').putImageData(img, 0, 0);
   g.imageSmoothingEnabled = false; g.drawImage(tmp, 0, 0, TS * scale, TS * scale); return c;
@@ -284,11 +285,13 @@ function tileCanvas(t, tint, scale = 1) {
 const ICON = 32, ICON_COLS = 32;
 const iconCanvas = document.createElement('canvas');
 const iconIndex = {}; // item id -> cell
+const spritePix = {}; // item id -> 16x16 RGBA of flat item sprites
 let iconCount = 0;
 function iconCell() { const k = iconCount++; return k; }
 
 // small sprite DSL on a 16x16 grid
-function sprite(draw) { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); const p = (x, y, col) => { if (x < 0 || y < 0 || x > 15 || y > 15 || !col) return; g.fillStyle = typeof col === 'string' ? col : `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`; g.fillRect(x, y, 1, 1); }; draw(p, g); return c; }
+// sprites keep their pixels in c._px so item meshes never need a (slow) canvas readback
+function sprite(draw) { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); const px = new Uint8ClampedArray(16 * 16 * 4); const p = (x, y, col) => { if (x < 0 || y < 0 || x > 15 || y > 15 || !col) return; const rgb = typeof col === 'string' ? hex(parseInt(col.slice(1), 16)) : col; const i = (y * 16 + x) * 4; px[i] = rgb[0]; px[i + 1] = rgb[1]; px[i + 2] = rgb[2]; px[i + 3] = 255; }; draw(p, g); g.putImageData(new ImageData(px, 16, 16), 0, 0); c._px = px; return c; }
 function line(p, x0, y0, x1, y1, col) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let i = 0; i <= n; i++) p(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), typeof col === 'function' ? col(i, n) : col); }
 // mask -> shaded pixels (light top-left, dark bottom-right edges)
 function maskDraw(p, pts, cols) {
@@ -383,6 +386,8 @@ const SPR = {
   spyglass: () => sprite(p => { line(p, 3, 12, 12, 3, hex(0xd67a4a)); line(p, 4, 12, 13, 3, hex(0x9c4d2f)); line(p, 3, 11, 12, 2, hex(0xf6b48a)); p(12, 2, hex(0xb18de6)); p(13, 2, hex(0x7f55b4)); p(13, 3, hex(0x7f55b4)); p(5, 10, hex(0x4a2a1a)); p(6, 9, hex(0x4a2a1a)); }),
   shears: () => sprite(p => { line(p, 3, 4, 11, 12, hex(0xd8d8d8)); line(p, 4, 4, 12, 12, hex(0x8a8a8a)); line(p, 11, 4, 3, 12, hex(0xd8d8d8)); for (const [x, y] of [[2, 12], [3, 13], [12, 12], [13, 13], [2, 13], [13, 12]]) p(x, y, hex(0xa02a1a)); }),
   saddle: () => sprite(p => blob(p, 8, 9, 6, 4, MATC.leather)),
+  ink_sac: () => sprite(p => { blob(p, 8, 9, 5, 5.5, [hex(0x4a4a5a), hex(0x2a2a36), hex(0x16161e), hex(0x08080c)]); p(7, 3, hex(0x2a2a36)); p(8, 3, hex(0x2a2a36)); p(6, 7, hex(0x6a6a7a)); }),
+  glow_ink_sac: () => sprite(p => { blob(p, 8, 9, 5, 5.5, [hex(0x9afff0), hex(0x2ad9c5), hex(0x14907f), hex(0x0a4a42)]); p(7, 3, hex(0x2ad9c5)); p(8, 3, hex(0x2ad9c5)); p(6, 7, hex(0xffffff)); }),
   name_tag: () => sprite(p => { const pts = []; for (let y = 5; y < 12; y++) for (let x = 3; x < 14; x++) if (x - 3 > Math.abs(y - 8.5) - 2) pts.push([x, y]); maskDraw(p, pts, [hex(0xf0e0c0), hex(0xd0b890), hex(0xa08a60), hex(0x6a5a3a)]); p(5, 8, hex(0x3a3a3a)); }),
   bed_item: () => sprite(p => { for (let x = 1; x < 15; x++) for (let y = 6; y < 11; y++) p(x, y, x < 5 && y < 9 ? hex(0xf0f0f0) : hex(0xb2241a)); for (let x = 1; x < 15; x++) p(x, 11, hex(0x8a6a3b)); p(1, 12, hex(0x6b5433)); p(14, 12, hex(0x6b5433)); }),
   oak_door_item: () => sprite(p => { for (let y = 1; y < 15; y++) for (let x = 4; x < 12; x++) p(x, y, (y === 1 || y === 14 || x === 4 || x === 11) ? hex(0x6b5433) : (y < 7 && (x === 6 || x === 9) ? hex(0x3a2a14) : hex(0x9c7b47))); p(10, 8, hex(0x3a3a3a)); }),
@@ -430,7 +435,7 @@ function buildIcons() {
     else if (d.tool) spr = toolSprite(d.tool.kind, d.tool.mat);
     else if (d.armor) spr = armorSprite(d.armor.slot, d.armor.mat);
     else if (SPR[d.key]) spr = SPR[d.key]();
-    if (spr) { g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(spr, ox, oy, ICON, ICON); }
+    if (spr) { g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(spr, ox, oy, ICON, ICON); spritePix[id] = spr._px; }
   }
 }
 let ICON_URL = '';

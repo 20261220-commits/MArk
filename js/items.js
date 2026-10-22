@@ -67,6 +67,7 @@ item('spyglass', '망원경', { stack: 1 });
 item('shears', '가위', { stack: 1, dur: 238 });
 item('egg', '달걀', { stack: 16 });
 item('saddle', '안장', { stack: 1 }); item('name_tag', '이름표');
+item('ink_sac', '먹물 주머니'); item('glow_ink_sac', '발광 먹물 주머니');
 for (const m of Object.keys(MATS)) for (const t of ['sword', 'pickaxe', 'axe', 'shovel', 'hoe']) {
   const [pre, tier, speed, dur] = MATS[m]; const [dmg, as] = TOOL_DMG[t][m];
   item(m + '_' + t, pre + ' ' + TOOL_NAME[t], { stack: 1, dur, tool: { type: TOOL_TYPE[t], tier, speed, dmg, as, mat: m, kind: t }, fuel: m === 'wooden' ? 200 : 0 });

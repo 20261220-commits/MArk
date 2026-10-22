@@ -129,13 +129,14 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); } return; }
+  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
   PL.inWater = inWater; PL.eyeFluid = spec ? 0 : eyeF;
   let web = false, snowB = false, ladder = false;
   if (!spec) inBlock(b => { if (b === BID.cobweb) web = true; if (b === BID.powder_snow) snowB = true; if (b === BID.ladder) ladder = true; });
+  if (snowB && INV.armor[3] && INV.armor[3].id === IID.leather_boots && !PL.sneaking && getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.01), Math.floor(PL.z)) === BID.powder_snow) { snowB = false; UI.advance('snow'); }
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
@@ -185,7 +186,8 @@ function playerTick() {
       while (mx !== 0 && mz !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z + mz)) { mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step; mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step; }
     }
     const oy = PL.y;
-    physMove(PL, mx, my, mz, 0.6);
+    PHYS.snowSolid = !!(INV.armor[3] && INV.armor[3].id === IID.leather_boots) && !PL.sneaking;
+    physMove(PL, mx, my, mz, 0.6); PHYS.snowSolid = false;
     if (web || snowB) { if (PL.vx) PL.vx = mx; if (PL.vz) PL.vz = mz; }
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround) {
@@ -336,7 +338,7 @@ function onUsePress() {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
   if (d && h.id === IID.bow) { if (creative() || INV.count(IID.arrow) > 0) { USE.kind = 'bow'; USE.t = 0; } return; }
-  if (d && h.id === IID.spyglass) { USE.kind = 'spy'; return; }
+  if (d && h.id === IID.spyglass) { USE.kind = 'spy'; UI.advance('spyglass'); return; }
   USE.kind = 'place';
   useItem(true);
 }
@@ -471,6 +473,7 @@ function placeBlock(t, d) {
   }
   if (SOLID[id] && entityBlocks(x, y, z)) return;
   setBlock(x, y, z, id, meta);
+  if (id === BID.wheat) UI.advance('seed');
   if (b.fall) schedule(x, y, z, 2);
   if (FLUID[getBlock(x, y + 1, z)] || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => FLUID[getBlock(x + dx, y, z + dz)])) for (const [dx, dy, dz] of N6) if (FLUID[getBlock(x + dx, y + dy, z + dz)]) schedule(x + dx, y + dy, z + dz, 5);
   if (id === BID.furnace) setTile(x, y, z, newFurnace());
@@ -505,9 +508,9 @@ function furnaceTick() {
     if (t.burn <= 0 && canOut && fuel && ITEMS[fuel.id].fuel) {
       t.burn = t.burnMax = ITEMS[fuel.id].fuel; fuel.n--;
       if (fuel.n <= 0) t.items[1] = fuel.id === IID.lava_bucket ? { id: IID.bucket, n: 1 } : null;
-      c.modified = true;
+      c.modified = c.edited = true;
     }
-    if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= 200) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = true; } }
+    if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= 200) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
     else if (t.cook > 0) t.cook = Math.max(0, t.cook - 2);
     const lit = t.burn > 0;
     if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); }

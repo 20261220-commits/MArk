@@ -135,6 +135,9 @@ kbd{font:inherit;background:#333;border:var(--px) solid #000;box-shadow:inset 0 
 .loading{display:flex;flex-direction:column;align-items:center;gap:calc(6 * var(--px))}
 .loading .bar{width:min(calc(200 * var(--px)),80vw);height:calc(4 * var(--px));background:#3a3a3a;border:var(--px) solid #000}
 .loading .bar i{display:block;height:100%;width:0;background:#80ff20}
+#adv{position:fixed;top:calc(4 * var(--px));right:calc(4 * var(--px));z-index:12;display:flex;gap:calc(5 * var(--px));align-items:center;width:calc(160 * var(--px));padding:calc(5 * var(--px));background:#212121;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #555,inset calc(-1*var(--px)) calc(-1*var(--px)) 0 #111;transform:translateX(130%);transition:transform .35s ease;pointer-events:none}
+#adv.show{transform:none}
+#adv b{display:block;font-weight:400;font-size:calc(7.5 * var(--px));color:#ffff55}#adv span{display:block;font-size:calc(7.5 * var(--px));color:#fff;margin-top:var(--px)}
 /* ---------- touch ---------- */
 #touch{position:fixed;inset:0;pointer-events:none;z-index:5}
 #joy{position:absolute;left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));width:130px;height:130px;border-radius:50%;background:rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.3);pointer-events:auto;touch-action:none}
@@ -187,6 +190,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <div id="screen" hidden></div>
 <div id="tooltip" hidden></div>
 <div id="chat" hidden><input id="chatIn" maxlength="256" autocomplete="off" spellcheck="false"></div>
+<div id="adv"></div>
 <div id="menu"></div>
 <!-- scripts: order matters (shared globals) -->
 <script src="vendor/three.min.js"></script>

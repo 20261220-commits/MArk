@@ -90,7 +90,10 @@ function renderDebug(dt, fps) {
   const facing = ['북쪽 (-Z)', '서쪽 (-X)', '남쪽 (+Z)', '동쪽 (+X)'][[0, 1, 2, 3][((Math.round((((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)) % 4) + 4) % 4]];
   let meshed = 0; for (const c of W.chunks.values()) if (c.mesh) meshed++;
   const t = TARGET && TARGET.type === 'block' ? `\n대상 블록: ${TARGET.x} ${TARGET.y} ${TARGET.z}\n${BLOCKS[TARGET.id].key} [${TARGET.m}]` : '';
-  el.textContent = `네모 대륙 1.17 (Java Edition 스타일)\n${fps} fps · 해상도 ${Math.round(R.pixelScale * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${S.BIOMES[biomeAt(bx, bz)][0]}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
+  const P = typeof PERF !== 'undefined' ? PERF : null, ms = k => P && P.n ? (P[k] / P.n).toFixed(1) : '-';
+  const perf = `틱 ${ms('tick')}ms · 청크 ${ms('stream')}+${ms('inbox')}ms · 렌더 ${ms('render')}ms`;
+  if (P) { for (const k in P) P[k] = 0; }
+  el.textContent = `네모 대륙 1.17 (Java Edition 스타일)\n${fps} fps · ${perf} · 해상도 ${Math.round(R.pixelScale * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${S.BIOMES[biomeAt(bx, bz)][0]}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
 }
 
 // ---------- container screens ----------
@@ -267,4 +270,47 @@ function runCommand(cmd) {
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
     default: err('알 수 없는 명령어입니다. /help 를 입력하세요');
   }
+}
+
+// ---------- advancements (subset of 1.17) ----------
+const ADV = [
+  ['root', 'Minecraft', '제작대를 얻으세요', 'crafting_table', { item: 'crafting_table' }],
+  ['stone', '석기 시대', '새 곡괭이로 돌을 캐세요', 'wooden_pickaxe', { item: 'cobblestone' }],
+  ['upgrade', '더 좋은 도구', '더 좋은 곡괭이를 만드세요', 'stone_pickaxe', { item: 'stone_pickaxe' }],
+  ['iron', '철 획득', '철 주괴를 제련하세요', 'iron_ingot', { item: 'iron_ingot' }],
+  ['armor', '갑옷을 입어라', '철 갑옷으로 몸을 보호하세요', 'iron_chestplate', { armor: 'iron' }],
+  ['lava', '화끈한 것', '양동이에 용암을 담으세요', 'lava_bucket', { item: 'lava_bucket' }],
+  ['ironpick', '철 곡괭이가 최고야', '곡괭이를 업그레이드하세요', 'iron_pickaxe', { item: 'iron_pickaxe' }],
+  ['diamond', '다이아몬드!', '다이아몬드를 얻으세요', 'diamond', { item: 'diamond' }],
+  ['obsidian', '아이스 버킷 챌린지', '흑요석을 얻으세요', 'obsidian', { item: 'obsidian' }],
+  ['copper', '구리 시대', '구리 주괴를 제련하세요', 'copper_ingot', { item: 'copper_ingot' }],
+  ['amethyst', '반짝이는 수정', '자수정 조각을 얻으세요', 'amethyst_shard', { item: 'amethyst_shard' }],
+  ['spyglass', '저게 새인가?', '망원경으로 멀리 보세요', 'spyglass', {}],
+  ['snow', '토끼처럼 가볍게', '가죽 부츠를 신고 가루눈 위를 걸으세요', 'leather_boots', {}],
+  ['seed', '씨앗을 심는 곳', '씨앗을 심어 보세요', 'wheat_seeds', {}],
+  ['breed', '둘이 함께', '두 동물을 번식시키세요', 'wheat', {}],
+  ['hunter', '몬스터 사냥꾼', '적대적 몬스터를 처치하세요', 'iron_sword', {}],
+  ['sleep', '달콤한 꿈', '침대에서 자세요', 'red_bed', {}],
+  ['glow', '빛나는 먹물', '발광 먹물 주머니를 얻으세요', 'glow_ink_sac', { item: 'glow_ink_sac' }],
+];
+const advQueue = [];
+UI.advance = key => {
+  if (!W.meta || PL.mode === 'creative' || PL.mode === 'spectator') return;
+  W.meta.adv = W.meta.adv || {};
+  if (W.meta.adv[key]) return;
+  const a = ADV.find(x => x[0] === key); if (!a) return;
+  W.meta.adv[key] = Date.now();
+  chatMsg(`플레이어가 도전 과제 [${a[1]}]을(를) 달성했습니다`, '#55ff55');
+  advQueue.push(a); if (advQueue.length === 1) showAdv();
+};
+function showAdv() {
+  const a = advQueue[0]; if (!a) return;
+  const el = $('adv'); el.innerHTML = `<i class="ic" style="${iconStyle(IID[a[3]], 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2))}"></i><div><b>도전 과제 달성!</b><span>${a[1]}</span></div>`;
+  el.classList.add('show'); play('levelup', { vol: 0.6 });
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => { advQueue.shift(); showAdv(); }, 400); }, 4000);
+}
+function advScan() {
+  if (!W.meta) return;
+  const have = new Set(); for (const s of INV.slots) if (s) have.add(s.id); if (INV.cursor) have.add(INV.cursor.id);
+  for (const a of ADV) { const t = a[4]; if (t.item && have.has(IID[t.item])) UI.advance(a[0]); if (t.armor && INV.armor.some(s => s && ITEMS[s.id].armor.mat === t.armor)) UI.advance(a[0]); }
 }

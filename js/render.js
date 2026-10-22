@@ -213,27 +213,22 @@ function updateRain(dt, px, py, pz, amt) {
 
 // ---------- extruded item meshes (held + dropped) ----------
 const itemGeoCache = {}, blockGeoCache = {};
-let iconPixels = null;
 function itemGeometry(id) {
   if (itemGeoCache[id]) return itemGeoCache[id];
-  // read pixels from one cached copy of the icon sheet (a getImageData per item stalls the GPU)
-  if (!iconPixels) iconPixels = iconCanvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, iconCanvas.width, iconCanvas.height);
-  const N = 32, cell = iconIndex[id], cx0 = (cell % ICON_COLS) * ICON, cy0 = Math.floor(cell / ICON_COLS) * ICON, W0 = iconCanvas.width;
-  const img = new Uint8ClampedArray(N * N * 4);
-  for (let y = 0; y < N; y++) img.set(iconPixels.data.subarray(((cy0 + y) * W0 + cx0) * 4, ((cy0 + y) * W0 + cx0 + N) * 4), y * N * 4);
+  const N = 16, img = spritePix[id] || new Uint8ClampedArray(N * N * 4);
   const pos = [], col = [], s = 1 / N;
   const A = (x, y) => x >= 0 && y >= 0 && x < N && y < N && img[(y * N + x) * 4 + 3] > 128;
   const push = (verts, r, gg, b, f) => { for (const v of [verts[0], verts[1], verts[2], verts[0], verts[2], verts[3]]) { pos.push(...v); col.push(r * f, gg * f, b * f); } };
-  for (let y = 0; y < N; y += 2) for (let x = 0; x < N; x += 2) {
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     if (!A(x, y)) continue;
     const i = (y * N + x) * 4, r = img[i] / 255, gg = img[i + 1] / 255, b = img[i + 2] / 255;
-    const x0 = x * s - .5, x1 = (x + 2) * s - .5, y0 = .5 - (y + 2) * s, y1 = .5 - y * s, z0 = -1 / 32, z1 = 1 / 32;
+    const x0 = x * s - .5, x1 = (x + 1) * s - .5, y0 = .5 - (y + 1) * s, y1 = .5 - y * s, z0 = -1 / 32, z1 = 1 / 32;
     push([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], r, gg, b, 1);
     push([[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]], r, gg, b, 0.8);
-    if (!A(x - 2, y)) push([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], r, gg, b, 0.7);
-    if (!A(x + 2, y)) push([[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], r, gg, b, 0.7);
-    if (!A(x, y - 2)) push([[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], r, gg, b, 0.9);
-    if (!A(x, y + 2)) push([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], r, gg, b, 0.6);
+    if (!A(x - 1, y)) push([[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], r, gg, b, 0.7);
+    if (!A(x + 1, y)) push([[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], r, gg, b, 0.7);
+    if (!A(x, y - 1)) push([[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], r, gg, b, 0.9);
+    if (!A(x, y + 1)) push([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], r, gg, b, 0.6);
   }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   return itemGeoCache[id] = geo;
@@ -291,11 +286,11 @@ function updateHand(dt, id, light, bobX, bobY) {
   const sw = h.swing > 0 ? Math.sin((1 - h.swing) * Math.PI) : 0, sw2 = h.swing > 0 ? Math.sin(Math.sqrt(1 - h.swing) * Math.PI) : 0;
   const c = new THREE.Color(light, light, light);
   if (heldMesh) heldMesh.material.color.copy(c); else armMat.color.copy(c);
-  handGroup.position.set(0.56 + bobX - sw2 * 0.25, -0.52 + bobY - (1 - h.equip) * 0.6 + sw * 0.12 - h.eat * 0.05 * Math.abs(Math.sin(performance.now() / 60)), -0.9 + sw2 * -0.1);
+  handGroup.position.set(0.5 + bobX - sw2 * 0.22, -0.44 + bobY - (1 - h.equip) * 0.6 + sw * 0.1 - h.eat * 0.05 * Math.abs(Math.sin(performance.now() / 60)), -0.85 + sw2 * -0.1);
   handGroup.rotation.set(0, 0, 0);
   if (heldMesh) {
-    if (heldMesh.userData.isBlock) { heldMesh.scale.setScalar(0.4); heldMesh.rotation.set(0, Math.PI / 4 + 0.2, 0); heldMesh.position.set(0, 0, 0); }
-    else { heldMesh.scale.setScalar(0.62); heldMesh.rotation.set(0, -Math.PI / 2 + 0.3, 0.45); heldMesh.position.set(0.02, 0.08, 0); }
+    if (heldMesh.userData.isBlock) { heldMesh.scale.setScalar(0.26); heldMesh.rotation.set(0.12, Math.PI / 4 + 0.15, 0); heldMesh.position.set(-0.04, 0.02, 0); }
+    else { heldMesh.scale.setScalar(0.42); heldMesh.rotation.set(-0.1, -Math.PI / 2 + 0.35, 0.4); heldMesh.position.set(0.02, 0.06, 0); }
     if (h.eat > 0) { handGroup.position.x -= 0.35; handGroup.position.y += 0.15; handGroup.rotation.y = 0.6; }
     if (h.bow > 0) { handGroup.position.x -= 0.25; heldMesh.rotation.set(0, -Math.PI / 2 + 0.1, 0.1); }
   } else { arm.rotation.set(-1.35 - sw2 * 0.5, 0.35, 0.6 + sw * 0.4); arm.position.set(0.12, -0.12, 0.25); }
@@ -328,7 +323,7 @@ function renderFrame(dt, eye, under) {
   skyMat.uniforms.glow.value.copy(DUSK); skyMat.uniforms.glowAmt.value = duskAmt * 0.85; skyMat.uniforms.glowDir.value.set(sunDir.x > 0 ? 1 : -1, 0, 0);
   const fogCol = tmpC2.clone(); if (duskAmt > 0) { const look = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation); const f = Math.max(0, look.x * (sunDir.x > 0 ? 1 : -1)); fogCol.lerp(DUSK, duskAmt * f * 0.5); }
   const rd = R.rd * 16;
-  if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.3 + day * 0.7); fog.near = 1; fog.far = 24; }
+  if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.3 + day * 0.7); fog.near = 1; fog.far = 32; }
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (under === 'snow') { fog.color.setRGB(0.85, 0.9, 0.95); fog.near = 0; fog.far = 2; }
   else { fog.color.copy(fogCol); fog.near = rd * (W.rain > 0.5 ? 0.35 : 0.6); fog.far = rd * (W.rain > 0.5 ? 0.85 : 1.0); }
@@ -338,7 +333,7 @@ function renderFrame(dt, eye, under) {
   moon.position.copy(camera.position).addScaledVector(sunDir, -300); moon.lookAt(camera.position);
   sun.material.opacity = moon.material.opacity = 1 - W.rain;
   stars.position.copy(camera.position); starMat.opacity = Math.max(0, 1 - day * 1.6) * (1 - W.rain); stars.rotation.z = ang;
-  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 120.5, camera.position.z);
+  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 128.33, camera.position.z); // 1.17 cloud height
   cloudTex.offset.set((camera.position.x / 768) * 6 + performance.now() / 1e6, (-camera.position.z / 768) * 6);
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms

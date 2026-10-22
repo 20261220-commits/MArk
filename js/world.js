@@ -1,6 +1,6 @@
 // World: chunk storage/streaming, cross-chunk lighting, block updates, fluids,
 // random ticks and IndexedDB persistence.
-const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS } = S;
+const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS, CVOL } = S;
 const ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
 class Chunk {
@@ -8,14 +8,14 @@ class Chunk {
     this.cx = cx; this.cz = cz; this.key = ckey(cx, cz);
     this.blocks = d.blocks; this.meta = d.meta; this.light = d.light; this.biome = d.biome;
     this.tiles = new Map(); this.modified = false; this.dirty = true; this.ver = 0; this.meshing = false; this.mesh = null;
-    this.mobs = d.mobs || null;
+    this.mobs = d.mobs || null; this.edited = !!d.fromSave; // edited: blocks differ from generated terrain
   }
 }
 
 const W = {
   seed: 0, id: '', chunks: new Map(), time: 1000, rain: 0, rainTarget: 0, rainTimer: 12000,
   last: null, lastKey: -1,
-  saved: new Set(), pending: new Map(), inbox: [], meshInbox: [], // pending: key -> job id | 'load'
+  saved: new Set(), pending: new Map(), inbox: [], meshInbox: [], pendingMobs: new Map(), // pending: key -> job id | 'load'
   sched: new Map(), tickN: 0,
   onDrop: null, onFall: null, onBlockChanged: null, onChunkLoaded: null, onChunkUnloaded: null,
 };
@@ -136,7 +136,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   const c = chunkAt(x >> 4, z >> 4); if (!c) return false;
   const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i], oldM = c.meta[i];
   if (old === id && oldM === meta) return false;
-  c.blocks[i] = id; c.meta[i] = meta; c.modified = true;
+  c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   if (old !== id) relight(x, y, z, old, id);
   markDirty(x, z);
@@ -144,9 +144,9 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!opts.noUpdate) { neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz); }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = true; markDirty(x, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
-function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = true; }
+function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern) || id === BID.glass || (id >= 22 && id <= 24);
 function breakNaturally(x, y, z, b, m) {
@@ -354,6 +354,7 @@ function handleWorker(m) {
 function addChunk(cx, cz, d, tiles) {
   const c = new Chunk(cx, cz, d);
   W.chunks.set(c.key, c); W.lastKey = -1;
+  const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
     if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'chest', items }); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
@@ -421,10 +422,18 @@ async function deleteWorld(id) {
 }
 async function loadSavedKeys(id) { const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys(IDBKeyRange.bound(id + ':', id + ':￿'))); W.saved = new Set((keys || []).map(k => k.slice(id.length + 1))); }
 function serTiles(c) { const a = []; for (const [i, t] of c.tiles) a.push([i, t]); return a; }
+// run-length encoding: chunk arrays are mostly long runs (air, stone, sky light)
+function rleEnc(a) {
+  const out = new Uint8Array(a.length * 2); let n = 0;
+  for (let i = 0; i < a.length;) { const v = a[i]; let r = 1; while (r < 255 && i + r < a.length && a[i + r] === v) r++; out[n++] = r; out[n++] = v; i += r; }
+  return out.slice(0, n);
+}
+function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 function saveChunk(c) {
   if (!c.modified) return; c.modified = false;
   const k = c.cx + ',' + c.cz; W.saved.add(k);
-  const rec = { b: c.blocks.slice(), m: c.meta.slice(), l: c.light.slice(), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null };
+  // untouched terrain is regenerated from the seed; only its animals are stored
+  const rec = c.edited ? { v: 2, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
   dbReq('chunks', 'readwrite', st => st.put(rec, W.id + ':' + k));
 }
 async function loadChunk(cx, cz) {
@@ -433,9 +442,9 @@ async function loadChunk(cx, cz) {
   const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + cx + ',' + cz));
   if (W.pending.get(key) !== 'load' || wid !== W.id) return;
   W.pending.delete(key);
-  if (!rec) { W.saved.delete(cx + ',' + cz); return; }
-  const c = { blocks: rec.b, meta: rec.m, light: rec.l, biome: rec.bio, mobs: rec.mobs, fromSave: true };
-  W.inbox.push({ cx, cz, blocks: c.blocks, meta: c.meta, light: c.light, biome: c.biome, mobs: c.mobs, fromSave: true, tileList: rec.t || [] });
+  if (!rec || !rec.b) { W.saved.delete(cx + ',' + cz); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
+  const dec = a => rec.v === 2 ? rleDec(a, CVOL) : a;
+  W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
 }
 function unloadChunk(c) {
   saveChunk(c);
@@ -484,5 +493,5 @@ function processInbox(budgetMs, maxMeshes) {
 }
 function resetWorld() {
   for (const c of W.chunks.values()) if (W.onChunkUnloaded) W.onChunkUnloaded(c);
-  W.chunks.clear(); W.pending.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; W.saved = new Set();
+  W.chunks.clear(); W.pending.clear(); W.pendingMobs.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; W.saved = new Set();
 }

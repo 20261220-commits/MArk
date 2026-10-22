@@ -160,7 +160,7 @@ function saveWorldMeta() {
   if (!W.active || !W.meta) return;
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead']) s[k] = PL[k];
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel };
-  W.meta.time = W.time; W.meta.rain = W.rain; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
+  W.meta.time = W.time; W.meta.rain = W.rain; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
 function saveAll() { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c); }
@@ -186,7 +186,7 @@ function gameTick() {
   furnaceTick();
   if (W.tickN % 10 === 0 && dayFactor() < 1.01) trySpawnHostile();
   spawnerTick();
-  if (W.tickN % 20 === 0) UI.hudDirty = true;
+  if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
   if (W.tickN % 600 === 0) saveAll();
 }
 
