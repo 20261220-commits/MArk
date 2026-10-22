@@ -31,7 +31,7 @@ MOBDEF.ghast.anim = (e, P, now) => { const t = e.shooting ? packTexture('ghast_s
     P.push({ n: k + 'fleg', o: [12 * s, 20, 2], r: [1.3, 0, 0], b: [[112, 104, -4, -4, -4, 8, 24, 8]] });
     P.push({ n: k + 'rleg', o: [16 * s, 16, 42], r: [1.0, 0, 0], b: [[0, 0, -8, -4, -8, 16, 32, 16]] });
   }
-  MCMODELS.ender_dragon = { tex: 'dragon', eyes: 'dragon_eyes', tw: 256, th: 256, parts: P.map(p => p.n === 'head' ? { ...p, e: 1 } : p) };
+  MCMODELS.ender_dragon = { tex: 'dragon', eyes: 'dragon_eyes', tw: 256, th: 256, big: 1, parts: P.map(p => p.n === 'head' ? { ...p, e: 1 } : p) };
 })();
 // ---- small helpers ----
 const plTargetable = () => PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
@@ -349,7 +349,7 @@ function blazeAnim(e, P, now) {
     p.position.set(Math.cos(a) * r, (24 - [-2, 2, 11][ring] - Math.cos(t * 1.5 + i)) / 16, Math.sin(a) * r);
   }
 }
-function slimeAnim(e, P) { const s = 1 + (e.squish || 0) * 0.4; e.mesh.children[0].scale.set((e.size || 1) / s, (e.size || 1) * s, (e.size || 1) / s); }
+function slimeAnim(e, P) { const s = 1 + (e.squish || 0) * 0.4, k = (e.size || 1); (e.mesh.userData.inner || e.mesh.children[0]).scale.set(k / s, k * s, k / s); }
 // ---------- ender dragon fight ----------
 let bossEl = null;
 function bossBar(e) {

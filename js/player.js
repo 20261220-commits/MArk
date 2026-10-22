@@ -538,8 +538,10 @@ function dropHeld(all) {
 }
 // ---------- furnaces ----------
 function furnaceTick() {
-  for (const c of W.chunks.values()) for (const [i, t] of c.tiles) {
+  for (const c of W.chunks.values()) if (c.hasFurnace !== false) for (const [i, t] of c.tiles) {
+    if (c.hasFurnace === undefined) c.hasFurnace = false; // re-flagged below (or by setTile) when a furnace exists
     if (t.type !== 'furnace') continue;
+    c.hasFurnace = true;
     const [inp, fuel, out] = t.items;
     const r = inp && SMELT[inp.id];
     const canOut = r && (!out || (out.id === r[0] && out.n < maxStack(r[0])));

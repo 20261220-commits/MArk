@@ -47,9 +47,9 @@ function markDirty(x, z) {
 }
 
 // ---------- lighting across chunks ----------
-function lightAdd(seeds, sh) {
-  // seeds: array of [x,y,z]
-  const q = []; for (const s of seeds) q.push(s[0], s[1], s[2]);
+function lightAdd(seeds, sh, flat) {
+  // seeds: array of [x,y,z], or a flat [x,y,z,x,y,z...] list when flat is set
+  let q; if (flat) q = seeds; else { q = []; for (const s of seeds) q.push(s[0], s[1], s[2]); }
   let h = 0;
   while (h < q.length) {
     const x = q[h], y = q[h + 1], z = q[h + 2]; h += 3;
@@ -122,14 +122,14 @@ function stitchLight(c) {
       for (let k = 0; k < 16; k++) {
         const ax = dx === 1 ? 15 : dx === -1 ? 0 : k, az = dz === 1 ? 15 : dz === -1 ? 0 : k;
         const bx = dx === 1 ? 0 : dx === -1 ? 15 : k, bz = dz === 1 ? 0 : dz === -1 ? 15 : k;
-        for (let y = 0; y < CH; y++) {
+        for (let y = 0, top = Math.min(CH - 1, Math.max(c.maxY, n.maxY) + 1); y <= top; y++) {
           const la = (c.light[(y << 8) | (az << 4) | ax] >> sh) & 15, lb = (n.light[(y << 8) | (bz << 4) | bx] >> sh) & 15;
-          if (la > lb + 1) seeds.push([x0 + ax, y, z0 + az]);
-          else if (lb > la + 1) seeds.push([(c.cx + dx) * 16 + bx, y, (c.cz + dz) * 16 + bz]);
+          if (la > lb + 1) seeds.push(x0 + ax, y, z0 + az);
+          else if (lb > la + 1) seeds.push((c.cx + dx) * 16 + bx, y, (c.cz + dz) * 16 + bz);
         }
       }
     }
-    if (seeds.length) lightAdd(seeds, sh);
+    if (seeds.length) lightAdd(seeds, sh, true);
   }
 }
 
@@ -154,7 +154,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
 }
 function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
-function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; }
+function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace') c.hasFurnace = true; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern) || id === BID.glass || (id >= 22 && id <= 24);
 function breakNaturally(x, y, z, b, m) {
@@ -335,11 +335,27 @@ const stack = (x, y, z, b, m) => {
 RANDOM_TICK[BID.sugar_cane] = stack; RANDOM_TICK[BID.cactus] = stack;
 for (const lv of [22, 23, 24]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
   if (m & 1) return;
-  // search for a log within 4 blocks through leaves
-  const seen = new Set(), q = [[x, y, z, 0]];
-  while (q.length) { const [px, py, pz, d] = q.shift(); for (const [dx, dy, dz] of N6) { const nx = px + dx, ny = py + dy, nz = pz + dz, k = nx + ',' + ny + ',' + nz; if (seen.has(k)) continue; seen.add(k); const t = getBlock(nx, ny, nz); if (S.LOGAX[t] && t !== BID.hay_block) return; if (t >= 22 && t <= 24 && d < 4) q.push([nx, ny, nz, d + 1]); } }
+  // search for a log within 4 blocks through leaves (flat typed queue, 9x9x9 visited grid)
+  if (leafSearch(x, y, z)) return;
   breakNaturally(x, y, z, b, m);
 };
+const LQ = new Int16Array(729 * 4), LSEEN = new Uint8Array(729); let lstamp = 0;
+function leafSearch(x, y, z) {
+  if (++lstamp > 250) { lstamp = 1; LSEEN.fill(0); }
+  let h = 0, t = 0; LQ[t++] = 4; LQ[t++] = 4; LQ[t++] = 4; LQ[t++] = 0; LSEEN[364] = lstamp;
+  while (h < t) {
+    const px = LQ[h], py = LQ[h + 1], pz = LQ[h + 2], d = LQ[h + 3]; h += 4;
+    for (let k = 0; k < 6; k++) {
+      const n = N6[k], nx = px + n[0], ny = py + n[1], nz = pz + n[2];
+      if (nx < 0 || ny < 0 || nz < 0 || nx > 8 || ny > 8 || nz > 8) continue;
+      const i = nx * 81 + ny * 9 + nz; if (LSEEN[i] === lstamp) continue; LSEEN[i] = lstamp;
+      const tb = getBlock(x + nx - 4, y + ny - 4, z + nz - 4);
+      if (S.LOGAX[tb] && tb !== BID.hay_block) return true;
+      if ((tb >= 22 && tb <= 24 || BLOCKS[tb] && BLOCKS[tb].leaves) && d < 4) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
+    }
+  }
+  return false;
+}
 RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   let wet = false;
   for (let dx = -4; dx <= 4 && !wet; dx++) for (let dz = -4; dz <= 4 && !wet; dz++) for (let dy = 0; dy <= 1; dy++) if (getBlock(x + dx, y + dy, z + dz) === 27) { wet = true; break; }
@@ -360,6 +376,7 @@ const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
 const bufPool = [];
+for (let i = 0; i < 4; i++) bufPool.push([new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
 function onWorker(w, m) {
   w.busy--;
@@ -463,17 +480,34 @@ function rleEnc(a) {
   return out.slice(0, n);
 }
 function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
-function saveChunk(c) {
+// RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:2,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const savePending = new Map(), saveWaiters = new Map();
+saveWorker.onmessage = e => {
+  const { k, rec } = e.data;
+  dbReq('chunks', 'readwrite', st => st.put(rec, k)).then(() => {
+    const n = (savePending.get(k) || 1) - 1;
+    if (n > 0) { savePending.set(k, n); return; }
+    savePending.delete(k); const w = saveWaiters.get(k); if (w) { saveWaiters.delete(k); for (const f of w) f(); }
+  });
+};
+const saveDone = k => savePending.has(k) ? new Promise(r => { const w = saveWaiters.get(k) || []; w.push(r); saveWaiters.set(k, w); }) : null;
+// unloading: the chunk's arrays are handed to the worker without copying; sync: encode here (page is closing)
+function saveChunk(c, unloading, sync) {
   if (!c.modified || W.pano) return; c.modified = false;
-  const k = dkey(c.cx, c.cz); W.saved.add(k);
+  const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
-  const rec = c.edited ? { v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
-  dbReq('chunks', 'readwrite', st => st.put(rec, W.id + ':' + k));
+  if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, mobs: c.mobs || null }, dk)); return; }
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
+  savePending.set(dk, (savePending.get(dk) || 0) + 1);
+  saveWorker.postMessage({ k: dk, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
   const wid = W.id;
   const dk = dkey(cx, cz), dim = W.dim;
+  const pend = saveDone(wid + ':' + dk); if (pend) await pend; // reloading a chunk that is still being saved
   const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + dk));
   if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
@@ -483,8 +517,8 @@ async function loadChunk(cx, cz) {
   W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
 }
 function unloadChunk(c) {
-  saveChunk(c);
-  if (W.onChunkUnloaded) W.onChunkUnloaded(c);
+  if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
+  saveChunk(c, true);
   W.chunks.delete(c.key); W.lastKey = -1;
 }
 // streaming: called every frame with player chunk position

@@ -146,7 +146,17 @@ function worldReady() {
   const t = $('loadtxt'); if (t) t.textContent = `청크 ${W.chunks.size}개 생성됨`;
   return have >= need || (performance.now() - loadingFrom > 15000 && chunkAt(pcx, pcz));
 }
+// build one of every model and compile all shader programs while the loading screen is up,
+// so the first zombie (or the dragon) doesn't cost a 50 ms shader compile mid-game
+let prewarmed = false;
+function prewarm() {
+  if (prewarmed) return; prewarmed = true;
+  const g = new THREE.Group(), keep = [];
+  for (const t of Object.keys(MOBDEF)) { try { const m = buildModel(t, { vtype: 'plains', prof: 'farmer' }); m.position.set(PL.x, PL.y - 300, PL.z); g.add(m); keep.push(m); } catch (e) {} }
+  scene.add(g); try { renderer.compile(scene, camera); } catch (e) {} scene.remove(g);
+}
 function finishLoading() {
+  prewarm();
   if (W.arrive) arriveDim();
   if (W.needSpawnFix) {
     W.needSpawnFix = false;
@@ -165,7 +175,7 @@ function saveWorldMeta() {
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
-function saveAll() { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c); }
+function saveAll(sync) { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c, false, sync === true); }
 function pauseGame() { if (!W.active || UI.menu) return; if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
 function resumeGame() {
   if (PL.dead) return; UI.paused = false; showMenu(null);
@@ -178,10 +188,10 @@ function quitToTitle() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
   W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
 }
-addEventListener('pagehide', saveAll);
+addEventListener('pagehide', () => saveAll(true));
 // Ctrl+W (sprint + forward in Java) closes a Chrome tab: ask before leaving a running world
-addEventListener('beforeunload', e => { if (W.active) { saveAll(); e.preventDefault(); e.returnValue = ''; } });
-document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
+addEventListener('beforeunload', e => { if (W.active) { saveAll(true); e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(true); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
 
 // ---------- game tick ----------
 function gameTick() {
@@ -242,7 +252,7 @@ W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, P
 // ---------- frame ----------
 let last = performance.now(), acc = 0, fpsN = 0, fpsT = 0, fps = 60;
 const PERF = { inbox: 0, stream: 0, tick: 0, ents: 0, render: 0, hud: 0, n: 0 };
-const pf = (k, t0) => { PERF[k] += performance.now() - t0; };
+const PERFMAX = {}; const pf = (k, t0) => { const d = performance.now() - t0; PERF[k] += d; if (!(PERFMAX[k] >= d)) PERFMAX[k] = d; };
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -250,7 +260,7 @@ function frame(now) {
   if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
-  processInbox(UI.menu === 'loading' ? 30 : 4, UI.menu === 'loading' ? 50 : 6); pf('inbox', t0); t0 = performance.now();
+  processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); // fewer GPU uploads per frame when the frame rate dips pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused) {
@@ -363,5 +373,5 @@ function autoRes() {
   buildHud();
   showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
-  window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF };
+  window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF, PERFMAX };
 })();

@@ -271,34 +271,65 @@ function villagerTexture(type, prof) {
   const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
-function buildMCModel(type, spec, tex, opts = {}) {
-  const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1 });
-  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1 }) : null;
-  const matT = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false });
-  const root = new THREE.Group(), inner = new THREE.Group(), parts = {};
-  root.add(inner); if (spec.scale) inner.scale.setScalar(spec.scale);
+// Each model part is a bone of one skinned mesh per material, so a mob costs 1-3 draw calls
+// instead of one per part (the dragon alone had ~40). Bind-pose geometry is built once per type.
+function buildBones(spec) {
+  const inner = new THREE.Bone(), parts = {}, list = [];
+  if (spec.scale) inner.scale.setScalar(spec.scale);
   for (const p of spec.parts) {
-    const g = new THREE.Group(), r = p.r || [0, 0, 0];
-    g.position.set(-p.o[0] / 16, (p.p ? -p.o[1] : 24 - p.o[1]) / 16, p.o[2] / 16);
-    g.rotation.set(-r[0], -r[1], r[2], 'ZYX');
-    g.userData.base = g.rotation.clone();
-    const key = type + ':' + p.n;
-    const geo = mobGeoCache[key] || (mobGeoCache[key] = (() => {
-      const gs = p.b.map(([u, v, x, y, z, w, h, d, inf, mir]) => boxGeo(w, h, d, u, v, -(x + w), -(y + h), z, inf || 0, spec.tw, spec.th, !!mir));
-      return gs.length === 1 ? gs[0] : mergeGeos(gs);
-    })());
-    const m = new THREE.Mesh(geo, p.tr ? matT : p.t ? mat2 : mat); g.add(m);
-    if (p.e && eyes) { const em = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: eyes, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); em.userData.emissive = 1; g.add(em); }
-    (p.p ? parts[p.p] : inner).add(g); parts[p.n] = g;
+    const b = new THREE.Bone(), r = p.r || [0, 0, 0];
+    b.position.set(-p.o[0] / 16, (p.p ? -p.o[1] : 24 - p.o[1]) / 16, p.o[2] / 16);
+    b.rotation.set(-r[0], -r[1], r[2], 'ZYX'); b.userData.base = b.rotation.clone();
+    (p.p ? parts[p.p] : inner).add(b); parts[p.n] = b; list.push(b);
   }
-  root.userData = { parts, mat, mats: [mat, mat2, matT].filter(Boolean), mc: true };
+  return { inner, parts, list };
+}
+const mcGeoCache = {};
+function mcModelGeos(type, spec) {
+  if (mcGeoCache[type]) return mcGeoCache[type];
+  const { inner, list } = buildBones(spec); inner.updateMatrixWorld(true);
+  const groups = { m: [], t: [], tr: [], e: [] };
+  spec.parts.forEach((p, bi) => {
+    const gs = p.b.map(([u, v, x, y, z, w, h, d, inf, mir]) => boxGeo(w, h, d, u, v, -(x + w), -(y + h), z, inf || 0, spec.tw, spec.th, !!mir));
+    for (const g of gs) {
+      g.applyMatrix4(list[bi].matrixWorld);
+      const n = g.attributes.position.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+      for (let k = 0; k < n; k++) { si[k * 4] = bi; sw[k * 4] = 1; }
+      g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+      groups[p.tr ? 'tr' : p.t ? 't' : 'm'].push(g); if (p.e) groups.e.push(g);
+    }
+  });
+  const out = {}; for (const k in groups) out[k] = groups[k].length ? mergeGeos(groups[k]) : null;
+  return mcGeoCache[type] = out;
+}
+function buildMCModel(type, spec, tex, opts = {}) {
+  const geos = mcModelGeos(type, spec);
+  const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[spec.tex + '_e'] && packTexture(spec.tex + '_e');
+  const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
+  const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
+  const root = new THREE.Group(), { inner, parts, list } = buildBones(spec);
+  const main = new THREE.SkinnedMesh(geos.m, mat); main.add(inner); root.add(main);
+  main.updateMatrixWorld(true);
+  const sk = new THREE.Skeleton(list); main.bind(sk);
+  const extra = (geo, m, emissive) => { if (!geo || !m) return; const x = new THREE.SkinnedMesh(geo, m); x.bind(sk, main.bindMatrix); if (emissive) x.userData.emissive = 1; root.add(x); };
+  extra(geos.t, mat2); extra(geos.tr, matT);
+  if (eyes && geos.e) extra(geos.e, new THREE.MeshBasicMaterial({ map: eyes, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, skinning: true }), true);
+  // OptiFine emissive textures (*_e.png): glowing parts drawn at full brightness on top
+  if (glow) extra(geos.m, new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, alphaTest: 0.05, skinning: true, polygonOffset: true, polygonOffsetFactor: -1 }), true);
+  if (spec.big) for (const o of root.children) o.frustumCulled = false;
+  root.userData = { parts, inner, mat, mats: [mat, mat2, matT].filter(Boolean), mc: true };
   return root;
 }
 function mergeGeos(gs) {
-  const pos = [], uv = [], col = [];
-  for (const g of gs) { pos.push(...g.attributes.position.array); uv.push(...g.attributes.uv.array); col.push(...g.attributes.color.array); }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeBoundingSphere();
+  let n = 0; for (const g of gs) n += g.attributes.position.count;
+  const geo = new THREE.BufferGeometry();
+  for (const [k, sz, T] of [['position', 3, Float32Array], ['uv', 2, Float32Array], ['color', 3, Float32Array], ['skinIndex', 4, Uint16Array], ['skinWeight', 4, Float32Array]]) {
+    if (!gs[0].attributes[k]) continue;
+    const a = new T(n * sz); let o = 0; for (const g of gs) { a.set(g.attributes[k].array, o); o += g.attributes[k].array.length; }
+    geo.setAttribute(k, new THREE.BufferAttribute(a, sz));
+  }
+  geo.computeBoundingSphere();
   return geo;
 }
 function buildModel(type, opts = {}) {
@@ -422,7 +453,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
 }
-function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e.mesh.userData.parts)) if (n.startsWith('fur_') || n === 'wool' || n === 'whead') p.visible = false; }
+function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e.mesh.userData.parts)) if (n.startsWith('fur_') || n === 'wool' || n === 'whead') { p.visible = false; p.scale.set(0, 0, 0); } } // bones: scale 0 hides a part
 function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
   if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
@@ -708,9 +739,8 @@ R.onChunkUnloaded = c => {
     if (e === PL.riding) continue;
     removeEnt(e);
   }
-  if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; saveChunkMobs(c); }
+  if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; } // unloadChunk saves right after this
 };
-function saveChunkMobs(c) { saveChunk(c); }
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
   if (fresh) spawnAnimalsForChunk(c);
