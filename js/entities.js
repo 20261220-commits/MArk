@@ -85,8 +85,9 @@ function paintBox(g, u, v, w, h, d, col, r, amt = 0.12, faces) {
 }
 const px = (g, x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
 // geometry for one box with given uv origin
-function boxGeo(w, h, d, u, v, ox, oy, oz, inflate = 0) {
+function boxGeo(w, h, d, u, v, ox, oy, oz, inflate = 0, tw = 64, th = 64, mirror = false) {
   const R0 = boxRegions(u, v, w, h, d), s = 1 / 16, i = inflate;
+  if (mirror) { const t = R0.right; R0.right = R0.left; R0.left = t; }
   const x0 = (ox - i) * s, y0 = (oy - i) * s, z0 = (oz - i) * s, x1 = (ox + w + i) * s, y1 = (oy + h + i) * s, z1 = (oz + d + i) * s;
   // faces: [corners bl,br,tr,tl], region, mirror
   // corners bl, br, tr, tl seen from outside (CCW); texture regions follow MC's box UV layout
@@ -102,8 +103,9 @@ function boxGeo(w, h, d, u, v, ox, oy, oz, inflate = 0) {
   const pos = [], uv = [], col = [];
   for (const [cs, reg] of F) {
     const [ru, rv, rw, rh] = R0[reg];
-    const U = [[ru, rv + rh], [ru + rw, rv + rh], [ru + rw, rv], [ru, rv]];
-    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...cs[k]); uv.push(U[k][0] / 64, U[k][1] / 64); col.push(shadeF[reg], shadeF[reg], shadeF[reg]); }
+    const a = mirror ? ru + rw : ru, b = mirror ? ru : ru + rw;
+    const U = [[a, rv + rh], [b, rv + rh], [b, rv], [a, rv]];
+    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...cs[k]); uv.push(U[k][0] / tw, U[k][1] / th); col.push(shadeF[reg], shadeF[reg], shadeF[reg]); }
   }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.computeBoundingSphere();
@@ -172,7 +174,136 @@ const MOBDEF = {
 };
 const mobTex = {};
 const mobGeoCache = {};
-function buildModel(type) {
+// ---------- Java Edition models for the resource-pack skins ----------
+// Parts use Minecraft's model space (y down, feet at y=24, +x = model's left after the
+// renderer's flip) so the pack's entity textures line up exactly. b: [u, v, x, y, z, w, h, d, inflate, mirror]
+const HUM_BODY = (lt) => [
+  { n: 'head', o: [0, 0, 0], b: [[0, 0, -4, -8, -4, 8, 8, 8], [32, 0, -4, -8, -4, 8, 8, 8, 0.5]] },
+  { n: 'body', o: [0, 0, 0], b: [[16, 16, -4, 0, -2, 8, 12, 4]] },
+  { n: 'rarm', o: [-5, 2, 0], b: [[40, 16, -3, -2, -2, 4, 12, 4]] },
+  { n: 'larm', o: [5, 2, 0], b: lt ? [[32, 48, -1, -2, -2, 4, 12, 4]] : [[40, 16, -1, -2, -2, 4, 12, 4, 0, 1]] },
+  { n: 'rleg', o: [-1.9, 12, 0], b: [[0, 16, -2, 0, -2, 4, 12, 4]] },
+  { n: 'lleg', o: [1.9, 12, 0], b: lt ? [[16, 48, -2, 0, -2, 4, 12, 4]] : [[0, 16, -2, 0, -2, 4, 12, 4, 0, 1]] }];
+const QUAD_LEGS = (h, x, zf, zh) => [['rleg', -x, zf], ['lleg', x, zf], ['rleg2', -x, zh], ['lleg2', x, zh]].map(([n, lx, lz]) => ({ n, o: [lx, 24 - h, lz], b: [[0, 16, -2, 0, -2, 4, h, 4]] }));
+const MCMODELS = {
+  zombie: { tex: 'zombie', tw: 64, th: 64, parts: HUM_BODY(false) },
+  player: { tex: 'steve', tw: 64, th: 64, parts: HUM_BODY(true) },
+  skeleton: { tex: 'skeleton', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 0, 0], b: [[0, 0, -4, -8, -4, 8, 8, 8]] }, { n: 'body', o: [0, 0, 0], b: [[16, 16, -4, 0, -2, 8, 12, 4]] },
+    { n: 'rarm', o: [-5, 2, 0], b: [[40, 16, -1, -2, -1, 2, 12, 2]] }, { n: 'larm', o: [5, 2, 0], b: [[40, 16, -1, -2, -1, 2, 12, 2, 0, 1]] },
+    { n: 'rleg', o: [-2, 12, 0], b: [[0, 16, -1, 0, -1, 2, 12, 2]] }, { n: 'lleg', o: [2, 12, 0], b: [[0, 16, -1, 0, -1, 2, 12, 2, 0, 1]] }] },
+  zombified_piglin: { tex: 'zombified_piglin', tw: 64, th: 64, parts: [
+    { n: 'head', o: [0, 0, 0], b: [[0, 0, -5, -8, -4, 10, 8, 8], [31, 1, -2, -4, -5, 4, 4, 1], [2, 4, 2, -2, -5, 1, 2, 1], [2, 0, -3, -2, -5, 1, 2, 1]] },
+    { n: 'rear', p: 'head', o: [-4.5, -6, 0], r: [0, 0, 0.5236], b: [[39, 6, -1, 0, -2, 1, 5, 4]] }, { n: 'lear', p: 'head', o: [4.5, -6, 0], r: [0, 0, -0.5236], b: [[51, 6, 0, 0, -2, 1, 5, 4]] },
+    ...HUM_BODY(true).slice(1)] },
+  creeper: { tex: 'creeper', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 6, 0], b: [[0, 0, -4, -8, -4, 8, 8, 8]] }, { n: 'body', o: [0, 6, 0], b: [[16, 16, -4, 0, -2, 8, 12, 4]] },
+    ...[['rleg2', -2, 4], ['lleg2', 2, 4], ['rleg', -2, -4], ['lleg', 2, -4]].map(([n, x, z]) => ({ n, o: [x, 18, z], b: [[0, 16, -2, 0, -2, 4, 6, 4]] }))] },
+  spider: { tex: 'spider', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 15, -3], b: [[32, 4, -4, -4, -8, 8, 8, 8]] }, { n: 'neck', o: [0, 15, 0], b: [[0, 0, -3, -3, -3, 6, 6, 6]] },
+    { n: 'body', o: [0, 15, 9], b: [[0, 12, -5, -4, -6, 10, 8, 12]] },
+    ...[0, 1, 2, 3].flatMap(i => { const z = [2, 1, 0, -1][i], yr = [Math.PI / 4, Math.PI / 8, -Math.PI / 8, -Math.PI / 4][i], zr = i === 0 || i === 3 ? Math.PI / 4 : Math.PI / 4 * 0.74;
+      return [{ n: 'leg' + i, o: [-4, 15, z], r: [0, yr, -zr], b: [[18, 0, -15, -1, -1, 16, 2, 2]] }, { n: 'legl' + i, o: [4, 15, z], r: [0, -yr, zr], b: [[18, 0, -1, -1, -1, 16, 2, 2]] }]; })] },
+  pig: { tex: 'pig', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 12, -6], b: [[0, 0, -4, -4, -8, 8, 8, 8], [16, 16, -2, 0, -9, 4, 3, 1]] },
+    { n: 'body', o: [0, 11, 2], r: [Math.PI / 2, 0, 0], b: [[28, 8, -5, -10, -7, 10, 16, 8]] }, ...QUAD_LEGS(6, 3, -5, 7)] },
+  cow: { tex: 'cow', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 4, -8], b: [[0, 0, -4, -4, -6, 8, 8, 6], [22, 0, -5, -5, -4, 1, 3, 1], [22, 0, 4, -5, -4, 1, 3, 1]] },
+    { n: 'body', o: [0, 5, 2], r: [Math.PI / 2, 0, 0], b: [[18, 4, -6, -10, -7, 12, 18, 10], [52, 0, -2, 2, -8, 4, 6, 1]] }, ...QUAD_LEGS(12, 4, -6, 7)] },
+  sheep: { tex: 'sheep', tex2: 'sheep_fur', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 6, -8], b: [[0, 0, -3, -4, -6, 6, 6, 8]] },
+    { n: 'body', o: [0, 5, 2], r: [Math.PI / 2, 0, 0], b: [[28, 8, -4, -10, -7, 8, 16, 6]] }, ...QUAD_LEGS(12, 3, -5, 7),
+    { n: 'fur_head', p: 'head', o: [0, 0, 0], t: 1, b: [[0, 0, -3, -4, -4, 6, 6, 6, 0.6]] },
+    { n: 'fur_body', p: 'body', o: [0, 0, 0], t: 1, b: [[28, 8, -4, -10, -7, 8, 16, 6, 1.75]] },
+    ...['rleg', 'lleg', 'rleg2', 'lleg2'].map(l => ({ n: 'fur_' + l, p: l, o: [0, 0, 0], t: 1, b: [[0, 16, -2, 0, -2, 4, 6, 4, 0.5]] }))] },
+  chicken: { tex: 'chicken', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, 15, -4], b: [[0, 0, -2, -6, -2, 4, 6, 3], [14, 0, -2, -4, -4, 4, 2, 2], [14, 4, -1, -2, -3, 2, 2, 2]] },
+    { n: 'body', o: [0, 16, 0], r: [Math.PI / 2, 0, 0], b: [[0, 9, -3, -4, -3, 6, 8, 6]] },
+    { n: 'rleg', o: [-2, 19, 1], b: [[26, 0, -1, 0, -3, 3, 5, 3]] }, { n: 'lleg', o: [1, 19, 1], b: [[26, 0, -1, 0, -3, 3, 5, 3]] },
+    { n: 'rwing', o: [-4, 13, 0], b: [[24, 13, 0, 0, -3, 1, 4, 6]] }, { n: 'lwing', o: [4, 13, 0], b: [[24, 13, -1, 0, -3, 1, 4, 6]] }] },
+  squid: { tex: 'squid', tw: 64, th: 32, parts: [{ n: 'body', o: [0, 8, 0], b: [[0, 0, -6, -8, -6, 12, 16, 12]] },
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const a = i * Math.PI * 2 / 8; return { n: 't' + i, o: [Math.cos(a) * 5, 15, Math.sin(a) * 5], r: [0, -a + Math.PI / 2, 0], b: [[48, 0, -1, 0, -1, 2, 18, 2]] }; })] },
+  villager: { tex: 'villager', tw: 64, th: 64, parts: [
+    { n: 'head', o: [0, 0, 0], b: [[0, 0, -4, -10, -4, 8, 10, 8], [24, 0, -1, -3, -6, 2, 4, 2]] },
+    { n: 'body', o: [0, 0, 0], b: [[16, 20, -4, 0, -3, 8, 12, 6], [0, 38, -4, 0, -3, 8, 18, 6, 0.5]] },
+    { n: 'arms', o: [0, 3, -1], r: [-0.75, 0, 0], b: [[44, 22, -8, -2, -2, 4, 8, 4], [44, 22, 4, -2, -2, 4, 8, 4, 0, 1], [40, 38, -4, 2, -2, 8, 4, 4]] },
+    { n: 'rleg', o: [-2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4]] }, { n: 'lleg', o: [2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4, 0, 1]] }] },
+  iron_golem: { tex: 'iron_golem', tw: 128, th: 128, parts: [
+    { n: 'head', o: [0, -7, -2], b: [[0, 0, -4, -12, -5.5, 8, 10, 8], [24, 0, -1, -5, -7.5, 2, 4, 2]] },
+    { n: 'body', o: [0, -7, 0], b: [[0, 40, -9, -2, -6, 18, 12, 11], [0, 70, -4.5, 10, -3, 9, 5, 6, 0.5]] },
+    { n: 'rarm', o: [0, -7, 0], b: [[60, 21, -13, -2.5, -3, 4, 30, 6]] }, { n: 'larm', o: [0, -7, 0], b: [[60, 58, 9, -2.5, -3, 4, 30, 6]] },
+    { n: 'rleg', o: [-4, 11, 0], b: [[37, 0, -3.5, -3, -3, 6, 16, 5]] }, { n: 'lleg', o: [5, 11, 0], b: [[60, 0, -3.5, -3, -3, 6, 16, 5, 0, 1]] }] },
+  enderman: { tex: 'enderman', eyes: 'enderman_eyes', tw: 64, th: 32, parts: [
+    { n: 'head', o: [0, -13, 0], b: [[0, 0, -4, -8, -4, 8, 8, 8], [0, 16, -4, -8, -4, 8, 8, 8, -0.5]], e: 1 },
+    { n: 'body', o: [0, -14, 0], b: [[32, 16, -4, 0, -2, 8, 12, 4]] },
+    { n: 'rarm', o: [-5, -12, 0], b: [[56, 0, -1, -2, -1, 2, 30, 2]] }, { n: 'larm', o: [5, -12, 0], b: [[56, 0, -1, -2, -1, 2, 30, 2, 0, 1]] },
+    { n: 'rleg', o: [-2, -5, 0], b: [[56, 0, -1, 0, -1, 2, 30, 2]] }, { n: 'lleg', o: [2, -5, 0], b: [[56, 0, -1, 0, -1, 2, 30, 2, 0, 1]] }] },
+  blaze: { tex: 'blaze', tw: 64, th: 32, parts: [{ n: 'head', o: [0, 0, 0], b: [[0, 0, -4, -4, -4, 8, 8, 8]] },
+    ...Array.from({ length: 12 }, (_, i) => ({ n: 'rod' + i, o: [0, 0, 0], b: [[0, 16, 0, 0, 0, 2, 8, 2]] }))] },
+  ghast: { tex: 'ghast', tex2: 'ghast_shooting', tw: 64, th: 32, scale: 4.5, parts: [{ n: 'body', o: [0, 16, 0], b: [[0, 0, -8, -8, -8, 16, 16, 16]] },
+    ...Array.from({ length: 9 }, (_, i) => ({ n: 't' + i, o: [(((i % 3) - ((i / 3) | 0) % 2 * 0.5 + 0.25) / 2 * 2 - 1) * 5, 24, ((((i / 3) | 0) / 2) * 2 - 1) * 5], b: [[0, 0, -1, 0, -1, 2, 8 + (i * 5) % 7, 2]] }))] },
+  magma_cube: { tex: 'magma_cube', tw: 64, th: 32, scale: 2, parts: [{ n: 'core', o: [0, 0, 0], b: [[0, 16, -2, 18, -2, 4, 4, 4]] },
+    ...Array.from({ length: 8 }, (_, i) => ({ n: 'seg' + i, o: [0, 0, 0], b: [[i === 2 ? 24 : i === 3 ? 24 : 0, i === 2 ? 10 : i === 3 ? 19 : i, -4, 16 + i, -4, 8, 1, 8]] }))] },
+  slime: { tex: 'slime', tw: 64, th: 32, scale: 2, parts: [{ n: 'core', o: [0, 0, 0], b: [[0, 16, -3, 17, -3, 6, 6, 6], [32, 0, -3.25, 18, -3.5, 2, 2, 2], [32, 4, 1.25, 18, -3.5, 2, 2, 2], [32, 8, 0, 21, -3.5, 1, 1, 1]] },
+    { n: 'outer', o: [0, 0, 0], b: [[0, 0, -4, 16, -4, 8, 8, 8]], tr: 1 }] },
+  end_crystal: { tex: 'end_crystal', tw: 64, th: 32, parts: [
+    { n: 'base', o: [0, 24, 0], b: [[0, 16, -6, 0, -6, 12, 4, 12]] },
+    { n: 'glass', o: [0, 8, 0], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 }, { n: 'glass2', p: 'glass', o: [0, 0, 0], r: [0.785, 0, 0.615], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 },
+    { n: 'core', p: 'glass', o: [0, 0, 0], r: [0.785, 0.785, 0], b: [[32, 0, -4, -4, -4, 8, 8, 8, -1.5]] }] },
+  boat: { tex: 'boat', tw: 128, th: 64, parts: [
+    { n: 'bottom', o: [0, 21, 1], r: [Math.PI / 2, 0, 0], b: [[0, 0, -14, -9, -3, 28, 16, 3]] },
+    { n: 'back', o: [-15, 20, 4], r: [0, Math.PI * 1.5, 0], b: [[0, 19, -13, -7, -1, 18, 6, 2]] }, { n: 'front', o: [15, 20, 0], r: [0, Math.PI / 2, 0], b: [[0, 27, -8, -7, -1, 16, 6, 2]] },
+    { n: 'right', o: [0, 20, -9], r: [0, Math.PI, 0], b: [[0, 35, -14, -7, -1, 28, 6, 2]] }, { n: 'left', o: [0, 20, 9], b: [[0, 43, -14, -7, -1, 28, 6, 2]] }] },
+};
+const entTex = {};
+function packTexture(key) {
+  if (entTex[key]) return entTex[key];
+  const e = PACKPX.ent[key]; if (!e) return null;
+  const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return entTex[key] = t;
+}
+// villagers: base skin + biome clothes + profession clothes, alpha-composited once per combination
+function villagerTexture(type, prof) {
+  const key = 'v:' + type + ':' + prof; if (entTex[key]) return entTex[key];
+  const base = PACKPX.ent.villager; if (!base) return null;
+  const px = new Uint8Array(base.px);
+  for (const k of ['vtype_' + type, 'vprof_' + prof]) { const o = PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
+  const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return entTex[key] = t;
+}
+function buildMCModel(type, spec, tex, opts = {}) {
+  const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1 });
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1 }) : null;
+  const matT = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false });
+  const root = new THREE.Group(), inner = new THREE.Group(), parts = {};
+  root.add(inner); if (spec.scale) inner.scale.setScalar(spec.scale);
+  for (const p of spec.parts) {
+    const g = new THREE.Group(), r = p.r || [0, 0, 0];
+    g.position.set(-p.o[0] / 16, (p.p ? -p.o[1] : 24 - p.o[1]) / 16, p.o[2] / 16);
+    g.rotation.set(-r[0], -r[1], r[2], 'ZYX');
+    g.userData.base = g.rotation.clone();
+    const key = type + ':' + p.n;
+    const geo = mobGeoCache[key] || (mobGeoCache[key] = (() => {
+      const gs = p.b.map(([u, v, x, y, z, w, h, d, inf, mir]) => boxGeo(w, h, d, u, v, -(x + w), -(y + h), z, inf || 0, spec.tw, spec.th, !!mir));
+      return gs.length === 1 ? gs[0] : mergeGeos(gs);
+    })());
+    const m = new THREE.Mesh(geo, p.tr ? matT : p.t ? mat2 : mat); g.add(m);
+    if (p.e && eyes) { const em = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: eyes, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); em.userData.emissive = 1; g.add(em); }
+    (p.p ? parts[p.p] : inner).add(g); parts[p.n] = g;
+  }
+  root.userData = { parts, mat, mats: [mat, mat2, matT].filter(Boolean), mc: true };
+  return root;
+}
+function mergeGeos(gs) {
+  const pos = [], uv = [], col = [];
+  for (const g of gs) { pos.push(...g.attributes.position.array); uv.push(...g.attributes.uv.array); col.push(...g.attributes.color.array); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeBoundingSphere();
+  return geo;
+}
+function buildModel(type, opts = {}) {
+  const spec = MCMODELS[type];
+  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer') : packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
   const def = MOBDEF[type];
   if (!mobTex[type]) mobTex[type] = def.tex();
   const mat = new THREE.MeshBasicMaterial({ map: mobTex[type], vertexColors: true, alphaTest: 0.5 });
@@ -184,7 +315,7 @@ function buildModel(type) {
     root.add(m); parts[name] = m;
   }
   if (type === 'spider') for (let i = 0; i < 4; i++) { parts['leg' + i].rotation.set(0, (i - 1.5) * 0.35, -0.55); parts['legl' + i].rotation.set(0, -(i - 1.5) * 0.35, 0.55); }
-  root.userData = { parts, mat };
+  root.userData = { parts, mat, mats: [mat] };
   return root;
 }
 
@@ -192,7 +323,7 @@ function buildModel(type) {
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) e.mesh.userData.mat.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -286,9 +417,10 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   e.mesh = buildModel(type);
   if (e.baby) e.mesh.scale.setScalar(0.5);
-  if (type === 'sheep' && e.sheared) { e.mesh.userData.parts.wool.visible = false; e.mesh.userData.parts.whead.visible = false; }
+  if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
 }
+function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e.mesh.userData.parts)) if (n.startsWith('fur_') || n === 'wool' || n === 'whead') p.visible = false; }
 function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
   if (e.inv > 0) return false;
@@ -579,15 +711,17 @@ function entityRender(alpha, now) {
       for (const [n, s] of legs) if (P[n]) P[n].rotation.x = sw * s;
       if (P.rarm) { if (e.def.armsOut || (e.type === 'skeleton' && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
       if (P.head && e.target) { const hy = Math.atan2(-(PL.x - x), -(PL.z - z)) - yaw; P.head.rotation.y = ((hy + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.head.rotation.y = Math.max(-1, Math.min(1, P.head.rotation.y)); }
-      if (e.def.water) { for (let i = 0; i < 8; i++) P['t' + i].rotation.set(Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283), 0, -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1); e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
+      if (e.def.water) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }
-      if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; P['leg' + i].rotation.y = (i - 1.5) * 0.35 + s; P['legl' + i].rotation.y = -(i - 1.5) * 0.35 - s; }
-      const mat = e.mesh.userData.mat;
-      if (!e.matOwn) { e.mesh.userData.mat = mat.clone(); e.mesh.traverse(o => { if (o.isMesh) o.material = e.mesh.userData.mat; }); e.matOwn = true; }
-      const m2 = e.mesh.userData.mat;
+      if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; const b1 = P['leg' + i].userData.base, b2 = P['legl' + i].userData.base; P['leg' + i].rotation.y = (b1 ? b1.y : (i - 1.5) * 0.35) + s; P['legl' + i].rotation.y = (b2 ? b2.y : -(i - 1.5) * 0.35) - s; }
+      if (!e.matOwn) { // per-mob copies of the shared materials so each mob can be lit / flash red on its own
+        const map = new Map();
+        e.mesh.traverse(o => { if (o.isMesh && !o.userData.emissive) { let c = map.get(o.material); if (!c) { c = o.material.clone(); map.set(o.material, c); } o.material = c; } });
+        e.mesh.userData.own = [...map.values()]; e.matOwn = true;
+      }
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
       const bb = e.def.glow ? Math.max(br, 0.9) : br;
-      if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb);
+      for (const m2 of e.mesh.userData.own) { if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb); }
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;

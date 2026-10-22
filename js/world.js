@@ -9,6 +9,8 @@ class Chunk {
     this.blocks = d.blocks; this.meta = d.meta; this.light = d.light; this.biome = d.biome;
     this.tiles = new Map(); this.modified = false; this.dirty = true; this.ver = 0; this.meshing = false; this.mesh = null;
     this.mobs = d.mobs || null; this.edited = !!d.fromSave; // edited: blocks differ from generated terrain
+    let y = CH - 1; scan: for (; y > 0; y--) { const o = y << 8; for (let i = 0; i < 256; i++) if (this.blocks[o + i]) break scan; }
+    this.maxY = y; // highest non-air layer: meshing and random ticks skip the empty sky above
   }
 }
 
@@ -137,6 +139,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i], oldM = c.meta[i];
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
+  if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   if (old !== id) relight(x, y, z, old, id);
   markDirty(x, z);
@@ -270,7 +273,7 @@ function randomTicks(px, pz) {
   const pcx = px >> 4, pcz = pz >> 4, R = 6;
   for (let cx = pcx - R; cx <= pcx + R; cx++) for (let cz = pcz - R; cz <= pcz + R; cz++) {
     const c = chunkAt(cx, cz); if (!c || !meshable(c)) continue; // neighbours must be loaded (leaf decay, spreading)
-    for (let s = 0; s < 8; s++) for (let k = 0; k < 3; k++) {
+    for (let s = 0, ns = (c.maxY >> 4) + 1; s < ns; s++) for (let k = 0; k < 3; k++) { // only sections that contain blocks
       const r = (Math.random() * 4096) | 0, i = (s << 12) | r, b = c.blocks[i];
       if (!b || !RANDOM_TICK[b]) continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
@@ -386,7 +389,10 @@ function requestMesh(c, opts) {
   const w = idleWorker(3); if (!w) return false;
   const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint8Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
-  B.fill(8, 0, PA); L.fill(0, 0, PA); B.fill(0, (PH - 1) * PA); L.fill(0xf0, (PH - 1) * PA); // floor below y=0 and open sky above
+  // only copy layers up to the tallest neighbour; everything above is open sky
+  let top = 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) top = Math.max(top, chunkAt(c.cx + dx, c.cz + dz).maxY);
+  const h = Math.min(CH, top + 2);
+  B.fill(8, 0, PA); L.fill(0, 0, PA); B.fill(0, (h + 1) * PA, (h + 2) * PA); L.fill(0xf0, (h + 1) * PA, (h + 2) * PA); // floor below y=0, sky layer above h
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
     const n = chunkAt(c.cx + dx, c.cz + dz);
     const xa = dx < 0 ? 15 : 0, xb = dx > 0 ? 0 : 15, za = dz < 0 ? 15 : 0, zb = dz > 0 ? 0 : 15;
@@ -394,15 +400,15 @@ function requestMesh(c, opts) {
     for (let z = za; z <= zb; z++) {
       const pz = z + oz + 1; for (let x = xa; x <= xb; x++) bio[pz * 18 + x + ox + 1] = n.biome[z * 16 + x];
       if (xa === 0 && xb === 15) {
-        for (let y = 0; y < CH; y++) { const si = (y << 8) | (z << 4), di = (y + 1) * PA + pz * 18 + 1; B.set(n.blocks.subarray(si, si + 16), di); M.set(n.meta.subarray(si, si + 16), di); L.set(n.light.subarray(si, si + 16), di); }
+        for (let y = 0; y < h; y++) { const si = (y << 8) | (z << 4), di = (y + 1) * PA + pz * 18 + 1; B.set(n.blocks.subarray(si, si + 16), di); M.set(n.meta.subarray(si, si + 16), di); L.set(n.light.subarray(si, si + 16), di); }
       } else {
         const x = xa, di0 = pz * 18 + x + ox + 1;
-        for (let y = 0; y < CH; y++) { const si = (y << 8) | (z << 4) | x, di = (y + 1) * PA + di0; B[di] = n.blocks[si]; M[di] = n.meta[si]; L[di] = n.light[si]; }
+        for (let y = 0; y < h; y++) { const si = (y << 8) | (z << 4) | x, di = (y + 1) * PA + di0; B[di] = n.blocks[si]; M[di] = n.meta[si]; L[di] = n.light[si]; }
       }
     }
   }
   w.busy++; c.meshing = true; c.dirty = false; c.ver++;
-  w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
+  w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
 
@@ -444,7 +450,7 @@ function saveChunk(c) {
   if (!c.modified || W.pano) return; c.modified = false;
   const k = c.cx + ',' + c.cz; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
-  const rec = c.edited ? { v: 2, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
+  const rec = c.edited ? { v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null } : { v: 2, mobs: c.mobs || null };
   dbReq('chunks', 'readwrite', st => st.put(rec, W.id + ':' + k));
 }
 async function loadChunk(cx, cz) {
@@ -454,8 +460,9 @@ async function loadChunk(cx, cz) {
   if (W.pending.get(key) !== 'load' || wid !== W.id) return;
   W.pending.delete(key);
   if (!rec || !rec.b) { W.saved.delete(cx + ',' + cz); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
-  const dec = a => rec.v === 2 ? rleDec(a, CVOL) : a;
-  W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
+  const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
+  const dec = (a, fill) => { const n = 256 * oldH, src = rec.v === 2 ? rleDec(a, n) : a, out = new Uint8Array(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
+  W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
 }
 function unloadChunk(c) {
   saveChunk(c);

@@ -223,7 +223,7 @@ function updateCamera(alpha, dt) {
     const P = playerModel.userData.parts, w = Math.sin(PL.bob * 2.2) * 0.8 * Math.min(1, spd * 2);
     P.rleg.rotation.x = w; P.lleg.rotation.x = -w; P.rarm.rotation.x = -w * 0.8 - (R.hand.swing > 0 ? Math.sin(R.hand.swing * Math.PI) : 0); P.larm.rotation.x = w * 0.8;
     P.head.rotation.x = -PL.pitch; if (PL.sneaking) { P.body.rotation.x = 0.3; } else P.body.rotation.x = 0;
-    playerModel.userData.mat.color.setScalar(lightBright(x, y + 1, z));
+    for (const m of playerModel.userData.mats) m.color.setScalar(lightBright(x, y + 1, z));
   }
   // fov
   let fov = OPT.fov * (PL.sprinting ? 1.15 : 1) * (PL.flying && PL.sprinting ? 1.1 : 1);
@@ -270,7 +270,7 @@ function frame(now) {
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
-  if ((frame.anim = (frame.anim || 0) + dt) > 0.125) { animateAtlas(frame.anim); frame.anim = 0; atlasTex.needsUpdate = true; }
+  R.stepAnimation(dt);
   R.updateRain(dt, px, py, pz, W.rain);
   ambientParticles(dt, px, py, pz);
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;
@@ -305,7 +305,7 @@ function panoramaFrame(dt) {
   camera.position.set(PL.x, PL.y + 1.62, PL.z); camera.rotation.set(PL.pitch, PL.yaw, 0);
   if (camera.fov !== 70) { camera.fov = 70; camera.updateProjectionMatrix(); }
   const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
-  if ((panoramaFrame.anim = (panoramaFrame.anim || 0) + dt) > 0.125) { animateAtlas(panoramaFrame.anim); panoramaFrame.anim = 0; atlasTex.needsUpdate = true; }
+  R.stepAnimation(dt);
   R.renderFrame(dt, camera.position, null); R.rd = rd;
 }
 // torch flames/smoke and lit furnaces near the player (light sources rescanned twice a second)
@@ -347,6 +347,10 @@ function autoRes() {
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
+  if (await loadPack()) {
+    atlasTex.needsUpdate = true;
+    for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
+  }
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
   ICON_URL = iconCanvas.toDataURL();
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);

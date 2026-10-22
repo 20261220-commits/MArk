@@ -2,8 +2,9 @@
 // function is stringified into the Web Worker, so it may not touch outer scope.
 const SHARED = function () {
 'use strict';
-const CW = 16, CH = 128, SEA = 62, CVOL = CW * CW * CH;
-const RT = { AIR: 0, CUBE: 1, CUTOUT: 2, CROSS: 3, FLUID: 4, TORCH: 5, BOX: 6, TRANS: 7, CROP: 8 };
+const CW = 16, CH = 256, SEA = 62, CVOL = CW * CW * CH; // 1.17 overworld height 0..255
+const ATL = 512, TPR = 32; // texture atlas: 32x32 tiles of 16px
+const RT = { AIR: 0, CUBE: 1, CUTOUT: 2, CROSS: 3, FLUID: 4, TORCH: 5, BOX: 6, TRANS: 7, CROP: 8, WIRE: 9, TBOX: 10 };
 const TOOL = { NONE: 0, PICK: 1, AXE: 2, SHOVEL: 3, HOE: 4, SWORD: 5, SHEARS: 6 };
 
 // ---------- texture tiles (16x16 atlas, painted on the main thread) ----------
@@ -19,7 +20,8 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'cobbled_deepslate deepslate_coal_ore deepslate_iron_ore deepslate_copper_ore deepslate_gold_ore deepslate_redstone_ore deepslate_lapis_ore ' +
   'deepslate_diamond_ore dripstone_block pointed_dripstone moss_block tinted_glass smooth_stone smooth_stone_slab_side stone_bricks granite ' +
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
-  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side').split(' ');
+  'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
+  'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block').split(' ');
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -146,6 +148,65 @@ const BLOCK_ROWS = [
   [116, 'oak_fence', '참나무 울타리', RT.BOX, 'oak_planks', 2, A, 0, { connect: 1 }],
   [117, 'glass_pane', '유리판', RT.BOX, 'glass', 0.3, N, 0, { connect: 2 }],
   [119, 'enchanting_table', '마법 부여대', RT.BOX, ['enchanting_table_side', 'enchanting_table_top', 'obsidian'], 5, P, 1, { light: 7 }],
+  // ---- redstone ----
+  [120, 'redstone_wire', '레드스톤 가루', RT.WIRE, 'redstone_dust_dot', 0, N, 0, { nosolid: 1, rs: 'wire', tint: 6 }],
+  [121, 'redstone_torch', '레드스톤 횃불', RT.TORCH, 'redstone_torch', 0, N, 0, { light: 7, nosolid: 1, rs: 'torch' }],
+  [122, 'unlit_redstone_torch', '레드스톤 횃불', RT.TORCH, 'redstone_torch_off', 0, N, 0, { nosolid: 1, rs: 'torch' }],
+  [123, 'redstone_lamp', '레드스톤 램프', C, 'redstone_lamp', 0.3, N, 0, { rs: 'lamp' }],
+  [124, 'lit_redstone_lamp', '레드스톤 램프', C, 'redstone_lamp_on', 0.3, N, 0, { rs: 'lamp', light: 15 }],
+  [125, 'lever', '레버', RT.BOX, 'cobblestone', 0.5, N, 0, { nosolid: 1, rs: 'lever' }],
+  [126, 'stone_button', '돌 버튼', RT.BOX, 'stone', 0.5, P, 0, { nosolid: 1, rs: 'button' }],
+  [127, 'stone_pressure_plate', '돌 압력판', RT.BOX, 'stone', 0.5, P, 1, { nosolid: 1, rs: 'plate' }],
+  [128, 'repeater', '레드스톤 중계기', RT.BOX, ['smooth_stone', 'repeater', 'smooth_stone'], 0, N, 0, { rs: 'repeater' }],
+  [129, 'piston', '피스톤', RT.BOX, ['piston_side', 'piston_top', 'piston_bottom'], 1.5, P, 0, { rs: 'piston' }],
+  [130, 'sticky_piston', '끈끈이 피스톤', RT.BOX, ['piston_side', 'piston_top_sticky', 'piston_bottom'], 1.5, P, 0, { rs: 'piston' }],
+  [131, 'piston_head', '피스톤 머리', RT.BOX, ['piston_side', 'piston_top', 'piston_top'], 1.5, P, 0, { rs: 'head' }],
+  // ---- utility & village ----
+  [132, 'anvil', '모루', RT.BOX, ['anvil', 'anvil_top', 'anvil'], 5, P, 1, { fall: 1, facing: 1 }],
+  [133, 'smithing_table', '대장장이 작업대', C, ['smithing_table_side', 'smithing_table_top', 'smithing_table_bottom', 'smithing_table_front'], 2.5, A, 0],
+  [134, 'dirt_path', '흙길', RT.BOX, ['dirt_path_side', 'dirt_path_top', 'dirt'], 0.65, S, 0],
+  // ---- nether ----
+  [135, 'netherrack', '네더랙', C, 'netherrack', 0.4, P, 1],
+  [136, 'nether_quartz_ore', '네더 석영 광석', C, 'nether_quartz_ore', 3, P, 1],
+  [137, 'nether_gold_ore', '네더 금 광석', C, 'nether_gold_ore', 3, P, 1],
+  [138, 'soul_sand', '영혼 모래', C, 'soul_sand', 0.5, S, 0],
+  [139, 'soul_soil', '영혼 흙', C, 'soul_soil', 0.5, S, 0],
+  [140, 'glowstone', '발광석', C, 'glowstone', 0.3, N, 0, { light: 15 }],
+  [141, 'magma_block', '마그마 블록', C, 'magma', 0.5, P, 1, { light: 3 }],
+  [142, 'basalt', '현무암', C, ['basalt_side', 'basalt_top', 'basalt_top'], 1.25, P, 1, { log: 1 }],
+  [143, 'blackstone', '흑암', C, ['blackstone', 'blackstone_top', 'blackstone_top'], 1.5, P, 1],
+  [144, 'nether_bricks', '네더 벽돌', C, 'nether_bricks', 2, P, 1],
+  [145, 'crimson_nylium', '진홍빛 나일리움', C, ['crimson_nylium_side', 'crimson_nylium', 'netherrack'], 0.4, P, 1],
+  [146, 'warped_nylium', '뒤틀린 나일리움', C, ['warped_nylium_side', 'warped_nylium', 'netherrack'], 0.4, P, 1],
+  [147, 'crimson_stem', '진홍빛 자루', C, ['crimson_stem', 'crimson_stem_top', 'crimson_stem_top'], 2, A, 0, { log: 1 }],
+  [148, 'warped_stem', '뒤틀린 자루', C, ['warped_stem', 'warped_stem_top', 'warped_stem_top'], 2, A, 0, { log: 1 }],
+  [149, 'nether_wart_block', '네더 사마귀 블록', C, 'nether_wart_block', 1, H, 0],
+  [150, 'warped_wart_block', '뒤틀린 사마귀 블록', C, 'warped_wart_block', 1, H, 0],
+  [151, 'shroomlight', '버섯불', C, 'shroomlight', 1, H, 0, { light: 15 }],
+  [152, 'crimson_fungus', '진홍빛 균', X, 'crimson_fungus', 0, N, 0, { plant: 7 }],
+  [153, 'warped_fungus', '뒤틀린 균', X, 'warped_fungus', 0, N, 0, { plant: 7 }],
+  [154, 'crimson_roots', '진홍빛 뿌리', X, 'crimson_roots', 0, N, 0, { plant: 7, repl: 1 }],
+  [155, 'warped_roots', '뒤틀린 뿌리', X, 'warped_roots', 0, N, 0, { plant: 7, repl: 1 }],
+  [156, 'nether_portal', '네더 차원문', RT.TBOX, 'nether_portal', -1, N, 0, { light: 11, nosolid: 1 }],
+  [157, 'ancient_debris', '고대 잔해', C, ['ancient_debris_side', 'ancient_debris_top', 'ancient_debris_top'], 30, P, 4],
+  [158, 'netherite_block', '네더라이트 블록', C, 'netherite_block', 50, P, 4],
+  [159, 'quartz_block', '석영 블록', C, ['quartz_block_side', 'quartz_block_top', 'quartz_block_top'], 0.8, P, 1],
+  [160, 'crying_obsidian', '우는 흑요석', C, 'crying_obsidian', 50, P, 4, { light: 10 }],
+  [161, 'nether_wart', '네더 사마귀', RT.CROP, 'nether_wart0', 0, N, 0, { plant: 8 }],
+  [162, 'fire', '불', RT.CROP, 'fire', 0, N, 0, { light: 15, nosolid: 1, repl: 1 }],
+  [163, 'crimson_planks', '진홍빛 판자', C, 'crimson_planks', 2, A, 0],
+  [164, 'warped_planks', '뒤틀린 판자', C, 'warped_planks', 2, A, 0],
+  [165, 'nether_brick_fence', '네더 벽돌 울타리', RT.BOX, 'nether_bricks', 2, P, 1, { connect: 3 }],
+  // ---- end & strongholds ----
+  [166, 'end_stone', '엔드 돌', C, 'end_stone', 3, P, 1],
+  [167, 'end_portal_frame', '엔드 차원문 틀', RT.BOX, ['end_portal_frame_side', 'end_portal_frame_top', 'end_stone'], -1, N, 0, { light: 1 }],
+  [168, 'end_portal', '엔드 차원문', RT.BOX, 'end_portal', -1, N, 0, { light: 15, nosolid: 1 }],
+  [169, 'end_stone_bricks', '엔드 돌 벽돌', C, 'end_stone_bricks', 3, P, 1],
+  [170, 'dragon_egg', '드래곤 알', RT.BOX, 'dragon_egg', 3, N, 0, { light: 1, fall: 1 }],
+  [171, 'mossy_stone_bricks', '이끼 낀 석재 벽돌', C, 'mossy_stone_bricks', 1.5, P, 1],
+  [172, 'cracked_stone_bricks', '금 간 석재 벽돌', C, 'cracked_stone_bricks', 1.5, P, 1],
+  [173, 'iron_bars', '철창', RT.BOX, 'iron_bars', 5, P, 1, { connect: 2 }],
+  [174, 'slime_block', '슬라임 블록', RT.TRANS, 'slime_block', 0, N, 0, { lop: 1, selfcull: 1, bounce: 1 }],
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 const NB = 256;
@@ -195,6 +256,9 @@ const BIO = { OCEAN: 0, PLAINS: 1, FOREST: 2, BIRCH: 3, TAIGA: 4, TUNDRA: 5, DES
 
 // ---------- shapes (pixel boxes) ----------
 const DIRS = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0]]; // facing 0 north,1 east,2 south,3 west
+const DIR6 = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]]; // down, up, north, south, west, east
+// rotate a pixel box about the block centre for horizontal facing f (boxes are authored facing north)
+function rotBox(b, f) { const [x0, y0, z0, x1, y1, z1] = b; return f === 0 ? b : f === 1 ? [16 - z1, y0, x0, 16 - z0, y1, x1] : f === 2 ? [16 - x1, y0, 16 - z1, 16 - x0, y1, 16 - z0] : [z0, y0, 16 - x1, z1, y1, 16 - x0]; }
 function shapes(id, meta) {
   switch (id) {
     case 37: return [[1, 0, 1, 15, 16, 15]];
@@ -211,7 +275,8 @@ function shapes(id, meta) {
       const back = f === 0 ? [0, ylo, 0, 16, yhi, 8] : f === 1 ? [8, ylo, 0, 16, yhi, 16] : f === 2 ? [0, ylo, 8, 16, yhi, 16] : [0, ylo, 0, 8, yhi, 16];
       return [top ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16], back];
     }
-    case 116: { // fence: meta bits N,E,S,W connections
+    case 119: return [[0, 0, 0, 16, 12, 16]];
+    case 116: case 165: { // fences: meta bits N,E,S,W connections
       const b = [[6, 0, 6, 10, 16, 10]];
       for (const y0 of [6, 12]) {
         if (meta & 1) b.push([7, y0, 0, 9, y0 + 3, 6]); if (meta & 2) b.push([10, y0, 7, 16, y0 + 3, 9]);
@@ -219,14 +284,38 @@ function shapes(id, meta) {
       }
       return b;
     }
-    case 119: return [[0, 0, 0, 16, 12, 16]];
-    case 118: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]]; // glow lichen: attached face
-    case 117: { // glass pane
+    case 117: case 173: { // glass pane / iron bars
       const b = [[7, 0, 7, 9, 16, 9]];
       if (meta & 1) b.push([7, 0, 0, 9, 16, 7]); if (meta & 2) b.push([9, 0, 7, 16, 16, 9]);
       if (meta & 4) b.push([7, 0, 9, 9, 16, 16]); if (meta & 8) b.push([0, 0, 7, 7, 16, 9]);
       return b;
     }
+    case 125: { // lever: meta = attached side (DIR6 index) | on<<3
+      const a = meta & 7, on = meta & 8;
+      const base = [[4, 0, 5, 12, 3, 11], [4, 13, 5, 12, 16, 11], [4, 5, 0, 12, 11, 3], [4, 5, 13, 12, 11, 16], [0, 5, 4, 3, 11, 12], [13, 5, 4, 16, 11, 12]][a];
+      const h = on ? [[9, 3, 7, 11, 10, 9], [9, 6, 7, 11, 13, 9], [7, 9, 3, 9, 11, 10], [7, 9, 6, 9, 11, 13], [3, 9, 7, 10, 11, 9], [6, 9, 7, 13, 11, 9]][a]
+        : [[5, 3, 7, 7, 10, 9], [5, 6, 7, 7, 13, 9], [7, 5, 3, 9, 7, 10], [7, 5, 6, 9, 7, 13], [3, 5, 7, 10, 7, 9], [6, 5, 7, 13, 7, 9]][a];
+      return [base, h];
+    }
+    case 126: { const a = meta & 7, t = meta & 8 ? 1 : 2; return [[[5, 0, 6, 11, t, 10], [5, 16 - t, 6, 11, 16, 10], [5, 6, 0, 11, 10, t], [5, 6, 16 - t, 11, 10, 16], [0, 6, 5, t, 10, 11], [16 - t, 6, 5, 16, 10, 11]][a]]; }
+    case 127: return [[1, 0, 1, 15, meta & 1 ? 1 : 2, 15]];
+    case 128: { // repeater: facing | delay<<2 | powered<<4; torches drawn as extra boxes
+      const f = meta & 3, d = (meta >> 2) & 3;
+      return [[0, 0, 0, 16, 2, 16], rotBox([7, 2, 2, 9, 7, 4], f), rotBox([7, 2, 6 + d * 2, 9, 7, 8 + d * 2], f)];
+    }
+    case 129: case 130: { // piston base: facing (DIR6) | extended<<3
+      if (!(meta & 8)) return [[0, 0, 0, 16, 16, 16]];
+      return [[[0, 4, 0, 16, 16, 16], [0, 0, 0, 16, 12, 16], [0, 0, 4, 16, 16, 16], [0, 0, 0, 16, 16, 12], [4, 0, 0, 16, 16, 16], [0, 0, 0, 12, 16, 16]][meta & 7]];
+    }
+    case 131: { const f = meta & 7; return [[[0, 0, 0, 16, 4, 16], [0, 12, 0, 16, 16, 16], [0, 0, 0, 16, 16, 4], [0, 0, 12, 16, 16, 16], [0, 0, 0, 4, 16, 16], [12, 0, 0, 16, 16, 16]][f],
+      [[6, 4, 6, 10, 16, 10], [6, 0, 6, 10, 12, 10], [6, 6, 4, 10, 10, 16], [6, 6, 0, 10, 10, 12], [4, 6, 6, 16, 10, 10], [0, 6, 6, 12, 10, 10]][f]]; }
+    case 132: { const f = meta & 3; return [rotBox([2, 0, 2, 14, 4, 14], f), rotBox([4, 4, 3, 12, 5, 13], f), rotBox([6, 5, 4, 10, 10, 12], f), rotBox([3, 10, 0, 13, 16, 16], f)]; }
+    case 134: return [[0, 0, 0, 16, 15, 16]];
+    case 156: return [(meta & 1) ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10]];
+    case 167: return meta & 4 ? [[0, 0, 0, 16, 13, 16], [4, 13, 4, 12, 16, 12]] : [[0, 0, 0, 16, 13, 16]];
+    case 168: return [[0, 0, 0, 16, 12, 16]];
+    case 170: return [[6, 15, 6, 10, 16, 10], [4, 14, 4, 12, 15, 12], [3, 13, 3, 13, 14, 13], [2, 11, 2, 14, 13, 14], [1, 8, 1, 15, 11, 15], [2, 3, 2, 14, 8, 14], [3, 1, 3, 13, 3, 13], [5, 0, 5, 11, 1, 11]];
+    case 118: return [[[0, 0, 0, 16, 1, 16], [0, 15, 0, 16, 16, 16], [0, 0, 0, 16, 16, 1], [0, 0, 15, 16, 16, 16], [0, 0, 0, 1, 16, 16], [15, 0, 0, 16, 16, 16]][meta % 6]]; // glow lichen: attached face
   }
   return null;
 }
@@ -236,7 +325,9 @@ function ladderBox(f) { return f === 0 ? [0, 0, 0, 16, 16, 1] : f === 1 ? [15, 0
 function collide(id, meta) {
   if (id === 51) { const l = meta & 7; return l === 0 ? [] : [[0, 0, 0, 16, l * 2, 16]]; }
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
-  if (id === 116) { // fences are 1.5 blocks tall for collision
+  if (id === 138) return [[0, 0, 0, 16, 14, 16]]; // soul sand slows by sinking you slightly
+  if (id === 128) return [[0, 0, 0, 16, 2, 16]];
+  if (id === 116 || id === 165) { // fences are 1.5 blocks tall for collision
     const b = [[6, 0, 6, 10, 24, 10]];
     if (meta & 1) b.push([6, 0, 0, 10, 24, 6]); if (meta & 2) b.push([10, 0, 6, 16, 24, 10]);
     if (meta & 4) b.push([6, 0, 10, 10, 24, 16]); if (meta & 8) b.push([0, 0, 6, 6, 24, 10]);
@@ -304,7 +395,7 @@ function makeGen(seed) {
     const hills = nD.fbm(wx / 130, wz / 130, 4);
     const detail = nD.n2(wx / 28, wz / 28);
     const oceanH = 44 + hills * 8 + cont * 10;
-    let landH = 66 + hills * 7 + detail * 1.5 + smooth(0.1, 0.4, cont) * 4 + mount * (24 + ridge * ridge * 34);
+    let landH = 66 + hills * 7 + detail * 1.5 + smooth(0.1, 0.4, cont) * 4 + mount * (28 + ridge * ridge * 64);
     let h = oceanH + (landH - oceanH) * land;
     const rv = Math.abs(nR.fbm(wx / 520, wz / 520, 3));
     let river = false;
@@ -654,7 +745,7 @@ function growTree(set, x, y, z, type, r, snowy) {
 
 // ---------- lighting (within one chunk) ----------
 function lightChunk(blocks, light) {
-  const q = new Int32Array(1 << 17); let qh = 0, qt = 0;
+  const q = new Int32Array(1 << 18); let qh = 0, qt = 0;
   const top = new Int16Array(256);
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     let y = CH - 1;
@@ -665,7 +756,7 @@ function lightChunk(blocks, light) {
     let hi = top[z * 16 + x], t = hi;
     if (x > 0) t = Math.max(t, top[z * 16 + x - 1]); if (x < 15) t = Math.max(t, top[z * 16 + x + 1]);
     if (z > 0) t = Math.max(t, top[z * 16 + x - 16]); if (z < 15) t = Math.max(t, top[z * 16 + x + 16]);
-    for (let y = hi; y <= Math.min(CH - 1, t); y++) { q[qt] = (y << 8) | (z << 4) | x; qt = (qt + 1) & 0x1ffff; }
+    for (let y = hi; y <= Math.min(CH - 1, t); y++) { q[qt] = (y << 8) | (z << 4) | x; qt = (qt + 1) & 0x3ffff; }
   }
   bfs(blocks, light, q, qh, qt, 4);
   qh = qt = 0;
@@ -673,7 +764,7 @@ function lightChunk(blocks, light) {
   bfs(blocks, light, q, qh, qt, 0);
 }
 function bfs(blocks, light, q, qh, qt, sh) {
-  const M = 0x1ffff;
+  const M = 0x3ffff;
   while (qh !== qt) {
     const i = q[qh]; qh = (qh + 1) & M;
     const l = (light[i] >> sh) & 15; if (l <= 1) continue;
@@ -738,8 +829,9 @@ function meshChunk(B, M, L, bio, opts) {
   }
   const FIX = { 4: [0x80, 0xa7, 0x55], 5: [0x61, 0x99, 0x61] };
   let cr = 255, cg = 255, cb = 255;
-  const setTint = (t, x, z) => {
+  const setTint = (t, x, z, meta) => {
     if (!t) { cr = cg = cb = 255; return; }
+    if (t === 6) { const p = (meta & 15) / 15; cr = (p ? p * 0.6 + 0.4 : 0.3) * 255; cg = Math.max(0, p * p * 0.7 - 0.5) * 255; cb = Math.max(0, p * p * 0.6 - 0.7) * 255; return; } // redstone power
     if (t >= 4) { const f = FIX[t]; cr = f[0]; cg = f[1]; cb = f[2]; return; }
     const o = ((z * 16 + x) * 3 + t - 1) * 3; cr = tint[o]; cg = tint[o + 1]; cb = tint[o + 2];
   };
@@ -756,12 +848,12 @@ function meshChunk(B, M, L, bio, opts) {
       AOO[f * 12 + k * 3] = a; AOO[f * 12 + k * 3 + 1] = b; AOO[f * 12 + k * 3 + 2] = a + b;
     }
   }
-  let maxY = CH - 1;
+  let maxY = Math.min(CH, opts.h || CH) - 1; // only layers below opts.h were filled
   findTop: for (; maxY > 0; maxY--) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) if (B[pidx(x, maxY, z)]) break findTop;
   const QU = new Uint16Array(8);
   // emits a quad; uvs given as [u0,v0,u1,v1] px within tile, rot 0..3
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
-    const tu = (tile & 15) * 16, tv = (tile >> 4) * 16;
+    const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
     QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
     if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
     const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
@@ -791,7 +883,7 @@ function meshChunk(B, M, L, bio, opts) {
   for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const pi = pidx(x, y, z), id = B[pi]; if (!id) continue;
     const rt = RTYPE[id], meta = M[pi];
-    setTint(TINT[id], x, z);
+    setTint(TINT[id], x, z, meta);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
       const trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(id >= 22 && id <= 24 && !fancy);
       const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
@@ -824,7 +916,7 @@ function meshChunk(B, M, L, bio, opts) {
         quad(buf, fl, CS, tile, 0, 0, 16, 16, rot, L4, SH4, flip);
       }
     } else if (rt === RT.CROSS || rt === RT.CROP) {
-      const tile = id === 58 ? T['wheat' + Math.min(7, meta)] : FT[id * 4];
+      const tile = id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : FT[id * 4];
       flatLight(x, y, z);
       const sh = SH4; sh[0] = sh[1] = sh[2] = sh[3] = 1;
       const planes = rt === RT.CROSS
@@ -857,12 +949,52 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       const boxes = shapes(id, meta);
-      boxFaces(id, meta, x, y, z, boxes);
+      boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
+    } else if (rt === RT.TBOX) {
+      setTint(0); boxFaces(id, meta, x, y, z, shapes(id, meta), Tr, tFlip);
+    } else if (rt === RT.WIRE) {
+      wire(x, y, z, meta);
     } else if (rt === RT.FLUID) {
       fluid(id, meta, x, y, z);
     }
   }
-  function boxFaces(id, meta, x, y, z, boxes) {
+  // texture rotation so that a face's texture "up" points along direction d
+  function rotFor(f, d) {
+    const c = FACES[f].c, U = [c[3][0] - c[0][0], c[3][1] - c[0][1], c[3][2] - c[0][2]], Rt = [c[1][0] - c[0][0], c[1][1] - c[0][1], c[1][2] - c[0][2]];
+    const du = U[0] * d[0] + U[1] * d[1] + U[2] * d[2], dr = Rt[0] * d[0] + Rt[1] * d[1] + Rt[2] * d[2];
+    return du > 0.5 ? 0 : dr > 0.5 ? 1 : du < -0.5 ? 2 : dr < -0.5 ? 3 : 0;
+  }
+  const D6F = [3, 2, 5, 4, 1, 0]; // DIR6 index -> face index
+  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104;
+  // redstone dust: flat lines toward connections, climbing up blocks, coloured by power
+  function wire(x, y, z, meta) {
+    const conn = [0, 0, 0, 0], up = [0, 0, 0, 0], above = OPQ[blk(x, y + 1, z)];
+    DIRS.forEach(([dx, , dz], d) => {
+      const n = blk(x + dx, y, z + dz);
+      if (isRS(n) && (n !== 128 || (((M[pidx(x + dx, y, z + dz)] & 3) & 1) === (d & 1)))) conn[d] = 1;
+      else if (!OPQ[n] && blk(x + dx, y - 1, z + dz) === 120) conn[d] = 1;
+      else if (!above && blk(x + dx, y + 1, z + dz) === 120) { conn[d] = 1; up[d] = 1; }
+    });
+    flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
+    const yy = y + 1 / 16, F = FACES[2];
+    const flat = (tile, x0, z0, x1, z1, u0, v0, u1, v1, rot) => { for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? x1 : x0) / 16; CS[k][1] = yy; CS[k][2] = z + (c[2] ? z1 : z0) / 16; } quad(Cu, cFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false); };
+    const ns = conn[0] || conn[2], ew = conn[1] || conn[3];
+    if (!ns && !ew) flat(T.redstone_dust_dot, 0, 0, 16, 16, 0, 0, 16, 16, 0);
+    else if (ns && !ew) flat(T.redstone_dust_line0, 0, 0, 16, 16, 0, 0, 16, 16, 0);
+    else if (ew && !ns) flat(T.redstone_dust_line1, 0, 0, 16, 16, 0, 0, 16, 16, 0);
+    else {
+      flat(T.redstone_dust_dot, 4, 4, 12, 12, 4, 4, 12, 12, 0);
+      if (conn[0]) flat(T.redstone_dust_line0, 0, 0, 16, 5, 0, 0, 16, 5, 0); if (conn[2]) flat(T.redstone_dust_line0, 0, 11, 16, 16, 0, 11, 16, 16, 0);
+      if (conn[3]) flat(T.redstone_dust_line1, 0, 0, 5, 16, 0, 0, 5, 16, 0); if (conn[1]) flat(T.redstone_dust_line1, 11, 0, 16, 16, 11, 0, 16, 16, 0);
+    }
+    DIRS.forEach(([dx, , dz], d) => { // vertical strip on the side of the block the dust climbs
+      if (!up[d]) return;
+      const Fv = FACES[[4, 1, 5, 0][d]], off = 1 / 16; // the neighbour's face that looks back toward this cell
+      for (let k = 0; k < 4; k++) { const c = Fv.c[k]; CS[k][0] = x + dx + c[0]; CS[k][1] = y + c[1]; CS[k][2] = z + dz + c[2]; if (dx) CS[k][0] = x + (dx > 0 ? 1 - off : off); if (dz) CS[k][2] = z + (dz > 0 ? 1 - off : off); }
+      quad(Cu, cFlip, CS, T.redstone_dust_line0, 0, 0, 16, 16, 0, L4, SH4, false);
+    });
+  }
+  function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {
       const bx = boxes[bi];
       for (let f = 0; f < 6; f++) {
@@ -870,6 +1002,7 @@ function meshChunk(B, M, L, bio, opts) {
         const atEdge = (F.n[0] > 0 && bx[3] === 16) || (F.n[0] < 0 && bx[0] === 0) || (F.n[1] > 0 && bx[4] === 16) || (F.n[1] < 0 && bx[1] === 0) || (F.n[2] > 0 && bx[5] === 16) || (F.n[2] < 0 && bx[2] === 0);
         const nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2];
         if (atEdge && OPQ[blk(nx, ny, nz)]) continue;
+        if (atEdge && (id === 156 || id === 117 || id === 173) && blk(nx, ny, nz) === id) continue;
         if (atEdge && id === 51 && F.n[1] === 0 && blk(nx, ny, nz) === 51 && M[pidx(nx, ny, nz)] >= meta) continue;
         if (atEdge && F.n[1] === 0 && (id >= 109 && id <= 111) && blk(nx, ny, nz) === id && (M[pidx(nx, ny, nz)] & 1) === (meta & 1)) continue;
         if (atEdge) flatLight(nx, ny, nz); else flatLight(x, y, z);
@@ -898,9 +1031,24 @@ function meshChunk(B, M, L, bio, opts) {
           else { u0 = 11; u1 = 13; v0 = 1; v1 = 7; }
         } else if (id === 37 && F.n[1] === 0) { u0 = 0; u1 = 16; }
         else if (id === 44 && F.n[1] === 0 && f !== DIR_FACE[meta & 3]) tile = T.chest_side;
+        else if (id === 125 && bi === 1) { tile = T.lever; u0 = 7; u1 = 9; if (F.n[1]) { v0 = 6; v1 = 8; } else { v0 = 6; v1 = 16; } }
+        else if (id === 128) {
+          if (bi === 0 && f === 2) { tile = meta & 16 ? T.repeater_on : T.repeater; rot = rotFor(2, DIRS[(meta & 3) ^ 2]); }
+          else if (bi > 0) { tile = meta & 16 ? T.redstone_torch : T.redstone_torch_off; u0 = 7; u1 = 9; if (F.n[1]) { v0 = 6; v1 = 8; } else { v0 = 6; v1 = 11; } }
+        } else if (id === 129 || id === 130) {
+          const fd = meta & 7, front = D6F[fd], back = D6F[fd ^ 1];
+          if (f === front) tile = meta & 8 ? T.piston_inner : FT[id * 4 + 1];
+          else if (f === back) tile = T.piston_bottom;
+          else { tile = T.piston_side; rot = rotFor(f, DIR6[fd]); }
+        } else if (id === 131) {
+          const fd = meta & 7, front = D6F[fd];
+          if (bi === 0) { if (f === front) tile = meta & 8 ? T.piston_top_sticky : T.piston_top; else if (f === D6F[fd ^ 1]) tile = T.piston_top; else { tile = T.piston_side; rot = rotFor(f, DIR6[fd]); } }
+          else { tile = T.piston_side; rot = rotFor(f, DIR6[fd]) ^ 1; u0 = 0; u1 = 16; v0 = 6; v1 = 10; }
+        } else if (id === 132) { tile = bi === 3 && f === 2 ? T.anvil_top : T.anvil; if (bi === 3 && f === 2) rot = rotFor(2, DIRS[meta & 3]); }
+        else if (id === 167 && bi === 1) { tile = T.end_portal_frame_eye; }
         if (id === 57 && f === 2 && (meta & 7) > 0) tile = T.farmland_wet;
         if (id === 51 || id === 57) setTint(0);
-        quad(Cu, cFlip, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
+        quad(OUT, OFL, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
       }
     }
   }
@@ -941,7 +1089,7 @@ function meshChunk(B, M, L, bio, opts) {
   return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
-return { CW, CH, SEA, CVOL, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS,
+return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 

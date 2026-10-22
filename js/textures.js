@@ -1,5 +1,5 @@
 // Procedural pixel textures: block atlas (16px tiles), item icon sheet, crack stages.
-const TS = 16, ATLAS_W = 256;
+const TS = 16, ATLAS_W = S.ATL, TPR = S.TPR;
 const TINT_A = 240; // alpha marker: pixel takes the biome tint in the shader
 const atlasCanvas = document.createElement('canvas'); atlasCanvas.width = atlasCanvas.height = ATLAS_W;
 const atlasCtx = atlasCanvas.getContext('2d');
@@ -24,7 +24,7 @@ function tnoise(r, cells) {
 let curTile = 0;
 function P(x, y, c, a = 255) {
   if (x < 0 || y < 0 || x > 15 || y > 15 || !c) return;
-  const i = (((curTile >> 4) * TS + y) * ATLAS_W + (curTile & 15) * TS + x) * 4;
+  const i = ((((curTile / TPR) | 0) * TS + y) * ATLAS_W + (curTile % TPR) * TS + x) * 4;
   AD[i] = c[0]; AD[i + 1] = c[1]; AD[i + 2] = c[2]; AD[i + 3] = a;
 }
 function fill(fn) { for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) { const c = fn(x, y); if (c) P(x, y, c, c[3] != null ? c[3] : 255); } }
@@ -240,7 +240,7 @@ PAINT.bed_head = r => fill((x, y) => { if (y < 7 && x > 1 && x < 14) return shad
 PAINT.bed_foot = r => fill((x, y) => { if (x === 0 || x === 15 || y === 15) return hex(0x8a1a12); return shade(hex(0xb2241a), 1 + (r() - .5) * .08); });
 PAINT.bed_side = r => fill((x, y) => y < 9 && y >= 3 ? (y < 5 ? hex(0xf0f0f0) : hex(0xb2241a)) : hex(0x8a6a3b));
 PAINT.oak_door_bottom = r => { planks(hex(0x9c7b47), r); for (let i = 0; i < 16; i++) { P(i, 15, hex(0x5e4422)); P(0, i, hex(0x6b5433)); P(15, i, hex(0x6b5433)); } for (let y = 2; y < 14; y += 4) for (let x = 2; x < 14; x++) P(x, y, hex(0x7a5a32)); P(12, 2, hex(0x3a3a3a)); };
-PAINT.oak_door_top = r => { planks(hex(0x9c7b47), r); for (let i = 0; i < 16; i++) { P(i, 0, hex(0x5e4422)); P(0, i, hex(0x6b5433)); P(15, i, hex(0x6b5433)); } for (const [x0, y0] of [[2, 2], [9, 2], [2, 9], [9, 9]]) for (let x = x0; x < x0 + 5; x++) for (let y = y0; y < y0 + 5; y++) P(x, y, null) || (AD[(((curTile >> 4) * TS + y) * ATLAS_W + (curTile & 15) * TS + x) * 4 + 3] = 0); P(12, 14, hex(0x3a3a3a)); };
+PAINT.oak_door_top = r => { planks(hex(0x9c7b47), r); for (let i = 0; i < 16; i++) { P(i, 0, hex(0x5e4422)); P(0, i, hex(0x6b5433)); P(15, i, hex(0x6b5433)); } for (const [x0, y0] of [[2, 2], [9, 2], [2, 9], [9, 9]]) for (let x = x0; x < x0 + 5; x++) for (let y = y0; y < y0 + 5; y++) P(x, y, null) || (AD[((((curTile / TPR) | 0) * TS + y) * ATLAS_W + (curTile % TPR) * TS + x) * 4 + 3] = 0); P(12, 14, hex(0x3a3a3a)); };
 PAINT.ladder = r => { for (let y = 0; y < 16; y++) { P(2, y, hex(0x8a6a3b)); P(3, y, hex(0x6b5433)); P(12, y, hex(0x8a6a3b)); P(13, y, hex(0x6b5433)); } for (const y of [1, 5, 9, 13]) for (let x = 2; x < 14; x++) { P(x, y, hex(0x9c7b47)); P(x, y + 1, hex(0x6b5433)); } };
 PAINT.lantern = r => { for (let x = 0; x < 6; x++) for (let y = 2; y < 9; y++) P(x, y, (y === 2 || y === 8 || x === 0 || x === 5) ? hex(0x3a3d44) : (y > 3 && y < 8) ? pal(r, [hex(0xffd84a), hex(0xffa830), hex(0xfff0a0)]) : hex(0x4a4d55)); for (let x = 0; x < 6; x++) for (let y = 9; y < 15; y++) P(x, y, hex(0x3f424a)); for (let x = 1; x < 5; x++) { P(x, 10, hex(0x3a3d44)); P(x, 0, hex(0x3a3d44)); P(x, 1, hex(0x2a2d33)); } for (let y = 1; y < 7; y++) { P(11, y, hex(0x3a3d44)); P(12, y, hex(0x2a2d33)); } };
 PAINT.spawner = r => fill((x, y) => { if (x % 4 === 0 || y % 4 === 0 || x === 15 || y === 15) return shade(hex(0x2a3a4a), 1 + (r() - .5) * .3); return null; });
@@ -249,6 +249,7 @@ PAINT.enchanting_table_top = r => { PAINT.obsidian(r); for (let y = 2; y < 14; y
 PAINT.enchanting_table_side = r => { PAINT.obsidian(r); for (let x = 0; x < 16; x++) for (let y = 0; y < 4; y++) P(x, y, y === 3 ? hex(0x6a1018) : (x + y) % 5 === 0 ? hex(0xa8202a) : hex(0xc8303a)); for (const x of [2, 6, 10, 13]) { P(x, 8, hex(0x3ac8c0)); P(x, 9, hex(0x1a8a84)); } };
 PAINT.glow_lichen = r => { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .35; return v > 0.62 ? (r() < 0.25 ? hex(0xd8ffe0) : hex(0x86c8a0)) : v > 0.5 ? hex(0x5f9478) : null; }); };
 
+PAINT.end_portal = r => fill(() => { const v = r(); return v > 0.96 ? pal(r, [hex(0x9fe8d8), hex(0xd8f0ff), hex(0x6fc8ff)]) : v > 0.9 ? hex(0x1b3a40) : pal(r, [hex(0x050a10), hex(0x08101a), hex(0x0a1420)]); });
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
     curTile = i;
@@ -264,8 +265,34 @@ function animateAtlas(dt) {
   animT += dt * 6;
   curTile = S.T.water; paintWater(null, animT);
   curTile = S.T.lava; paintLava(null, animT * 0.5);
-  for (const t of [S.T.water, S.T.lava]) atlasCtx.putImageData(atlasImg, 0, 0, (t & 15) * TS, (t >> 4) * TS, TS, TS);
+  for (const t of [S.T.water, S.T.lava]) atlasCtx.putImageData(atlasImg, 0, 0, (t % TPR) * TS, ((t / TPR) | 0) * TS, TS, TS);
 }
+
+// ---------- resource pack (Pixel Perfection CE, CC BY-SA 4.0) ----------
+// js/pack.js holds raw RGBA pixels (gzip+base64); they are written straight into the atlas
+// and sprite buffers, so no image decoding or canvas readback happens at runtime.
+const PACKPX = { data: null, items: {}, ent: {}, anim: {} };
+async function loadPack() {
+  if (typeof PACK === 'undefined' || !window.DecompressionStream) return false;
+  try {
+    const bin = Uint8Array.from(atob(PACK.data), c => c.charCodeAt(0));
+    const buf = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const D = new Uint8Array(buf); PACKPX.data = D;
+    for (const [name, off] of Object.entries(PACK.tiles)) {
+      const t = S.T[name]; if (t == null) continue;
+      const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+      for (let y = 0; y < TS; y++) AD.set(D.subarray(off + y * 64, off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4);
+    }
+    for (const [k, [off, frames]] of Object.entries(PACK.anim)) if (S.T[k] != null) PACKPX.anim[k] = { off, frames };
+    for (const [k, off] of Object.entries(PACK.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
+    for (const [k, [off, w, h]] of Object.entries(PACK.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
+    for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(D.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
+    atlasCtx.putImageData(atlasImg, 0, 0);
+    return true;
+  } catch (e) { console.warn('texture pack unavailable', e); return false; }
+}
+// one 16x16 frame of an animated tile (water, lava, portal, fire, magma)
+function animFrame(k, i) { const a = PACKPX.anim[k]; if (!a) return null; const f = i % a.frames; return PACKPX.data.subarray(a.off + f * 1024, a.off + f * 1024 + 1024); }
 
 // ---------- tinted tile canvas helper (for icons, particles) ----------
 const DEFAULT_TINT = { 1: hex(0x7cbd6b), 2: hex(0x59ae30), 3: hex(0x3f76e4), 4: hex(0x80a755), 5: hex(0x619961) };
@@ -273,7 +300,7 @@ function tileCanvas(t, tint, scale = 1) {
   const c = document.createElement('canvas'); c.width = c.height = TS * scale; const g = c.getContext('2d');
   const img = g.createImageData(TS, TS);
   for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
-    const si = (((t >> 4) * TS + y) * ATLAS_W + (t & 15) * TS + x) * 4, di = (y * TS + x) * 4;
+    const si = ((((t / TPR) | 0) * TS + y) * ATLAS_W + (t % TPR) * TS + x) * 4, di = (y * TS + x) * 4;
     let r = AD[si], gg = AD[si + 1], b = AD[si + 2], a = AD[si + 3];
     if (a === TINT_A) { const tc = tint || DEFAULT_TINT[1]; r = r * tc[0] / 255; gg = gg * tc[1] / 255; b = b * tc[2] / 255; a = 255; }
     img.data[di] = r; img.data[di + 1] = gg; img.data[di + 2] = b; img.data[di + 3] = a;
@@ -428,13 +455,15 @@ function buildIcons() {
     const d = ITEMS[id], cell = iconCell(), ox = (cell % ICON_COLS) * ICON, oy = Math.floor(cell / ICON_COLS) * ICON;
     iconIndex[id] = cell;
     let spr = null;
-    if (d.block && !d.sprite) {
+    if (d.block && !d.sprite && !PACKPX.items[d.key]) {
       const h = id === S.BID.snow ? 0.18 : (id >= 109 && id <= 111) ? 0.5 : id === S.BID.farmland ? 0.94 : 1;
       isoBlock(g, id, ox, oy, ICON, h);
       continue;
     }
-    if (d.sprite && SPR[d.sprite]) spr = SPR[d.sprite]();
-    else if (d.sprite) spr = tileCanvas(S.T[d.sprite], DEFAULT_TINT[S.TINT[id]]);
+    const packKey = PACKPX.items[d.key] ? d.key : null;
+    if (packKey) { const c = document.createElement('canvas'); c.width = c.height = 16; const px = new Uint8ClampedArray(PACKPX.items[packKey]); c.getContext('2d').putImageData(new ImageData(px, 16, 16), 0, 0); c._px = px; spr = c; }
+    else if (d.sprite && SPR[d.sprite]) spr = SPR[d.sprite]();
+    else if (d.sprite && S.T[d.sprite] != null) spr = tileCanvas(S.T[d.sprite], DEFAULT_TINT[S.TINT[id]]);
     else if (d.tool) spr = toolSprite(d.tool.kind, d.tool.mat);
     else if (d.armor) spr = armorSprite(d.armor.slot, d.armor.mat);
     else if (SPR[d.key]) spr = SPR[d.key]();

@@ -22,7 +22,7 @@ varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 256.0;
+  vUv = uv / 512.0;
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
@@ -148,7 +148,7 @@ const pMat = new THREE.ShaderMaterial({
     }`,
   fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vCol;
     #include <fog_pars_fragment>
-    void main(){ vec2 uv = vUv + gl_PointCoord * (4.0 / 256.0); vec4 t = texture2D(map, uv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
+    void main(){ vec2 uv = vUv + gl_PointCoord * (4.0 / 512.0); vec4 t = texture2D(map, uv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
     #include <fog_fragment>
     }`, fog: true });
 const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene.add(points);
@@ -156,18 +156,18 @@ const parts = []; // {x,y,z,vx,vy,vz,life,size,u,v,r,g,b,grav}
 R.particles = parts;
 function spawnParticle(p) { if (parts.length >= PMAX) parts.shift(); parts.push(p); }
 function blockParticles(x, y, z, id, n = 24, light = 1) {
-  const t = S.FT[id * 4]; const tu = (t & 15) * 16, tv = (t >> 4) * 16;
+  const t = S.FT[id * 4]; const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
   const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
   for (let i = 0; i < n; i++) {
     const px = x + 0.1 + Math.random() * 0.8, py = y + 0.1 + Math.random() * 0.8, pz = z + 0.1 + Math.random() * 0.8;
     spawnParticle({ x: px, y: py, z: pz, vx: (px - x - .5) * 3, vy: Math.random() * 3 + 1, vz: (pz - z - .5) * 3, life: 0.6 + Math.random() * 0.6, size: 0.12 + Math.random() * 0.08,
-      u: (tu + Math.floor(Math.random() * 12)) / 256, v: (tv + Math.floor(Math.random() * 12)) / 256, r: tint[0] / 255 * light, g: tint[1] / 255 * light, b: tint[2] / 255 * light, grav: 1 });
+      u: (tu + Math.floor(Math.random() * 12)) / S.ATL, v: (tv + Math.floor(Math.random() * 12)) / S.ATL, r: tint[0] / 255 * light, g: tint[1] / 255 * light, b: tint[2] / 255 * light, grav: 1 });
   }
 }
 function simpleParticle(x, y, z, col, opts = {}) {
   const t = S.T.white_wool; // flat white tile, tinted by color
   spawnParticle({ x, y, z, vx: opts.vx || (Math.random() - .5), vy: opts.vy != null ? opts.vy : Math.random() * 1.5, vz: opts.vz || (Math.random() - .5), life: opts.life || 0.8, size: opts.size || 0.15,
-    u: ((t & 15) * 16 + 4) / 256, v: ((t >> 4) * 16 + 4) / 256, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3 });
+    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3 });
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
 function updateParticles(dt) {
@@ -247,14 +247,14 @@ function blockGeometry(id) {
     let t = S.FT[id * 4 + (f === 2 ? 1 : f === 3 ? 2 : 0)];
     if ((S.FACING[id] || id === S.BID.crafting_table) && f === 4) t = S.FT[id * 4 + 3];
     if (id === S.BID.oak_door) t = f === 2 || f === 3 ? S.T.oak_planks : S.T.oak_door_bottom;
-    const tu = (t & 15) * 16, tv = (t >> 4) * 16, sh = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
+    const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16, sh = [0.6, 0.6, 1, 0.5, 0.8, 0.8][f];
     const P = C.map(c => [(c[0] ? bx[3] : bx[0]) / 16 - .5, (c[1] ? bx[4] : bx[1]) / 16 - .5, (c[2] ? bx[5] : bx[2]) / 16 - .5]);
     // texture coordinates follow the box like the terrain mesher (pixel-exact on partial blocks)
     let u0, u1, v0, v1;
     if (f === 0) { u0 = 16 - bx[5]; u1 = 16 - bx[2]; } else if (f === 1) { u0 = bx[2]; u1 = bx[5]; } else if (f === 4) { u0 = bx[0]; u1 = bx[3]; } else { u0 = 16 - bx[3]; u1 = 16 - bx[0]; }
     if (f === 2) { u0 = bx[0]; u1 = bx[3]; v0 = bx[2]; v1 = bx[5]; } else if (f === 3) { u0 = bx[0]; u1 = bx[3]; v0 = 16 - bx[5]; v1 = 16 - bx[2]; } else { v0 = 16 - bx[4]; v1 = 16 - bx[1]; }
     const U = [[tu + u0, tv + v1], [tu + u1, tv + v1], [tu + u1, tv + v0], [tu + u0, tv + v0]];
-    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / 256, U[k][1] / 256); shade.push(sh); tintA.push(tint[0] / 255, tint[1] / 255, tint[2] / 255); }
+    for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...P[k]); uv.push(U[k][0] / S.ATL, U[k][1] / S.ATL); shade.push(sh); tintA.push(tint[0] / 255, tint[1] / 255, tint[2] / 255); }
   }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
@@ -287,7 +287,7 @@ function itemMesh(id) {
 function setMeshLight(mesh, v) { const m = mesh.material; if (m.uniforms) m.uniforms.light.value = v; else m.color.setScalar(v); }
 // render true 3D inventory icons for block items once at startup (Java GUI angle)
 function renderBlockIcons() {
-  const ids = ITEMS.map((d, i) => d && d.block && !d.sprite ? i : -1).filter(i => i >= 0);
+  const ids = ITEMS.map((d, i) => d && d.block && !d.sprite ? i : -1).filter(i => i >= 0); // pack sprites already set d.sprite
   if (!ids.length) return;
   const cols = 32, rows = Math.ceil(ids.length / cols), Wd = cols * ICON, Hd = rows * ICON;
   const rt = new THREE.WebGLRenderTarget(Wd, Hd, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
@@ -316,6 +316,16 @@ function renderBlockIcons() {
     const cell = iconIndex[id]; g.clearRect((cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON, ICON, ICON); g.putImageData(img, (cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON);
   });
 }
+// ---------- animated tiles: only the changed 16x16 tiles are copied into the atlas texture ----------
+const animTiles = []; let animIdx = 0;
+function stepAnimation(dt) {
+  R.animT = (R.animT || 0) + dt; if (R.animT < 0.1) return; R.animT = 0;
+  if (!PACKPX.data) { animateAtlas(0.1); atlasTex.needsUpdate = true; return; } // procedural fallback
+  if (!animTiles.length) for (const k in PACKPX.anim) { const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' ? 2 : 1 }); }
+  animIdx++;
+  for (const a of animTiles) { if (animIdx % a.slow) continue; a.data.set(animFrame(a.k, (animIdx / a.slow) | 0)); a.tex.needsUpdate = true; renderer.copyTextureToTexture(a.pos, a.tex, atlasTex); }
+}
+R.stepAnimation = stepAnimation;
 R.itemMesh = itemMesh; R.blockGeometry = blockGeometry; R.blockMaterial = blockMaterial; R.setMeshLight = setMeshLight; R.renderBlockIcons = renderBlockIcons;
 
 // ---------- first person hand ----------
