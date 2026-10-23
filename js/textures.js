@@ -230,6 +230,23 @@ for (let st = 0; st < 4; st++) PAINT['sweet_berry_bush_stage' + st] = r => {
 PAINT.wither_skull_side = r => fill((x, y) => quant(shade(hex(0x2e2e2e), 1 + (r() - .5) * .2), 3));
 PAINT.wither_skull_top = r => fill((x, y) => quant(shade(hex(0x343434), 1 + (r() - .5) * .2), 3));
 PAINT.wither_skull_front = r => { PAINT.wither_skull_side(r); for (const [x0, y0] of [[5, 9], [9, 9]]) for (let y = y0; y < y0 + 2; y++) for (let x = x0; x < x0 + 2; x++) P(x, y, hex(0x0a0a0a)); for (let x = 6; x < 10; x++) P(x, 13, hex(0x0a0a0a)); }; // boxes map 8 px of the tile, rows 8-15
+// the sea: kelp, seagrass, corals (live and dead), sea pickles, the conduit, dried kelp
+PAINT.kelp_plant = r => { for (let y = 0; y < 16; y++) { const x = 7 + Math.round(Math.sin(y / 2.5) * 1.5); P(x, y, hex(0x5a8a2a)); P(x + 1, y, hex(0x4a7a22)); if (y % 4 === 1) { P(x - 1, y, hex(0x6a9a32)); P(x - 2, y + 1, hex(0x6a9a32)); } if (y % 4 === 3) { P(x + 2, y, hex(0x5a8a2a)); P(x + 3, y + 1, hex(0x5a8a2a)); } } };
+PAINT.kelp = r => { PAINT.kelp_plant(r); for (let y = 0; y < 5; y++) for (let x = 0; x < 16; x++) P(x, y, null); for (let y = 0; y < 5; y++) for (let x = 0; x < 16; x++) AD[((((curTile / TPR) | 0) * TS + y) * ATLAS_W + (curTile % TPR) * TS + x) * 4 + 3] = 0; for (let y = 2; y < 6; y++) { P(7, y, hex(0x6aa83a)); P(8, y - 1, hex(0x6aa83a)); } };
+PAINT.seagrass = r => { for (let k = 0; k < 6; k++) { const x0 = 2 + k * 2 + Math.floor(r() * 2), top = 3 + Math.floor(r() * 8); for (let y = top; y < 16; y++) P(x0 + Math.round(Math.sin((y + k) / 3) * 0.7), y, quant(shade(hex(0x3a8a2a), 0.8 + r() * 0.4), 3)); } };
+PAINT.tall_seagrass_bottom = r => { for (let k = 0; k < 6; k++) { const x0 = 2 + k * 2; for (let y = 0; y < 16; y++) P(x0 + Math.round(Math.sin((y + k) / 3) * 0.7), y, quant(shade(hex(0x3a8a2a), 0.8 + r() * 0.4), 3)); } };
+PAINT.tall_seagrass_top = r => { for (let k = 0; k < 6; k++) { const x0 = 2 + k * 2, top = 2 + Math.floor(r() * 9); for (let y = top; y < 16; y++) P(x0 + Math.round(Math.sin((y + k) / 3) * 0.7), y, quant(shade(hex(0x4a9a32), 0.8 + r() * 0.4), 3)); } };
+PAINT.sea_pickle = r => fill((x, y) => quant(shade(hex(y < 3 ? 0x9ac860 : 0x5a8a2a), 0.85 + r() * 0.3 + (x % 4 === 0 ? -0.1 : 0)), 3));
+PAINT.conduit = r => fill((x, y) => { const e = x < 4 || x > 11 || y < 4 || y > 11; if (e) return quant(shade(hex(0xa88a6a), 0.85 + r() * 0.3), 3); return Math.hypot(x - 7.5, y - 7.5) < 2.5 ? hex(0x2a9ab0) : hex(0x6a5a8a); });
+PAINT.dried_kelp_side = r => fill((x, y) => quant(shade(hex(y % 4 === 0 ? 0x2a3418 : 0x3a4a22), 0.85 + r() * 0.3), 3));
+PAINT.dried_kelp_top = r => fill((x, y) => quant(shade(hex(Math.hypot(x - 7.5, y - 7.5) % 3 < 1 ? 0x2a3418 : 0x3e4e24), 0.85 + r() * 0.3), 3));
+const CORAL_C = { tube: 0x3050d0, brain: 0xd05a9a, bubble: 0xa030b0, fire: 0xd03030, horn: 0xd8c030 };
+for (const [k, c0] of Object.entries(CORAL_C)) for (const dead of [false, true]) {
+  const pre = dead ? 'dead_' + k : k, col = dead ? hex(0x8a8680) : hex(c0);
+  PAINT[pre + '_coral'] = r => { for (const [x0, top] of [[4, 4], [8, 2], [11, 5]]) { for (let y = top; y < 16; y++) P(x0, y, shade(col, 0.85 + r() * 0.3)); for (let y = top; y < top + 6; y += 3) { P(x0 - 1, y, shade(col, 1.1)); P(x0 + 1, y + 1, shade(col, 0.9)); } } };
+  PAINT[pre + '_coral_fan'] = r => { for (let a = 0; a < 7; a++) { const t = Math.PI * (0.12 + a * 0.127); for (let d = 1; d < 8; d++) P(Math.round(7.5 + Math.cos(t) * d), Math.round(15 - Math.sin(t) * d), shade(col, 0.8 + r() * 0.4)); } };
+  PAINT[pre + '_coral_block'] = r => fill((x, y) => quant(shade(col, 0.8 + r() * 0.35 - ((x * 7 + y * 5) % 9 === 0 ? 0.35 : 0)), 3));
+}
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
@@ -542,6 +559,10 @@ function cartSprite(load) {
 }
 Object.assign(SPR, {
   minecart: () => cartSprite(null),
+  heart_of_the_sea: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 6) p(x, y, d < 2 ? hex(0x9affff) : d < 4 ? hex(0x2ab8d8) : hex(0x1a6a8a)); } p(6, 6, hex(0xffffff)); }),
+  nautilus_shell: () => sprite(p => { for (let a = 0; a < 60; a++) { const t = a / 60 * Math.PI * 3.2, rr = 1 + t * 1.2; p(Math.round(8 + Math.cos(t) * rr), Math.round(8 + Math.sin(t) * rr), a % 6 < 3 ? hex(0xe8d8c0) : hex(0xc87a4a)); } for (let y = 6; y < 11; y++) for (let x = 6; x < 11; x++) if (Math.hypot(x - 8, y - 8) < 2.5) p(x, y, hex(0xe8d8c0)); }),
+  map: () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 2; x < 14; x++) p(x, y, x === 2 || y === 2 || x === 13 || y === 13 ? hex(0x9a7a4a) : hex(0xe8dcb8)); for (const y of [5, 8, 11]) for (let x = 4; x < 12; x++) if ((x + y) % 3) p(x, y, hex(0xb8a880)); }),
+  filled_map: () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 2; x < 14; x++) p(x, y, x === 2 || y === 2 || x === 13 || y === 13 ? hex(0x9a7a4a) : (Math.sin(x / 2) + Math.cos(y / 2.5)) > 0.6 ? hex(0x5a9a3a) : (x + y) % 7 === 0 ? hex(0x3a6ad8) : hex(0xd8c898)); p(8, 8, hex(0xc01818)); }),
   rabbit: () => meat([hex(0xf0b8a8), hex(0xd88a7a), hex(0xa85a4a), hex(0x6a2a1a)]), cooked_rabbit: () => meat([hex(0xd8a070), hex(0xb07a48), hex(0x7a4a24), hex(0x4a2a10)]),
   rabbit_stew: () => bowl(hex(0xb8743a)),
   rabbit_foot: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 6; x < 10; x++) p(x, y, y > 10 ? hex(0xe8c8a0) : x === 6 ? hex(0xb08860) : hex(0x9a7048)); for (const [x, y] of [[5, 12], [10, 12], [6, 13], [9, 13]]) p(x, y, hex(0xe8c8a0)); for (let x = 6; x < 10; x++) p(x, 2, hex(0xd8d0c8)); }),

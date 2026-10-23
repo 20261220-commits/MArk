@@ -6,11 +6,11 @@ const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
-  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush']);
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
-  oak_door: 'oak_door_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
+  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
   ITEMS[b.id] = { id: b.id, key: b.key, name: b.name, stack: 64, place: b.id, block: b, sprite: SPRITE_BLOCKS[b.key] || null };
@@ -175,6 +175,9 @@ for (const [k, n] of [['leather', '가죽'], ['iron', '철'], ['golden', '금'],
 item('phantom_membrane', '팬텀 막'); item('sweet_berries', '달콤한 열매', { food: [2, 0.4], place: BID.sweet_berry_bush });
 item('honey_bottle', '꿀이 든 병', { food: [6, 1.2], stack: 16, leaves: 'glass_bottle', cures: 'poison', drinkFood: 1 }); item('scute', '인갑');
 item('turtle_helmet', '거북 등딱지', { stack: 1, dur: 275, armor: { slot: 0, pts: 2, tough: 0, mat: 'turtle' } });
+// the sea and maps (ocean.js, maps.js)
+item('heart_of_the_sea', '바다의 심장'); item('nautilus_shell', '앵무조개 껍데기');
+item('map', '빈 지도'); item('filled_map', '지도', { stack: 1 });
 // minecarts (cart: the kind spawned by minecarts.js)
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
@@ -190,7 +193,7 @@ for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spru
   'spruce_fence', 'birch_fence', 'jungle_fence', 'acacia_fence', 'dark_oak_fence']) ITEMS[IID[k]].fuel = k.endsWith('_slab') ? 150 : 300;
 for (const k of ['jungle_sapling', 'acacia_sapling', 'dark_oak_sapling', 'fishing_rod', ...S.COLORS.map(c => c + '_wool'), ...S.COLORS.map(c => c + '_carpet')]) if (IID[k] != null) ITEMS[IID[k]].fuel = k.endsWith('carpet') ? 67 : 100;
 for (const k of ['oak_sapling', 'spruce_sapling', 'birch_sapling', 'white_wool']) ITEMS[IID[k]].fuel = 100;
-ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
+ITEMS[IID.dried_kelp_block].fuel = 4000; ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
 // netherite floats in lava and never burns; redstone dust places wire
 for (const k in IID) if (k.startsWith('netherite') || k === 'ancient_debris') ITEMS[IID[k]].fireproof = 1;
 ITEMS[IID.redstone].place = BID.redstone_wire;
@@ -352,6 +355,8 @@ shapeless('rabbit_stew', 1, ['cooked_rabbit', 'carrot', 'baked_potato', 'brown_m
 shaped('leather_horse_armor', 1, ['L L', 'LLL', 'L L'], { L: 'leather' }); shaped('turtle_helmet', 1, ['SSS', 'S S'], { S: 'scute' });
 shaped('beehive', 1, ['PPP', 'HHH', 'PPP'], { P: 'planks', H: 'honeycomb' }); shaped('honey_block', 1, ['BB', 'BB'], { B: 'honey_bottle' }); shapeless('honey_bottle', 4, ['honey_block', 'glass_bottle', 'glass_bottle', 'glass_bottle', 'glass_bottle']);
 shaped('honeycomb_block', 1, ['HH', 'HH'], { H: 'honeycomb' }); shapeless('sugar', 3, ['honey_bottle']);
+shaped('conduit', 1, ['NNN', 'NHN', 'NNN'], { N: 'nautilus_shell', H: 'heart_of_the_sea' }); shaped('dried_kelp_block', 1, ['KKK', 'KKK', 'KKK'], { K: 'dried_kelp' }); shapeless('dried_kelp', 9, ['dried_kelp_block']);
+shaped('map', 1, ['PPP', 'PCP', 'PPP'], { P: 'paper', C: 'compass' });
 shaped('rail', 16, ['I I', 'ISI', 'I I'], { I: 'iron_ingot', S: 'stick' });
 shaped('powered_rail', 6, ['G G', 'GSG', 'GRG'], { G: 'gold_ingot', S: 'stick', R: 'redstone' });
 shaped('detector_rail', 6, ['I I', 'IPI', 'IRI'], { I: 'iron_ingot', P: 'stone_pressure_plate', R: 'redstone' });
@@ -489,7 +494,7 @@ const SMELT = {};
  ['oak_log', 'charcoal', 0.15], ['spruce_log', 'charcoal', 0.15], ['birch_log', 'charcoal', 0.15],
  ['raw_iron', 'iron_ingot', 0.7], ['raw_gold', 'gold_ingot', 1], ['raw_copper', 'copper_ingot', 0.7],
  ['iron_ore', 'iron_ingot', 0.7], ['gold_ore', 'gold_ingot', 1], ['copper_ore', 'copper_ingot', 0.7],
- ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35], ['rabbit', 'cooked_rabbit', 0.35],
+ ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35], ['rabbit', 'cooked_rabbit', 0.35], ['kelp', 'dried_kelp', 0.1],
  ['wet_sponge', 'sponge', 0], ['clay', 'terracotta', 0.35], ['cactus', 'green_dye', 1], ['potato', 'baked_potato', 0.35], ['cod', 'cooked_cod', 0.35], ['salmon', 'cooked_salmon', 0.35],
  ['chorus_fruit', 'popped_chorus_fruit', 0.1], ['nether_bricks', 'cracked_nether_bricks', 0.1], ['red_sand', 'glass', 0.1], ['jungle_log', 'charcoal', 0.15], ['acacia_log', 'charcoal', 0.15], ['dark_oak_log', 'charcoal', 0.15], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
  ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
@@ -532,6 +537,11 @@ function blockDrops(b, meta, stack) {
   const add = (k, n = 1) => { if (n > 0) res.items.push([typeof k === 'number' ? k : IID[k], n]); };
   const shears = stack && stack.id === IID.shears;
   const t = toolOf(stack);
+  if (d.key === 'kelp_plant') { add('kelp'); return res; }
+  if (d.key === 'tall_seagrass') { if (shears) add('seagrass', 2); return res; }
+  if ((d.key === 'coral' || d.key === 'coral_fan') && !enchLv(stack, 'silk_touch')) return res; // corals need silk touch
+  if (d.key === 'coral_block' && !enchLv(stack, 'silk_touch')) { if (canHarvest(b, stack)) add(itemOfBlock(b, (meta % 5) + 5)); return res; } // drops as dead coral
+  if (d.key === 'sea_pickle') { add('sea_pickle', (meta & 3) + 1); return res; }
   if (d.key === 'sweet_berry_bush') { const a = meta & 3; if (a >= 2) add('sweet_berries', a === 3 ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)); return res; }
   if ((d.key === 'bee_nest' || d.key === 'turtle_egg') && !enchLv(stack, 'silk_touch')) return res; // need silk touch
   const cd = (b === 198 || b === 246) && S.candleOf(b, meta);

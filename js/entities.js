@@ -57,7 +57,7 @@ function boxBlocks(e, fn) { // iterate blocks overlapping the entity box
   for (let x = Math.floor(e.x - e.w); x <= Math.floor(e.x + e.w); x++) for (let y = Math.floor(e.y); y <= Math.floor(e.y + e.h - 0.01); y++) for (let z = Math.floor(e.z - e.w); z <= Math.floor(e.z + e.w); z++) if (fn(getBlock(x, y, z), x, y, z)) return true;
   return false;
 }
-function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
+function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return S.WLOG[b] && S.isWet(b, getMeta(Math.floor(x), Math.floor(y), Math.floor(z))) ? 1 : 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
@@ -735,7 +735,7 @@ function spawnAnimalsForChunk(c) {
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 9));
   if (R0() > 0.1) return;
   let types;
-  if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
+  if (S.isOceanBio(b) || b === S.BIO.RIVER) {
     const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
@@ -827,7 +827,7 @@ function entityRender(alpha, now) {
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb); }
-      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.def.scale || 1);
+      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

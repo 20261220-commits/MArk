@@ -334,7 +334,7 @@ function attackEntity(e) {
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
-  if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
+  if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
   if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
 }
 function breakBlock(x, y, z) {
@@ -493,6 +493,7 @@ function consume(n = 1) { if (creative()) return; const h = PL.held(); if (!h) r
 function useItem(first) {
   USE.placeCd = 4;
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
+  if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'frame') { frameUse(e, h); return; }
@@ -519,6 +520,7 @@ function useItem(first) {
     if (d && h.id === IID.armor_stand) { if (t.ny === 1 && !SOLID[getBlock(t.x, t.y + 1, t.z)]) { spawnArmorStand(t.x + .5, t.y + 1, t.z + .5, Math.round(PL.yaw / (Math.PI / 4)) * Math.PI / 4 + Math.PI); consume(); swing(); play('place', { mat: 'wood' }); } return; }
     if (d && d.place === BID.banner) { placeBanner(t, h); return; }
     if (first && lushUse(t, h, d)) return;
+    if (first && oceanUse(t, h, d)) return;
     if (first && d && bottleUse(t, h)) return;
     const { x, y, z, id } = t;
     if (d) {
@@ -608,7 +610,7 @@ function placeBlock(t, d) {
   const b = BLOCKS[id];
   // placement rules
   if (b.plant) {
-    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : OPQ[below];
+    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : b.plant >= 15 ? true : OPQ[below]; // 15+: sea plants, checked by oceanPlace
     if (!ok) return;
     if (id === BID.cactus && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)])) return;
   }
@@ -638,6 +640,7 @@ function placeBlock(t, d) {
   if (b.leaves) meta = 1;
   if (vi != null && S.HASV[id]) meta = (meta & ((1 << vsh) - 1)) | (vi << vsh); // colour / material lives above the shape bits
   if (id === BID.pointed_dripstone) meta = t.ny === -1 ? 0 : 1;
+  if (typeof oceanPlace === 'function') { const om = oceanPlace(x, y, z, id, meta); if (om === false) return; meta = om; }
   if (S.DOOR[id]) {
     if (getBlock(x, y + 1, z) && !REPL[getBlock(x, y + 1, z)] || !supportedBy(below)) return;
     if (entityBlocks(x, y, z) || entityBlocks(x, y + 1, z)) return;
@@ -730,7 +733,7 @@ function useRod() {
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
     if (b.bite > 0) {
-      const r = Math.random(), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book'][Math.floor(Math.random() * 4)];
+      const r = Math.random(), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book', 'nautilus_shell'][Math.floor(Math.random() * 5)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
       if (it && loot === 'enchanted_book') { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; it.stack.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; }
       spawnXP(PL.x, PL.y + 1, PL.z, 1 + Math.floor(Math.random() * 6)); play('splash', { vol: 0.5 });

@@ -472,7 +472,7 @@ function villagerOffers(e) {
   if (!e.trades) {
     const pool = TRADES[e.prof] || TRADES.farmer, r = S.rng(e.id * 7919 + 13), picked = [];
     const idx = pool.map((_, i) => i).sort(() => r() - 0.5).slice(0, Math.min(pool.length, 4 + r.int(2)));
-    for (const i of idx) { const [[a, an], [b, bn]] = pool[i]; if (IID[a] == null || IID[b] == null) continue; picked.push({ a: IID[a], an, b: IID[b], bn, ench: b === 'enchanted_book', uses: 0, max: 12 }); }
+    for (const i of idx) { const [[a, an], [b, bn]] = pool[i]; if (b.endsWith('explorer_map')) { picked.push({ a: IID[a], an, b: IID.filled_map, bn: 1, special: b, uses: 0, max: 12 }); continue; } if (IID[a] == null || IID[b] == null) continue; picked.push({ a: IID[a], an, b: IID[b], bn, ench: b === 'enchanted_book', uses: 0, max: 12 }); }
     e.trades = picked;
   }
   return e.trades;

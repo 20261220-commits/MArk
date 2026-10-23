@@ -108,7 +108,7 @@ function findSpawn(seed) {
   for (let r = 0; r < 2048; r += 16) for (let a = 0; a < Math.max(1, r / 4); a++) {
     const ang = a / Math.max(1, r / 4) * Math.PI * 2, x = Math.round(Math.cos(ang) * r), z = Math.round(Math.sin(ang) * r);
     const [h, b] = g.column(x, z);
-    if (h > S.SEA + 1 && h < 95 && b !== S.BIO.OCEAN && b !== S.BIO.RIVER && b !== S.BIO.FROZEN_OCEAN) return [x, h + 1, z];
+    if (h > S.SEA + 1 && h < 95 && !S.isOceanBio(b) && b !== S.BIO.RIVER) return [x, h + 1, z];
   }
   return [0, 100, 0];
 }
@@ -202,7 +202,7 @@ function gameTick() {
   if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
-  animalTick();
+  animalTick(); oceanTick(); mapViewTick();
   playerTick();
   entityTick();
   tickScheduled();

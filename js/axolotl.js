@@ -138,12 +138,11 @@ function trySpawnAxolotl() {
     return;
   }
 }
-// there are no warm ocean biomes, so tropical fish school in ocean chunks next to warm land (jungle, desert, savanna, badlands)
+// tropical fish school in warm and lukewarm oceans; pufferfish too
 function spawnWarmFish(c) {
-  const b = c.biome[8 * 16 + 8]; if (b !== S.BIO.OCEAN && b !== S.BIO.BEACH) return;
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.15) return;
-  const x0 = c.cx * 16 + 8, z0 = c.cz * 16 + 8, warm = [S.BIO.JUNGLE, S.BIO.DESERT, S.BIO.SAVANNA, S.BIO.BADLANDS];
-  if (![[48, 0], [-48, 0], [0, 48], [0, -48], [34, 34], [-34, -34], [34, -34], [-34, 34]].some(([dx, dz]) => warm.includes(biomeAt(x0 + dx, z0 + dz)))) return;
+  const b = c.biome[8 * 16 + 8]; if (b !== S.BIO.WARM_OCEAN && b !== S.BIO.LUKEWARM_OCEAN) return;
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.25) return;
+  if (R0() < 0.3) { for (let i = 0; i < 1 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(9); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('pufferfish', x + .5, y, z + .5); } return; }
   const v = R0.int(TFISH_COL.length);
   for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
 }

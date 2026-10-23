@@ -139,6 +139,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (y < 0 || y >= CH) return false;
   const c = chunkAt(x >> 4, z >> 4); if (!c) return false;
   const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i], oldM = c.meta[i];
+  if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
   if (id && y > c.maxY) c.maxY = y;
@@ -177,6 +178,10 @@ function plantOK(b, x, y, z, m) {
     }
     case 13: return m & 8 ? below === b : (below === BID.clay || below === BID.moss_block) && above === b; // small dripleaf: two blocks tall
     case 14: return below !== 0; // moss carpet
+    case 15: return OPQ[below] || below === BID.kelp_plant || below === BID.kelp; // kelp
+    case 16: return OPQ[below]; // seagrass
+    case 17: return m & 8 ? below === b : OPQ[below] && above === b; // tall seagrass
+    case 18: return supportedBy(below); // corals, fans, sea pickles
   }
   return true;
 }
@@ -492,7 +497,7 @@ function addChunk(cx, cz, d, tiles) {
   W.chunks.set(c.key, c); W.lastKey = -1;
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
-    if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'chest', items }); }
+    if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) { const sp = typeof lootSpecial === 'function' && lootSpecial(key, cx * 16 + (t.i & 15), cz * 16 + ((t.i >> 4) & 15)); if (sp) items[slot] = sp; else if (IID[key] != null) items[slot] = { id: IID[key], n }; } c.tiles.set(t.i, { type: 'chest', items }); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
     else if (t.type) c.tiles.set(t.i, t);

@@ -202,13 +202,14 @@ function smithResult(c) {
 function tradeResult(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
+  if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
   const out = { id: o.b, n: o.bn }; if (o.ench) { if (!o.e) { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; o.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; } out.e = { ...o.e }; }
   return out;
 }
 function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
-  o.uses++; if (o.ench) o.e = null;
+  o.uses++; if (o.ench) o.e = null; o.made = null;
   play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
