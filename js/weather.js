@@ -72,6 +72,7 @@ function strikeLightning(x, y, z, viaRod) {
   for (const e of [...ENT]) {
     if (e.kind !== 'mob' || e.dead || !inBolt(e.x, e.y, e.z)) continue;
     if (e.type === 'pig') { removeEnt(e); spawnMob('zombified_piglin', e.x, e.y, e.z); continue; }
+    if (e.type === 'villager' && PL.difficulty > 0) { removeEnt(e); spawnMob('witch', e.x, e.y, e.z).persistent = true; continue; } // struck villagers turn into witches
     e.fire = Math.max(e.fire || 0, 160); hurtMob(e, 5, null, 0, 0, 'lightning');
   }
   if (!PL.dead && inBolt(PL.x, PL.y, PL.z) && !creative()) { PL.fire = Math.max(PL.fire, 160); hurtPlayer(5, 'lightning'); }
