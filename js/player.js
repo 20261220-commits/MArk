@@ -94,7 +94,7 @@ function hurtPlayer(dmg, cause, attacker) {
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -146,6 +146,7 @@ function playerTick() {
   let web = false, snowB = false, ladder = false;
   if (!spec) inBlock(b => { if (b === BID.cobweb) web = true; if (b === BID.powder_snow) snowB = true; if (b === BID.ladder) ladder = true; });
   if (snowB && INV.armor[3] && INV.armor[3].id === IID.leather_boots && !PL.sneaking && getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.01), Math.floor(PL.z)) === BID.powder_snow) { snowB = false; UI.advance('snow'); }
+  PL.inSnowBody = snowB;
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
@@ -241,7 +242,10 @@ function survivalTick(inWater, inLava, eyeF) {
   const hb = getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z));
   if (OPQ[hb] && SOLID[hb] && hb !== BID.powder_snow && W.tickN % 10 === 0) hurtPlayer(1, 'suffocate');
   if (PL.y < -64) hurtPlayer(4, 'void');
-  if (PL.inSnow && W.tickN % 40 === 0 && PL.mode !== 'creative') hurtPlayer(1, 'fire');
+  // freezing (1.17): 140 ticks inside powder snow to freeze fully, thaws twice as fast; any leather armour piece or burning prevents it
+  const canFreeze = !creative() && PL.fire <= 0 && !INV.armor.some(s => s && ITEMS[s.id].armor.mat === 'leather');
+  PL.frozen = PL.inSnowBody && canFreeze ? Math.min(140, (PL.frozen || 0) + 1) : Math.max(0, (PL.frozen || 0) - 2);
+  if (PL.frozen >= 140 && W.tickN % 40 === 0) hurtPlayer(1, 'freeze');
   if (creative()) return;
   // hunger
   if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
@@ -448,7 +452,7 @@ function useItem(first) {
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
-    if (d && h.id === IID.bucket && e.type === 'cow' && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
+    if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
     if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }

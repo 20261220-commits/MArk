@@ -3346,7 +3346,13 @@ function neighborUpdate(x, y, z) {
   if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.red_bed) { const f = m & 3, dir = DIRS[f], s = (m & 4) ? -1 : 1; if (getBlock(x + dir[0] * s, y, z + dir[2] * s) !== b) setBlock(x, y, z, 0); return; }
   if (b === BID.farmland && SOLID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] === RT.CUBE) { setBlock(x, y, z, 3); return; }
-  if (b === BID.amethyst_cluster || b === BID.pointed_dripstone) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
+  // pointed dripstone: meta 0 hangs (needs the block above), meta 1 stands (needs the block below); an unsupported stalactite falls
+  if (b === BID.pointed_dripstone) {
+    if (m === 0) { const up = getBlock(x, y + 1, z); if (!OPQ[up] && !(up === b && getMeta(x, y + 1, z) === 0)) { setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); } }
+    else if (!OPQ[below] && !(below === b && getMeta(x, y - 1, z) === 1)) breakNaturally(x, y, z, b, m);
+    return;
+  }
+  if (b === BID.amethyst_cluster) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.concrete_powder) { if (N6.some(([dx, dy, dz]) => dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27)) setBlock(x, y, z, BID.concrete, m); else if (below === 0 || FLUID[below] || REPL[below]) schedule(x, y, z, 2); return; }
   if (b === BID.glow_lichen || b === BID.vine) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
   if (b === BID.lantern || b === BID.soul_lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
@@ -3938,11 +3944,14 @@ function updateRain(dt, px, py, pz, amt) {
   for (let i = 0; i < RAIN_N; i++) {
     const d = drops[i];
     if (i >= active) { rainPos.fill(0, i * 6, i * 6 + 6); continue; }
-    const t = top(Math.floor(d.x), Math.floor(d.z));
+    let t = top(Math.floor(d.x), Math.floor(d.z));
     if (d.y < t + 1 || d.y < py - 12 || Math.abs(d.x - px) > 14 || Math.abs(d.z - pz) > 14) {
       d.x = px + (Math.random() * 2 - 1) * 14; d.z = pz + (Math.random() * 2 - 1) * 14; d.y = py + 10 + Math.random() * 10; d.s = cold ? 3 + Math.random() : 18 + Math.random() * 6;
+      t = top(Math.floor(d.x), Math.floor(d.z));
+      if (d.y < t + 1) { d.y = -999; rainPos.fill(0, i * 6, i * 6 + 6); continue; } // column is roofed above the drop (caves, houses): no rain here
     }
     d.y -= d.s * dt;
+    if (d.y < t + 1) { rainPos.fill(0, i * 6, i * 6 + 6); continue; } // passed the surface this frame: don't draw it below the roof
     const len = cold ? 0.12 : 0.7, sw = cold ? Math.sin(d.y * 2 + i) * 0.05 : 0;
     rainPos[i * 6] = d.x + sw; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z; rainPos[i * 6 + 3] = d.x + sw; rainPos[i * 6 + 4] = d.y + len; rainPos[i * 6 + 5] = d.z;
   }
@@ -4334,7 +4343,7 @@ const MOBDEF = {
     parts: [['body', [0, 8, 0], [-3, -3, -4, 6, 6, 8], [0, 9]], ['head', [0, 9, -4], [-2, 0, -2, 4, 6, 3], [0, 0]], ['beak', [0, 9, -4], [-2, 2, -4, 4, 2, 2], [14, 0]], ['wattle', [0, 9, -4], [-1, 0, -3, 2, 2, 2], [14, 4]],
       ['rleg', [1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['lleg', [-1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['rwing', [3, 10, 0], [0, -4, -3, 1, 4, 6], [24, 13]], ['lwing', [-3, 10, 0], [-1, -4, -3, 1, 4, 6], [24, 13]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xf4f4f4); paintBox(g, 0, 9, 6, 6, 8, w, r, .06); paintBox(g, 0, 0, 4, 6, 3, w, r, .06, { front: (g, x, y) => { px(g, x, y + 1, '#000'); px(g, x + 3, y + 1, '#000'); } }); paintBox(g, 14, 0, 4, 2, 2, () => hex(0xf2b43a), r); paintBox(g, 14, 4, 2, 2, 2, () => hex(0xd82020), r); paintBox(g, 26, 0, 2, 5, 2, () => hex(0xf2b43a), r); paintBox(g, 24, 13, 1, 4, 6, w, r, .06); }) },
-  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1,
+  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1, fallReduce: 10,
     parts: [...QUAD(10, 15, [-4, -4, -8, 9, 8, 16], [0, 18, -7], [-3, -3, -7, 6, 6, 7], 3, -5, 6), ['horn', [0, 18, -7], [-3, 3, -3, 1, 6, 1], [22, 0]], ['horn2', [0, 18, -7], [2, 3, -3, 1, 6, 1], [22, 0]], ['beard', [0, 18, -7], [-1, -6, -7, 2, 3, 1], [24, 0]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xe8e2d6); paintBox(g, 28, 0, 9, 8, 16, w, r, .1); paintBox(g, 0, 0, 6, 6, 7, w, r, .1, { front: (g, x, y) => { px(g, x, y + 2, '#c8a83a'); px(g, x + 5, y + 2, '#c8a83a'); px(g, x + 1, y + 2, '#000'); px(g, x + 4, y + 2, '#000'); } }); paintBox(g, 0, 32, 4, 10, 4, (k, x, y) => y > 8 ? hex(0x5a5048) : w(), r, .1); paintBox(g, 22, 0, 1, 6, 1, () => hex(0xa8a294), r); paintBox(g, 24, 0, 2, 3, 1, () => hex(0xd8d0c0), r); }) },
   squid: { hp: 10, w: 0.4, h: 0.8, speed: 0.04, xp: 2, snd: 'splash', drops: [['ink_sac', 1, 3]], water: 1,
@@ -4556,7 +4565,7 @@ function spawnXP(x, y, z, amt) {
 }
 // ---------- falling blocks & TNT ----------
 W.onFall = (x, y, z, id, meta = 0) => {
-  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.bmeta = meta; e.w = 0.49; e.h = 0.98;
+  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.bmeta = meta; e.w = 0.49; e.h = 0.98; e.y0 = y;
   e.mesh = new THREE.Mesh(R.blockGeometry(itemOfBlock(id, meta)), R.blockMaterial()); addEnt(e);
 };
 function primeTNT(x, y, z, fuse = 80) {
@@ -4726,7 +4735,7 @@ function mobTick(e) {
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
       if (e.ram > 0) { e.ram--; const l = Math.hypot(dx, dz) || 1; mx = dx / l; mz = dz / l; speed = 0.22; e.yawTarget = Math.atan2(-dx, -dz);
-        if (dist < 1.3) { e.ram = 0; if (hurtPlayer(1 * DIFF_MUL() + 1, 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
+        if (dist < 1.3) { e.ram = 0; if (hurtPlayer([0, 2, 2, 3][PL.difficulty], 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
       else if (dist > 4 && dist < 12 && Math.random() < 1 / 1500) { e.ram = 40; play('bleat'); }
     }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
@@ -4746,7 +4755,7 @@ function mobTick(e) {
   if (!inF) e.vy = (e.vy - 0.08) * 0.98; // Java order: move, then gravity (a 0.42 jump clears 1.25 blocks)
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
   // fall damage
-  if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3), null); e.fallY = null; }
+  if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 + (d.fallReduce || 0) && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3 - (d.fallReduce || 0)), null); e.fallY = null; }
   else if (e.vy < 0 && e.fallY == null) e.fallY = e.y; else if (inF) e.fallY = null;
   if (e.y < -40) removeEnt(e);
   const hs = Math.hypot(e.vx, e.vz);
@@ -4807,13 +4816,20 @@ function entityTick() {
       if (e.y < -40) removeEnt(e);
     } else if (e.kind === 'falling') {
       e.vy -= 0.04; e.vy *= 0.98; physMove(e, 0, e.vy, 0);
-      if (e.onGround || e.age > 600) {
+      const drip = e.block === BID.pointed_dripstone;
+      // a falling stalactite hurts what it lands on: 2 per block fallen past the first, at most 40 (1.17), then shatters into an item
+      if (drip && !PL.dead && e.vy < 0 && Math.abs(PL.x - e.x) < PL.w + e.w && Math.abs(PL.z - e.z) < PL.w + e.w && e.y < PL.y + PL.h && e.y + e.h > PL.y) {
+        const n = Math.ceil(e.y0 - e.y - 1); if (n > 0) hurtPlayer(Math.min(n * 2, 40), 'stalactite');
+        removeEnt(e); dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, 0), 1); play('break');
+      } else if (drip && e.vy < 0) for (const o of ENT) if (o.kind === 'mob' && !o.dead && Math.abs(o.x - e.x) < o.w + e.w && Math.abs(o.z - e.z) < o.w + e.w && e.y < o.y + o.h && e.y + e.h > o.y) {
+        const n = Math.ceil(e.y0 - e.y - 1); if (n > 0) hurtMob(o, Math.min(n * 2, 40), null);
+        removeEnt(e); dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, 0), 1); break;
+      }
+      if (!e.dead && (e.onGround || e.age > 600)) {
         const bx = Math.floor(e.x), by = Math.floor(e.y + 0.5), bz = Math.floor(e.z), cur = getBlock(bx, by, bz);
         removeEnt(e);
-        if (cur === 0 || (REPL[cur])) setBlock(bx, by, bz, e.block, e.bmeta || 0); else dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, e.bmeta || 0), 1);
+        if (!drip && (cur === 0 || (REPL[cur]))) setBlock(bx, by, bz, e.block, e.bmeta || 0); else dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, drip ? 0 : e.bmeta || 0), 1);
       }
-      // suffocate/hit player
-      if (!PL.dead && Math.abs(PL.x - e.x) < 0.8 && Math.abs(PL.z - e.z) < 0.8 && e.y > PL.y && e.y < PL.y + 1.8 && e.vy < -0.2) {}
     } else if (e.kind === 'tnt') {
       e.vy -= 0.04; physMove(e, e.vx, e.vy, e.vz); e.vx *= 0.98; e.vz *= 0.98; e.vy *= 0.98; if (e.onGround) { e.vx *= 0.7; e.vz *= 0.7; }
       if (--e.fuse <= 0) { removeEnt(e); explode(e.x, e.y + 0.49, e.z, 4); }
@@ -6501,7 +6517,7 @@ function hurtPlayer(dmg, cause, attacker) {
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -6553,6 +6569,7 @@ function playerTick() {
   let web = false, snowB = false, ladder = false;
   if (!spec) inBlock(b => { if (b === BID.cobweb) web = true; if (b === BID.powder_snow) snowB = true; if (b === BID.ladder) ladder = true; });
   if (snowB && INV.armor[3] && INV.armor[3].id === IID.leather_boots && !PL.sneaking && getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.01), Math.floor(PL.z)) === BID.powder_snow) { snowB = false; UI.advance('snow'); }
+  PL.inSnowBody = snowB;
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
@@ -6648,7 +6665,10 @@ function survivalTick(inWater, inLava, eyeF) {
   const hb = getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z));
   if (OPQ[hb] && SOLID[hb] && hb !== BID.powder_snow && W.tickN % 10 === 0) hurtPlayer(1, 'suffocate');
   if (PL.y < -64) hurtPlayer(4, 'void');
-  if (PL.inSnow && W.tickN % 40 === 0 && PL.mode !== 'creative') hurtPlayer(1, 'fire');
+  // freezing (1.17): 140 ticks inside powder snow to freeze fully, thaws twice as fast; any leather armour piece or burning prevents it
+  const canFreeze = !creative() && PL.fire <= 0 && !INV.armor.some(s => s && ITEMS[s.id].armor.mat === 'leather');
+  PL.frozen = PL.inSnowBody && canFreeze ? Math.min(140, (PL.frozen || 0) + 1) : Math.max(0, (PL.frozen || 0) - 2);
+  if (PL.frozen >= 140 && W.tickN % 40 === 0) hurtPlayer(1, 'freeze');
   if (creative()) return;
   // hunger
   if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
@@ -6855,7 +6875,7 @@ function useItem(first) {
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
-    if (d && h.id === IID.bucket && e.type === 'cow' && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
+    if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
     if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }

@@ -202,11 +202,14 @@ function updateRain(dt, px, py, pz, amt) {
   for (let i = 0; i < RAIN_N; i++) {
     const d = drops[i];
     if (i >= active) { rainPos.fill(0, i * 6, i * 6 + 6); continue; }
-    const t = top(Math.floor(d.x), Math.floor(d.z));
+    let t = top(Math.floor(d.x), Math.floor(d.z));
     if (d.y < t + 1 || d.y < py - 12 || Math.abs(d.x - px) > 14 || Math.abs(d.z - pz) > 14) {
       d.x = px + (Math.random() * 2 - 1) * 14; d.z = pz + (Math.random() * 2 - 1) * 14; d.y = py + 10 + Math.random() * 10; d.s = cold ? 3 + Math.random() : 18 + Math.random() * 6;
+      t = top(Math.floor(d.x), Math.floor(d.z));
+      if (d.y < t + 1) { d.y = -999; rainPos.fill(0, i * 6, i * 6 + 6); continue; } // column is roofed above the drop (caves, houses): no rain here
     }
     d.y -= d.s * dt;
+    if (d.y < t + 1) { rainPos.fill(0, i * 6, i * 6 + 6); continue; } // passed the surface this frame: don't draw it below the roof
     const len = cold ? 0.12 : 0.7, sw = cold ? Math.sin(d.y * 2 + i) * 0.05 : 0;
     rainPos[i * 6] = d.x + sw; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z; rainPos[i * 6 + 3] = d.x + sw; rainPos[i * 6 + 4] = d.y + len; rainPos[i * 6 + 5] = d.z;
   }

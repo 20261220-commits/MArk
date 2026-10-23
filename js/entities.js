@@ -159,7 +159,7 @@ const MOBDEF = {
     parts: [['body', [0, 8, 0], [-3, -3, -4, 6, 6, 8], [0, 9]], ['head', [0, 9, -4], [-2, 0, -2, 4, 6, 3], [0, 0]], ['beak', [0, 9, -4], [-2, 2, -4, 4, 2, 2], [14, 0]], ['wattle', [0, 9, -4], [-1, 0, -3, 2, 2, 2], [14, 4]],
       ['rleg', [1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['lleg', [-1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['rwing', [3, 10, 0], [0, -4, -3, 1, 4, 6], [24, 13]], ['lwing', [-3, 10, 0], [-1, -4, -3, 1, 4, 6], [24, 13]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xf4f4f4); paintBox(g, 0, 9, 6, 6, 8, w, r, .06); paintBox(g, 0, 0, 4, 6, 3, w, r, .06, { front: (g, x, y) => { px(g, x, y + 1, '#000'); px(g, x + 3, y + 1, '#000'); } }); paintBox(g, 14, 0, 4, 2, 2, () => hex(0xf2b43a), r); paintBox(g, 14, 4, 2, 2, 2, () => hex(0xd82020), r); paintBox(g, 26, 0, 2, 5, 2, () => hex(0xf2b43a), r); paintBox(g, 24, 13, 1, 4, 6, w, r, .06); }) },
-  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1,
+  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1, fallReduce: 10,
     parts: [...QUAD(10, 15, [-4, -4, -8, 9, 8, 16], [0, 18, -7], [-3, -3, -7, 6, 6, 7], 3, -5, 6), ['horn', [0, 18, -7], [-3, 3, -3, 1, 6, 1], [22, 0]], ['horn2', [0, 18, -7], [2, 3, -3, 1, 6, 1], [22, 0]], ['beard', [0, 18, -7], [-1, -6, -7, 2, 3, 1], [24, 0]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xe8e2d6); paintBox(g, 28, 0, 9, 8, 16, w, r, .1); paintBox(g, 0, 0, 6, 6, 7, w, r, .1, { front: (g, x, y) => { px(g, x, y + 2, '#c8a83a'); px(g, x + 5, y + 2, '#c8a83a'); px(g, x + 1, y + 2, '#000'); px(g, x + 4, y + 2, '#000'); } }); paintBox(g, 0, 32, 4, 10, 4, (k, x, y) => y > 8 ? hex(0x5a5048) : w(), r, .1); paintBox(g, 22, 0, 1, 6, 1, () => hex(0xa8a294), r); paintBox(g, 24, 0, 2, 3, 1, () => hex(0xd8d0c0), r); }) },
   squid: { hp: 10, w: 0.4, h: 0.8, speed: 0.04, xp: 2, snd: 'splash', drops: [['ink_sac', 1, 3]], water: 1,
@@ -381,7 +381,7 @@ function spawnXP(x, y, z, amt) {
 }
 // ---------- falling blocks & TNT ----------
 W.onFall = (x, y, z, id, meta = 0) => {
-  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.bmeta = meta; e.w = 0.49; e.h = 0.98;
+  const e = Ent('falling', x + .5, y, z + .5); e.kind = 'falling'; e.block = id; e.bmeta = meta; e.w = 0.49; e.h = 0.98; e.y0 = y;
   e.mesh = new THREE.Mesh(R.blockGeometry(itemOfBlock(id, meta)), R.blockMaterial()); addEnt(e);
 };
 function primeTNT(x, y, z, fuse = 80) {
@@ -551,7 +551,7 @@ function mobTick(e) {
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
       if (e.ram > 0) { e.ram--; const l = Math.hypot(dx, dz) || 1; mx = dx / l; mz = dz / l; speed = 0.22; e.yawTarget = Math.atan2(-dx, -dz);
-        if (dist < 1.3) { e.ram = 0; if (hurtPlayer(1 * DIFF_MUL() + 1, 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
+        if (dist < 1.3) { e.ram = 0; if (hurtPlayer([0, 2, 2, 3][PL.difficulty], 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
       else if (dist > 4 && dist < 12 && Math.random() < 1 / 1500) { e.ram = 40; play('bleat'); }
     }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
@@ -571,7 +571,7 @@ function mobTick(e) {
   if (!inF) e.vy = (e.vy - 0.08) * 0.98; // Java order: move, then gravity (a 0.42 jump clears 1.25 blocks)
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
   // fall damage
-  if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3), null); e.fallY = null; }
+  if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 + (d.fallReduce || 0) && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3 - (d.fallReduce || 0)), null); e.fallY = null; }
   else if (e.vy < 0 && e.fallY == null) e.fallY = e.y; else if (inF) e.fallY = null;
   if (e.y < -40) removeEnt(e);
   const hs = Math.hypot(e.vx, e.vz);
@@ -632,13 +632,20 @@ function entityTick() {
       if (e.y < -40) removeEnt(e);
     } else if (e.kind === 'falling') {
       e.vy -= 0.04; e.vy *= 0.98; physMove(e, 0, e.vy, 0);
-      if (e.onGround || e.age > 600) {
+      const drip = e.block === BID.pointed_dripstone;
+      // a falling stalactite hurts what it lands on: 2 per block fallen past the first, at most 40 (1.17), then shatters into an item
+      if (drip && !PL.dead && e.vy < 0 && Math.abs(PL.x - e.x) < PL.w + e.w && Math.abs(PL.z - e.z) < PL.w + e.w && e.y < PL.y + PL.h && e.y + e.h > PL.y) {
+        const n = Math.ceil(e.y0 - e.y - 1); if (n > 0) hurtPlayer(Math.min(n * 2, 40), 'stalactite');
+        removeEnt(e); dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, 0), 1); play('break');
+      } else if (drip && e.vy < 0) for (const o of ENT) if (o.kind === 'mob' && !o.dead && Math.abs(o.x - e.x) < o.w + e.w && Math.abs(o.z - e.z) < o.w + e.w && e.y < o.y + o.h && e.y + e.h > o.y) {
+        const n = Math.ceil(e.y0 - e.y - 1); if (n > 0) hurtMob(o, Math.min(n * 2, 40), null);
+        removeEnt(e); dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, 0), 1); break;
+      }
+      if (!e.dead && (e.onGround || e.age > 600)) {
         const bx = Math.floor(e.x), by = Math.floor(e.y + 0.5), bz = Math.floor(e.z), cur = getBlock(bx, by, bz);
         removeEnt(e);
-        if (cur === 0 || (REPL[cur])) setBlock(bx, by, bz, e.block, e.bmeta || 0); else dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, e.bmeta || 0), 1);
+        if (!drip && (cur === 0 || (REPL[cur]))) setBlock(bx, by, bz, e.block, e.bmeta || 0); else dropItem(e.x, e.y + .5, e.z, itemOfBlock(e.block, drip ? 0 : e.bmeta || 0), 1);
       }
-      // suffocate/hit player
-      if (!PL.dead && Math.abs(PL.x - e.x) < 0.8 && Math.abs(PL.z - e.z) < 0.8 && e.y > PL.y && e.y < PL.y + 1.8 && e.vy < -0.2) {}
     } else if (e.kind === 'tnt') {
       e.vy -= 0.04; physMove(e, e.vx, e.vy, e.vz); e.vx *= 0.98; e.vz *= 0.98; e.vy *= 0.98; if (e.onGround) { e.vx *= 0.7; e.vz *= 0.7; }
       if (--e.fuse <= 0) { removeEnt(e); explode(e.x, e.y + 0.49, e.z, 4); }
