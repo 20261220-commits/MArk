@@ -124,6 +124,7 @@ item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_f
 Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
 item('glow_berries', '발광 열매', { food: [2, 0.4] });
+item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
@@ -285,6 +286,7 @@ shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
 for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
+shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' }); shapeless('glow_item_frame', 1, ['item_frame', 'glow_ink_sac']);
 // cut copper of every oxidation stage, its slabs and stairs, waxed or not
 for (const [full, cut] of [['copper_block', 'cut_copper'], ['exposed_copper', 'exposed_cut_copper'], ['weathered_copper', 'weathered_cut_copper'], ['oxidized_copper', 'oxidized_cut_copper']]) for (const w of ['', 'waxed_']) {
   if (cut !== 'cut_copper' || w) shaped(w + cut, 4, ['##', '##'], { '#': w + full });
@@ -496,6 +498,7 @@ function blockDrops(b, meta, stack) {
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
     case 'small_amethyst_bud': case 'medium_amethyst_bud': case 'large_amethyst_bud': break; // only with silk touch
     case 'cave_vines': if (meta & 1) add('glow_berries'); break;
+    case 'sculk_sensor': res.xp = 5; break; // the block itself only with silk touch
     case 'big_dripleaf_stem': add('big_dripleaf'); break;
     case 'small_dripleaf': if (shears && !(meta & 8)) add(b); break;
     case 'hanging_roots': if (shears) add(b); break;

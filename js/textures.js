@@ -222,6 +222,13 @@ PAINT.small_dripleaf = r => { for (const [x0, lean] of [[6, -0.15], [9, 0.15]]) 
 PAINT.small_dripleaf_top = r => { for (let y = 8; y < 16; y++) { P(6, y, hex(0x5a8a2c)); P(9, y, hex(0x5a8a2c)); } for (const [cx, cy] of [[4, 5], [11, 4]]) for (let dx = -3; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) if (dx * dx / 9 + dy * dy / 4 <= 1) P(cx + dx, cy + dy, shade(hex(0x6aa83a), 1 + (r() - .5) * .15)); };
 PAINT.rooted_dirt = r => { PAINT.dirt(r); for (let i = 0; i < 5; i++) { let x = r.int(16), y = r.int(16); for (let k = 0; k < 5; k++) { P(x, y, hex(0xb08a5a)); x = (x + (r() < .5 ? 1 : 0)) & 15; y = (y + 1) & 15; } } };
 PAINT.hanging_roots = r => { for (const x0 of [3, 6, 9, 12]) { let x = x0; for (let y = 0; y < 10 + r.int(6); y++) { P(x, y, hex(0x9a7448)); if (r() < 0.25) x += r() < .5 ? -1 : 1; } } };
+// sculk sensor (1.17): dark teal with glowing cyan spots
+const SCULK = [hex(0x0b2f34), hex(0x0f3d44), hex(0x08262a)];
+PAINT.sculk_sensor_side = r => fill((x, y) => y < 8 ? (r() < 0.12 ? hex(0x1a8a96) : pal(r, SCULK)) : pal(r, SCULK));
+PAINT.sculk_sensor_top = r => fill((x, y) => { const d = Math.hypot(x - 7.5, y - 7.5); return d < 3 ? hex(0x2ad1d8) : d < 4.2 ? hex(0x137a84) : r() < 0.08 ? hex(0x1a8a96) : pal(r, SCULK); });
+PAINT.sculk_sensor_bottom = r => fill(() => pal(r, SCULK));
+PAINT.sculk_sensor_tendril = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x14646c) : null);
+PAINT.sculk_sensor_tendril_active = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x5af0f4) : null);
 PAINT.moss_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x5a7a2c), 1 + (nz(x, y) - .5) * .3 + (r() - .5) * .2), 3)); };
 PAINT.bricks = r => fill((x, y) => { if (y % 4 === 3) return gray(0x9c + r.int(10)); const off = (y >> 2) % 2 ? 4 : 0; if ((x + off) % 8 === 7) return gray(0xa0); return quant(shade(pal(r, [hex(0x965040), hex(0xa25a47), hex(0x8a4636)]), 1 + (r() - .5) * .1), 3); });
 PAINT.stone_bricks = r => { stoneLike(hex(0x7c7c7c), r, 0.18); for (let x = 0; x < 16; x++) { P(x, 7, gray(0x4a)); P(x, 15, gray(0x4a)); P(x, 0, gray(0x95)); P(x, 8, gray(0x95)); } for (let y = 0; y < 8; y++) { P(15, y, gray(0x4a)); P(0, y, gray(0x95)); } for (let y = 8; y < 16; y++) { P(7, y, gray(0x4a)); P(8, y, gray(0x95)); } };
@@ -478,6 +485,9 @@ Object.assign(SPR, {
   tropical_fish_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6]]) p(x, y, x === 7 ? hex(0xf4f4f4) : hex(0xf08a20)); }),
 });
 for (const c of S.COLORS) SPR[c + '_candle_item'] = () => candleSprite(CANDLE_COL[c]);
+const frameSprite = edge => sprite(p => { for (let y = 1; y < 15; y++) for (let x = 1; x < 15; x++) p(x, y, x < 3 || y < 3 || x > 12 || y > 12 ? edge : hex(0x8a5a2a)); });
+SPR.glow_berries = () => sprite(p => { line(p, 8, 1, 8, 5, hex(0x4a6a24)); for (const [cx, cy] of [[6, 8], [10, 8], [8, 12]]) { blob(p, cx, cy, 2.6, 2.6, [hex(0xffd060), hex(0xf8a028), hex(0xe07a10), hex(0x9a4a08)]); p(cx - 1, cy - 1, hex(0xfff0b0)); } });
+SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));
 function ingot(c) { return sprite(p => { const pts = []; for (let y = 5; y < 12; y++) { const pad = Math.max(0, 8 - y); for (let x = 2 + pad; x <= 13 - Math.max(0, y - 9); x++) pts.push([x, y]); } maskDraw(p, pts, c); }); }
 function apple(c) { return sprite(p => { blob(p, 8, 9, 5.5, 5, c); p(8, 3, hex(0x5a3a1a)); p(8, 4, hex(0x5a3a1a)); p(9, 3, hex(0x3a8a2a)); p(10, 2, hex(0x3a8a2a)); p(6, 7, hex(0xffffff)); }); }
 function meat(c) { return sprite(p => { const pts = []; for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) if (((x - 8) / 6) ** 2 + ((y - 7.5) / 4.5) ** 2 < 1 - ((x + y) % 4) * 0.04) pts.push([x, y]); maskDraw(p, pts, c); for (let i = 0; i < 4; i++) p(5 + i * 2, 6 + (i & 1), hex(0xf8f0e8)); }); }

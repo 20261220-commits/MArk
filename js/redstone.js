@@ -20,6 +20,7 @@ function strongPower(x, y, z) {
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
     else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
+    else if (b === BID.sculk_sensor && dy === 1) { const m = getMeta(nx, ny, nz); if ((m & 3) === 1) return m >> 4; } // an active sensor strongly powers the block it sits on
     else if (b === BID.chain) { const m = getMeta(nx, ny, nz); if (S.isRod(b, m) && (m & 128)) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } } // a struck lightning rod strongly powers what it stands on
   }
   return 0;
@@ -63,6 +64,7 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.observer: { if (!(m & 8)) return 0; const d = S.DIR6[m & 7]; return d[0] === -dx && d[1] === -dy && d[2] === -dz ? 15 : 0; }
     case BID.daylight_detector: case BID.target: return m & 15;
     case BID.chain: return S.isRod(b, m) && (m & 128) ? 15 : 0;
+    case BID.sculk_sensor: return (m & 3) === 1 ? m >> 4 : 0;
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -258,6 +260,8 @@ const compOut = (x, y, z) => { const t = getTile(x, y, z); return t && t.out || 
 function containerSignal(x, y, z) {
   const b = getBlock(x, y, z);
   if (b === BID.composter) return Math.min(15, (getMeta(x, y, z) & 15) * 2 - (getMeta(x, y, z) >= 8 ? 1 : 0));
+  if (b === BID.cauldron) return getMeta(x, y, z) & 3;
+  const fr = typeof frameAt === 'function' && frameAt(x, y, z); if (fr) return fr.item ? fr.rot + 1 : 0; // item frame: its rotation
   const t = getTile(x, y, z); if (!t || !t.items) return -1;
   let f = 0, any = false; for (const st of t.items) if (st) { f += st.n / maxStack(st.id); any = true; }
   return any ? Math.floor(1 + f / t.items.length * 14) : 0;

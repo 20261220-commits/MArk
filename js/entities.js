@@ -399,6 +399,7 @@ function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
 // ---------- explosions ----------
 function resistance(b) { const d = BLOCKS[b]; if (!d || d.hard < 0) return 3600000; if (FLUID[b]) return 100; if (b === BID.obsidian) return 1200; if (d.tool === S.TOOL.PICK) return Math.max(3, d.hard * 4); return d.hard * 1.5 + 0.1; }
 function explode(x, y, z, power, fire) {
+  vibrate(x, y, z);
   play('explode');
   const broken = new Map();
   for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) for (let k = 0; k < 16; k++) {
@@ -512,6 +513,7 @@ function mobTick(e) {
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
   mobExtraTick(e, dist);
@@ -663,7 +665,7 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) vibrate(nx, ny, nz); if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
@@ -750,6 +752,7 @@ R.onChunkUnloaded = c => {
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
     if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant }]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
+    else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
     if (e === PL.riding) continue;
     removeEnt(e);
   }
@@ -762,7 +765,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
 };
 
 // ---------- render update (interpolated) ----------

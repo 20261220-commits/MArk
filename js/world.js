@@ -147,6 +147,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (old !== id || oe !== ne) relight(x, y, z, old, id, oe, ne);
   markDirty(x, z);
   if ((old === BID.chain || id === BID.chain) && typeof rodTrack === 'function') rodTrack(x, y, z, S.isRod(id, meta));
+  if ((old === BID.sculk_sensor || id === BID.sculk_sensor) && typeof sensorTrack === 'function') sensorTrack(x, y, z, id === BID.sculk_sensor);
   if (W.onBlockChanged) W.onBlockChanged(x, y, z, old, id);
   if (!opts.noUpdate) {
     neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz);
@@ -491,7 +492,7 @@ function addChunk(cx, cz, d, tiles) {
   }
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
-  if (d.fromSave && typeof rodScan === 'function') rodScan(c);
+  if (d.fromSave && typeof rodScan === 'function') { rodScan(c); sensorScan(c); }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
 }
 function requestGen(cx, cz) {
@@ -603,7 +604,7 @@ async function loadChunk(cx, cz) {
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
   saveChunk(c, true);
-  if (typeof rodUnload === 'function') rodUnload(c);
+  if (typeof rodUnload === 'function') { rodUnload(c); sensorUnload(c); }
   W.chunks.delete(c.key); W.lastKey = -1;
 }
 // streaming: called every frame with player chunk position

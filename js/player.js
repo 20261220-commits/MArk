@@ -66,7 +66,7 @@ function raycast(reach, fluids) {
   // entities
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
-    const h = rayBox(ox, oy, oz, dx, dy, dz, [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
+    const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
     const lim = creative() ? 5 : 3;
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
@@ -230,7 +230,7 @@ function playerTick() {
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();
-  dripleafStep();
+  dripleafStep(); stepVibration();
   interactTick();
 }
 function survivalTick(inWater, inLava, eyeF) {
@@ -329,6 +329,7 @@ function attackEntity(e) {
 function breakBlock(x, y, z) {
   const id = getBlock(x, y, z), m = getMeta(x, y, z); if (!id || BLOCKS[id].hard < 0 && !creative()) return;
   if (BLOCKS[id].hard < 0) return;
+  vibrate(x + .5, y + .5, z + .5);
   const held = PL.held();
   play('break', { mat: soundMat(id) });
   R.blockParticles(x, y, z, id, 24, lightBright(x + .5, y + 1, z + .5), m);
@@ -466,6 +467,7 @@ function useItem(first) {
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (t && t.type === 'ent') {
     const e = t.e;
+    if (e.kind === 'frame') { frameUse(e, h); return; }
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
     if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
       removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
@@ -481,7 +483,8 @@ function useItem(first) {
     return;
   }
   if (t && t.type === 'block') {
-    if (first && interactBlock(t, false)) { swing(); return; }
+    if (first && interactBlock(t, false)) { swing(); vibrate(t.x + .5, t.y + .5, t.z + .5); return; }
+    if (d && (h.id === IID.item_frame || h.id === IID.glow_item_frame)) { placeFrame(t, h.id === IID.glow_item_frame); return; }
     if (first && lushUse(t, h, d)) return;
     const { x, y, z, id } = t;
     if (d) {
@@ -622,7 +625,7 @@ function placeBlock(t, d) {
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
-  consume(); play('place', { mat: soundMat(id) }); swing();
+  consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }
 function pickBlock() {
   const t = TARGET; if (!t || t.type !== 'block') return;
