@@ -338,6 +338,7 @@ function attackEntity(e) {
   if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
 }
 function breakBlock(x, y, z) {
+  { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
   const id = getBlock(x, y, z), m = getMeta(x, y, z); if (!id || BLOCKS[id].hard < 0 && !creative()) return;
   if (BLOCKS[id].hard < 0) return;
   vibrate(x + .5, y + .5, z + .5);
@@ -449,7 +450,7 @@ function interactBlock(t, dry) {
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
     case BID.grindstone: { const h = PL.held(); if (h && h.e) { if (!dry) { let xp = 0; for (const lv of Object.values(h.e)) xp += lv * 3; delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
-    case BID.chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
+    case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.iron_door: return false;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
     case BID.red_bed: if (!dry) trySleep(x, y, z); return true;

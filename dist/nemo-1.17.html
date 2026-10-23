@@ -1106,6 +1106,9 @@ const LOOT = {
   desert_pyramid: [['bone', 6], ['rotten_flesh', 7], ['gunpowder', 5], ['sand', 8], ['string', 8], ['spider_eye', 3], ['gold_ingot', 5], ['iron_ingot', 5], ['emerald', 3], ['diamond', 2], ['saddle', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1], ['iron_horse_armor', 1], ['golden_horse_armor', 1], ['diamond_horse_armor', 1]],
   jungle_temple: [['bone', 6], ['rotten_flesh', 7], ['gold_ingot', 5], ['iron_ingot', 5], ['emerald', 3], ['diamond', 2], ['saddle', 1], ['iron_horse_armor', 1], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['bamboo', 4]],
   mansion: [['lead', 2], ['gold_ingot', 4], ['bread', 4], ['wheat', 4], ['coal', 4], ['redstone', 4], ['beetroot_seeds', 4], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['iron_ingot', 4], ['bucket', 1], ['golden_apple', 1], ['diamond_hoe', 1], ['diamond_chestplate', 1], ['music_disc_13', 1], ['music_disc_cat', 1], ['name_tag', 1], ['chainmail_chestplate', 1], ['enchanted_golden_apple', 1]],
+  ruined_portal: [['obsidian', 2], ['flint', 4], ['iron_nugget', 9], ['flint_and_steel', 1], ['fire_charge', 1], ['golden_apple', 1], ['gold_nugget', 18], ['golden_sword', 1], ['golden_axe', 1], ['golden_hoe', 1], ['golden_shovel', 1], ['golden_pickaxe', 1], ['golden_boots', 1], ['golden_chestplate', 1], ['golden_helmet', 1], ['golden_leggings', 1], ['glistering_melon_slice', 6], ['golden_carrot', 6], ['gold_ingot', 6], ['clock', 1], ['bell', 1], ['enchanted_golden_apple', 1], ['gold_block', 1]],
+  bastion: [['gold_ingot', 6], ['gold_nugget', 12], ['crying_obsidian', 5], ['gilded_blackstone', 5], ['chain', 6], ['magma_cream', 6], ['golden_carrot', 9], ['cooked_porkchop', 5], ['crossbow', 1], ['arrow', 12], ['iron_nugget', 9], ['lodestone', 1], ['obsidian', 6], ['string', 6], ['leather', 3], ['golden_boots', 1], ['golden_sword', 1], ['netherite_scrap', 1], ['music_disc_pigstep', 1]],
+  bastion_treasure: [['netherite_ingot', 1], ['ancient_debris', 2], ['netherite_scrap', 2], ['diamond', 4], ['gold_block', 3], ['gold_ingot', 9], ['enchanted_golden_apple', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_helmet', 1], ['crying_obsidian', 6]],
   igloo: [['apple', 3], ['coal', 4], ['gold_nugget', 3], ['stone_axe', 1], ['rotten_flesh', 3], ['emerald', 1], ['wheat', 3]],
   ship_supply: [['paper', 8], ['potato', 6], ['carrot', 6], ['wheat', 10], ['coal', 6], ['rotten_flesh', 8], ['gunpowder', 5], ['pumpkin', 3], ['leather_helmet', 1], ['leather_boots', 1], ['tnt', 2], ['moss_block', 4], ['poisonous_potato', 4], ['experience_bottle', 0]],
   ship_map: [['paper', 8], ['compass', 1], ['feather', 5], ['book', 2], ['clock', 1], ['map', 1]],
@@ -1113,7 +1116,7 @@ const LOOT = {
   buried_treasure: [['iron_ingot', 4], ['gold_ingot', 4], ['tnt', 2], ['emerald', 6], ['diamond', 2], ['prismarine_crystals', 5], ['cooked_cod', 4], ['cooked_salmon', 4], ['leather_chestplate', 1], ['iron_sword', 1]],
   ruin_small: [['coal', 4], ['stone_axe', 1], ['rotten_flesh', 5], ['emerald', 1], ['wheat', 3], ['gold_nugget', 3], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1]],
   ruin_big: [['coal', 4], ['gold_ingot', 3], ['emerald', 2], ['golden_apple', 1], ['wheat', 4], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1], ['buried_treasure_map', 1]],
-  fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['music_disc_pigstep', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
+  fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
 function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
@@ -1672,6 +1675,71 @@ function stampMansions(seed, G, st, cx, cz, tiles) {
     }
   }
 }
+// ---------- ruined portals (overworld and Nether) and bastion remnants ----------
+const RPREG = 25, BREG = 27, RP_CACHE = new Map();
+function ruinedPortalAt(seed, G, rx, rz, nether) {
+  const key = seed + (nether ? 'n' : 'o') + rx + ',' + rz; if (RP_CACHE.has(key)) return RP_CACHE.get(key);
+  const { r, cx, cz } = regionPick(seed, rx, rz, nether ? 73 : 71, RPREG, 2); let out = null;
+  if (r() < 0.7) { const x = cx * 16 + 8, z = cz * 16 + 8; if (nether) out = { x, z, y: 32, seed: r.int(1 << 30), flat: r() < 0.3, f: r.int(2) }; else { const [h, b] = G.column(x, z); if (h > SEA - 1) out = { x, z, y: h + 1 - (r() < 0.3 ? 3 : 0), seed: r.int(1 << 30), flat: r() < 0.25, f: r.int(2), cold: BIOMES[b][4] < 0.3 }; } }
+  RP_CACHE.set(key, out); return out;
+}
+function bastionAt(seed, rx, rz) {
+  const key = seed + 'b' + rx + ',' + rz; if (RP_CACHE.has(key)) return RP_CACHE.get(key);
+  const { r, cx, cz } = regionPick(seed, rx, rz, 79, BREG, 4); let out = null;
+  if (r() < 0.6) { const x = cx * 16 + 8, z = cz * 16 + 8, nb = makeNoise(seed + 103); if (netherBiome(nb, x, z) !== NETHER_BIO.BASALT) out = { x, z, y: 32, seed: r.int(1 << 30) }; }
+  RP_CACHE.set(key, out); return out;
+}
+// obsidian frame (parts missing, some crying obsidian), netherrack and magma around it, a gold block and a chest
+function stampRuinedPortal(st, o, nether, tiles) {
+  const r = rng(o.seed), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), y0 = o.y;
+  const at = (u, v) => o.flat ? [o.x + u - 1, y0, o.z + v - 2] : o.f ? [o.x + u - 1, y0 + v, o.z] : [o.x, y0 + v, o.z + u - 1];
+  if (nether) for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) if (dx * dx + dz * dz <= 18) { st(o.x + dx, y0 - 1, o.z + dz, BID.blackstone); for (let y = y0; y <= y0 + 6; y++) st(o.x + dx, y, o.z + dz, 0); }
+  for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+    const k = hash32(o.seed, dx, dz, 1) % 100; if (dx * dx + dz * dz > 16 || k > 55) continue;
+    const by = nether ? y0 - 1 : y0 - 1; st(o.x + dx, by, o.z + dz, k < 8 ? BID.magma_block : k < 20 && !o.cold ? BID.blackstone : BID.netherrack); // magma, blackstone, netherrack
+  }
+  for (let u = 0; u < 4; u++) for (let v = 0; v < 5; v++) {
+    if (u > 0 && u < 3 && v > 0 && v < 4) continue; // the opening
+    const k = hash32(o.seed, u, v, 2) % 100; if (k < 28) continue; // missing pieces
+    const [x, y, z] = at(u, v); st(x, y, z, k < 40 ? BID.crying_obsidian : BID.obsidian);
+  }
+  st(o.x + 2, y0, o.z + 2, BID.gold_block);
+  const cx2 = o.x - 2, cz2 = o.z + 2; st(cx2, y0, cz2, 44, 2); if (st.get(cx2, y0, cz2) >= 0) tiles.push({ t: 'chest', i: tl(cx2, y0, cz2), loot: rollLoot(r, 'ruined_portal', 5) });
+}
+// bastion: blackstone walls around a four-storey keep, chests on every floor, the treasure at the top; piglins, brutes, hoglins
+function stampBastion(st, o, tiles) {
+  const r = rng(o.seed), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), y0 = o.y, BS = BID.blackstone, PBB = [200, 14], PB = [200, 13], GB = BID.gilded_blackstone, BA = BID.basalt;
+  const put = (dx, y, dz, id, m = 0) => st(o.x + dx, y, o.z + dz, id, m);
+  const brick = (dx, y, dz) => { const k = hash32(o.seed, dx * 31 + dz, y, 3) % 100; if (k < 4) put(dx, y, dz, GB); else if (k < 30) put(dx, y, dz, BS); else put(dx, y, dz, ...PBB); };
+  for (let dx = -18; dx <= 18; dx++) for (let dz = -18; dz <= 18; dz++) {
+    const d = Math.max(Math.abs(dx), Math.abs(dz));
+    for (let y = y0 - 5; y < y0; y++) put(dx, y, dz, BS); // foundation over the lava sea
+    for (let y = y0; y <= y0 + 26; y++) put(dx, y, dz, 0);
+    put(dx, y0, dz, ...(d % 4 === 0 ? PB : [BS, 0]));
+    if (d >= 17) for (let y = y0 + 1; y <= y0 + 16; y++) { const gate = Math.abs(dx) <= 1 && Math.abs(dz) >= 17 && y <= y0 + 4; if (!gate) brick(dx, y, dz); }
+    if (d === 18 && (dx + dz) % 2 === 0) brick(dx, y0 + 17, dz); // battlements
+    if (d <= 10) {
+      for (const fy of [y0 + 6, y0 + 12, y0 + 18]) if (d > 2) put(dx, fy, dz, ...PB); // floors around a central shaft
+      if (d === 10) for (let y = y0 + 1; y <= y0 + 23; y++) { const door = (dx === 0 || dz === 0) && (y - y0) % 6 >= 1 && (y - y0) % 6 <= 3; if (!door) brick(dx, y, dz); }
+      if (d === 10 && Math.abs(dx) === 10 && Math.abs(dz) === 10) for (let y = y0 + 1; y <= y0 + 24; y++) put(dx, y, dz, BA, 0);
+      if (d <= 10) put(dx, y0 + 24, dz, ...PB);
+    }
+  }
+  // lava in the courtyard corners, chains hanging in the shaft
+  for (const [dx, dz] of [[-14, -14], [14, 14]]) { put(dx, y0, dz, 28); }
+  for (let y = y0 + 8; y <= y0 + 22; y++) put(0, y, 0, BID.chain);
+  // chests on each floor, the treasure room on top: gold blocks and ancient debris
+  const chest = (dx, y, dz, loot, f = 0) => { put(dx, y, dz, 44, f); if (st.get(o.x + dx, y, o.z + dz) >= 0) tiles.push({ t: 'chest', i: tl(o.x + dx, y, o.z + dz), loot }); };
+  chest(-8, y0 + 1, -8, rollLoot(r, 'bastion', 5)); chest(8, y0 + 7, 8, rollLoot(r, 'bastion', 5), 2); chest(-8, y0 + 13, 8, rollLoot(r, 'bastion', 5), 1);
+  for (let dx = 4; dx <= 6; dx++) for (let dz = 4; dz <= 6; dz++) put(dx, y0 + 19, dz, (dx + dz) % 3 ? BID.gold_block : BID.ancient_debris);
+  chest(-5, y0 + 19, -5, rollLoot(r, 'bastion_treasure', 6), 0);
+  const mob = (dx, y, dz, m) => { if (st.get(o.x + dx, y, o.z + dz) >= 0) tiles.push({ t: 'mob', i: tl(o.x + dx, y, o.z + dz), mob: m }); };
+  [[-12, 1, -12, 'piglin'], [12, 1, -12, 'piglin'], [-12, 1, 12, 'piglin'], [5, 7, -5, 'piglin'], [-5, 13, 5, 'piglin'], [5, 1, 5, 'piglin_brute'], [-4, 7, -6, 'piglin_brute'], [3, 19, -3, 'piglin_brute'], [-14, 1, 0, 'hoglin'], [14, 1, 0, 'hoglin']].forEach(([dx, dy, dz, m]) => mob(dx, y0 + dy, dz, m));
+}
+function stampNetherRuins(seed, st, cx, cz, tiles) {
+  for (let rx = Math.floor((cx - 1) / RPREG); rx <= Math.floor((cx + 1) / RPREG); rx++) for (let rz = Math.floor((cz - 1) / RPREG); rz <= Math.floor((cz + 1) / RPREG); rz++) { const o = ruinedPortalAt(seed, null, rx, rz, true); if (o && st.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) stampRuinedPortal(st, o, true, tiles); }
+  for (let rx = Math.floor((cx - 2) / BREG); rx <= Math.floor((cx + 2) / BREG); rx++) for (let rz = Math.floor((cz - 2) / BREG); rz <= Math.floor((cz + 2) / BREG); rz++) { const o = bastionAt(seed, rx, rz); if (o && st.inside(o.x - 19, o.z - 19, o.x + 19, o.z + 19)) stampBastion(st, o, tiles); }
+}
 // ---------- the Nether ----------
 const NETHER_BIO = { WASTES: 13, CRIMSON: 14, WARPED: 15, SOUL: 16, BASALT: 17 };
 function netherBiome(nb, wx, wz) {
@@ -1806,6 +1874,7 @@ function genNether(seed, cx, cz) {
     if (!st.inside(f.x - reach, f.z - reach, f.x + reach, f.z + reach)) continue;
     stampFortress(f, st, rng(hash32(seed, a, b, 54)), tiles);
   }
+  stampNetherRuins(seed, st, cx, cz, tiles);
   fixConnections(blocks, meta);
   const light = new Uint8Array(CVOL);
   lightChunk(blocks, light, meta);
@@ -2203,6 +2272,7 @@ function genChunk(seed, cx, cz, dim) {
   stampOceanStructures(seed, G, makeStamp(blocks, meta, x0, z0), blocks, cx, cz, tiles);
   stampTemples(seed, G, makeStamp(blocks, meta, x0, z0), cx, cz, tiles);
   stampMansions(seed, G, makeStamp(blocks, meta, x0, z0), cx, cz, tiles);
+  { const st2 = makeStamp(blocks, meta, x0, z0); for (let rx = Math.floor((cx - 1) / RPREG); rx <= Math.floor((cx + 1) / RPREG); rx++) for (let rz = Math.floor((cz - 1) / RPREG); rz <= Math.floor((cz + 1) / RPREG); rz++) { const o = ruinedPortalAt(seed, G, rx, rz, false); if (o && st2.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) stampRuinedPortal(st2, o, false, tiles); } }
   // structures: villages on the surface, strongholds underground
   const stamp = makeStamp(blocks, meta, x0, z0);
   for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
@@ -10200,6 +10270,27 @@ Object.assign(MOBDEF, {
 { const prev = W.onBlockChanged; W.onBlockChanged = (x, y, z, old, id) => { if (prev) prev(x, y, z, old, id); if (old !== id && (old === BID.tripwire || isHook(old))) tripRefresh(x, y, z); }; }
 
 </script>
+<script>/* js/nether.js */
+// Bastion remnants' residents: piglin brutes (always hostile, golden axe) and piglins that turn on players who open
+// chests or break gold blocks in front of them, even when they wear gold.
+MCMODELS.piglin_brute = { ...MCMODELS.piglin };
+function bruteAI(e, dist) {
+  if (!e.target && plTargetable() && dist < 16 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.6, PL.z)) { e.target = PL; e.angry = true; }
+  piglinAI(e, dist);
+}
+function bruteGear(e) {
+  const P = e.mesh.userData.parts, arm = P.rarm || P.right_arm; if (!arm || P.heldItem) return;
+  const m = R.itemMesh(IID.golden_axe); m.scale.setScalar(0.6); m.position.set(0, -0.6, -0.15); m.rotation.set(-Math.PI / 2, 0, Math.PI / 4); arm.add(m); P.heldItem = m;
+}
+function piglinAnger(x, y, z) {
+  if (W.dim !== -1 || !plTargetable()) return;
+  for (const e of ENT) if ((e.type === 'piglin' || e.type === 'piglin_brute') && !e.dead && Math.hypot(e.x - x, e.y - y, e.z - z) < 16) { e.target = PL; e.angry = true; }
+}
+Object.assign(MOBDEF, {
+  piglin_brute: { ...MOBDEF.piglin, hp: 50, dmg: 13, xp: 20, neutral: 0, drops: [], extraDrop: [['golden_axe', 0.085]], ai: bruteAI, init: e => bruteGear(e) },
+});
+
+</script>
 <script>/* js/inventory.js */
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
@@ -10834,6 +10925,7 @@ function attackEntity(e) {
   if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
 }
 function breakBlock(x, y, z) {
+  { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
   const id = getBlock(x, y, z), m = getMeta(x, y, z); if (!id || BLOCKS[id].hard < 0 && !creative()) return;
   if (BLOCKS[id].hard < 0) return;
   vibrate(x + .5, y + .5, z + .5);
@@ -10945,7 +11037,7 @@ function interactBlock(t, dry) {
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
     case BID.grindstone: { const h = PL.held(); if (h && h.e) { if (!dry) { let xp = 0; for (const lv of Object.values(h.e)) xp += lv * 3; delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
-    case BID.chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
+    case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.iron_door: return false;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
     case BID.red_bed: if (!dry) trySleep(x, y, z); return true;
