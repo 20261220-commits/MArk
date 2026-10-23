@@ -669,7 +669,7 @@ function pickBlock() {
 function dropHeld(all) {
   const h = PL.held(); if (!h) return;
   const n = all ? h.n : 1; const [dx, dy, dz] = lookDir();
-  dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d);
+  dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d, h);
   h.n -= n; if (h.n <= 0) INV.slots[INV.sel] = null; swing(); UI.hudDirty = true;
 }
 // ---------- furnaces ----------

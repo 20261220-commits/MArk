@@ -34,7 +34,7 @@ function spawnFrame(ax, ay, az, f, opts = {}) {
   return addEnt(e);
 }
 function frameDropAll(e, keepFrame) {
-  if (e.item) dropItem(e.x, e.y, e.z, e.item.id, 1, null, 10, e.item.d);
+  if (e.item) dropStack(e.x, e.y, e.z, e.item);
   if (!keepFrame) dropItem(e.x, e.y, e.z, e.glow ? IID.glow_item_frame : IID.item_frame, 1);
 }
 function frameTick(e) {

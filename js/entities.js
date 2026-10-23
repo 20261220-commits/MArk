@@ -359,16 +359,17 @@ function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
-function dropItem(x, y, z, id, n, vel, delay = 10, dur) {
+// extra: the stack the item came from, so enchantments, names, banner patterns and the like survive being dropped
+function dropItem(x, y, z, id, n, vel, delay = 10, dur, extra) {
   if (!n || ITEMS[id] == null) return null;
-  const e = Ent('item', x, y, z); e.kind = 'item'; e.w = 0.125; e.h = 0.25; e.stack = { id, n }; if (dur != null) e.stack.d = dur;
+  const e = Ent('item', x, y, z); e.kind = 'item'; e.w = 0.125; e.h = 0.25; e.stack = extra ? { ...extra, id, n } : { id, n }; if (dur != null) e.stack.d = dur; else if (extra) delete e.stack.d;
   e.vx = vel ? vel[0] : (Math.random() - .5) * 0.2; e.vy = vel ? vel[1] : 0.2; e.vz = vel ? vel[2] : (Math.random() - .5) * 0.2;
   e.pickup = delay; e.spin = Math.random() * 6;
   const m = R.itemMesh(id); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
   if (n > 1) { const m2 = R.itemMesh(id); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
   return addEnt(e);
 }
-function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropItem(x, y, z, st.id, st.n, vel, delay, st.d); }
+function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropItem(x, y, z, st.id, st.n, vel, delay, st.d, st); }
 W.onDrop = (x, y, z, items, xp) => { for (const [id, n] of items) dropItem(x + 0.5, y + 0.3, z + 0.5, id, n); if (xp) spawnXP(x + .5, y + .5, z + .5, xp); };
 const xpMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.fillStyle = '#3a5a00'; g.fillRect(1, 1, 6, 6); g.fillStyle = '#c8ff3a'; g.fillRect(2, 2, 4, 4); g.fillStyle = '#ffff9a'; g.fillRect(2, 2, 2, 2); return c; })()), fog: true });
 xpMat.map.magFilter = THREE.NearestFilter;
@@ -632,7 +633,7 @@ function entityTick() {
       if (e.pickup > 0) e.pickup--;
       if (e.kind === 'item') {
         if (e.age > 6000) { removeEnt(e); continue; }
-        if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
+        if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && same(o.stack, e.stack) && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
         if (e.pickup <= 0 && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.3 && e.y > PL.y - 0.8 && e.y < PL.y + 2.3 && Math.abs(PL.z - e.z) < 1.3) {
           const left = INV.add(e.stack); if (left < e.stack.n) { play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
         }

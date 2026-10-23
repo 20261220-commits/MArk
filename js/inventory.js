@@ -1,17 +1,17 @@
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
-const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name;
+const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
-  if (!ITEMS[st.id].dur) for (const i of order) { const s = INV.slots[i]; if (s && s.id === st.id && !s.d && s.n < max) { const m = Math.min(n, max - s.n); s.n += m; n -= m; if (!n) break; } }
-  if (n) for (const i of order) if (!INV.slots[i]) { const m = Math.min(n, max); INV.slots[i] = { id: st.id, n: m }; if (st.d != null) INV.slots[i].d = st.d; n -= m; if (!n) break; }
+  if (!ITEMS[st.id].dur) for (const i of order) { const s = INV.slots[i]; if (s && same(s, st) && s.n < max) { const m = Math.min(n, max - s.n); s.n += m; n -= m; if (!n) break; } }
+  if (n) for (const i of order) if (!INV.slots[i]) { const m = Math.min(n, max); INV.slots[i] = { ...st, n: m }; n -= m; if (!n) break; } // keeps enchantments, names and other data
   UI.hudDirty = true; if (UI.screen) UI.renderScreen();
   return n;
 };
 INV.count = id => INV.slots.reduce((a, s) => a + (s && s.id === id ? s.n : 0), 0);
 INV.remove = function (id, n) { for (let i = 35; i >= 0 && n > 0; i--) { const s = INV.slots[i]; if (s && s.id === id) { const m = Math.min(n, s.n); s.n -= m; n -= m; if (!s.n) INV.slots[i] = null; } } UI.hudDirty = true; };
-INV.giveOrDrop = st => { const left = INV.add(st); if (left > 0) dropItem(PL.x, PL.y + 1.2, PL.z, st.id, left, null, 40, st.d); };
+INV.giveOrDrop = st => { const left = INV.add(st); if (left > 0) dropItem(PL.x, PL.y + 1.2, PL.z, st.id, left, null, 40, st.d, st); };
 
 // ---------- screens ----------
 const GUI = { slots: [], el: null, type: null, ctx: null, drag: null, hover: -1, lastClick: { t: 0, i: -1 }, creativeTab: 'all', search: '' };
