@@ -2361,6 +2361,8 @@ for (const [k, name, col, eff] of POTION_TYPES) {
   if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
 }
 item('nether_star', '네더의 별', { glint: 1 });
+item('shield', '방패', { stack: 1, dur: 336 }); item('crossbow', '쇠뇌', { stack: 1, dur: 465 }); item('tripwire_hook', '철사 덫 갈고리');
+item('trident', '삼지창', { stack: 1, dur: 250, tool: { type: TOOL.NONE, tier: 0, speed: 1, dmg: 9, as: 1.1, mat: 'trident', kind: 'trident' } });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
@@ -2383,15 +2385,17 @@ const maxStack = id => ITEMS[id] ? ITEMS[id].stack : 64;
 // ---------- enchantments ----------
 // key: [name, max level, applicable kinds]
 const ENCH = {
-  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow']],
+  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield']],
   fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel']],
   sharpness: ['날카로움', 5, ['sword', 'axe']], knockback: ['밀치기', 2, ['sword']], looting: ['약탈', 3, ['sword']],
   protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']],
-  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow'], 1] }; // 4th field: treasure (never from the enchanting table)
-const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity']];
+  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield'], 1],
+  quick_charge: ['빠른 장전', 3, ['crossbow']], multishot: ['다중 발사', 1, ['crossbow']], piercing: ['관통', 4, ['crossbow']],
+  loyalty: ['충성', 3, ['trident']], riptide: ['급류', 3, ['trident']], channeling: ['집전', 1, ['trident']], impaling: ['찌르기', 5, ['trident']] }; // 4th field: treasure (never from the enchanting table)
+const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity'], ['multishot', 'piercing'], ['riptide', 'loyalty'], ['riptide', 'channeling']];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
-function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
+function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
 function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) => ENCH[k][0] + (ENCH[k][1] > 1 ? ' ' + ROMAN[l] : '')) : []; }
 // Java-like roll: modified level -> weighted pick of applicable enchantments
 function rollEnchant(id, level, seed) {
@@ -2525,6 +2529,8 @@ for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
 shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
+shaped('shield', 1, ['WIW', 'WWW', ' W '], { W: 'planks', I: 'iron_ingot' }); shaped('tripwire_hook', 2, ['I', 'S', 'P'], { I: 'iron_ingot', S: 'stick', P: 'planks' });
+shaped('crossbow', 1, ['SIS', 'TJT', ' S '], { S: 'stick', I: 'iron_ingot', T: 'string', J: 'tripwire_hook' });
 shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' }); shaped('beacon', 1, ['GGG', 'GSG', 'OOO'], { G: 'glass', S: 'nether_star', O: 'obsidian' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
 shapeless('fermented_spider_eye', 1, ['spider_eye', 'brown_mushroom', 'sugar']); shaped('glistering_melon_slice', 1, ['NNN', 'NMN', 'NNN'], { N: 'gold_nugget', M: 'melon_slice' });
 for (const P of Object.values(POTION)) if (P.items.arrow && P.key !== 'water') shaped(P.key + '_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_' + P.key + '_potion' });
@@ -3333,6 +3339,10 @@ SPR.rabbit_foot = () => sprite(p => { blob(p, 8, 10, 3, 4, [hex(0xd8c8a8), hex(0
 SPR.pufferfish = () => sprite(p => { blob(p, 8, 8, 5, 5, [hex(0xf8e060), hex(0xe8c030), hex(0xb89020), hex(0x7a5a10)]); for (const [x, y] of [[8, 2], [3, 8], [13, 8], [8, 14], [4, 4], [12, 4], [4, 12], [12, 12]]) p(x, y, hex(0xf0f0e0)); p(6, 7, hex(0x101010)); p(10, 7, hex(0x101010)); });
 const frameSprite = edge => sprite(p => { for (let y = 1; y < 15; y++) for (let x = 1; x < 15; x++) p(x, y, x < 3 || y < 3 || x > 12 || y > 12 ? edge : hex(0x8a5a2a)); });
 SPR.glow_berries = () => sprite(p => { line(p, 8, 1, 8, 5, hex(0x4a6a24)); for (const [cx, cy] of [[6, 8], [10, 8], [8, 12]]) { blob(p, cx, cy, 2.6, 2.6, [hex(0xffd060), hex(0xf8a028), hex(0xe07a10), hex(0x9a4a08)]); p(cx - 1, cy - 1, hex(0xfff0b0)); } });
+SPR.shield = () => sprite(p => { for (let y = 2; y < 15; y++) for (let x = 3; x < 13; x++) { if (y > 11 && Math.abs(x - 7.5) > 15 - y) continue; const edge = x === 3 || x === 12 || y === 2 || (y > 10 && Math.abs(x - 7.5) > 14 - y); p(x, y, edge ? hex(0x8a8a8a) : (x + y) % 4 === 0 ? hex(0x7a5a30) : hex(0x9c7b47)); } line(p, 7, 3, 7, 13, hex(0x6a6a6a)); });
+SPR.crossbow = () => sprite(p => { line(p, 3, 12, 12, 3, hex(0x6b5433)); line(p, 4, 12, 13, 3, hex(0x8a6a3b)); for (let i = 0; i < 9; i++) { p(2 + i, 6 - Math.round(Math.sin(i / 8 * Math.PI) * 3) + 4 - i % 1, hex(0xb8b8b8)); } line(p, 2, 8, 8, 2, hex(0x9a9a9a)); line(p, 8, 14, 14, 8, hex(0x9a9a9a)); line(p, 2, 8, 8, 14, hex(0xdddddd)); });
+SPR.trident = () => sprite(p => { line(p, 2, 13, 11, 4, hex(0x3a8a7a)); line(p, 3, 13, 12, 4, hex(0x5ab8a0)); for (const [x, y] of [[11, 1], [12, 2], [13, 3], [14, 4], [9, 3], [10, 2], [13, 5], [12, 6], [14, 1], [11, 4]]) p(x, y, hex(0x8ae8d0)); });
+SPR.tripwire_hook = () => sprite(p => { for (let y = 3; y < 9; y++) for (let x = 6; x < 10; x++) p(x, y, x === 6 || y === 3 ? hex(0xc8c8c8) : hex(0x8a8a8a)); line(p, 8, 9, 8, 14, hex(0x8a6a3b)); line(p, 7, 9, 7, 14, hex(0x6b5433)); });
 SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));
 function ingot(c) { return sprite(p => { const pts = []; for (let y = 5; y < 12; y++) { const pad = Math.max(0, 8 - y); for (let x = 2 + pad; x <= 13 - Math.max(0, y - 9); x++) pts.push([x, y]); } maskDraw(p, pts, c); }); }
 function apple(c) { return sprite(p => { blob(p, 8, 9, 5.5, 5, c); p(8, 3, hex(0x5a3a1a)); p(8, 4, hex(0x5a3a1a)); p(9, 3, hex(0x3a8a2a)); p(10, 2, hex(0x3a8a2a)); p(6, 7, hex(0xffffff)); }); }
@@ -5033,7 +5043,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion'); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp); else if (e.kind === 'item' || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -5058,6 +5068,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5);
+  if (type === 'drowned' && Math.random() < 0.0625) e.hasTrident = true; // 6.25% carry a trident
   if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
@@ -5093,6 +5104,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
+      if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
       if (e.def.hostile) UI.advance('hunter');
     }
   }
@@ -5265,7 +5277,8 @@ function entityTick() {
   if (ENT.some(e => e.dead)) { for (let i = ENT.length - 1; i >= 0; i--) if (ENT[i].dead) ENT.splice(i, 1); }
 }
 function arrowTick(e) {
-  if (e.stuck) { if (e.age > 1200) removeEnt(e); else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
+  if (e.trident && tridentTick(e)) return;
+  if (e.stuck) { if (e.age > 1200 && !(e.trident && e.owner === PL)) removeEnt(e); else if (e.trident) {} else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
   const steps = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.25);
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
@@ -5274,19 +5287,23 @@ function arrowTick(e) {
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
-      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
-    for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
+    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125); removeEnt(e); return;
+      if (e.trident) { tridentHit(e, o); break; }
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
+      removeEnt(e); return;
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
   e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99;
   if (fluidAt(e.x, e.y, e.z)) { e.vx *= 0.6; e.vy *= 0.6; e.vz *= 0.6; }
-  if (e.age > 1200 || e.y < -20) removeEnt(e);
+  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < -20 && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
 function trySpawnHostile() {
@@ -6244,6 +6261,7 @@ function mobExtraTick(e, dist) {
   const d = e.def;
   if (d.waterHurt && (e.inWater || (W.dim === 0 && W.rain > 0.5 && e.age % 20 === 0 && (getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15))) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   if (d.villager) villagerAIExtra(e);
+  if (e.hasTrident) drownedTrident(e, dist);
   swimAssist(e);
 }
 // slimes and magma cubes split when they die
@@ -7372,6 +7390,104 @@ function beaconHtml() {
 }
 
 </script>
+<script>/* js/weapons.js */
+// Shield, crossbow and trident (Java Edition). There is no off hand, so the shield blocks while held in the
+// main hand with the use button down.
+
+// ---------- shield ----------
+const shieldUp = () => USE.kind === 'shield' && USE.t >= 5 && !(PL.shieldCd > 0); // 5 ticks to raise it
+// called by hurtPlayer: true when the hit came from the front and the shield took it
+function shieldBlocks(dmg, cause, attacker, from) {
+  if (!shieldUp() || (cause !== 'mob' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
+  const src = from || attacker; if (!src) return false;
+  const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
+  if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
+  if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
+  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 });
+  if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // axes knock the shield away for 5 s
+  return true;
+}
+
+// ---------- crossbow ----------
+const crossbowCharge = st => Math.max(0, 25 - 5 * enchLv(st, 'quick_charge'));
+function crossbowRelease(h) { // let go of the button: load if fully drawn
+  if (USE.t < crossbowCharge(h)) return;
+  const ai = arrowSlot(); if (ai < 0 && !creative()) return;
+  const ast = ai >= 0 ? INV.slots[ai] : { id: IID.arrow, n: 1 };
+  h.ch = ast.id; play('click', { pitch: 0.6 });
+  if (!creative()) { ast.n--; if (!ast.n) INV.slots[ai] = null; }
+  UI.hudDirty = true;
+}
+function crossbowFire(h) {
+  const [dx, dy, dz] = lookDir(), ms = enchLv(h, 'multishot'), pierce = enchLv(h, 'piercing'), d = ITEMS[h.ch];
+  const angles = ms ? [0, -0.17, 0.17] : [0];
+  for (const a of angles) {
+    const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
+    const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2);
+    if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
+    if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
+    if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
+    e.crossbow = true;
+  }
+  h.ch = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
+}
+
+// ---------- trident ----------
+const AQUATIC = new Set(['squid', 'glow_squid', 'cod', 'salmon', 'tropical_fish', 'axolotl', 'dolphin', 'turtle']);
+function tridentRelease(h) {
+  if (USE.t < 10) return;
+  const rip = enchLv(h, 'riptide');
+  if (rip) { // only works in water or rain: launches the player instead of the trident
+    const wet = PL.inWater || (W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15);
+    if (!wet) return;
+    const [dx, dy, dz] = lookDir(), v = 3 * (1 + rip) / 4;
+    PL.vx = dx * v; PL.vy = dy * v + (PL.onGround ? 0.4 : 0); PL.vz = dz * v; PL.fallDist = 0; PL.riptideT = 20;
+    damageItem(INV.slots, INV.sel, 1); play('splash'); return;
+  }
+  const [dx, dy, dz] = lookDir();
+  const e = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * 2.5, dy * 2.5, dz * 2.5, PL, 0);
+  e.trident = { ...h, n: 1 }; e.slot = INV.sel; scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh);
+  if (!creative()) { INV.slots[INV.sel] = null; damageItem([e.trident], 0, 1); } play('bow');
+  UI.hudDirty = true;
+}
+// hit by a thrown trident: 8 damage, impaling vs water mobs, channeling calls lightning in a thunderstorm
+function tridentHit(e, o) {
+  const st = e.trident;
+  let dmg = 8; if (st && AQUATIC.has(o.type)) dmg += 2.5 * enchLv(st, 'impaling');
+  if (o === PL) { if (!creative()) hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e); }
+  else hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null);
+  if (st && enchLv(st, 'channeling') && W.thunder > 0.5 && W.dim === 0 && (getLight(Math.floor(o.x), Math.floor(o.y + 1), Math.floor(o.z)) >> 4) === 15) strikeLightning(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z), false);
+  e.vx *= -0.1; e.vy = 0.1; e.vz *= -0.1; e.hitDone = true;
+}
+// every tick for thrown tridents: loyalty brings it back, otherwise it lies where it landed until picked up
+function tridentTick(e) {
+  const st = e.trident; if (!st) return false;
+  const loyal = st && e.owner === PL ? enchLv(st, 'loyalty') : 0;
+  if ((e.stuck || e.hitDone || e.y < -10) && loyal) {
+    const dx = PL.x - e.x, dy = PL.y + 1.2 - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz) || 1, sp = 0.05 * loyal + 0.3;
+    e.stuck = false; e.x += dx / d * sp; e.y += dy / d * sp; e.z += dz / d * sp; e.vx = e.vy = e.vz = 0;
+    if (d < 1.2) { tridentPickup(e); }
+    return true;
+  }
+  if (e.stuck && e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) tridentPickup(e);
+  return false;
+}
+function tridentPickup(e) {
+  removeEnt(e); if (creative()) return;
+  const st = e.trident; if (!INV.slots[e.slot]) INV.slots[e.slot] = st; else if (INV.add(st)) dropStack(PL.x, PL.y + 1, PL.z, st);
+  play('pop', { vol: 0.5 }); UI.hudDirty = true;
+}
+// drowned: some carry a trident and throw it from range
+function drownedTrident(e, dist) {
+  if (!e.hasTrident || !e.target || dist > 15 || dist < 3 || e.attackCd > 0 || !e.inWater && Math.random() < 0.5) return;
+  if (!canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z)) return;
+  e.attackCd = 40;
+  const dx = PL.x - e.x, dy = PL.y + 1.2 - (e.y + 1.6), dz = PL.z - e.z, d = Math.hypot(dx, dy, dz) || 1;
+  const t = shootArrow(e.x, e.y + 1.6, e.z, dx / d * 1.6, dy / d * 1.6 + 0.08, dz / d * 1.6, e, 0);
+  t.trident = { id: IID.trident, n: 1 }; t.noPickup = true; scene.remove(t.mesh); t.mesh = R.itemMesh(IID.trident); t.mesh.scale.setScalar(0.8); scene.add(t.mesh);
+}
+
+</script>
 <script>/* js/inventory.js */
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
@@ -7408,7 +7524,7 @@ function buildSlots(type, ctx) {
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
   } else if (type === 'enchant') {
     ctx.items = ctx.items || [null, null];
-    L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e), max: 1 }));
+    L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e && st.id !== IID.shield), max: 1 }));
     L.push(slotRef(ctx.items, 1, { group: 'elapis', accepts: st => !st || st.id === IID.lapis_lazuli }));
   } else if (type === 'anvil') {
     ctx.items = ctx.items || [null, null]; ctx.name = ctx.name || '';
@@ -7731,11 +7847,12 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
-function hurtPlayer(dmg, cause, attacker) {
+function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
@@ -7813,7 +7930,8 @@ function playerTick() {
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
-  const using = USE.kind === 'eat' || USE.kind === 'bow';
+  const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
+  if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
   if (PL.sneaking) { f *= 0.3; s *= 0.3; }
   if (using) { f *= 0.2; s *= 0.2; }
@@ -7958,6 +8076,8 @@ function interactTick() {
       if (USE.t % 4 === 0 && USE.t > 8) { play('eat', { vol: 0.5 }); const h = PL.held(); if (h) for (let i = 0; i < 3; i++) R.simpleParticle(PL.x - Math.sin(PL.yaw) * .4, PL.y + 1.4, PL.z - Math.cos(PL.yaw) * .4, [0.8, 0.6, 0.4], { size: 0.06, vy: 1, life: 0.4 }); }
       if (USE.t >= 32) finishEat();
     } else if (USE.kind === 'bow') { USE.t++; R.hand.bow = Math.min(1, USE.t / 20); }
+    else if (USE.kind === 'shield' || USE.kind === 'trident') USE.t++;
+    else if (USE.kind === 'crossbow') { USE.t++; R.hand.bow = Math.min(1, USE.t / Math.max(1, crossbowCharge(PL.held()))); if (USE.t === crossbowCharge(PL.held())) play('click', { pitch: 1.4 }); }
     else if (USE.kind === 'spy') { R.hand.spy = true; }
     else if (USE.kind === 'place' && USE.placeCd <= 0) { useItem(false); }
   }
@@ -8037,6 +8157,9 @@ function onUsePress() {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
   if (d && h.id === IID.bow) { if (creative() || arrowSlot() >= 0) { USE.kind = 'bow'; USE.t = 0; } return; }
+  if (d && h.id === IID.shield) { if (!(PL.shieldCd > 0)) { USE.kind = 'shield'; USE.t = 0; } return; }
+  if (d && h.id === IID.crossbow) { if (h.ch) crossbowFire(h); else if (creative() || arrowSlot() >= 0) { USE.kind = 'crossbow'; USE.t = 0; } return; }
+  if (d && h.id === IID.trident) { USE.kind = 'trident'; USE.t = 0; return; }
   if (d && h.id === IID.spyglass) { USE.kind = 'spy'; UI.advance('spyglass'); return; }
   USE.kind = 'place';
   useItem(true);
@@ -8053,6 +8176,8 @@ function onUseRelease() {
       if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }
+  if (USE.kind === 'crossbow' && PL.held() && PL.held().id === IID.crossbow) crossbowRelease(PL.held());
+  if (USE.kind === 'trident' && PL.held() && PL.held().id === IID.trident) tridentRelease(PL.held());
   if (USE.kind === 'eat') R.hand.eat = 0;
   USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0;
 }
@@ -8566,7 +8691,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();

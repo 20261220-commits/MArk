@@ -429,7 +429,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion'); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp); else if (e.kind === 'item' || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -454,6 +454,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5);
+  if (type === 'drowned' && Math.random() < 0.0625) e.hasTrident = true; // 6.25% carry a trident
   if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
@@ -489,6 +490,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
+      if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
       if (e.def.hostile) UI.advance('hunter');
     }
   }
@@ -661,7 +663,8 @@ function entityTick() {
   if (ENT.some(e => e.dead)) { for (let i = ENT.length - 1; i >= 0; i--) if (ENT[i].dead) ENT.splice(i, 1); }
 }
 function arrowTick(e) {
-  if (e.stuck) { if (e.age > 1200) removeEnt(e); else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
+  if (e.trident && tridentTick(e)) return;
+  if (e.stuck) { if (e.age > 1200 && !(e.trident && e.owner === PL)) removeEnt(e); else if (e.trident) {} else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
   const steps = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.25);
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
@@ -670,19 +673,23 @@ function arrowTick(e) {
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
-      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
-    for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
+    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125); removeEnt(e); return;
+      if (e.trident) { tridentHit(e, o); break; }
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
+      removeEnt(e); return;
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
   e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99;
   if (fluidAt(e.x, e.y, e.z)) { e.vx *= 0.6; e.vy *= 0.6; e.vz *= 0.6; }
-  if (e.age > 1200 || e.y < -20) removeEnt(e);
+  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < -20 && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
 function trySpawnHostile() {

@@ -75,11 +75,12 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
-function hurtPlayer(dmg, cause, attacker) {
+function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
@@ -157,7 +158,8 @@ function playerTick() {
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
-  const using = USE.kind === 'eat' || USE.kind === 'bow';
+  const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
+  if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
   if (PL.sneaking) { f *= 0.3; s *= 0.3; }
   if (using) { f *= 0.2; s *= 0.2; }
@@ -302,6 +304,8 @@ function interactTick() {
       if (USE.t % 4 === 0 && USE.t > 8) { play('eat', { vol: 0.5 }); const h = PL.held(); if (h) for (let i = 0; i < 3; i++) R.simpleParticle(PL.x - Math.sin(PL.yaw) * .4, PL.y + 1.4, PL.z - Math.cos(PL.yaw) * .4, [0.8, 0.6, 0.4], { size: 0.06, vy: 1, life: 0.4 }); }
       if (USE.t >= 32) finishEat();
     } else if (USE.kind === 'bow') { USE.t++; R.hand.bow = Math.min(1, USE.t / 20); }
+    else if (USE.kind === 'shield' || USE.kind === 'trident') USE.t++;
+    else if (USE.kind === 'crossbow') { USE.t++; R.hand.bow = Math.min(1, USE.t / Math.max(1, crossbowCharge(PL.held()))); if (USE.t === crossbowCharge(PL.held())) play('click', { pitch: 1.4 }); }
     else if (USE.kind === 'spy') { R.hand.spy = true; }
     else if (USE.kind === 'place' && USE.placeCd <= 0) { useItem(false); }
   }
@@ -381,6 +385,9 @@ function onUsePress() {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
   if (d && h.id === IID.bow) { if (creative() || arrowSlot() >= 0) { USE.kind = 'bow'; USE.t = 0; } return; }
+  if (d && h.id === IID.shield) { if (!(PL.shieldCd > 0)) { USE.kind = 'shield'; USE.t = 0; } return; }
+  if (d && h.id === IID.crossbow) { if (h.ch) crossbowFire(h); else if (creative() || arrowSlot() >= 0) { USE.kind = 'crossbow'; USE.t = 0; } return; }
+  if (d && h.id === IID.trident) { USE.kind = 'trident'; USE.t = 0; return; }
   if (d && h.id === IID.spyglass) { USE.kind = 'spy'; UI.advance('spyglass'); return; }
   USE.kind = 'place';
   useItem(true);
@@ -397,6 +404,8 @@ function onUseRelease() {
       if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }
+  if (USE.kind === 'crossbow' && PL.held() && PL.held().id === IID.crossbow) crossbowRelease(PL.held());
+  if (USE.kind === 'trident' && PL.held() && PL.held().id === IID.trident) tridentRelease(PL.held());
   if (USE.kind === 'eat') R.hand.eat = 0;
   USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0;
 }

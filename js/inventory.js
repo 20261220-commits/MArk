@@ -33,7 +33,7 @@ function buildSlots(type, ctx) {
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
   } else if (type === 'enchant') {
     ctx.items = ctx.items || [null, null];
-    L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e), max: 1 }));
+    L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e && st.id !== IID.shield), max: 1 }));
     L.push(slotRef(ctx.items, 1, { group: 'elapis', accepts: st => !st || st.id === IID.lapis_lazuli }));
   } else if (type === 'anvil') {
     ctx.items = ctx.items || [null, null]; ctx.name = ctx.name || '';

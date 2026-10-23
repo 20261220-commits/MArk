@@ -162,6 +162,8 @@ for (const [k, name, col, eff] of POTION_TYPES) {
   if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
 }
 item('nether_star', '네더의 별', { glint: 1 });
+item('shield', '방패', { stack: 1, dur: 336 }); item('crossbow', '쇠뇌', { stack: 1, dur: 465 }); item('tripwire_hook', '철사 덫 갈고리');
+item('trident', '삼지창', { stack: 1, dur: 250, tool: { type: TOOL.NONE, tier: 0, speed: 1, dmg: 9, as: 1.1, mat: 'trident', kind: 'trident' } });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
@@ -184,15 +186,17 @@ const maxStack = id => ITEMS[id] ? ITEMS[id].stack : 64;
 // ---------- enchantments ----------
 // key: [name, max level, applicable kinds]
 const ENCH = {
-  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow']],
+  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield']],
   fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel']],
   sharpness: ['날카로움', 5, ['sword', 'axe']], knockback: ['밀치기', 2, ['sword']], looting: ['약탈', 3, ['sword']],
   protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']],
-  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow'], 1] }; // 4th field: treasure (never from the enchanting table)
-const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity']];
+  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield'], 1],
+  quick_charge: ['빠른 장전', 3, ['crossbow']], multishot: ['다중 발사', 1, ['crossbow']], piercing: ['관통', 4, ['crossbow']],
+  loyalty: ['충성', 3, ['trident']], riptide: ['급류', 3, ['trident']], channeling: ['집전', 1, ['trident']], impaling: ['찌르기', 5, ['trident']] }; // 4th field: treasure (never from the enchanting table)
+const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity'], ['multishot', 'piercing'], ['riptide', 'loyalty'], ['riptide', 'channeling']];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
-function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
+function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
 function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) => ENCH[k][0] + (ENCH[k][1] > 1 ? ' ' + ROMAN[l] : '')) : []; }
 // Java-like roll: modified level -> weighted pick of applicable enchantments
 function rollEnchant(id, level, seed) {
@@ -326,6 +330,8 @@ for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
 shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
+shaped('shield', 1, ['WIW', 'WWW', ' W '], { W: 'planks', I: 'iron_ingot' }); shaped('tripwire_hook', 2, ['I', 'S', 'P'], { I: 'iron_ingot', S: 'stick', P: 'planks' });
+shaped('crossbow', 1, ['SIS', 'TJT', ' S '], { S: 'stick', I: 'iron_ingot', T: 'string', J: 'tripwire_hook' });
 shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' }); shaped('beacon', 1, ['GGG', 'GSG', 'OOO'], { G: 'glass', S: 'nether_star', O: 'obsidian' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
 shapeless('fermented_spider_eye', 1, ['spider_eye', 'brown_mushroom', 'sugar']); shaped('glistering_melon_slice', 1, ['NNN', 'NMN', 'NNN'], { N: 'gold_nugget', M: 'melon_slice' });
 for (const P of Object.values(POTION)) if (P.items.arrow && P.key !== 'water') shaped(P.key + '_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_' + P.key + '_potion' });
