@@ -281,7 +281,8 @@ function dispense(x, y, z, b, m) {
   const cx = fx + .5, cy = fy + .5, cz = fz + .5;
   if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { id, n: 1, d: st.d, e: st.e })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
   const fb = getBlock(fx, fy, fz);
-  if (id === IID.arrow) { shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 2); take(); }
+  if (isArrow(id)) { const a = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 2); if (ITEMS[id].tipped != null) { a.potion = ITEMS[id].tipped; a.item = id; } take(); }
+  else if (ITEMS[id].splash || ITEMS[id].lingering) { const e = shootArrow(cx, cy, cz, d[0] * 0.6, d[1] * 0.6 + 0.1, d[2] * 0.6, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
   else if (id === IID.fire_charge) { spawnFireball(cx, cy, cz, d[0], d[1], d[2], null, true); take(); }
   else if (id === IID.snowball || id === IID.egg) { const e = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
   else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); t.items[i] = { id: IID.bucket, n: 1 }; }

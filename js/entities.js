@@ -661,7 +661,7 @@ function entityTick() {
   if (ENT.some(e => e.dead)) { for (let i = ENT.length - 1; i >= 0; i--) if (ENT[i].dead) ENT.splice(i, 1); }
 }
 function arrowTick(e) {
-  if (e.stuck) { if (e.age > 1200) removeEnt(e); else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (PL.mode === 'creative' || INV.add({ id: IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
+  if (e.stuck) { if (e.age > 1200) removeEnt(e); else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
   const steps = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.25);
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
@@ -670,13 +670,13 @@ function arrowTick(e) {
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
-      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner) && e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
-      hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); removeEnt(e); return;
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125); removeEnt(e); return;
     }
     e.x = nx; e.y = ny; e.z = nz;
   }

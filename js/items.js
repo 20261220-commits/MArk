@@ -22,7 +22,8 @@ BLOCKS[BID.red_bed].name = '침대';
 ITEMS[BID.tnt].fuel = 0;
 
 let nextId = 256;
-function item(key, name, o = {}) { const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
+// plain items skip the block id range NEWB..NB-1 (block items use their block's id)
+function item(key, name, o = {}) { if (nextId === S.NEWB) nextId = S.NB; const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
 // one item per variant of colour/material blocks (variant 0 lives at the block id)
 const VARITEM = new Int32Array(S.NB * 16).fill(-1);
 for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late && b.id < S.NEWB) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
@@ -125,6 +126,41 @@ Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[I
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
 item('glow_berries', '발광 열매', { food: [2, 0.4] });
 item('enchanted_golden_apple', '마법이 부여된 황금 사과', { food: [4, 9.6], always: 1, glint: 1, sprite: 'golden_apple', eff: [['regeneration', 400, 1], ['absorption', 2400, 3], ['resistance', 6000, 0], ['fire_resistance', 6000, 0]] });
+// ---- brewing (pre-1.17 features that were missing) ----
+item('glass_bottle', '유리병'); item('fermented_spider_eye', '발효된 거미 눈'); item('glistering_melon_slice', '반짝이는 수박 조각');
+item('dragon_breath', '드래곤의 숨결'); item('rabbit_foot', '토끼발'); item('pufferfish', '복어', { food: [1, 0.2], eff: [['hunger', 300, 2], ['nausea', 300, 0], ['poison', 1200, 1]] });
+// potion types: [key, name, colour, effects [effect, ticks, level]]; long_/strong_ variants brew from the base with redstone / glowstone
+const POTION_TYPES = [
+  ['water', '물병', 0x385dc6, []], ['mundane', '평범한 물약', 0x385dc6, []], ['thick', '진한 물약', 0x385dc6, []], ['awkward', '이상한 물약', 0x385dc6, []],
+  ['night_vision', '야간 투시의 물약', 0x1f1fa1, [['night_vision', 3600]]], ['long_night_vision', '야간 투시의 물약', 0x1f1fa1, [['night_vision', 9600]]],
+  ['invisibility', '투명화의 물약', 0x7f8392, [['invisibility', 3600]]], ['long_invisibility', '투명화의 물약', 0x7f8392, [['invisibility', 9600]]],
+  ['leaping', '도약의 물약', 0x22ff4c, [['jump_boost', 3600]]], ['long_leaping', '도약의 물약', 0x22ff4c, [['jump_boost', 9600]]], ['strong_leaping', '도약의 물약', 0x22ff4c, [['jump_boost', 1800, 1]]],
+  ['fire_resistance', '화염 저항의 물약', 0xe49a3a, [['fire_resistance', 3600]]], ['long_fire_resistance', '화염 저항의 물약', 0xe49a3a, [['fire_resistance', 9600]]],
+  ['swiftness', '신속의 물약', 0x7cafc6, [['speed', 3600]]], ['long_swiftness', '신속의 물약', 0x7cafc6, [['speed', 9600]]], ['strong_swiftness', '신속의 물약', 0x7cafc6, [['speed', 1800, 1]]],
+  ['slowness', '감속의 물약', 0x5a6c81, [['slowness', 1800]]], ['long_slowness', '감속의 물약', 0x5a6c81, [['slowness', 4800]]], ['strong_slowness', '감속의 물약', 0x5a6c81, [['slowness', 400, 3]]],
+  ['turtle_master', '거북 도사의 물약', 0x755a8e, [['slowness', 400, 3], ['resistance', 400, 2]]], ['long_turtle_master', '거북 도사의 물약', 0x755a8e, [['slowness', 800, 3], ['resistance', 800, 2]]],
+  ['strong_turtle_master', '거북 도사의 물약', 0x755a8e, [['slowness', 400, 5], ['resistance', 400, 3]]],
+  ['water_breathing', '수중 호흡의 물약', 0x2e5299, [['water_breathing', 3600]]], ['long_water_breathing', '수중 호흡의 물약', 0x2e5299, [['water_breathing', 9600]]],
+  ['healing', '치유의 물약', 0xf82423, [['instant_health', 1]]], ['strong_healing', '치유의 물약', 0xf82423, [['instant_health', 1, 1]]],
+  ['harming', '고통의 물약', 0x430a09, [['instant_damage', 1]]], ['strong_harming', '고통의 물약', 0x430a09, [['instant_damage', 1, 1]]],
+  ['poison', '독 물약', 0x4e9331, [['poison', 900]]], ['long_poison', '독 물약', 0x4e9331, [['poison', 1800]]], ['strong_poison', '독 물약', 0x4e9331, [['poison', 432, 1]]],
+  ['regeneration', '재생의 물약', 0xcd5cab, [['regeneration', 900]]], ['long_regeneration', '재생의 물약', 0xcd5cab, [['regeneration', 1800]]], ['strong_regeneration', '재생의 물약', 0xcd5cab, [['regeneration', 450, 1]]],
+  ['strength', '힘의 물약', 0x932423, [['strength', 3600]]], ['long_strength', '힘의 물약', 0x932423, [['strength', 9600]]], ['strong_strength', '힘의 물약', 0x932423, [['strength', 1800, 1]]],
+  ['weakness', '나약함의 물약', 0x484d48, [['weakness', 1800]]], ['long_weakness', '나약함의 물약', 0x484d48, [['weakness', 4800]]],
+  ['slow_falling', '느린 낙하의 물약', 0xf7f8e0, [['slow_falling', 1800]]], ['long_slow_falling', '느린 낙하의 물약', 0xf7f8e0, [['slow_falling', 4800]]],
+];
+const POTION = {}; // type key -> { name, col, eff, items: { potion, splash, lingering, arrow } }
+const effText = (eff, mul) => eff.map(([k, t, lv = 0]) => EFF_NAMES[k] + (lv ? ' ' + ['', 'II', 'III', 'IV', 'V', 'VI'][lv] : '') + (t > 1 ? ` (${Math.floor(t * mul / 1200)}:${String(Math.floor(t * mul / 20) % 60).padStart(2, '0')})` : ''));
+const EFF_NAMES = { night_vision: '야간 투시', invisibility: '투명화', jump_boost: '점프 강화', fire_resistance: '화염 저항', speed: '신속', slowness: '구속', resistance: '저항', water_breathing: '수중 호흡',
+  instant_health: '즉시 회복', instant_damage: '즉시 피해', poison: '독', regeneration: '재생', strength: '힘', weakness: '나약함', slow_falling: '느린 낙하' };
+for (const [k, name, col, eff] of POTION_TYPES) {
+  const P = POTION[k] = { key: k, name, col, eff, items: {} }, lore = eff.length ? effText(eff, 1) : ['효과 없음'];
+  const stem = k === 'water' ? '물병' : name;
+  P.items.potion = item(k + '_potion', stem, { stack: 1, drink: 1, potion: k, pcol: col, form: 0, lore });
+  P.items.splash = item('splash_' + k + '_potion', '투척용 ' + stem, { stack: 1, splash: 1, potion: k, pcol: col, form: 1, lore });
+  P.items.lingering = item('lingering_' + k + '_potion', '잔류형 ' + stem, { stack: 1, lingering: 1, potion: k, pcol: col, form: 2, lore: eff.length ? effText(eff, 0.25) : lore });
+  if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
+}
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
@@ -288,7 +324,11 @@ shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
 for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
-shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' }); shapeless('glow_item_frame', 1, ['item_frame', 'glow_ink_sac']);
+shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
+shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
+shapeless('fermented_spider_eye', 1, ['spider_eye', 'brown_mushroom', 'sugar']); shaped('glistering_melon_slice', 1, ['NNN', 'NMN', 'NNN'], { N: 'gold_nugget', M: 'melon_slice' });
+for (const P of Object.values(POTION)) if (P.items.arrow && P.key !== 'water') shaped(P.key + '_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_' + P.key + '_potion' });
+shaped('water_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_water_potion' }); shapeless('glow_item_frame', 1, ['item_frame', 'glow_ink_sac']);
 // cut copper of every oxidation stage, its slabs and stairs, waxed or not
 for (const [full, cut] of [['copper_block', 'cut_copper'], ['exposed_copper', 'exposed_cut_copper'], ['weathered_copper', 'weathered_cut_copper'], ['oxidized_copper', 'oxidized_cut_copper']]) for (const w of ['', 'waxed_']) {
   if (cut !== 'cut_copper' || w) shaped(w + cut, 4, ['##', '##'], { '#': w + full });

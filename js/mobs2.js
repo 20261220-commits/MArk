@@ -127,6 +127,9 @@ function fireballTick(e) {
 function spinRender(e, x, y, z, br, now) { e.mesh.position.set(x, y + e.h / 2, z); e.mesh.rotation.set(0, now / 200, now / 300); e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
 // thrown items: snowballs, eggs and ender pearls break on impact; eyes of ender fly toward a stronghold
 function onThrownHit(e, x, y, z, hitMob) {
+  const td = ITEMS[e.thrown];
+  if (td && td.splash) { splashPotion(e.thrown, x, y, z, hitMob); return; }
+  if (td && td.lingering) { play('break', { mat: 'glass' }); potionBurst(x, y, z, POTION[td.potion].col); spawnCloud(x, Math.floor(y) + 0.05, z, td.potion); return; }
   if (e.thrown === IID.ender_pearl && Math.random() < 0.05) spawnMob('endermite', x, y, z);
   if (e.thrown === IID.ender_pearl && e.owner === PL && !PL.dead) {
     for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.5, grav: 0 });
@@ -393,6 +396,7 @@ function dragonAI(e) {
     case 'perch':
       tx = e.x; ty = C[1] + 4; tz = e.z; sp = 0;
       if (plTargetable()) { faceTo(e, PL.x, PL.z); const d = Math.hypot(PL.x - e.x, PL.z - e.z); if (d < 9 && Math.abs(PL.y - e.y) < 6 && e.age % 30 === 0) { attackPlayer(e, 10, (PL.x - e.x) / d, (PL.z - e.z) / d); e.bite = 10; } }
+      if (e.phaseT === 70 || e.phaseT === 170) { const a = Math.atan2(PL.z - e.z, PL.x - e.x); spawnCloud(e.x + Math.cos(a) * 5, C[1] + 1.05, e.z + Math.sin(a) * 5, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 400 }); play('fireball', { vol: 0.6 }); } // dragon's breath
       if (e.phaseT > 260) { e.phase = 'takeoff'; e.phaseT = 0; }
       break;
     case 'takeoff': tx = e.x + Math.cos(e.ang) * 30; ty = 90; tz = e.z + Math.sin(e.ang) * 30; sp = 0.3; if (e.y > 82) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); } break;

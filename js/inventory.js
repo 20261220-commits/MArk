@@ -49,6 +49,11 @@ function buildSlots(type, ctx) {
     ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
     L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
+  } else if (type === 'brewing') {
+    const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
+    for (let k = 0; k < 3; k++) L.push(slotRef(t.items, k, { group: 'bbottle', accepts: isBottle, max: 1 }));
+    L.push(slotRef(t.items, 3, { group: 'bing', accepts: st => !st || BREW_ING.has(ITEMS[st.id].key) }));
+    L.push(slotRef(t.items, 4, { group: 'bfuel', accepts: st => !st || st.id === IID.blaze_powder }));
   } else if (type === 'furnace') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     L.push(slotRef(t.items, 0, { group: 'fin' }));
@@ -101,6 +106,7 @@ function quickMove(i) {
     const d = ITEMS[st.id];
     if (T === 'chest' || T === 'hopper' || T === 'dispenser') targets = idx(s => s.group === 'cont');
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
+    else if (T === 'brewing') targets = idx(s => s.accepts(st) && (s.group === 'bbottle' ? d.potion != null || st.id === IID.glass_bottle : s.group === 'bfuel' ? !GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64 : !(st.id === IID.blaze_powder && (!GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64))));
     else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
     else if (T === 'anvil') targets = idx(s => s.group === (GUI.ctx.items[0] ? 'a1' : 'a0'));

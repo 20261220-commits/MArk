@@ -229,6 +229,9 @@ PAINT.sculk_sensor_top = r => fill((x, y) => { const d = Math.hypot(x - 7.5, y -
 PAINT.sculk_sensor_bottom = r => fill(() => pal(r, SCULK));
 PAINT.sculk_sensor_tendril = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x14646c) : null);
 PAINT.sculk_sensor_tendril_active = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x5af0f4) : null);
+PAINT.brewing_stand = r => fill((x, y) => x >= 6 && x <= 9 ? quant(shade(hex(0xc8a24a), 1 + (x === 6 ? .15 : x === 9 ? -.2 : 0) + (r() - .5) * .1), 3) : null);
+PAINT.brewing_stand_base = r => stoneLike(hex(0x5a5a5a), r, 0.2);
+PAINT.brewing_bottle = r => fill((x, y) => [200 + r.int(30), 220 + r.int(20), 240, 150]);
 PAINT.moss_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x5a7a2c), 1 + (nz(x, y) - .5) * .3 + (r() - .5) * .2), 3)); };
 PAINT.bricks = r => fill((x, y) => { if (y % 4 === 3) return gray(0x9c + r.int(10)); const off = (y >> 2) % 2 ? 4 : 0; if ((x + off) % 8 === 7) return gray(0xa0); return quant(shade(pal(r, [hex(0x965040), hex(0xa25a47), hex(0x8a4636)]), 1 + (r() - .5) * .1), 3); });
 PAINT.stone_bricks = r => { stoneLike(hex(0x7c7c7c), r, 0.18); for (let x = 0; x < 16; x++) { P(x, 7, gray(0x4a)); P(x, 15, gray(0x4a)); P(x, 0, gray(0x95)); P(x, 8, gray(0x95)); } for (let y = 0; y < 8; y++) { P(15, y, gray(0x4a)); P(0, y, gray(0x95)); } for (let y = 8; y < 16; y++) { P(7, y, gray(0x4a)); P(8, y, gray(0x95)); } };
@@ -485,6 +488,25 @@ Object.assign(SPR, {
   tropical_fish_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6]]) p(x, y, x === 7 ? hex(0xf4f4f4) : hex(0xf08a20)); }),
 });
 for (const c of S.COLORS) SPR[c + '_candle_item'] = () => candleSprite(CANDLE_COL[c]);
+// potions: bottle (drinkable), round splash flask, lingering flask with a long neck, tipped arrow with a coloured head
+function potionSprite(col, form) {
+  const c = hex(col), glass = hex(0xd8e8f4), dark = shade(c, 0.6), light = mixc(c, [255, 255, 255], 0.4);
+  if (form === 3) return sprite(p => { line(p, 3, 12, 11, 4, hex(0x8a6a3b)); for (const [x, y] of [[11, 4], [12, 3], [10, 3], [12, 5], [11, 3], [12, 4], [13, 2]]) p(x, y, c); for (const [x, y] of [[2, 13], [3, 14], [1, 12], [2, 11], [4, 13], [3, 12]]) p(x, y, hex(0xf0f0f0)); });
+  return sprite(p => {
+    const neck = form === 2 ? 5 : 3, top = 2;
+    for (let y = top; y < top + neck; y++) { p(7, y, glass); p(8, y, glass); }
+    p(6, top, hex(0x8a6a3b)); p(7, top, hex(0x8a6a3b)); p(8, top, hex(0x8a6a3b)); p(9, top, hex(0x8a6a3b));
+    const cy = form === 1 ? 10 : 10.5, rx = form === 1 ? 5 : 4.5, ry = form === 1 ? 4.5 : 4.5;
+    for (let y = top + neck; y < 16; y++) for (let x = 1; x < 15; x++) { const d = ((x + .5 - 8) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2; if (d > 1) continue; p(x, y, d > 0.72 ? glass : y < cy - 1 ? light : x < 7 ? c : dark); }
+    p(6, Math.round(cy) - 1, hex(0xffffff));
+  });
+}
+for (const d of ITEMS) if (d && d.pcol != null) SPR[d.key] = () => potionSprite(d.pcol, d.form);
+SPR.glass_bottle = () => potionSprite(0xd8e8f4, 0); SPR.dragon_breath = () => potionSprite(0xc87ad8, 0);
+SPR.fermented_spider_eye = () => sprite(p => { blob(p, 8, 9, 5, 4.5, [hex(0xc86a5a), hex(0x9a3a3a), hex(0x6a1a2a), hex(0x3a0a1a)]); p(6, 8, hex(0x2a0a0a)); p(9, 8, hex(0x2a0a0a)); p(5, 6, hex(0xa8805a)); p(10, 6, hex(0xa8805a)); });
+SPR.glistering_melon_slice = () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const d = Math.hypot(x - 2, y - 14); if (d < 11 && d > 9.6) p(x, y, hex(0xe8c040)); else if (d <= 9.6 && x - 2 > 0 && 14 - y > 0) p(x, y, (x * 3 + y) % 5 === 0 ? hex(0xfff090) : hex(0xe8402a)); } });
+SPR.rabbit_foot = () => sprite(p => { blob(p, 8, 10, 3, 4, [hex(0xd8c8a8), hex(0xb8a080), hex(0x8a7058), hex(0x5a4830)]); line(p, 8, 2, 8, 6, hex(0xb8a080)); });
+SPR.pufferfish = () => sprite(p => { blob(p, 8, 8, 5, 5, [hex(0xf8e060), hex(0xe8c030), hex(0xb89020), hex(0x7a5a10)]); for (const [x, y] of [[8, 2], [3, 8], [13, 8], [8, 14], [4, 4], [12, 4], [4, 12], [12, 12]]) p(x, y, hex(0xf0f0e0)); p(6, 7, hex(0x101010)); p(10, 7, hex(0x101010)); });
 const frameSprite = edge => sprite(p => { for (let y = 1; y < 15; y++) for (let x = 1; x < 15; x++) p(x, y, x < 3 || y < 3 || x > 12 || y > 12 ? edge : hex(0x8a5a2a)); });
 SPR.glow_berries = () => sprite(p => { line(p, 8, 1, 8, 5, hex(0x4a6a24)); for (const [cx, cy] of [[6, 8], [10, 8], [8, 12]]) { blob(p, cx, cy, 2.6, 2.6, [hex(0xffd060), hex(0xf8a028), hex(0xe07a10), hex(0x9a4a08)]); p(cx - 1, cy - 1, hex(0xfff0b0)); } });
 SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));

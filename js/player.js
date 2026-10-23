@@ -276,7 +276,7 @@ let TARGET = null;
 function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
   const held = PL.held();
-  TARGET = raycast(reach(), held && (held.id === IID.bucket || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
+  TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
   if (MINE.cd > 0) MINE.cd--;
   if (USE.placeCd > 0) USE.placeCd--;
   // mining
@@ -359,6 +359,7 @@ function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
   if (!h) return;
   const d = ITEMS[h.id];
+  if (d.drink) { drinkPotion(h); return; }
   if (h.id === IID.milk_bucket) { clearEffects(PL); INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
@@ -375,10 +376,11 @@ function onUsePress() {
   if (PL.sleeping) return;
   // eat / drink
   const plantBerries = d && h.id === IID.glow_berries && TARGET && TARGET.type === 'block' && (TARGET.ny === -1 || TARGET.id === BID.cave_vines); // aimed at a ceiling: plant instead of eating
+  if (d && d.drink) { if (!(TARGET && TARGET.type === 'block' && (TARGET.id === BID.cauldron && h.id === POTION.water.items.potion || interactBlock(TARGET, true)))) { USE.kind = 'eat'; USE.t = 0; } return; }
   if (d && !plantBerries && (d.food || h.id === IID.milk_bucket) && (PL.food < 20 || d.always || creative() || h.id === IID.milk_bucket || PL.difficulty === 0)) {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
-  if (d && h.id === IID.bow) { if (creative() || INV.count(IID.arrow) > 0) { USE.kind = 'bow'; USE.t = 0; } return; }
+  if (d && h.id === IID.bow) { if (creative() || arrowSlot() >= 0) { USE.kind = 'bow'; USE.t = 0; } return; }
   if (d && h.id === IID.spyglass) { USE.kind = 'spy'; UI.advance('spyglass'); return; }
   USE.kind = 'place';
   useItem(true);
@@ -389,8 +391,10 @@ function onUseRelease() {
     if (f >= 0.1) {
       const [dx, dy, dz] = lookDir(); const v = f * 3;
       const bowSt = PL.held(), pw = enchLv(bowSt, 'power');
-      shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
-      if (!creative()) { if (!enchLv(bowSt, 'infinity')) INV.remove(IID.arrow, 1); damageItem(INV.slots, INV.sel, 1); }
+      const ai = arrowSlot(), ast = ai >= 0 ? INV.slots[ai] : null;
+      const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
+      if (ast && ITEMS[ast.id].tipped != null) { arr.potion = ITEMS[ast.id].tipped; arr.item = ast.id; }
+      if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }
   if (USE.kind === 'eat') R.hand.eat = 0;
@@ -408,6 +412,7 @@ function interactBlock(t, dry) {
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
+    case BID.brewing_stand: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newBrewing()); UI.openScreen('brewing', { x, y, z }); } return true;
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.blast_furnace: case BID.smoker: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace(BLOCKS[id].furnace)); UI.openScreen('furnace', { x, y, z }); } return true;
@@ -487,6 +492,7 @@ function useItem(first) {
     if (first && interactBlock(t, false)) { swing(); vibrate(t.x + .5, t.y + .5, t.z + .5); return; }
     if (d && (h.id === IID.item_frame || h.id === IID.glow_item_frame)) { placeFrame(t, h.id === IID.glow_item_frame); return; }
     if (first && lushUse(t, h, d)) return;
+    if (first && d && bottleUse(t, h)) return;
     const { x, y, z, id } = t;
     if (d) {
       // candles: stack up to four of the same colour, or light one with flint and steel
@@ -522,18 +528,20 @@ function useItem(first) {
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
         play('splash'); swing(); return;
       }
-      if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle) { throwItem(h.id); return; }
+      if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle || d.splash || d.lingering) { throwItem(h.id); return; }
       if (h.id === IID.fishing_rod) { useRod(); return; }
       if (ITEMS[h.id].boat) { const fl = FLUID[id] === 1; if (!fl && t.ny !== 1) return; placeBoat(x + (fl ? 0 : t.nx) + .5, fl ? y + 0.88 : y + 1, z + (fl ? 0 : t.nz) + .5, PL.yaw, ITEMS[h.id].boat); consume(); swing(); return; }
       if (d.place != null) { placeBlock(t, d); return; }
     }
   } else if (d && h.id === IID.fishing_rod) { useRod(); return; }
-  else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
+  else if (d && bottleUse(null, h)) return;
+  else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle || d.splash || d.lingering)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
   else if (d && h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
 }
 function throwItem(id) {
   const [dx, dy, dz] = lookDir();
-  const e = shootArrow(PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4, dx * 1.5, dy * 1.5 + 0.1, dz * 1.5, PL, 0);
+  const v = ITEMS[id].splash || ITEMS[id].lingering ? 0.75 : 1.5; // potions are thrown softer
+  const e = shootArrow(PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4, dx * v, dy * v + 0.1, dz * v, PL, 0);
   e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh);
   consume(); swing();
 }
@@ -621,6 +629,7 @@ function placeBlock(t, d) {
   if (id === BID.furnace) setTile(x, y, z, newFurnace());
   if (id === BID.blast_furnace || id === BID.smoker) setTile(x, y, z, newFurnace(BLOCKS[id].furnace));
   if (id === BID.barrel) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
+  if (id === BID.brewing_stand) setTile(x, y, z, newBrewing());
   if (id === BID.hopper) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 });
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
@@ -648,6 +657,7 @@ function dropHeld(all) {
 function furnaceTick() {
   for (const c of W.chunks.values()) if (c.hasFurnace !== false) for (const [i, t] of c.tiles) {
     if (c.hasFurnace === undefined) c.hasFurnace = false; // re-flagged below (or by setTile) when a furnace exists
+    if (t.type === 'brewing') { c.hasFurnace = true; brewTick(c, i, t); continue; }
     if (t.type !== 'furnace') continue;
     c.hasFurnace = true;
     const [inp, fuel, out] = t.items;
@@ -684,7 +694,7 @@ function useRod() {
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
     if (b.bite > 0) {
-      const r = Math.random(), loot = r < 0.6 ? 'cod' : r < 0.85 ? 'salmon' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book'][Math.floor(Math.random() * 4)];
+      const r = Math.random(), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book'][Math.floor(Math.random() * 4)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
       if (it && loot === 'enchanted_book') { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; it.stack.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; }
       spawnXP(PL.x, PL.y + 1, PL.z, 1 + Math.floor(Math.random() * 6)); play('splash', { vol: 0.5 });
