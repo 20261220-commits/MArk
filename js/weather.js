@@ -39,22 +39,23 @@ function weatherTick() {
 }
 
 // copper (1.17): a strike clears the oxidation of the copper it lands on, then wanders off cleaning neighbours one stage at a time
-const COPPER_OX = [64, 65, 66];
+const weathered = (b, m) => BLOCKS[b] && BLOCKS[b].wax && BLOCKS[b].scrape && !(m & BLOCKS[b].wax); // oxidised and not waxed
 function cleanCopper(x, y, z) {
   const b = getBlock(x, y, z), m = getMeta(x, y, z);
-  if (!COPPER_OX.includes(b) || (m & 1)) return;
-  setBlock(x, y, z, BID.copper_block);
+  if (!weathered(b, m)) return;
+  let c = b; while (BLOCKS[c].scrape) c = BLOCKS[c].scrape;
+  setBlock(x, y, z, c, m);
   const walks = 3 + ((Math.random() * 3) | 0);
   for (let w = 0; w < walks; w++) {
     let px = x, py = y, pz = z;
     for (let s = 0, len = 1 + ((Math.random() * 8) | 0); s < len; s++) {
       const opts = [];
       for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
-        const nb = getBlock(px + dx, py + dy, pz + dz); if ((dx || dy || dz) && nb >= 63 && nb <= 66 && !(getMeta(px + dx, py + dy, pz + dz) & 1)) opts.push([px + dx, py + dy, pz + dz, nb]);
+        const nb = getBlock(px + dx, py + dy, pz + dz); if ((dx || dy || dz) && weathered(nb, getMeta(px + dx, py + dy, pz + dz))) opts.push([px + dx, py + dy, pz + dz, nb]);
       }
       if (!opts.length) break;
       const [nx, ny, nz, nb] = opts[(Math.random() * opts.length) | 0];
-      if (BLOCKS[nb].scrape) setBlock(nx, ny, nz, BLOCKS[nb].scrape);
+      setBlock(nx, ny, nz, BLOCKS[nb].scrape, getMeta(nx, ny, nz));
       px = nx; py = ny; pz = nz;
     }
   }

@@ -230,6 +230,7 @@ function playerTick() {
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();
+  dripleafStep();
   interactTick();
 }
 function survivalTick(inWater, inLava, eyeF) {
@@ -371,7 +372,8 @@ function onUsePress() {
   const h = PL.held(), d = h && ITEMS[h.id];
   if (PL.sleeping) return;
   // eat / drink
-  if (d && (d.food || h.id === IID.milk_bucket) && (PL.food < 20 || d.always || creative() || h.id === IID.milk_bucket || PL.difficulty === 0)) {
+  const plantBerries = d && h.id === IID.glow_berries && TARGET && TARGET.type === 'block' && (TARGET.ny === -1 || TARGET.id === BID.cave_vines); // aimed at a ceiling: plant instead of eating
+  if (d && !plantBerries && (d.food || h.id === IID.milk_bucket) && (PL.food < 20 || d.always || creative() || h.id === IID.milk_bucket || PL.difficulty === 0)) {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
   if (d && h.id === IID.bow) { if (creative() || INV.count(IID.arrow) > 0) { USE.kind = 'bow'; USE.t = 0; } return; }
@@ -480,6 +482,7 @@ function useItem(first) {
   }
   if (t && t.type === 'block') {
     if (first && interactBlock(t, false)) { swing(); return; }
+    if (first && lushUse(t, h, d)) return;
     const { x, y, z, id } = t;
     if (d) {
       // candles: stack up to four of the same colour, or light one with flint and steel
@@ -488,12 +491,12 @@ function useItem(first) {
       if (d.candle != null) { placeCandle(t, d.candle); return; }
       if (cdT && !cdT.lit && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !FLUID[getBlock(x, y + 1, z)]) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n, 1)); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return; }
       // copper (1.17): honeycomb waxes it (no more oxidation), an axe scrapes the wax off before any oxidation
-      if (h.id === IID.honeycomb && id >= 63 && id <= 67 && !(t.m & 1)) { setMeta(x, y, z, t.m | 1); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); play('place', { mat: 'wool' }); swing(); return; }
+      if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
-      if (tool && tool.type === S.TOOL.AXE && id >= 63 && id <= 67 && (t.m & 1)) { setMeta(x, y, z, t.m & ~1); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
-      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape, BLOCKS[id].wax ? t.m : 0); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (h.id === IID.bone_meal) { if (boneMeal(x, y, z, id)) { consume(); swing(); } return; }
       if (h.id === IID.flint_and_steel || h.id === IID.fire_charge) {
         const px = x + t.nx, py = y + t.ny, pz = z + t.nz, cur = getBlock(px, py, pz);
@@ -532,6 +535,7 @@ function throwItem(id) {
 }
 function boneMeal(x, y, z, id) {
   for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
+  const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
   if (id === BID.wheat) { setMeta(x, y, z, Math.min(7, getMeta(x, y, z) + 2 + Math.floor(Math.random() * 4))); return true; }
   if (id === BID.crops2) { const m = getMeta(x, y, z); setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
   const sap = { 38: 0, 39: 3, 40: 2, [BID.jungle_sapling]: 4, [BID.acacia_sapling]: 5, [BID.dark_oak_sapling]: 6 }[id];
@@ -552,13 +556,14 @@ function placeBlock(t, d) {
   const tgt = getBlock(t.x, t.y, t.z);
   if (REPL[tgt] && !FLUID[tgt] && !(tgt === BID.snow && id === BID.snow)) { x = t.x; y = t.y; z = t.z; }
   // slab merging / snow stacking
+  // slab merging keeps the wax: a waxed copper slab doubles into waxed cut copper
   const slabFull = BLOCKS[id].slab || (BLOCKS[id].slabv && BLOCKS[id].full[vi]);
   const sameSlab = m => !BLOCKS[id].slabv || (m >> 1) === vi;
-  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
+  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
   if (id === BID.snow && tgt === BID.snow && (t.m & 7) < 7) { setBlock(t.x, t.y, t.z, BID.snow, t.m + 1); consume(); swing(); return; }
   if (y < 0 || y >= CH) return;
   const cur = getBlock(x, y, z); if (cur && !REPL[cur]) return;
-  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull); consume(); swing(); return; }
+  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0); consume(); swing(); return; }
   const below = getBlock(x, y - 1, z), fd = facingDir();
   const b = BLOCKS[id];
   // placement rules

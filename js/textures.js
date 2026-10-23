@@ -171,6 +171,9 @@ PAINT.exposed_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r);
 PAINT.weathered_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r);
 PAINT.oxidized_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r);
 PAINT.cut_copper = r => copperTex(hex(0xbf6a4f), null, r, true);
+PAINT.exposed_cut_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r, true);
+PAINT.weathered_cut_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r, true);
+PAINT.oxidized_cut_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r, true);
 // amethyst buds grow from a small nub to nearly a full cluster
 function budTex(cr) { for (const [x, top] of cr) for (let y = top; y <= 15; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 1) P(x - 1, y, hex(0x7f55b4)); } }
 PAINT.small_amethyst_bud = r => budTex([[7, 12], [5, 14], [9, 13]]);
@@ -199,6 +202,26 @@ PAINT.budding_amethyst = r => { PAINT.amethyst_block(r); for (let i = 0; i < 6; 
 PAINT.amethyst_cluster = r => { const cr = [[7, 2, 15], [4, 6, 15], [10, 5, 15], [2, 10, 15], [12, 9, 15]]; for (const [x, top, bot] of cr) for (let y = top; y <= bot; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 2) P(x - 1, y, hex(0x7f55b4)); } };
 PAINT.dripstone_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x86685a), 1 + (nz(x, y * 0.4) - .5) * .25 + ((x * 3) % 5 === 0 ? -0.08 : 0) + (r() - .5) * .08), 3)); };
 PAINT.pointed_dripstone = r => { for (let y = 0; y < 16; y++) { const w = Math.max(0, Math.round((16 - y) / 4)); for (let x = 8 - w; x <= 7 + w; x++) P(x, y, shade(hex(0x86685a), 1 + (r() - .5) * .2 + (x < 8 ? .08 : -0.08))); } };
+// ---- lush caves (1.17) ----
+const AZ = [hex(0x5e7a2a), hex(0x6e8c34), hex(0x4c6522), hex(0x7d9b3c)], AZFL = [hex(0xd86aa8), hex(0xf09ac8), hex(0xb24a86)];
+function azaleaLeafy(r, rows, flowers, holes) { fill((x, y) => { if (y >= rows) return null; if (holes && r() < 0.18) return null; return quant(shade(pal(r, AZ), 1 + (r() - .5) * .15), 3); }); if (flowers) for (let i = 0; i < 7; i++) { const x = r.int(15), y = r.int(Math.max(1, rows - 1)); P(x, y, pal(r, AZFL)); P(x + 1, y, AZFL[2]); if (y + 1 < rows) P(x, y + 1, AZFL[0]); } }
+PAINT.azalea_top = r => azaleaLeafy(r, 16, false); PAINT.azalea_side = r => azaleaLeafy(r, 8, false);
+PAINT.flowering_azalea_top = r => azaleaLeafy(r, 16, true); PAINT.flowering_azalea_side = r => azaleaLeafy(r, 8, true);
+PAINT.azalea_plant = r => fill((x, y) => quant(shade(hex(0x6a4f2e), 1 + ((x % 4) === 0 ? -.2 : 0) + (r() - .5) * .12), 3));
+PAINT.azalea_leaves = r => azaleaLeafy(r, 16, false, true); PAINT.azalea_leaves_o = r => azaleaLeafy(r, 16, false, false);
+PAINT.flowering_azalea_leaves = r => azaleaLeafy(r, 16, true, true); PAINT.flowering_azalea_leaves_o = r => azaleaLeafy(r, 16, true, false);
+function vine(r, berries) {
+  for (let y = 0; y < 16; y++) { const x = 7 + Math.round(Math.sin(y * 0.7) * 1.2); P(x, y, hex(0x4a6a24)); P(x + 1, y, hex(0x3a5a1c)); if (y % 3 === 0) { P(x - 1, y, hex(0x6a9a34)); P(x - 2, y + 1, hex(0x5a8a2c)); } if (y % 3 === 1) { P(x + 2, y, hex(0x6a9a34)); P(x + 3, y + 1, hex(0x5a8a2c)); } }
+  if (berries) for (const [x, y] of [[4, 4], [10, 9], [5, 13]]) { P(x, y, hex(0xffb030)); P(x + 1, y, hex(0xf08a20)); P(x, y + 1, hex(0xe07a10)); P(x + 1, y + 1, hex(0xffd060)); }
+}
+PAINT.cave_vines = r => vine(r, false); PAINT.cave_vines_lit = r => vine(r, true);
+PAINT.spore_blossom = r => fill((x, y) => { const dx = x - 7.5, dy = y - 7.5, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); if (d > 7.5) return null; if (d < 2) return hex(0x6a9a34); const petal = Math.cos(a * 4) > 0.2; return petal ? quant(shade(hex(0xe87ab8), 1 - d / 30 + (r() - .5) * .1), 3) : d < 4 ? hex(0x8ab83c) : null; });
+PAINT.big_dripleaf_top = r => fill((x, y) => { const vein = x === 7 || x === 8 || (Math.abs(x - 7.5) - Math.abs(y - 14) * 0.6 < 0.6 && Math.abs(x - 7.5) - Math.abs(y - 14) * 0.6 > -0.6); const edge = x === 0 || x === 15 || y === 0 || y === 15; return quant(shade(hex(0x6aa83a), edge ? 0.78 : vein ? 1.18 : 1 + (r() - .5) * .1), 3); });
+PAINT.big_dripleaf_stem = r => fill((x, y) => x < 6 || x > 9 ? null : quant(shade(hex(0x5a8a2c), 1 + (x === 6 ? .12 : x === 9 ? -.15 : 0) + (r() - .5) * .08), 3)); // a thin stalk in the middle
+PAINT.small_dripleaf = r => { for (const [x0, lean] of [[6, -0.15], [9, 0.15]]) for (let y = 0; y < 16; y++) P(Math.round(x0 + (15 - y) * lean), y, hex(0x5a8a2c)); };
+PAINT.small_dripleaf_top = r => { for (let y = 8; y < 16; y++) { P(6, y, hex(0x5a8a2c)); P(9, y, hex(0x5a8a2c)); } for (const [cx, cy] of [[4, 5], [11, 4]]) for (let dx = -3; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) if (dx * dx / 9 + dy * dy / 4 <= 1) P(cx + dx, cy + dy, shade(hex(0x6aa83a), 1 + (r() - .5) * .15)); };
+PAINT.rooted_dirt = r => { PAINT.dirt(r); for (let i = 0; i < 5; i++) { let x = r.int(16), y = r.int(16); for (let k = 0; k < 5; k++) { P(x, y, hex(0xb08a5a)); x = (x + (r() < .5 ? 1 : 0)) & 15; y = (y + 1) & 15; } } };
+PAINT.hanging_roots = r => { for (const x0 of [3, 6, 9, 12]) { let x = x0; for (let y = 0; y < 10 + r.int(6); y++) { P(x, y, hex(0x9a7448)); if (r() < 0.25) x += r() < .5 ? -1 : 1; } } };
 PAINT.moss_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x5a7a2c), 1 + (nz(x, y) - .5) * .3 + (r() - .5) * .2), 3)); };
 PAINT.bricks = r => fill((x, y) => { if (y % 4 === 3) return gray(0x9c + r.int(10)); const off = (y >> 2) % 2 ? 4 : 0; if ((x + off) % 8 === 7) return gray(0xa0); return quant(shade(pal(r, [hex(0x965040), hex(0xa25a47), hex(0x8a4636)]), 1 + (r() - .5) * .1), 3); });
 PAINT.stone_bricks = r => { stoneLike(hex(0x7c7c7c), r, 0.18); for (let x = 0; x < 16; x++) { P(x, 7, gray(0x4a)); P(x, 15, gray(0x4a)); P(x, 0, gray(0x95)); P(x, 8, gray(0x95)); } for (let y = 0; y < 8; y++) { P(15, y, gray(0x4a)); P(0, y, gray(0x95)); } for (let y = 8; y < 16; y++) { P(7, y, gray(0x4a)); P(8, y, gray(0x95)); } };
@@ -487,7 +510,7 @@ function buildIcons() {
     iconIndex[id] = cell;
     let spr = null;
     if (d.block && !d.sprite && !PACKPX.items[d.key]) {
-      const h = id === S.BID.snow ? 0.18 : (id >= 109 && id <= 111) ? 0.5 : id === S.BID.farmland ? 0.94 : 1;
+      const h = id === S.BID.snow ? 0.18 : (id >= 109 && id <= 111) || (id >= 1031 && id <= 1034) ? 0.5 : id === S.BID.farmland ? 0.94 : 1;
       isoBlock(g, id, ox, oy, ICON, h);
       continue;
     }

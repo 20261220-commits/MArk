@@ -6,10 +6,10 @@ const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
-  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire']);
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
-  amethyst_cluster: 'amethyst_cluster', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
+  amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
   oak_door: 'oak_door_item', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
@@ -123,6 +123,7 @@ item('tropical_fish', '열대어', { food: [1, 0.2] });
 item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
 Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
+item('glow_berries', '발광 열매', { food: [2, 0.4] });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
@@ -279,11 +280,17 @@ shapeless('magma_cream', 1, ['blaze_powder', 'slime_ball']);
 shapeless('fire_charge', 3, ['gunpowder', 'blaze_powder', 'coals']);
 // 1.17: waxing, lightning rods, candles
 for (const k of ['copper_block', 'exposed_copper', 'weathered_copper', 'oxidized_copper', 'cut_copper']) shapeless('waxed_' + k, 1, [k, 'honeycomb']);
-shaped('waxed_cut_copper', 4, ['##', '##'], { '#': 'waxed_copper_block' });
 shaped('lightning_rod', 1, ['#', '#', '#'], { '#': 'copper_ingot' });
 shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
 for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
+shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
+// cut copper of every oxidation stage, its slabs and stairs, waxed or not
+for (const [full, cut] of [['copper_block', 'cut_copper'], ['exposed_copper', 'exposed_cut_copper'], ['weathered_copper', 'weathered_cut_copper'], ['oxidized_copper', 'oxidized_cut_copper']]) for (const w of ['', 'waxed_']) {
+  if (cut !== 'cut_copper' || w) shaped(w + cut, 4, ['##', '##'], { '#': w + full });
+  shaped(w + cut + '_slab', 6, ['###'], { '#': w + cut }); shaped(w + cut + '_stairs', 4, ['#  ', '## ', '###'], { '#': w + cut });
+  if (!w) { if (cut !== 'cut_copper') shapeless('waxed_' + cut, 1, [cut, 'honeycomb']); shapeless('waxed_' + cut + '_slab', 1, [cut + '_slab', 'honeycomb']); shapeless('waxed_' + cut + '_stairs', 1, [cut + '_stairs', 'honeycomb']); }
+}
 
 // ---------- 1.17 expansion recipes ----------
 [['jungle_log', 'jungle_planks'], ['acacia_log', 'acacia_planks'], ['dark_oak_log', 'dark_oak_planks'], ['stripped_oak_log', 'oak_planks'], ['stripped_spruce_log', 'spruce_planks'], ['stripped_birch_log', 'birch_planks'],
@@ -488,6 +495,15 @@ function blockDrops(b, meta, stack) {
     case 'ice': break;
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
     case 'small_amethyst_bud': case 'medium_amethyst_bud': case 'large_amethyst_bud': break; // only with silk touch
+    case 'cave_vines': if (meta & 1) add('glow_berries'); break;
+    case 'big_dripleaf_stem': add('big_dripleaf'); break;
+    case 'small_dripleaf': if (shears && !(meta & 8)) add(b); break;
+    case 'hanging_roots': if (shears) add(b); break;
+    case 'azalea_leaves': case 'flowering_azalea_leaves':
+      if (shears) { add(b); break; }
+      if (Math.random() < 0.05) add(b === BID.azalea_leaves ? 'azalea' : 'flowering_azalea');
+      if (Math.random() < 0.02) add('stick', ri(1, 2));
+      break;
     case 'spawner': res.xp = ri(15, 43); break;
     case 'lit_furnace': add('furnace'); break;
     case 'glowstone': add('glowstone_dust', ri(2, 4)); break;

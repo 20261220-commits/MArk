@@ -163,6 +163,22 @@ function observerCheck(x, y, z) {
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
 function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace') c.hasFurnace = true; c.noTicking = false; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
+// support rules of the 1.17 lush-cave plants (plant codes 10+)
+const LUSH_SOIL = new Set([2, 3, 53, 57, 87, 203, 204, 205, 1049]); // grass, dirt, clay, farmland, moss, podzol, mycelium, coarse dirt, rooted dirt
+function plantOK(b, x, y, z, m) {
+  const below = getBlock(x, y - 1, z), above = getBlock(x, y + 1, z);
+  switch (BLOCKS[b].plant) {
+    case 10: return LUSH_SOIL.has(below); // azaleas
+    case 11: return OPQ[above] || above === b; // hangs from the ceiling: cave vines, spore blossom, hanging roots
+    case 12: { // big dripleaf: stems stand on soil or another stem; a stem needs more dripleaf above
+      const base = below === BID.big_dripleaf_stem || LUSH_SOIL.has(below);
+      return b === BID.big_dripleaf_stem ? base && (above === BID.big_dripleaf_stem || above === BID.big_dripleaf) : base;
+    }
+    case 13: return m & 8 ? below === b : (below === BID.clay || below === BID.moss_block) && above === b; // small dripleaf: two blocks tall
+    case 14: return below !== 0; // moss carpet
+  }
+  return true;
+}
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern && id !== BID.soul_lantern && id !== BID.vine) || id === BID.glass || S.LEAF[id] || id === BID.stained_glass;
 function breakNaturally(x, y, z, b, m) {
   setBlock(x, y, z, 0, 0);
@@ -176,7 +192,8 @@ function neighborUpdate(x, y, z) {
   if (d.fall) { if (below === 0 || FLUID[below] || (REPL[below] && below !== b)) schedule(x, y, z, 2); return; }
   if (d.plant) {
     let ok = true;
-    if (d.plant === 1) ok = below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block;
+    if (d.plant >= 10) ok = plantOK(b, x, y, z, m);
+    else if (d.plant === 1) ok = below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block;
     else if (d.plant === 2) ok = below === 9 || below === 3 || below === 2;
     else if (d.plant === 3) { ok = below === b || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27)); }
     else if (d.plant === 4) { ok = (below === b || below === 9) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
@@ -233,8 +250,9 @@ function updateConnections(x, y, z, b) {
   setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
 }
 // ---------- fluids ----------
+const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
 function fluidUpdate(x, y, z) {
-  const b = getBlock(x, y, z); if (!FLUID[b]) { const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
+  const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
   const water = b === 27, drop = water ? 1 : 2, m = getMeta(x, y, z);
   let lvl = m & 7, falling = (m & 8) !== 0;
   const other = water ? 28 : 27;
@@ -357,7 +375,7 @@ const stack = (x, y, z, b, m) => {
   if (m >= 15) { setBlock(x, y + 1, z, b, 0); setMeta(x, y, z, 0); } else setMeta(x, y, z, m + 1);
 };
 RANDOM_TICK[BID.sugar_cane] = stack; RANDOM_TICK[BID.cactus] = stack;
-for (const lv of [22, 23, 24, BID.jungle_leaves, BID.acacia_leaves, BID.dark_oak_leaves]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
+for (const lv of [22, 23, 24, BID.jungle_leaves, BID.acacia_leaves, BID.dark_oak_leaves, BID.azalea_leaves, BID.flowering_azalea_leaves]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
   if (m & 1) return;
   // search for a log within 4 blocks through leaves (flat typed queue, 9x9x9 visited grid)
   if (leafSearch(x, y, z)) return;
@@ -387,7 +405,7 @@ RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   else if (m > 0) setMeta(x, y, z, m - 1);
   else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
 };
-for (const id of [63, 64, 65]) RANDOM_TICK[id] = (x, y, z, b, m) => { if (!(m & 1) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[b].oxid); }; // meta 1: waxed, never oxidises
+for (const b of BLOCKS) if (b && b.oxid) RANDOM_TICK[b.id] = (x, y, z, id, m) => { if (!(m & BLOCKS[id].wax) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[id].oxid, m); }; // waxed copper never oxidises; shape bits (slab half, stair facing) stay
 // budding amethyst (1.17): small bud -> medium -> large -> cluster, each pointing away from the budding block
 const BUD_STAGES = [BID.small_amethyst_bud, BID.medium_amethyst_bud, BID.large_amethyst_bud, BID.amethyst_cluster];
 RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => {

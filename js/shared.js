@@ -22,7 +22,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
   'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ')
-  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
+  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom', 'exposed_cut_copper', 'weathered_cut_copper', 'oxidized_cut_copper', 'azalea_top', 'azalea_side', 'azalea_plant', 'flowering_azalea_top', 'flowering_azalea_side', 'azalea_leaves', 'azalea_leaves_o', 'flowering_azalea_leaves', 'flowering_azalea_leaves_o', 'cave_vines', 'cave_vines_lit', 'spore_blossom', 'big_dripleaf_top', 'big_dripleaf_stem', 'small_dripleaf', 'small_dripleaf_top', 'rooted_dirt', 'hanging_roots'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -114,11 +114,11 @@ const BLOCK_ROWS = [
   [60, 'iron_block', '철 블록', C, 'iron_block', 5, P, 2],
   [61, 'gold_block', '금 블록', C, 'gold_block', 3, P, 3],
   [62, 'diamond_block', '다이아몬드 블록', C, 'diamond_block', 5, P, 3],
-  [63, 'copper_block', '구리 블록', C, 'copper_block', 3, P, 2, { oxid: 64, vars: ['copper_block', 'copper_block'], vk: ['copper_block', 'waxed_copper_block'], vn: ['구리 블록', '밀랍칠한 구리 블록'], late: 1 }],
-  [64, 'exposed_copper', '약간 녹슨 구리', C, 'exposed_copper', 3, P, 2, { oxid: 65, scrape: 63, vars: ['exposed_copper', 'exposed_copper'], vk: ['exposed_copper', 'waxed_exposed_copper'], vn: ['약간 녹슨 구리', '밀랍칠한 약간 녹슨 구리'], late: 1 }],
-  [65, 'weathered_copper', '녹슨 구리', C, 'weathered_copper', 3, P, 2, { oxid: 66, scrape: 64, vars: ['weathered_copper', 'weathered_copper'], vk: ['weathered_copper', 'waxed_weathered_copper'], vn: ['녹슨 구리', '밀랍칠한 녹슨 구리'], late: 1 }],
-  [66, 'oxidized_copper', '산화된 구리', C, 'oxidized_copper', 3, P, 2, { scrape: 65, vars: ['oxidized_copper', 'oxidized_copper'], vk: ['oxidized_copper', 'waxed_oxidized_copper'], vn: ['산화된 구리', '밀랍칠한 산화된 구리'], late: 1 }],
-  [67, 'cut_copper', '깎인 구리', C, 'cut_copper', 3, P, 2, { vars: ['cut_copper', 'cut_copper'], vk: ['cut_copper', 'waxed_cut_copper'], vn: ['깎인 구리', '밀랍칠한 깎인 구리'], late: 1 }],
+  [63, 'copper_block', '구리 블록', C, 'copper_block', 3, P, 2, { oxid: 64, wax: 1, vars: ['copper_block', 'copper_block'], vk: ['copper_block', 'waxed_copper_block'], vn: ['구리 블록', '밀랍칠한 구리 블록'], late: 1 }],
+  [64, 'exposed_copper', '약간 녹슨 구리', C, 'exposed_copper', 3, P, 2, { oxid: 65, scrape: 63, wax: 1, vars: ['exposed_copper', 'exposed_copper'], vk: ['exposed_copper', 'waxed_exposed_copper'], vn: ['약간 녹슨 구리', '밀랍칠한 약간 녹슨 구리'], late: 1 }],
+  [65, 'weathered_copper', '녹슨 구리', C, 'weathered_copper', 3, P, 2, { oxid: 66, scrape: 64, wax: 1, vars: ['weathered_copper', 'weathered_copper'], vk: ['weathered_copper', 'waxed_weathered_copper'], vn: ['녹슨 구리', '밀랍칠한 녹슨 구리'], late: 1 }],
+  [66, 'oxidized_copper', '산화된 구리', C, 'oxidized_copper', 3, P, 2, { scrape: 65, wax: 1, vars: ['oxidized_copper', 'oxidized_copper'], vk: ['oxidized_copper', 'waxed_oxidized_copper'], vn: ['산화된 구리', '밀랍칠한 산화된 구리'], late: 1 }],
+  [67, 'cut_copper', '깎인 구리', C, 'cut_copper', 3, P, 2, { oxid: 1028, wax: 1, vars: ['cut_copper', 'cut_copper'], vk: ['cut_copper', 'waxed_cut_copper'], vn: ['깎인 구리', '밀랍칠한 깎인 구리'], late: 1 }],
   [68, 'raw_iron_block', '철 원석 블록', C, 'raw_iron_block', 5, P, 2],
   [69, 'raw_gold_block', '금 원석 블록', C, 'raw_gold_block', 5, P, 3],
   [70, 'raw_copper_block', '구리 원석 블록', C, 'raw_copper_block', 5, P, 2],
@@ -323,6 +323,31 @@ const BLOCK_ROWS = [
   [1025, 'medium_amethyst_bud', '중간 자수정 싹', X, 'medium_amethyst_bud', 1.5, P, 0, { light: 2, nosolid: 1, bud: 2 }],
   [1026, 'large_amethyst_bud', '큰 자수정 싹', X, 'large_amethyst_bud', 1.5, P, 0, { light: 4, nosolid: 1, bud: 3 }],
   [1027, 'cauldron', '가마솥', RT.BOX, ['cauldron_side', 'cauldron_top', 'cauldron_bottom'], 2, P, 1, { tint: 3 }], // meta: level (0-3) | contents << 2 (0 water, 1 lava, 2 powder snow)
+  // copper keeps its stage chain in oxid/scrape and its waxed flag in the meta bit `wax`
+  [1028, 'exposed_cut_copper', '약간 녹슨 깎인 구리', C, 'exposed_cut_copper', 3, P, 2, { oxid: 1029, scrape: 67, wax: 1, vars: ['exposed_cut_copper', 'exposed_cut_copper'], vk: ['exposed_cut_copper', 'waxed_exposed_cut_copper'], vn: ['약간 녹슨 깎인 구리', '밀랍칠한 약간 녹슨 깎인 구리'] }],
+  [1029, 'weathered_cut_copper', '녹슨 깎인 구리', C, 'weathered_cut_copper', 3, P, 2, { oxid: 1030, scrape: 1028, wax: 1, vars: ['weathered_cut_copper', 'weathered_cut_copper'], vk: ['weathered_cut_copper', 'waxed_weathered_cut_copper'], vn: ['녹슨 깎인 구리', '밀랍칠한 녹슨 깎인 구리'] }],
+  [1030, 'oxidized_cut_copper', '산화된 깎인 구리', C, 'oxidized_cut_copper', 3, P, 2, { scrape: 1029, wax: 1, vars: ['oxidized_cut_copper', 'oxidized_cut_copper'], vk: ['oxidized_cut_copper', 'waxed_oxidized_cut_copper'], vn: ['산화된 깎인 구리', '밀랍칠한 산화된 깎인 구리'] }],
+  [1031, 'cut_copper_slab', '깎인 구리 반 블록', RT.BOX, 'cut_copper', 3, P, 2, { oxid: 1032, slab: 67, wax: 2, vshift: 1, vars: ['cut_copper', 'cut_copper'], vk: ['cut_copper_slab', 'waxed_cut_copper_slab'], vn: ['깎인 구리 반 블록', '밀랍칠한 깎인 구리 반 블록'] }],
+  [1032, 'exposed_cut_copper_slab', '약간 녹슨 깎인 구리 반 블록', RT.BOX, 'exposed_cut_copper', 3, P, 2, { oxid: 1033, scrape: 1031, slab: 1028, wax: 2, vshift: 1, vars: ['exposed_cut_copper', 'exposed_cut_copper'], vk: ['exposed_cut_copper_slab', 'waxed_exposed_cut_copper_slab'], vn: ['약간 녹슨 깎인 구리 반 블록', '밀랍칠한 약간 녹슨 깎인 구리 반 블록'] }],
+  [1033, 'weathered_cut_copper_slab', '녹슨 깎인 구리 반 블록', RT.BOX, 'weathered_cut_copper', 3, P, 2, { oxid: 1034, scrape: 1032, slab: 1029, wax: 2, vshift: 1, vars: ['weathered_cut_copper', 'weathered_cut_copper'], vk: ['weathered_cut_copper_slab', 'waxed_weathered_cut_copper_slab'], vn: ['녹슨 깎인 구리 반 블록', '밀랍칠한 녹슨 깎인 구리 반 블록'] }],
+  [1034, 'oxidized_cut_copper_slab', '산화된 깎인 구리 반 블록', RT.BOX, 'oxidized_cut_copper', 3, P, 2, { scrape: 1033, slab: 1030, wax: 2, vshift: 1, vars: ['oxidized_cut_copper', 'oxidized_cut_copper'], vk: ['oxidized_cut_copper_slab', 'waxed_oxidized_cut_copper_slab'], vn: ['산화된 깎인 구리 반 블록', '밀랍칠한 산화된 깎인 구리 반 블록'] }],
+  [1035, 'cut_copper_stairs', '깎인 구리 계단', RT.BOX, 'cut_copper', 3, P, 2, { oxid: 1036, stairs: 1, wax: 8, vshift: 3, vars: ['cut_copper', 'cut_copper'], vk: ['cut_copper_stairs', 'waxed_cut_copper_stairs'], vn: ['깎인 구리 계단', '밀랍칠한 깎인 구리 계단'] }],
+  [1036, 'exposed_cut_copper_stairs', '약간 녹슨 깎인 구리 계단', RT.BOX, 'exposed_cut_copper', 3, P, 2, { oxid: 1037, scrape: 1035, stairs: 1, wax: 8, vshift: 3, vars: ['exposed_cut_copper', 'exposed_cut_copper'], vk: ['exposed_cut_copper_stairs', 'waxed_exposed_cut_copper_stairs'], vn: ['약간 녹슨 깎인 구리 계단', '밀랍칠한 약간 녹슨 깎인 구리 계단'] }],
+  [1037, 'weathered_cut_copper_stairs', '녹슨 깎인 구리 계단', RT.BOX, 'weathered_cut_copper', 3, P, 2, { oxid: 1038, scrape: 1036, stairs: 1, wax: 8, vshift: 3, vars: ['weathered_cut_copper', 'weathered_cut_copper'], vk: ['weathered_cut_copper_stairs', 'waxed_weathered_cut_copper_stairs'], vn: ['녹슨 깎인 구리 계단', '밀랍칠한 녹슨 깎인 구리 계단'] }],
+  [1038, 'oxidized_cut_copper_stairs', '산화된 깎인 구리 계단', RT.BOX, 'oxidized_cut_copper', 3, P, 2, { scrape: 1037, stairs: 1, wax: 8, vshift: 3, vars: ['oxidized_cut_copper', 'oxidized_cut_copper'], vk: ['oxidized_cut_copper_stairs', 'waxed_oxidized_cut_copper_stairs'], vn: ['산화된 깎인 구리 계단', '밀랍칠한 산화된 깎인 구리 계단'] }],
+  // lush caves (1.17): plant codes 10+ are checked by plantOK in world.js
+  [1039, 'azalea', '진달래', RT.BOX, ['azalea_side', 'azalea_top', 'azalea_side'], 0, N, 0, { plant: 10 }],
+  [1040, 'flowering_azalea', '꽃 핀 진달래', RT.BOX, ['flowering_azalea_side', 'flowering_azalea_top', 'flowering_azalea_side'], 0, N, 0, { plant: 10 }],
+  [1041, 'azalea_leaves', '진달래 잎', RT.CUTOUT, 'azalea_leaves', 0.2, H, 0, { lop: 1, leaves: 1 }],
+  [1042, 'flowering_azalea_leaves', '꽃 핀 진달래 잎', RT.CUTOUT, 'flowering_azalea_leaves', 0.2, H, 0, { lop: 1, leaves: 1 }],
+  [1043, 'moss_carpet', '이끼 카펫', RT.BOX, 'moss_block', 0.1, H, 0, { plant: 14 }],
+  [1044, 'cave_vines', '동굴 덩굴', X, 'cave_vines', 0, N, 0, { plant: 11, climb: 1 }], // meta 1: glow berries
+  [1045, 'spore_blossom', '포자 꽃', RT.BOX, 'spore_blossom', 0, N, 0, { plant: 11, nosolid: 1 }],
+  [1046, 'big_dripleaf', '큰 흘림잎', RT.BOX, ['big_dripleaf_top', 'big_dripleaf_top', 'big_dripleaf_top'], 0.1, A, 0, { plant: 12 }], // meta: facing | tilt << 2 (0 none, 1 unstable, 2 partial, 3 full)
+  [1047, 'big_dripleaf_stem', '큰 흘림잎 줄기', X, 'big_dripleaf_stem', 0.1, A, 0, { plant: 12 }],
+  [1048, 'small_dripleaf', '작은 흘림잎', X, 'small_dripleaf', 0, N, 0, { plant: 13 }], // meta 8: upper half
+  [1049, 'rooted_dirt', '뿌리 내린 흙', C, 'rooted_dirt', 0.5, S, 0],
+  [1050, 'hanging_roots', '매달린 뿌리', X, 'hanging_roots', 0, N, 0, { plant: 11, repl: 1 }],
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 // block ids are 16 bit: 0..255 are the original blocks, newer ones start at 1024 so their block items
@@ -370,7 +395,7 @@ function candleOf(id, m) {
 function candleBlock(c, n, lit) { return c < 0 ? [246, 16 | (n - 1) | (lit ? 4 : 0)] : [198, c | ((1 + n - 1 + (lit ? 4 : 0)) << 4)]; }
 const isRod = (id, m) => id === 246 && ((m >> 3) & 15) === 1;
 // block light emitted by a block, including the meta-dependent ones (lit candles give 3 per candle)
-function emitOf(id, m) { if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
+function emitOf(id, m) { if (id === 1044) return m & 1 ? 14 : 0; if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
 const CANDLE_POS = [[[7, 7]], [[5, 6], [9, 7]], [[7, 5], [5, 9], [9, 8]], [[6, 5], [9, 5], [5, 8], [8, 8]]], CANDLE_H = [[6], [6, 5], [6, 5, 4], [6, 5, 4, 5]];
 function candleBoxes(cd) { // bodies first, then one wick (or flame) per candle
   const pos = CANDLE_POS[cd.n - 1], hs = CANDLE_H[cd.n - 1], b = pos.map(([x, z], k) => [x, 0, z, x + 2, hs[k], z + 2]);
@@ -420,6 +445,15 @@ function shapes(id, meta) {
     case 51: return [[0, 0, 0, 16, ((meta & 7) + 1) * 2, 16]];
     case 95: return [[0, 3, 0, 16, 9, 16], [0, 0, 0, 3, 3, 3], [13, 0, 0, 16, 3, 3], [0, 0, 13, 3, 3, 16], [13, 0, 13, 16, 3, 16]];
     case 96: case 231: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
+    case 1039: case 1040: return [[0, 8, 0, 16, 16, 16], [7, 0, 7, 9, 8, 9]]; // azalea: leafy top on a short stem
+    case 1043: return [[0, 0, 0, 16, 1, 16]];
+    case 1045: return [[1, 15, 1, 15, 16, 15]];
+    case 1046: { // big dripleaf: the leaf droops toward its facing as it tilts; stem underneath
+      const f = meta & 3, t = (meta >> 2) & 3, stem = [7, 0, 7, 9, t === 3 ? 13 : 14, 9];
+      if (t <= 1) return [[0, 14, 0, 16, 15, 16], stem];
+      if (t === 2) return [rotBox([0, 12, 0, 16, 13, 8], f), rotBox([0, 13, 8, 16, 14, 16], f), stem];
+      return [rotBox([0, 3, 0, 16, 13, 1], f), rotBox([0, 13, 1, 16, 14, 6], f), stem];
+    }
     case 1027: { // cauldron: walls, floor, legs, then the contents
       const b = [[0, 3, 0, 2, 16, 16], [14, 3, 0, 16, 16, 16], [2, 3, 0, 14, 16, 2], [2, 3, 14, 14, 16, 16], [2, 3, 2, 14, 4, 14], [0, 0, 0, 4, 3, 4], [12, 0, 0, 16, 3, 4], [0, 0, 12, 4, 3, 16], [12, 0, 12, 16, 3, 16]];
       const lv = meta & 3; if (lv) b.push([2, 4, 2, 14, ((meta >> 2) & 3) === 1 ? 15 : 6 + lv * 3, 14]);
@@ -452,8 +486,8 @@ function shapes(id, meta) {
     }
     case 97: return [ladderBox(meta & 3)];
     case 99: case 244: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
-    case 109: case 110: case 111: case 250: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
-    case 113: case 114: case 115: case 251: { // stairs: meta = facing | top<<2
+    case 109: case 110: case 111: case 250: case 1031: case 1032: case 1033: case 1034: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
+    case 113: case 114: case 115: case 251: case 1035: case 1036: case 1037: case 1038: { // stairs: meta = facing | top<<2
       const f = meta & 3, top = meta & 4, ylo = top ? 0 : 8, yhi = top ? 8 : 16;
       const back = f === 0 ? [0, ylo, 0, 16, yhi, 8] : f === 1 ? [8, ylo, 0, 16, yhi, 16] : f === 2 ? [0, ylo, 8, 16, yhi, 16] : [0, ylo, 0, 8, yhi, 16];
       return [top ? [0, 8, 0, 16, 16, 16] : [0, 0, 0, 16, 8, 16], back];
@@ -507,6 +541,8 @@ function ladderBox(f) { return f === 0 ? [0, 0, 0, 16, 16, 1] : f === 1 ? [15, 0
 // collision boxes (null => full cube when SOLID)
 function collide(id, meta) {
   if (id === 51) { const l = meta & 7; return l === 0 ? [] : [[0, 0, 0, 16, l * 2, 16]]; }
+  if (id === 1046) { const t = (meta >> 2) & 3; return t === 3 ? [] : t === 2 ? [[0, 11, 0, 16, 13, 16]] : [[0, 11, 0, 16, 15, 16]]; } // a fully tilted dripleaf drops you
+  if (id === 1039 || id === 1040) return [[0, 0, 0, 16, 16, 16]];
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
   if (id === 138) return [[0, 0, 0, 16, 14, 16]]; // soul sand slows by sinking you slightly
   if (id === 128) return [[0, 0, 0, 16, 2, 16]];
@@ -1330,6 +1366,35 @@ function genChunk(seed, cx, cz, dim) {
       }
     }
   }
+  // 7. lush cave patches (rare; in 1.17 these blocks came only from wandering traders and bone meal):
+  // moss floors with azaleas and dripleaves, clay pools, cave vines and spore blossoms on the ceiling
+  if (R.int(10) === 0) {
+    const lx = R.int(16), lz = R.int(16), ly = 22 + R.int(26), rad = 6 + R.int(5);
+    const rocky = v => v === 1 || v === 3 || v === 2 || v === 91 || v === 92 || v === 93 || v === 75 || v === 76;
+    for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) {
+      if (Math.hypot(x - lx, z - lz) > rad) continue;
+      for (let y = Math.max(14, ly - 10); y < Math.min(CH - 8, ly + 10); y++) {
+        const i = I(x, y, z); if (blocks[i] !== 0) continue;
+        const below = blocks[I(x, y - 1, z)], above = blocks[I(x, y + 1, z)];
+        if (rocky(below)) {
+          const r = R();
+          if (r < 0.05 && rocky(blocks[I(x, y - 2, z)]) && x > 0 && x < 15 && z > 0 && z < 15 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => blocks[I(x + dx, y - 1, z + dz)] !== 0)) {
+            blocks[I(x, y - 1, z)] = 27; blocks[I(x, y - 2, z)] = 53; continue; // a little clay-bottomed pool (axolotls spawn over clay in the dark)
+          }
+          blocks[I(x, y - 1, z)] = 87;
+          const v = R();
+          if (v < 0.25) blocks[i] = 1043; else if (v < 0.45) blocks[i] = 29; else if (v < 0.48) blocks[i] = 1039; else if (v < 0.495) blocks[i] = 1040;
+          else if (v < 0.52) { const h = 1 + R.int(3); let k = 0; while (k < h && blocks[I(x, y + k + 1, z)] === 0) { blocks[I(x, y + k, z)] = 1047; k++; } blocks[I(x, y + k, z)] = 1046; meta[I(x, y + k, z)] = R.int(4); }
+          else if (v < 0.54 && blocks[I(x, y + 1, z)] === 0) { blocks[i] = 1048; blocks[I(x, y + 1, z)] = 1048; meta[I(x, y + 1, z)] = 8; }
+        } else if (rocky(above)) {
+          if (R() < 0.5) blocks[I(x, y + 1, z)] = 87;
+          const v = R();
+          if (v < 0.2) { const n = 1 + R.int(6); for (let k = 0; k < n && y - k > 2 && blocks[I(x, y - k, z)] === 0; k++) { blocks[I(x, y - k, z)] = 1044; meta[I(x, y - k, z)] = R() < 0.15 ? 1 : 0; } }
+          else if (v < 0.21) blocks[i] = 1045;
+        }
+      }
+    }
+  }
   // glow lichen on cave walls (1.17), only well below the surface
   const LF = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]];
   const rocky = b => b === 1 || b === 76 || b === 75 || b === 91 || b === 92 || b === 93;
@@ -1660,7 +1725,7 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.CROSS || rt === RT.CROP) {
       const age = meta & 7, stg = age >= 7 ? 3 : age >= 4 ? 2 : age >= 2 ? 1 : 0;
-      const tile = id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : id === 255 ? T[['carrots', 'potatoes', 'beetroots', 'carrots'][(meta >> 3) & 3] + '_stage' + stg] : HASV[id] ? VT[id * 16 + (meta & 15)] : FT[id * 4];
+      const tile = id === 1044 ? (meta & 1 ? T.cave_vines_lit : T.cave_vines) : id === 1048 ? (meta & 8 ? T.small_dripleaf_top : T.small_dripleaf) : id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : id === 255 ? T[['carrots', 'potatoes', 'beetroots', 'carrots'][(meta >> 3) & 3] + '_stage' + stg] : HASV[id] ? VT[id * 16 + (meta & 15)] : FT[id * 4];
       flatLight(x, y, z);
       const sh = SH4; sh[0] = sh[1] = sh[2] = sh[3] = 1;
       const planes = rt === RT.CROSS
@@ -1748,9 +1813,9 @@ function meshChunk(B, M, L, bio, opts) {
         if (atEdge && OPQ[blk(nx, ny, nz)]) continue;
         if (atEdge && (id === 156 || id === 117 || id === 173 || id === 254) && blk(nx, ny, nz) === id) continue;
         if (atEdge && id === 51 && F.n[1] === 0 && blk(nx, ny, nz) === 51 && M[pidx(nx, ny, nz)] >= meta) continue;
-        if (atEdge && F.n[1] === 0 && (id >= 109 && id <= 111 || id === 250) && blk(nx, ny, nz) === id && M[pidx(nx, ny, nz)] === meta) continue;
+        if (atEdge && F.n[1] === 0 && (id >= 109 && id <= 111 || id === 250 || (id >= 1031 && id <= 1034)) && blk(nx, ny, nz) === id && M[pidx(nx, ny, nz)] === meta) continue;
         if (atEdge) flatLight(nx, ny, nz); else flatLight(x, y, z);
-        if (atEdge && id !== 51 && id !== 57 && !(id >= 109 && id <= 111)) { const own = lightAt(x, y, z), nl = lightAt(nx, ny, nz); if (((own >> 4) + (own & 15)) > ((nl >> 4) + (nl & 15))) flatLight(x, y, z); }
+        if (atEdge && id !== 51 && id !== 57 && !(id >= 109 && id <= 111) && !(id >= 1031 && id <= 1034)) { const own = lightAt(x, y, z), nl = lightAt(nx, ny, nz); if (((own >> 4) + (own & 15)) > ((nl >> 4) + (nl & 15))) flatLight(x, y, z); }
         SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
         for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? bx[3] : bx[0]) / 16; CS[k][1] = y + (c[1] ? bx[4] : bx[1]) / 16; CS[k][2] = z + (c[2] ? bx[5] : bx[2]) / 16; }
         let u0, u1, v0, v1;
@@ -1795,6 +1860,8 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 233 && bi > 0 && F.n[1] > 0) { tile = T.composter_top; }
         else if (id === 224 && bi === 0 && f === 2) { tile = T.hopper_top; }
         else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
+        else if ((id === 1039 || id === 1040) && bi === 1) { tile = T.azalea_plant; u0 = 0; u1 = 16; v0 = 8; v1 = 16; }
+        else if (id === 1046 && bi === (((meta >> 2) & 3) >= 2 ? 2 : 1)) { tile = T.big_dripleaf_stem; u0 = 6; u1 = 10; }
         else if (id === 1027) {
           if (bi === 4) tile = F.n[1] < 0 ? T.cauldron_bottom : T.cauldron_inner;
           else if (bi >= 5 && bi < 9) tile = F.n[1] < 0 ? T.cauldron_bottom : T.cauldron_side;
