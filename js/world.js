@@ -147,7 +147,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (old !== id || oe !== ne) relight(x, y, z, old, id, oe, ne);
   markDirty(x, z);
   if ((old === BID.chain || id === BID.chain) && typeof rodTrack === 'function') rodTrack(x, y, z, S.isRod(id, meta));
-  if ((old === BID.sculk_sensor || id === BID.sculk_sensor) && typeof sensorTrack === 'function') sensorTrack(x, y, z, id === BID.sculk_sensor);
+  if (old !== id && (TRACKED.has(old) || TRACKED.has(id))) { const k = x + ',' + y + ',' + z; if (TRACKED.has(old)) TRACKED.get(old).delete(k); if (TRACKED.has(id)) TRACKED.get(id).add(k); }
   if (W.onBlockChanged) W.onBlockChanged(x, y, z, old, id);
   if (!opts.noUpdate) {
     neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz);
@@ -251,6 +251,9 @@ function updateConnections(x, y, z, b) {
   setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
 }
 // ---------- fluids ----------
+// blocks that some system needs to find quickly (sculk sensors, beacons): block id -> Set of "x,y,z" in loaded chunks
+const TRACKED = new Map();
+function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); return TRACKED.get(id); }
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
 function fluidUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
@@ -492,7 +495,8 @@ function addChunk(cx, cz, d, tiles) {
   }
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
-  if (d.fromSave && typeof rodScan === 'function') { rodScan(c); sensorScan(c); }
+  if (d.fromSave && typeof rodScan === 'function') rodScan(c);
+  if (d.fromSave && TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
 }
 function requestGen(cx, cz) {
@@ -604,7 +608,8 @@ async function loadChunk(cx, cz) {
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
   saveChunk(c, true);
-  if (typeof rodUnload === 'function') { rodUnload(c); sensorUnload(c); }
+  if (typeof rodUnload === 'function') rodUnload(c);
+  for (const s of TRACKED.values()) for (const k of s) { const [x, , z] = k.split(',').map(Number); if (x >> 4 === c.cx && z >> 4 === c.cz) s.delete(k); }
   W.chunks.delete(c.key); W.lastKey = -1;
 }
 // streaming: called every frame with player chunk position

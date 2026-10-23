@@ -232,6 +232,7 @@ PAINT.sculk_sensor_tendril_active = r => fill((x, y) => (x + y) % 5 === 0 || r()
 PAINT.brewing_stand = r => fill((x, y) => x >= 6 && x <= 9 ? quant(shade(hex(0xc8a24a), 1 + (x === 6 ? .15 : x === 9 ? -.2 : 0) + (r() - .5) * .1), 3) : null);
 PAINT.brewing_stand_base = r => stoneLike(hex(0x5a5a5a), r, 0.2);
 PAINT.brewing_bottle = r => fill((x, y) => [200 + r.int(30), 220 + r.int(20), 240, 150]);
+PAINT.beacon = r => fill((x, y) => { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return d > 6 ? hex(0x6ad8d0) : quant(shade(hex(0xd8fff8), 1 - d / 20 + (r() - .5) * .08), 3); });
 PAINT.moss_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x5a7a2c), 1 + (nz(x, y) - .5) * .3 + (r() - .5) * .2), 3)); };
 PAINT.bricks = r => fill((x, y) => { if (y % 4 === 3) return gray(0x9c + r.int(10)); const off = (y >> 2) % 2 ? 4 : 0; if ((x + off) % 8 === 7) return gray(0xa0); return quant(shade(pal(r, [hex(0x965040), hex(0xa25a47), hex(0x8a4636)]), 1 + (r() - .5) * .1), 3); });
 PAINT.stone_bricks = r => { stoneLike(hex(0x7c7c7c), r, 0.18); for (let x = 0; x < 16; x++) { P(x, 7, gray(0x4a)); P(x, 15, gray(0x4a)); P(x, 0, gray(0x95)); P(x, 8, gray(0x95)); } for (let y = 0; y < 8; y++) { P(15, y, gray(0x4a)); P(0, y, gray(0x95)); } for (let y = 8; y < 16; y++) { P(7, y, gray(0x4a)); P(8, y, gray(0x95)); } };

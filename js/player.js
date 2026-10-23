@@ -412,6 +412,7 @@ function interactBlock(t, dry) {
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
+    case BID.beacon: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'beacon' }); UI.openScreen('beacon', { x, y, z }); } return true;
     case BID.brewing_stand: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newBrewing()); UI.openScreen('brewing', { x, y, z }); } return true;
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
@@ -630,6 +631,7 @@ function placeBlock(t, d) {
   if (id === BID.blast_furnace || id === BID.smoker) setTile(x, y, z, newFurnace(BLOCKS[id].furnace));
   if (id === BID.barrel) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   if (id === BID.brewing_stand) setTile(x, y, z, newBrewing());
+  if (id === BID.beacon) setTile(x, y, z, { type: 'beacon' });
   if (id === BID.hopper) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 });
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });

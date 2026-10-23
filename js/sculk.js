@@ -1,10 +1,7 @@
 // Sculk sensors (1.17): vibrations within 8 blocks (footsteps, landing, blocks placed or broken, doors and
 // chests used, projectiles, explosions) activate them for 40 ticks with a redstone signal that fades with distance.
 // Wool between the source and the sensor muffles the vibration; walking on wool or carpet makes none.
-const SENSORS = new Set();
-function sensorTrack(x, y, z, on) { const k = x + ',' + y + ',' + z; if (on) SENSORS.add(k); else SENSORS.delete(k); }
-function sensorScan(c) { const b = c.blocks; for (let i = 0; i < b.length; i++) if (b[i] === BID.sculk_sensor) SENSORS.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); }
-function sensorUnload(c) { for (const k of SENSORS) { const [x, , z] = k.split(',').map(Number); if (x >> 4 === c.cx && z >> 4 === c.cz) SENSORS.delete(k); } }
+const SENSORS = trackBlocks(BID.sculk_sensor);
 const isWool = b => b === BID.white_wool;
 function woolBetween(ax, ay, az, bx, by, bz) {
   const d = Math.hypot(bx - ax, by - ay, bz - az), n = Math.ceil(d * 2);

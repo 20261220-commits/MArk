@@ -161,6 +161,7 @@ for (const [k, name, col, eff] of POTION_TYPES) {
   P.items.lingering = item('lingering_' + k + '_potion', '잔류형 ' + stem, { stack: 1, lingering: 1, potion: k, pcol: col, form: 2, lore: eff.length ? effText(eff, 0.25) : lore });
   if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
 }
+item('nether_star', '네더의 별', { glint: 1 });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
@@ -325,7 +326,7 @@ for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
 shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
-shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
+shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' }); shaped('beacon', 1, ['GGG', 'GSG', 'OOO'], { G: 'glass', S: 'nether_star', O: 'obsidian' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
 shapeless('fermented_spider_eye', 1, ['spider_eye', 'brown_mushroom', 'sugar']); shaped('glistering_melon_slice', 1, ['NNN', 'NMN', 'NNN'], { N: 'gold_nugget', M: 'melon_slice' });
 for (const P of Object.values(POTION)) if (P.items.arrow && P.key !== 'water') shaped(P.key + '_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_' + P.key + '_potion' });
 shaped('water_arrow', 8, ['AAA', 'APA', 'AAA'], { A: 'arrow', P: 'lingering_water_potion' }); shapeless('glow_item_frame', 1, ['item_frame', 'glow_ink_sac']);

@@ -129,6 +129,8 @@ UI.renderScreen = () => {
   } else if (T === 'furnace') {
     const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / (t.kind ? 100 : 200);
     h = `<div class="panel"><div class="cap">${t.kind === 'blast' ? '용광로' : t.kind === 'smoker' ? '훈연기' : '화로'}</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'beacon') {
+    h = beaconHtml();
   } else if (T === 'brewing') {
     const t = GUI.ctx.tile, prog = t.time ? 1 - t.time / 400 : 0;
     h = `<div class="panel"><div class="cap">양조기</div><div class="row top brew"><div class="col">${slotHtml(4, 'bfuel')}<div class="fuelbar"><i style="width:${t.fuel / 20 * 100}%"></i></div></div><div class="col bmid">${slotHtml(3)}<div class="bprog"><i style="height:${prog * 100}%"></i></div><div class="row">${slotHtml(0)}${slotHtml(1)}${slotHtml(2)}</div></div></div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
@@ -404,6 +406,7 @@ function enchantOptions() {
   return { shelves, list };
 }
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-trade]'); if (b && UI.screen === 'trade') selectTrade(+b.dataset.trade); });
+$('screen').addEventListener('click', e => { const b = e.target.closest('[data-beacon]'); if (!b || UI.screen !== 'beacon') return; const [slot, k] = b.dataset.beacon.split(':'); if (slot === 'ok') beaconConfirm(); else beaconPick(slot, k); });
 $('screen').addEventListener('click', e => {
   const b = e.target.closest('[data-ench]'); if (!b || UI.screen !== 'enchant') return;
   const i = +b.dataset.ench, o = enchantOptions().list[i]; if (!o || !o.ok) return;

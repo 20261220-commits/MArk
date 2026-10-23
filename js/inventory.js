@@ -49,6 +49,9 @@ function buildSlots(type, ctx) {
     ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
     L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
+  } else if (type === 'beacon') {
+    ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
+    L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
   } else if (type === 'brewing') {
     const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let k = 0; k < 3; k++) L.push(slotRef(t.items, k, { group: 'bbottle', accepts: isBottle, max: 1 }));
@@ -112,6 +115,7 @@ function quickMove(i) {
     else if (T === 'anvil') targets = idx(s => s.group === (GUI.ctx.items[0] ? 'a1' : 'a0'));
     else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
+    else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
     if (T === 'creative') targets = [];
@@ -129,7 +133,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }

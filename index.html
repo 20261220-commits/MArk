@@ -57,6 +57,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #ovPortal{background:radial-gradient(ellipse at center,rgba(120,40,200,.35),rgba(90,0,170,.85));opacity:0}
 .brew{justify-content:center;gap:calc(14*var(--px))}.brew .bmid{align-items:center}.fuelbar{width:calc(18*var(--px));height:calc(4*var(--px));background:#3a2a10;margin-top:calc(2*var(--px))}.fuelbar i{display:block;height:100%;background:#e8a020}.bprog{width:calc(5*var(--px));height:calc(18*var(--px));background:#555;margin:calc(2*var(--px)) 0;display:flex;align-items:flex-end}.bprog i{display:block;width:100%;background:#f0f0f0}
 #tooltip small.lore{color:#5555ff}
+.beacon{gap:calc(10*var(--px))}.btier{display:flex;align-items:center;gap:calc(3*var(--px));margin-bottom:calc(3*var(--px))}.btier small{width:calc(26*var(--px));color:#404040}
+.bpow{display:flex;align-items:center;gap:calc(2*var(--px));font:inherit;font-size:calc(7*var(--px));padding:calc(2*var(--px)) calc(4*var(--px));background:#8b8b8b;border:var(--px) solid #373737;color:#fff;cursor:pointer}.bpow i{width:calc(6*var(--px));height:calc(6*var(--px));display:inline-block}.bpow.on{background:#2f8f2f}.bpow.off{opacity:.4;pointer-events:none}.bok{font:inherit;padding:calc(3*var(--px)) calc(6*var(--px));margin-left:calc(4*var(--px));cursor:pointer}
 #effects{position:fixed;top:calc(4*var(--px));right:calc(4*var(--px));pointer-events:none;z-index:5;display:flex;flex-direction:column;gap:var(--px);align-items:flex-end}
 #effects .ef{background:rgba(0,0,0,.55);color:#fff;font-size:calc(7*var(--px));padding:calc(2*var(--px)) calc(4*var(--px));display:flex;align-items:center;gap:calc(3*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 #effects .ef i{display:inline-block;width:calc(6*var(--px));height:calc(6*var(--px));border:var(--px) solid #000}
@@ -248,6 +250,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/sculk.js"></script>
 <script src="js/frames.js"></script>
 <script src="js/potions.js"></script>
+<script src="js/beacon.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/effects.js"></script>
 <script src="js/player.js"></script>
