@@ -217,7 +217,8 @@ function gameTick() {
   if (W.tickN % 200 === 100) trySpawnGlowSquid();
   displayTick();
   spawnerTick();
-  if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); beaconTick(); }
+  if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); beaconTick(); jukeboxVolume(); }
+  if (W.tickN % 40 === 0) campfireCleanup();
   if (W.tickN % 600 === 0) saveAll();
 }
 

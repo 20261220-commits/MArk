@@ -131,6 +131,7 @@ function rsTick() {
 // immediate checks: decide whether a component needs to change, and schedule it
 function rsComponent(x, y, z, b) {
   const m = getMeta(x, y, z);
+  if (b === BID.bell) { bellPower(x, y, z, m); return; }
   if (b === RSB.torch || b === RSB.torchOff) {
     const a = torchAttach(x, y, z, m), pw = isConductor(getBlock(a[0], a[1], a[2])) ? Math.max(strongPower(a[0], a[1], a[2]), weakPower(a[0], a[1], a[2])) : 0;
     if ((b === RSB.torch) === (pw > 0)) rsLater(x, y, z, 2);
@@ -261,6 +262,7 @@ function containerSignal(x, y, z) {
   const b = getBlock(x, y, z);
   if (b === BID.composter) return Math.min(15, (getMeta(x, y, z) & 15) * 2 - (getMeta(x, y, z) >= 8 ? 1 : 0));
   if (b === BID.cauldron) return getMeta(x, y, z) & 3;
+  if (b === BID.jukebox) { const t = getTile(x, y, z), st = t && t.items && t.items[0]; return st ? ITEMS[st.id].disc : 0; } // the disc number
   const fr = typeof frameAt === 'function' && frameAt(x, y, z); if (fr) return fr.item ? fr.rot + 1 : 0; // item frame: its rotation
   const t = getTile(x, y, z); if (!t || !t.items) return -1;
   let f = 0, any = false; for (const st of t.items) if (st) { f += st.n / maxStack(st.id); any = true; }

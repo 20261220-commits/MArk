@@ -455,7 +455,7 @@ function ensureDragon() {
 const TRADES = {
   farmer: [[['wheat', 20], ['emerald', 1]], [['emerald', 1], ['bread', 6]], [['emerald', 1], ['apple', 4]], [['pumpkin', 6], ['emerald', 1]], [['emerald', 3], ['golden_apple', 1]], [['melon', 4], ['emerald', 1]]],
   librarian: [[['paper', 24], ['emerald', 1]], [['emerald', 9], ['bookshelf', 1]], [['book', 4], ['emerald', 1]], [['emerald', 1], ['lantern', 1]], [['emerald', 5], ['glass', 4]], [['emerald', 20], ['enchanted_book', 1]]],
-  armorer: [[['emerald', 5], ['chainmail_chestplate', 1]], [['emerald', 3], ['chainmail_helmet', 1]], [['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
+  armorer: [[['emerald', 36], ['bell', 1]], [['emerald', 5], ['chainmail_chestplate', 1]], [['emerald', 3], ['chainmail_helmet', 1]], [['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
   toolsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 1], ['stone_axe', 1]], [['emerald', 1], ['stone_pickaxe', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 13], ['diamond_pickaxe', 1]]],
   weaponsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 3], ['iron_axe', 1]], [['emerald', 7], ['iron_sword', 1]], [['flint', 24], ['emerald', 1]], [['emerald', 13], ['diamond_sword', 1]]],
   butcher: [[['chicken', 14], ['emerald', 1]], [['porkchop', 7], ['emerald', 1]], [['emerald', 1], ['cooked_porkchop', 5]], [['emerald', 1], ['cooked_chicken', 8]], [['coal', 15], ['emerald', 1]]],

@@ -69,7 +69,7 @@ function splashPotion(id, x, y, z, direct) {
     if (d.potion === 'water') { t.fire = 0; if (t !== PL && t.def.waterHurt) hurtMob(t, 1, null); continue; }
     applyPotion(t, d.potion, f);
   }
-  if (d.potion === 'water') for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -2; dz <= 2; dz++) { const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz; if (getBlock(bx, by, bz) === BID.fire) setBlock(bx, by, bz, 0); }
+  if (d.potion === 'water') for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -2; dz <= 2; dz++) { const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz, fb = getBlock(bx, by, bz); if (fb === BID.fire) setBlock(bx, by, bz, 0); else if (isCampfire(fb)) setMeta(bx, by, bz, getMeta(bx, by, bz) & ~4); }
 }
 // ---------- lingering clouds ----------
 function spawnCloud(x, y, z, type, opts = {}) {

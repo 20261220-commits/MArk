@@ -244,6 +244,7 @@ function survivalTick(inWater, inLava, eyeF) {
   if (eyeF === 1 && !effLv(PL, 'water_breathing') && !effLv(PL, 'conduit_power')) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
+  campfireStand();
   const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
   if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
@@ -421,6 +422,9 @@ function interactBlock(t, dry) {
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
+    case BID.campfire: case BID.soul_campfire: { const h = PL.held(); if (dry) return !!(h && (campfireFood(h.id) || (ITEMS[h.id].tool && ITEMS[h.id].tool.type === S.TOOL.SHOVEL && (m & 4)) || ((h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !(m & 4)))); return campfireUse(x, y, z, m, h); }
+    case BID.bell: if (!dry) ringBell(x, y, z); return true;
+    case BID.jukebox: { const h = PL.held(), t = getTile(x, y, z); if (dry) return !!((t && t.items && t.items[0]) || (h && ITEMS[h.id].disc)); return jukeboxUse(x, y, z, h); }
     case BID.beacon: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'beacon' }); UI.openScreen('beacon', { x, y, z }); } return true;
     case BID.brewing_stand: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newBrewing()); UI.openScreen('brewing', { x, y, z }); } return true;
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
@@ -597,6 +601,8 @@ function placeBlock(t, d) {
   if (id === BID.torch || id === BID.soul_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
+  if (isCampfire(id)) meta = fd | 4; // placed lit
+  if (id === BID.bell) { meta = bellAttach(t, fd); if (!bellSupported(x, y, z, meta)) return; }
   if (id === BID.end_rod || (id === BID.chain && vi === 1)) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
   if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
@@ -641,6 +647,8 @@ function placeBlock(t, d) {
   if (id === BID.barrel) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   if (id === BID.brewing_stand) setTile(x, y, z, newBrewing());
   if (id === BID.beacon) setTile(x, y, z, { type: 'beacon' });
+  if (isCampfire(id)) setTile(x, y, z, newCampfire());
+  if (id === BID.jukebox) setTile(x, y, z, { type: 'jukebox', items: [null] });
   if (id === BID.hopper) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 });
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
@@ -669,6 +677,7 @@ function furnaceTick() {
   for (const c of W.chunks.values()) if (c.hasFurnace !== false) for (const [i, t] of c.tiles) {
     if (c.hasFurnace === undefined) c.hasFurnace = false; // re-flagged below (or by setTile) when a furnace exists
     if (t.type === 'brewing') { c.hasFurnace = true; brewTick(c, i, t); continue; }
+    if (t.type === 'campfire') { c.hasFurnace = true; campfireTick(c, i, t); continue; }
     if (t.type !== 'furnace') continue;
     c.hasFurnace = true;
     const [inp, fuel, out] = t.items;

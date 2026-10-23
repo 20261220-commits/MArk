@@ -162,7 +162,7 @@ function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
 }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
-function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing') c.hasFurnace = true; c.noTicking = false; }
+function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing' || t.type === 'campfire') c.hasFurnace = true; c.noTicking = false; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
 // support rules of the 1.17 lush-cave plants (plant codes 10+)
 const LUSH_SOIL = new Set([2, 3, 53, 57, 87, 203, 204, 205, 1049]); // grass, dirt, clay, farmland, moss, podzol, mycelium, coarse dirt, rooted dirt
@@ -219,6 +219,7 @@ function neighborUpdate(x, y, z) {
     return;
   }
   if ((b === 198 || b === 246) && S.candleOf(b, m)) { if (!supportedBy(below) || FLUID[getBlock(x, y + 1, z)] === 2) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.bell) { if (!bellSupported(x, y, z, m)) breakNaturally(x, y, z, b, m); return; }
   if (S.BUD[b]) { // buds and clusters need the block they grow from (old saves without a facing: any side)
     if (m) { const d = S.DIR6[m - 1]; if (!OPQ[getBlock(x - d[0], y - d[1], z - d[2])]) breakNaturally(x, y, z, b, m); }
     else if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m);

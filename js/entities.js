@@ -482,6 +482,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.hp <= 0) {
     e.deathT = 20;
     if (e.def.slime) slimeDeath(e);
+    if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
     if (attacker === PL || src === 'player') {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
       const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
@@ -669,7 +670,7 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) vibrate(nx, ny, nz); if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
@@ -681,7 +682,7 @@ function arrowTick(e) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
       if (e.trident) { tridentHit(e, o); break; }
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
       removeEnt(e); return;
     }
