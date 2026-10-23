@@ -379,6 +379,7 @@ function resize() {
 addEventListener('resize', resize); resize();
 R.resize = resize;
 const NETHER_FOG = { 13: new THREE.Color(0x330808), 14: new THREE.Color(0x330303), 15: new THREE.Color(0x1a051a), 16: new THREE.Color(0x1b4745), 17: new THREE.Color(0x685f70) };
+const FLASH_SKY = new THREE.Color(0xdde4ff);
 const END_SKY = new THREE.Color(0x0b0811), netherFog = new THREE.Color(0x330808);
 function renderFrame(dt, eye, under) {
   if (W.dim) return renderOtherDim(dt, eye, under);
@@ -389,6 +390,8 @@ function renderFrame(dt, eye, under) {
   // sky colors
   tmpC.copy(SKY_NIGHT).lerp(SKY_DAY, day); tmpC2.copy(FOG_NIGHT).lerp(FOG_DAY, day);
   if (W.rain > 0) { tmpC.lerp(RAIN_SKY, W.rain * 0.6 * day); tmpC2.lerp(RAIN_SKY, W.rain * 0.6 * day); }
+  if (W.thunder > 0) { tmpC.multiplyScalar(1 - W.thunder * 0.35); tmpC2.multiplyScalar(1 - W.thunder * 0.35); }
+  if (W.flash > 0) { tmpC.lerp(FLASH_SKY, W.flash * 0.7); tmpC2.lerp(FLASH_SKY, W.flash * 0.7); }
   const duskAmt = Math.max(0, 1 - Math.abs(sunDir.y) * 3.2) * (1 - W.rain);
   skyMat.uniforms.top.value.copy(tmpC); skyMat.uniforms.bottom.value.copy(tmpC2);
   skyMat.uniforms.glow.value.copy(DUSK); skyMat.uniforms.glowAmt.value = duskAmt * 0.85; skyMat.uniforms.glowDir.value.set(sunDir.x > 0 ? 1 : -1, 0, 0);
@@ -408,7 +411,7 @@ function renderFrame(dt, eye, under) {
   cloudTex.offset.set((camera.position.x / 768) * 6 + performance.now() / 1e6, (-camera.position.z / 768) * 6);
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
-  const skyF = 0.18 + 0.82 * day;
+  const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment
   for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = 0.035; m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));

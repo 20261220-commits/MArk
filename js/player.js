@@ -94,7 +94,7 @@ function hurtPlayer(dmg, cause, attacker) {
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -137,7 +137,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -273,7 +273,7 @@ function interactTick() {
     if (creative()) { breakBlock(t.x, t.y, t.z); MINE.cd = 5; }
     else {
       if (MINE.x !== t.x || MINE.y !== t.y || MINE.z !== t.z || MINE.id !== t.id) { MINE.x = t.x; MINE.y = t.y; MINE.z = t.z; MINE.id = t.id; MINE.prog = 0; MINE.ticks = 0; }
-      const need = breakTicks(t.id, held, PL.onGround || PL.flying, PL.eyeFluid === 1);
+      const need = breakTicks(t.id, held, PL.onGround || PL.flying, PL.eyeFluid === 1, t.m);
       if (need === Infinity) MINE.prog = 0;
       else {
         MINE.prog += need === 0 ? 1 : 1 / need; MINE.ticks++;
@@ -387,6 +387,7 @@ function interactBlock(t, dry) {
   if (PL.sneaking && PL.held()) return false;
   const { x, y, z, id, m } = t;
   switch (id) {
+    case 198: case 246: { const cd = S.candleOf(id, m); if (!cd || !cd.lit || PL.held()) return false; if (!dry) { setBlock(x, y, z, ...S.candleBlock(cd.c, cd.n, 0)); play('fizz', { vol: 0.4 }); } return true; }
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.blast_furnace: case BID.smoker: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace(BLOCKS[id].furnace)); UI.openScreen('furnace', { x, y, z }); } return true;
@@ -416,7 +417,7 @@ function trySleep(x, y, z) {
   if (W.dim !== 0) { setBlock(x, y, z, 0); explode(x + .5, y + .5, z + .5, 5, true); return; } // beds explode outside the Overworld
   const t = ((W.time % 24000) + 24000) % 24000;
   PL.spawn = [x, y + 1, z]; UI.flash('리스폰 지점이 설정되었습니다');
-  if (t < 12542 || t > 23460) { if (W.rain < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } }
+  if (t < 12542 || t > 23460) { if (W.thunder < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } } // plain rain is not enough (Java)
   if (ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - x) < 8 && Math.abs(e.y - y) < 5 && Math.abs(e.z - z) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
   PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0;
 }
@@ -448,20 +449,32 @@ function useItem(first) {
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
+    if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
+      removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
+      if (creative()) { if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } else INV.slots[INV.sel] = it;
+      play('splash'); swing(); UI.hudDirty = true; return;
+    }
     if (e.kind === 'mob' && mobInteract(e, h, d)) return;
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
     if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
-    if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
+    if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }
   if (t && t.type === 'block') {
     if (first && interactBlock(t, false)) { swing(); return; }
     const { x, y, z, id } = t;
     if (d) {
-      // tools on blocks
+      // candles: stack up to four of the same colour, or light one with flint and steel
+      const cdT = S.candleOf(id, t.m);
+      if (d.candle != null && cdT && cdT.c === d.candle && cdT.n < 4) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n + 1, cdT.lit)); consume(); play('place', { mat: 'wool' }); swing(); return; }
+      if (d.candle != null) { placeCandle(t, d.candle); return; }
+      if (cdT && !cdT.lit && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !FLUID[getBlock(x, y + 1, z)]) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n, 1)); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      // copper (1.17): honeycomb waxes it (no more oxidation), an axe scrapes the wax off before any oxidation
+      if (h.id === IID.honeycomb && id >= 63 && id <= 67 && !(t.m & 1)) { setMeta(x, y, z, t.m | 1); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
+      if (tool && tool.type === S.TOOL.AXE && id >= 63 && id <= 67 && (t.m & 1)) { setMeta(x, y, z, t.m & ~1); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
@@ -477,11 +490,12 @@ function useItem(first) {
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
       if (h.id === IID.bucket) { if (FLUID[id] && getMeta(x, y, z) === 0) { setBlock(x, y, z, 0); consume(); const it = { id: id === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; if (creative()) {} else if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); play('splash'); swing(); } else if (id === BID.powder_snow) { setBlock(x, y, z, 0); consume(); const it = { id: IID.powder_snow_bucket, n: 1 }; if (!PL.held()) INV.slots[INV.sel] = it; else INV.add(it); swing(); } return; }
-      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket) {
+      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket || h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
-        const fl = h.id === IID.water_bucket ? 27 : h.id === IID.lava_bucket ? 28 : BID.powder_snow;
+        const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
+        if (h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) spawnMob(h.id === IID.axolotl_bucket ? 'axolotl' : 'tropical_fish', px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true });
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
         play('splash'); swing(); return;
       }
@@ -509,6 +523,12 @@ function boneMeal(x, y, z, id) {
   if (id === 2) { for (let k = 0; k < 40; k++) { const tx = x + Math.floor((Math.random() - .5) * 7), tz = z + Math.floor((Math.random() - .5) * 7); for (let ty = y + 2; ty >= y - 2; ty--) if (getBlock(tx, ty, tz) === 2 && getBlock(tx, ty + 1, tz) === 0) { setBlock(tx, ty + 1, tz, Math.random() < 0.85 ? 29 : [31, 32, 33, 34][Math.floor(Math.random() * 4)]); break; } } return true; }
   return false;
 }
+function placeCandle(t, c) {
+  let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
+  const tgt = getBlock(t.x, t.y, t.z); if (REPL[tgt] && !FLUID[tgt]) { x = t.x; y = t.y; z = t.z; }
+  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < 0 || y >= CH) return;
+  setBlock(x, y, z, ...S.candleBlock(c, 1, 0)); consume(); play('place', { mat: 'wool' }); swing();
+}
 function placeBlock(t, d) {
   let id = d.place, meta = d.pmeta || 0;
   const vi = d.vi != null ? d.vi : null, vsh = S.VSH[id];
@@ -534,7 +554,7 @@ function placeBlock(t, d) {
   if (id === BID.torch || id === BID.soul_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
-  if (id === BID.end_rod) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
+  if (id === BID.end_rod || (id === BID.chain && vi === 1)) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);

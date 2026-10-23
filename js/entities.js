@@ -453,6 +453,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5);
+  if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
   if (type === 'sheep' && e.sheared) setSheared(e);
   return addEnt(e);
 }
@@ -466,6 +467,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
   if (attacker === PL) {
+    e.plHitT = W.tickN; // axolotls go after what the player is fighting
     if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
@@ -746,7 +748,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0 }]);
+    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant }]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     if (e === PL.riding) continue;
     removeEnt(e);
@@ -755,7 +757,7 @@ R.onChunkUnloaded = c => {
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
-  if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); }
+  if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;

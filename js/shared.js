@@ -21,7 +21,8 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'deepslate_diamond_ore dripstone_block pointed_dripstone moss_block tinted_glass smooth_stone smooth_stone_slab_side stone_bricks granite ' +
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
-  'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ');
+  'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ')
+  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -113,11 +114,11 @@ const BLOCK_ROWS = [
   [60, 'iron_block', '철 블록', C, 'iron_block', 5, P, 2],
   [61, 'gold_block', '금 블록', C, 'gold_block', 3, P, 3],
   [62, 'diamond_block', '다이아몬드 블록', C, 'diamond_block', 5, P, 3],
-  [63, 'copper_block', '구리 블록', C, 'copper_block', 3, P, 2, { oxid: 64 }],
-  [64, 'exposed_copper', '약간 녹슨 구리', C, 'exposed_copper', 3, P, 2, { oxid: 65, scrape: 63 }],
-  [65, 'weathered_copper', '녹슨 구리', C, 'weathered_copper', 3, P, 2, { oxid: 66, scrape: 64 }],
-  [66, 'oxidized_copper', '산화된 구리', C, 'oxidized_copper', 3, P, 2, { scrape: 65 }],
-  [67, 'cut_copper', '깎인 구리', C, 'cut_copper', 3, P, 2],
+  [63, 'copper_block', '구리 블록', C, 'copper_block', 3, P, 2, { oxid: 64, vars: ['copper_block', 'copper_block'], vk: ['copper_block', 'waxed_copper_block'], vn: ['구리 블록', '밀랍칠한 구리 블록'], late: 1 }],
+  [64, 'exposed_copper', '약간 녹슨 구리', C, 'exposed_copper', 3, P, 2, { oxid: 65, scrape: 63, vars: ['exposed_copper', 'exposed_copper'], vk: ['exposed_copper', 'waxed_exposed_copper'], vn: ['약간 녹슨 구리', '밀랍칠한 약간 녹슨 구리'], late: 1 }],
+  [65, 'weathered_copper', '녹슨 구리', C, 'weathered_copper', 3, P, 2, { oxid: 66, scrape: 64, vars: ['weathered_copper', 'weathered_copper'], vk: ['weathered_copper', 'waxed_weathered_copper'], vn: ['녹슨 구리', '밀랍칠한 녹슨 구리'], late: 1 }],
+  [66, 'oxidized_copper', '산화된 구리', C, 'oxidized_copper', 3, P, 2, { scrape: 65, vars: ['oxidized_copper', 'oxidized_copper'], vk: ['oxidized_copper', 'waxed_oxidized_copper'], vn: ['산화된 구리', '밀랍칠한 산화된 구리'], late: 1 }],
+  [67, 'cut_copper', '깎인 구리', C, 'cut_copper', 3, P, 2, { vars: ['cut_copper', 'cut_copper'], vk: ['cut_copper', 'waxed_cut_copper'], vn: ['깎인 구리', '밀랍칠한 깎인 구리'], late: 1 }],
   [68, 'raw_iron_block', '철 원석 블록', C, 'raw_iron_block', 5, P, 2],
   [69, 'raw_gold_block', '금 원석 블록', C, 'raw_gold_block', 5, P, 3],
   [70, 'raw_copper_block', '구리 원석 블록', C, 'raw_copper_block', 5, P, 2],
@@ -306,7 +307,7 @@ const BLOCK_ROWS = [
   [243, 'soul_torch', '영혼 횃불', RT.TORCH, 'soul_torch', 0, N, 0, { light: 10, nosolid: 1 }],
   [244, 'soul_lantern', '영혼 랜턴', RT.BOX, 'soul_lantern', 3.5, P, 0, { light: 10, lantern: 1 }],
   [245, 'soul_fire', '영혼 불', RT.CROP, 'soul_fire', 0, N, 0, { light: 10, nosolid: 1, repl: 1 }],
-  [246, 'chain', '사슬', RT.BOX, 'chain', 5, P, 0],
+  [246, 'chain', '사슬', RT.BOX, 'chain', 5, P, 0, { vars: ['chain', 'lightning_rod', 'candle'], vshift: 3, vk: ['chain', 'lightning_rod', 'candle'], vn: ['사슬', '피뢰침', '양초'], late: 1 }], // 1.17 blocks ride on chain variants (no block ids left)
   [247, 'gilded_blackstone', '금박 흑암', C, 'gilded_blackstone', 1.5, P, 1],
   [248, 'lodestone', '자석석', C, ['lodestone_side', 'lodestone_top', 'lodestone_top'], 3.5, P, 0],
   [249, 'nether_sprouts', '네더 새싹', X, 'nether_sprouts', 0, N, 0, { plant: 7, repl: 1 }],
@@ -352,6 +353,23 @@ for (const r of BLOCK_ROWS) {
   }
 }
 OPQ[BID.powder_snow] = 1;
+// candles (1.17): every block id is taken, so they live in spare meta of two hosts. Coloured candles sit on carpet
+// (198: colour | (1 + (count - 1) + lit * 4) << 4), the plain one is chain variant 2 (246: 2 << 3 | (count - 1) | lit << 2).
+function candleOf(id, m) {
+  if (id === 198) { const h = m >> 4; return h && h <= 8 ? { c: m & 15, n: ((h - 1) & 3) + 1, lit: (h - 1) >> 2 } : null; }
+  if (id === 246 && ((m >> 3) & 15) === 2) return { c: -1, n: (m & 3) + 1, lit: (m >> 2) & 1 };
+  return null;
+}
+function candleBlock(c, n, lit) { return c < 0 ? [246, 16 | (n - 1) | (lit ? 4 : 0)] : [198, c | ((1 + n - 1 + (lit ? 4 : 0)) << 4)]; }
+const isRod = (id, m) => id === 246 && ((m >> 3) & 15) === 1;
+// block light emitted by a block, including the meta-dependent ones (lit candles give 3 per candle)
+function emitOf(id, m) { if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
+const CANDLE_POS = [[[7, 7]], [[5, 6], [9, 7]], [[7, 5], [5, 9], [9, 8]], [[6, 5], [9, 5], [5, 8], [8, 8]]], CANDLE_H = [[6], [6, 5], [6, 5, 4], [6, 5, 4, 5]];
+function candleBoxes(cd) { // bodies first, then one wick (or flame) per candle
+  const pos = CANDLE_POS[cd.n - 1], hs = CANDLE_H[cd.n - 1], b = pos.map(([x, z], k) => [x, 0, z, x + 2, hs[k], z + 2]);
+  pos.forEach(([x, z], k) => b.push([x + 0.5, hs[k], z + 0.5, x + 1.5, hs[k] + (cd.lit ? 2 : 1), z + 1.5]));
+  return b;
+}
 
 // ---------- biomes ----------
 // name, grass, foliage, water, temperature, trees per chunk, tree type
@@ -395,7 +413,7 @@ function shapes(id, meta) {
     case 51: return [[0, 0, 0, 16, ((meta & 7) + 1) * 2, 16]];
     case 95: return [[0, 3, 0, 16, 9, 16], [0, 0, 0, 3, 3, 3], [13, 0, 0, 16, 3, 3], [0, 0, 13, 3, 3, 16], [13, 0, 13, 16, 3, 16]];
     case 96: case 231: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
-    case 198: return [[0, 0, 0, 16, 1, 16]];
+    case 198: { const cd = candleOf(198, meta); return cd ? candleBoxes(cd) : [[0, 0, 0, 16, 1, 16]]; }
     case 215: { const a = meta & 7; return a < 2 ? [[6, 0, 6, 10, 1, 10], [7, 1, 7, 9, 16, 9]] : a < 4 ? [[6, 6, 0, 10, 10, 1], [7, 7, 1, 9, 9, 16]] : [[0, 6, 6, 1, 10, 10], [1, 7, 7, 16, 9, 9]]; }
     case 216: return [[3, 0, 3, 13, 16, 13]];
     case 221: return [[0, 0, 0, 16, 0.5, 16]];
@@ -408,7 +426,13 @@ function shapes(id, meta) {
     case 240: return [[0, 0, 0, 16, 9, 16]];
     case 241: return [[4, 4, 2, 12, 16, 14], [2, 0, 6, 4, 13, 10], [12, 0, 6, 14, 13, 10]];
     case 242: return [[0, 0, 0, 16, 2, 16], [4, 2, 4, 12, 13, 12], [0, 13, 0, 16, 16, 16]];
-    case 246: return [[6.5, 0, 6.5, 9.5, 16, 9.5]];
+    case 246: { // chain | lightning rod (facing = DIR6 index of the tip) | plain candle
+      const v = (meta >> 3) & 15;
+      if (v === 2) return candleBoxes(candleOf(246, meta));
+      if (v !== 1) return [[6.5, 0, 6.5, 9.5, 16, 9.5]];
+      return [[[6, 0, 6, 10, 4, 10], [7, 4, 7, 9, 16, 9]], [[6, 12, 6, 10, 16, 10], [7, 0, 7, 9, 12, 9]], [[6, 6, 0, 10, 10, 4], [7, 7, 4, 9, 9, 16]],
+        [[6, 6, 12, 10, 10, 16], [7, 7, 0, 9, 9, 12]], [[0, 6, 6, 4, 10, 10], [4, 7, 7, 16, 9, 9]], [[12, 6, 6, 16, 10, 10], [0, 7, 7, 12, 9, 9]]][Math.min(5, meta & 7)];
+    }
     case 253: { // walls: post + arms toward N,E,S,W
       const b = [[4, 0, 4, 12, 16, 12]];
       if (meta & 1) b.push([5, 0, 0, 11, 14, 4]); if (meta & 2) b.push([12, 0, 5, 16, 14, 11]); if (meta & 4) b.push([5, 0, 12, 11, 14, 16]); if (meta & 8) b.push([0, 0, 5, 4, 14, 11]);
@@ -700,7 +724,7 @@ const VSTYLE = {
 const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman'];
 const LOOT = {
   smith: [['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
-  house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0]],
+  house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
   stronghold: [['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
   fortress: [['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
@@ -1007,7 +1031,7 @@ function genNether(seed, cx, cz) {
   }
   fixConnections(blocks, meta);
   const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light);
+  lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome, tiles };
 }
 // ---------- the End ----------
@@ -1095,7 +1119,7 @@ function genEnd(seed, cx, cz) {
   if (st.inside(98, -2, 102, 2)) for (let x = 98; x <= 102; x++) for (let z = -2; z <= 2; z++) { st(x, 48, z, 49); for (let y = 49; y <= 51; y++) st(x, y, z, 0); }
   fixConnections(blocks, meta);
   const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light);
+  lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome, tiles };
 }
 // fences and panes generated by structures get their connection state here (inside the chunk)
@@ -1375,7 +1399,7 @@ function genChunk(seed, cx, cz, dim) {
     }
   }
   const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light);
+  lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome, tiles };
 }
 // tree shapes; types 0 oak, 2 birch, 3 spruce
@@ -1436,7 +1460,7 @@ function growTree(set, x, y, z, type, r, snowy) {
 }
 
 // ---------- lighting (within one chunk) ----------
-function lightChunk(blocks, light) {
+function lightChunk(blocks, light, meta) {
   const q = new Int32Array(1 << 18); let qh = 0, qt = 0;
   const top = new Int16Array(256);
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -1452,7 +1476,7 @@ function lightChunk(blocks, light) {
   }
   bfs(blocks, light, q, qh, qt, 4);
   qh = qt = 0;
-  for (let i = 0; i < CVOL; i++) { const e = LEM[blocks[i]]; if (e) { light[i] = (light[i] & 0xf0) | e; q[qt++] = i; } }
+  for (let i = 0; i < CVOL; i++) { const e = meta ? emitOf(blocks[i], meta[i]) : LEM[blocks[i]]; if (e) { light[i] = (light[i] & 0xf0) | e; q[qt++] = i; } }
   bfs(blocks, light, q, qh, qt, 0);
 }
 function bfs(blocks, light, q, qh, qt, sh) {
@@ -1751,7 +1775,11 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 233 && bi > 0 && F.n[1] > 0) { tile = T.composter_top; }
         else if (id === 224 && bi === 0 && f === 2) { tile = T.hopper_top; }
         else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
-        else if (id === 246) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; }
+        else if (id === 246 || id === 198) {
+          const cd = candleOf(id, meta);
+          if (cd) tile = bi < cd.n ? (cd.c < 0 ? T.candle : T[COLORS[cd.c] + '_candle']) : cd.lit ? T.candle_flame : T.candle_wick;
+          else if (id === 246 && ((meta >> 3) & 15) === 0) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; }
+        }
         if (id === 57 && f === 2 && (meta & 7) > 0) tile = T.farmland_wet;
         if (id === 51 || id === 57) setTint(0);
         quad(OUT, OFL, CS, tile, u0, v0, u1, v1, rot, L4, SH4, false);
@@ -1797,7 +1825,7 @@ function meshChunk(B, M, L, bio, opts) {
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
-  COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, tileFor,
+  COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 

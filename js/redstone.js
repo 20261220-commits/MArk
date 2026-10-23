@@ -20,6 +20,7 @@ function strongPower(x, y, z) {
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
     else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
+    else if (b === BID.chain) { const m = getMeta(nx, ny, nz); if (S.isRod(b, m) && (m & 128)) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } } // a struck lightning rod strongly powers what it stands on
   }
   return 0;
 }
@@ -61,6 +62,7 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.comparator: { if (dy) return 0; const d = DIRS[m & 3]; return d[0] === dx && d[2] === dz ? compOut(x, y, z) : 0; }
     case BID.observer: { if (!(m & 8)) return 0; const d = S.DIR6[m & 7]; return d[0] === -dx && d[1] === -dy && d[2] === -dz ? 15 : 0; }
     case BID.daylight_detector: case BID.target: return m & 15;
+    case BID.chain: return S.isRod(b, m) && (m & 128) ? 15 : 0;
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -181,6 +183,7 @@ function rsDelayed(x, y, z) {
     const d = S.DIR6[m & 7]; rsNotify(x - d[0], y - d[1], z - d[2]); rsMark(x, y, z);
   } else if (b === BID.dispenser || b === BID.dropper) { dispense(x, y, z, b, m); }
   else if (b === BID.target && (m & 15)) { setMeta(x, y, z, m & ~15); rsNotify(x, y, z); }
+  else if (S.isRod(b, m) && (m & 128)) { setMeta(x, y, z, m & ~128); rsNotify(x, y, z); }
   else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);

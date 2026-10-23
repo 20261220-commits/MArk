@@ -171,6 +171,14 @@ PAINT.exposed_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r);
 PAINT.weathered_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r);
 PAINT.oxidized_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r);
 PAINT.cut_copper = r => copperTex(hex(0xbf6a4f), null, r, true);
+PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
+// candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
+const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
+  light_gray: 0x9a9a94, cyan: 0x188a96, purple: 0x7a30b0, blue: 0x3448a0, brown: 0x7a4c28, green: 0x4a6a1c, red: 0xa82a24, black: 0x26242c };
+function candleTex(col, r) { const c = hex(col); fill((x, y) => quant(shade(c, 1 + (x % 2 ? -0.08 : 0.06) + (y % 5 === 0 ? 0.05 : 0) + (r() - .5) * .06), 3)); }
+for (const k in CANDLE_COL) PAINT[k === 'candle' ? 'candle' : k + '_candle'] = r => candleTex(CANDLE_COL[k], r);
+PAINT.candle_wick = r => fill(() => hex(0x2a2420));
+PAINT.candle_flame = r => fill((x, y) => y < 6 ? hex(0xfff2b0) : y < 11 ? hex(0xffc040) : hex(0xff8a20));
 function rawBlock(cols, r) { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .3; return v > .65 ? cols[0] : v > .35 ? cols[1] : cols[2]; }); }
 PAINT.raw_iron_block = r => rawBlock([hex(0xe6c7ad), hex(0xa68166), hex(0x6e5444)], r);
 PAINT.raw_gold_block = r => rawBlock([hex(0xfff17a), hex(0xdea52b), hex(0x8f6514)], r);
@@ -426,6 +434,16 @@ const SPR = {
   lantern_item: () => sprite(p => { for (let x = 5; x < 11; x++) for (let y = 5; y < 13; y++) p(x, y, (y === 5 || y === 12 || x === 5 || x === 10) ? hex(0x3a3d44) : hex(0xffc84a)); for (let x = 6; x < 10; x++) p(x, 4, hex(0x3a3d44)); p(7, 2, hex(0x3a3d44)); p(8, 2, hex(0x3a3d44)); p(7, 3, hex(0x2a2d33)); p(8, 3, hex(0x2a2d33)); }),
   sugar_cane_item: () => sprite(p => { for (const x0 of [4, 8, 11]) for (let y = 1; y < 15; y++) { p(x0, y, (y + x0) % 5 === 0 ? hex(0xa8d878) : hex(0x88c060)); p(x0 + 1, y, hex(0x5a9a3a)); } }),
 };
+function candleSprite(col) { return sprite(p => { const c = hex(col); for (let y = 5; y < 15; y++) for (let x = 6; x < 10; x++) p(x, y, shade(c, x === 6 ? 1.15 : x === 9 ? 0.75 : 1)); for (let x = 6; x < 10; x++) p(x, 5, shade(c, 1.25)); p(7, 3, hex(0x2a2420)); p(7, 4, hex(0x2a2420)); }); }
+Object.assign(SPR, {
+  honeycomb: () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const dx = Math.abs(x - 7.5), dy = Math.abs(y - 8); if (dx + dy * 0.6 > 7) continue; const cell = ((x >> 1) + (y >> 2)) % 3 === 0; p(x, y, cell ? hex(0xb8701a) : (x + y) % 5 === 0 ? hex(0xffd860) : hex(0xf0a828)); } }),
+  candle_item: () => candleSprite(CANDLE_COL.candle),
+  lightning_rod_item: () => sprite(p => { for (let y = 5; y < 16; y++) { p(7, y, hex(0xe89a74)); p(8, y, hex(0xa8553a)); } for (let y = 1; y < 5; y++) for (let x = 6; x < 10; x++) p(x, y, x === 6 || y === 1 ? hex(0xf6b48a) : x === 9 ? hex(0x9c4d2f) : hex(0xd47a55)); }),
+  tropical_fish: () => sprite(p => { for (let y = 5; y < 12; y++) for (let x = 3; x < 12; x++) if (((x - 7) / 4.5) ** 2 + ((y - 8.5) / 3.2) ** 2 < 1) p(x, y, x === 7 || x === 8 ? hex(0xf4f4f4) : hex(0xf08a20)); for (let y = 6; y < 12; y++) p(12 + (Math.abs(y - 8.5) > 1.5 ? 1 : 0), y, hex(0xf08a20)); p(5, 7, hex(0x101010)); }),
+  axolotl_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6], [5, 4], [10, 4]]) p(x, y, hex(0xf5a0c4)); p(7, 5, hex(0x2a1a2a)); }),
+  tropical_fish_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6]]) p(x, y, x === 7 ? hex(0xf4f4f4) : hex(0xf08a20)); }),
+});
+for (const c of S.COLORS) SPR[c + '_candle_item'] = () => candleSprite(CANDLE_COL[c]);
 function ingot(c) { return sprite(p => { const pts = []; for (let y = 5; y < 12; y++) { const pad = Math.max(0, 8 - y); for (let x = 2 + pad; x <= 13 - Math.max(0, y - 9); x++) pts.push([x, y]); } maskDraw(p, pts, c); }); }
 function apple(c) { return sprite(p => { blob(p, 8, 9, 5.5, 5, c); p(8, 3, hex(0x5a3a1a)); p(8, 4, hex(0x5a3a1a)); p(9, 3, hex(0x3a8a2a)); p(10, 2, hex(0x3a8a2a)); p(6, 7, hex(0xffffff)); }); }
 function meat(c) { return sprite(p => { const pts = []; for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) if (((x - 8) / 6) ** 2 + ((y - 7.5) / 4.5) ** 2 < 1 - ((x + y) % 4) * 0.04) pts.push([x, y]); maskDraw(p, pts, c); for (let i = 0; i < 4; i++) p(5 + i * 2, 6 + (i & 1), hex(0xf8f0e8)); }); }

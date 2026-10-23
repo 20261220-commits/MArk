@@ -25,9 +25,9 @@ let nextId = 256;
 function item(key, name, o = {}) { const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
 // one item per variant of colour/material blocks (variant 0 lives at the block id)
 const VARITEM = new Int32Array(256 * 16).fill(-1);
-for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
+for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
 // the item a block (with its meta) drops or is picked as
-const itemOfBlock = (b, m) => { const d = BLOCKS[b]; if (!d) return b; if (d.vars) { const i = VARITEM[b * 16 + ((m >> (d.vshift || 0)) & 15)]; return i >= 0 ? i : b; } return b; };
+const itemOfBlock = (b, m) => { const d = BLOCKS[b]; if (!d) return b; const cd = (b === 198 || b === 246) && S.candleOf(b, m); if (cd) return cd.c < 0 ? IID.candle : IID[S.COLORS[cd.c] + '_candle']; if (d.vars) { const i = VARITEM[b * 16 + ((m >> (d.vshift || 0)) & 15)]; return i >= 0 ? i : b; } return b; };
 // materials: [name prefix, harvest tier, mining speed, durability, colors]
 const MATS = {
   wooden: ['나무', 1, 2, 59], stone: ['돌', 2, 4, 131], iron: ['철', 3, 6, 250], golden: ['금', 1, 12, 32], diamond: ['다이아몬드', 4, 8, 1561], netherite: ['네더라이트', 4, 9, 2031] };
@@ -115,6 +115,13 @@ for (const m of Object.keys(ARMOR)) ARMOR_PART.forEach(([k, nm], slot) => {
   const [pre, pts, durs, tough] = ARMOR[m];
   item(m + '_' + k, (m === 'leather' ? '가죽 ' : pre + ' ') + nm, { stack: 1, dur: durs[slot], armor: { slot, pts: pts[slot], tough, mat: m } });
 });
+// ---------- later additions: always appended here, because saved worlds store item ids by position ----------
+for (const b of BLOCKS) if (b && b.late) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); // waxed copper, lightning rod, candle
+item('honeycomb', '꿀벌집 조각');
+S.COLORS.forEach((c, i) => item(c + '_candle', S.COLKO[i] + ' 양초', { candle: i, sprite: c + '_candle_item' }));
+item('tropical_fish', '열대어', { food: [1, 0.2] });
+item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
+Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
   'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'jungle_log', 'acacia_log', 'dark_oak_log', 'stripped_oak_log', 'stripped_spruce_log', 'stripped_birch_log', 'stripped_jungle_log', 'stripped_acacia_log', 'stripped_dark_oak_log',
@@ -268,6 +275,12 @@ shapeless('blaze_powder', 2, ['blaze_rod']);
 shapeless('ender_eye', 1, ['ender_pearl', 'blaze_powder']);
 shapeless('magma_cream', 1, ['blaze_powder', 'slime_ball']);
 shapeless('fire_charge', 3, ['gunpowder', 'blaze_powder', 'coals']);
+// 1.17: waxing, lightning rods, candles
+for (const k of ['copper_block', 'exposed_copper', 'weathered_copper', 'oxidized_copper', 'cut_copper']) shapeless('waxed_' + k, 1, [k, 'honeycomb']);
+shaped('waxed_cut_copper', 4, ['##', '##'], { '#': 'waxed_copper_block' });
+shaped('lightning_rod', 1, ['#', '#', '#'], { '#': 'copper_ingot' });
+shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
+for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
 
 // ---------- 1.17 expansion recipes ----------
 [['jungle_log', 'jungle_planks'], ['acacia_log', 'acacia_planks'], ['dark_oak_log', 'dark_oak_planks'], ['stripped_oak_log', 'oak_planks'], ['stripped_spruce_log', 'spruce_planks'], ['stripped_birch_log', 'birch_planks'],
@@ -400,9 +413,12 @@ function canHarvest(b, stack) {
   return t.type === d.tool && t.tier >= d.tier;
 }
 // seconds to break, per MC formula (ticks/20)
-function breakTicks(b, stack, onGround, inWater) {
+// blocks hosted in another block's spare meta (candles, lightning rod) have their own hardness
+const blockHard = (b, m) => (b === 198 || b === 246) && S.candleOf(b, m) ? 0.1 : S.isRod(b, m) ? 3 : BLOCKS[b].hard;
+function breakTicks(b, stack, onGround, inWater, meta = 0) {
   const d = BLOCKS[b]; if (!d || d.hard < 0) return Infinity;
-  if (d.hard === 0) return 0;
+  const hard = blockHard(b, meta);
+  if (hard === 0) return 0;
   const t = toolOf(stack);
   let speed = 1;
   if (t && t.type === d.tool) { speed = t.speed; const ef = enchLv(stack, 'efficiency'); if (ef && canHarvest(b, stack)) speed += ef * ef + 1; }
@@ -412,7 +428,7 @@ function breakTicks(b, stack, onGround, inWater) {
   if (inWater) speed /= 5;
   if (!onGround) speed /= 5;
   const harvest = canHarvest(b, stack) || (b === BID.cobweb && t && t.type === TOOL.SWORD);
-  const dmg = speed / d.hard / (harvest ? 30 : 100);
+  const dmg = speed / hard / (harvest ? 30 : 100);
   if (dmg >= 1) return 0;
   return Math.ceil(1 / dmg);
 }
@@ -423,6 +439,9 @@ function blockDrops(b, meta, stack) {
   const add = (k, n = 1) => { if (n > 0) res.items.push([typeof k === 'number' ? k : IID[k], n]); };
   const shears = stack && stack.id === IID.shears;
   const t = toolOf(stack);
+  const cd = (b === 198 || b === 246) && S.candleOf(b, meta);
+  if (cd) { add(itemOfBlock(b, meta), cd.n); return res; }
+  if (S.isRod(b, meta) && !(t && t.type === TOOL.PICK)) return res;
   // silk touch keeps the block itself; fortune multiplies ore drops (applied after the switch)
   if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(itemOfBlock(b, meta)); return res; }
   const fortune = enchLv(stack, 'fortune');

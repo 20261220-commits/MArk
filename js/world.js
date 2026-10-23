@@ -94,12 +94,12 @@ function lightRemove(x, y, z, sh) {
   markDirty(x, z);
   return re;
 }
-function relight(x, y, z, oldId, newId) {
-  // block light
-  if (LEM[oldId] || LEM[newId] || LOP[oldId] !== LOP[newId]) {
+function relight(x, y, z, oldId, newId, oldE = LEM[oldId], newE = LEM[newId]) {
+  // block light (emission can depend on meta: lit candles)
+  if (oldE || newE || LOP[oldId] !== LOP[newId]) {
     const re = lightRemove(x, y, z, 0);
     const c = chunkAt(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15);
-    if (LEM[newId]) { c.light[i] = (c.light[i] & 0xf0) | LEM[newId]; re.push([x, y, z]); }
+    if (newE) { c.light[i] = (c.light[i] & 0xf0) | newE; re.push([x, y, z]); }
     else if (LOP[newId] < 15) for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) re.push([x + dx, y + dy, z + dz]);
     lightAdd(re, 0);
   }
@@ -143,8 +143,10 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
-  if (old !== id) relight(x, y, z, old, id);
+  const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
+  if (old !== id || oe !== ne) relight(x, y, z, old, id, oe, ne);
   markDirty(x, z);
+  if ((old === BID.chain || id === BID.chain) && typeof rodTrack === 'function') rodTrack(x, y, z, S.isRod(id, meta));
   if (W.onBlockChanged) W.onBlockChanged(x, y, z, old, id);
   if (!opts.noUpdate) {
     neighborUpdate(x, y, z); for (const [dx, dy, dz] of N6) neighborUpdate(x + dx, y + dy, z + dz);
@@ -153,7 +155,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
 // an observer facing (x,y,z) fires a short pulse whenever that block changes
 function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
@@ -198,6 +200,7 @@ function neighborUpdate(x, y, z) {
     else if (!OPQ[below] && !(below === b && getMeta(x, y - 1, z) === 1)) breakNaturally(x, y, z, b, m);
     return;
   }
+  if ((b === 198 || b === 246) && S.candleOf(b, m)) { if (!supportedBy(below) || FLUID[getBlock(x, y + 1, z)] === 2) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.amethyst_cluster) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.concrete_powder) { if (N6.some(([dx, dy, dz]) => dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27)) setBlock(x, y, z, BID.concrete, m); else if (below === 0 || FLUID[below] || REPL[below]) schedule(x, y, z, 2); return; }
   if (b === BID.glow_lichen || b === BID.vine) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
@@ -299,7 +302,7 @@ function tickScheduled() {
 function lightLevelAbove(x, y, z) { const l = getLight(x, y + 1, z); return Math.max(l & 15, (l >> 4) - skyDarken()); }
 function skyDarken() { const d = dayFactor(); return Math.round((1 - d) * 11); }
 function celestial() { let a = (((W.time % 24000) + 24000) % 24000) / 24000 - 0.25; if (a < 0) a += 1; const b = 1 - (Math.cos(a * Math.PI) + 1) / 2; return a + (b - a) / 3; }
-function dayFactor() { const f = Math.cos(celestial() * Math.PI * 2) * 2 + 0.5; return Math.max(0, Math.min(1, f)) * (1 - W.rain * 0.3); }
+function dayFactor() { const f = Math.cos(celestial() * Math.PI * 2) * 2 + 0.5; return Math.max(0, Math.min(1, f)) * (1 - W.rain * 0.3) * (1 - (W.thunder || 0) * 0.3); }
 function randomTicks(px, pz) {
   const pcx = px >> 4, pcz = pz >> 4, R = 6;
   for (let cx = pcx - R; cx <= pcx + R; cx++) for (let cz = pcz - R; cz <= pcz + R; cz++) {
@@ -380,7 +383,7 @@ RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   else if (m > 0) setMeta(x, y, z, m - 1);
   else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
 };
-for (const id of [63, 64, 65]) RANDOM_TICK[id] = (x, y, z, b) => { if (Math.random() < 0.02) setBlock(x, y, z, BLOCKS[b].oxid); };
+for (const id of [63, 64, 65]) RANDOM_TICK[id] = (x, y, z, b, m) => { if (!(m & 1) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[b].oxid); }; // meta 1: waxed, never oxidises
 RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => { if (Math.random() > 0.2) return; const [dx, dy, dz] = N6[(Math.random() * 6) | 0]; if (getBlock(x + dx, y + dy, z + dz) === 0) setBlock(x + dx, y + dy, z + dz, BID.amethyst_cluster); };
 RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, 27); };
 RANDOM_TICK[BID.snow] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11) setBlock(x, y, z, 0); };
@@ -427,6 +430,7 @@ function addChunk(cx, cz, d, tiles) {
   }
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
+  if (d.fromSave && typeof rodScan === 'function') rodScan(c);
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
 }
 function requestGen(cx, cz) {
@@ -536,6 +540,7 @@ async function loadChunk(cx, cz) {
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
   saveChunk(c, true);
+  if (typeof rodUnload === 'function') rodUnload(c);
   W.chunks.delete(c.key); W.lastKey = -1;
 }
 // streaming: called every frame with player chunk position
