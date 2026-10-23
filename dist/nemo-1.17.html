@@ -1105,6 +1105,7 @@ const LOOT = {
   outpost: [['crossbow', 1], ['arrow', 9], ['wheat', 7], ['potato', 4], ['carrot', 4], ['dark_oak_log', 3], ['iron_ingot', 3], ['string', 6], ['experience_bottle', 2], ['tripwire_hook', 2]],
   desert_pyramid: [['bone', 6], ['rotten_flesh', 7], ['gunpowder', 5], ['sand', 8], ['string', 8], ['spider_eye', 3], ['gold_ingot', 5], ['iron_ingot', 5], ['emerald', 3], ['diamond', 2], ['saddle', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1], ['iron_horse_armor', 1], ['golden_horse_armor', 1], ['diamond_horse_armor', 1]],
   jungle_temple: [['bone', 6], ['rotten_flesh', 7], ['gold_ingot', 5], ['iron_ingot', 5], ['emerald', 3], ['diamond', 2], ['saddle', 1], ['iron_horse_armor', 1], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['bamboo', 4]],
+  mansion: [['lead', 2], ['gold_ingot', 4], ['bread', 4], ['wheat', 4], ['coal', 4], ['redstone', 4], ['beetroot_seeds', 4], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['iron_ingot', 4], ['bucket', 1], ['golden_apple', 1], ['diamond_hoe', 1], ['diamond_chestplate', 1], ['music_disc_13', 1], ['music_disc_cat', 1], ['name_tag', 1], ['chainmail_chestplate', 1], ['enchanted_golden_apple', 1]],
   igloo: [['apple', 3], ['coal', 4], ['gold_nugget', 3], ['stone_axe', 1], ['rotten_flesh', 3], ['emerald', 1], ['wheat', 3]],
   ship_supply: [['paper', 8], ['potato', 6], ['carrot', 6], ['wheat', 10], ['coal', 6], ['rotten_flesh', 8], ['gunpowder', 5], ['pumpkin', 3], ['leather_helmet', 1], ['leather_boots', 1], ['tnt', 2], ['moss_block', 4], ['poisonous_potato', 4], ['experience_bottle', 0]],
   ship_map: [['paper', 8], ['compass', 1], ['feather', 5], ['book', 2], ['clock', 1], ['map', 1]],
@@ -1604,6 +1605,70 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
           put(-3, yb, 0, 198, 14); put(-3, yb + 2, -1, B.redstone_torch, 1);
         }
       }
+    }
+  }
+}
+// ---------- woodland mansions: rare three-storey dark oak mansions in dark forests ----------
+// a 6 x 5 grid of 8-block rooms per floor (upper floors smaller), a corridor along the middle row, rooms of several
+// kinds, a stepped roof; vindicators in the rooms and evokers upstairs
+const MREG = 64, MN_CACHE = new Map();
+function mansionAt(seed, G, rx, rz) {
+  const key = seed + ':' + rx + ',' + rz; if (MN_CACHE.has(key)) return MN_CACHE.get(key);
+  const { r, cx, cz } = regionPick(seed, rx, rz, 69, MREG, 6); let out = null;
+  if (r() < 0.6) { const x = cx * 16 + 8, z = cz * 16 + 8, [h, b] = G.column(x, z); if (b === BIO.DARK_FOREST && h > SEA) out = { x, z, h, seed: r.int(1 << 30) }; }
+  MN_CACHE.set(key, out); return out;
+}
+function stampMansions(seed, G, st, cx, cz, tiles) {
+  const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), B = BID;
+  for (let rx = Math.floor((cx - 4) / MREG); rx <= Math.floor((cx + 4) / MREG); rx++) for (let rz = Math.floor((cz - 4) / MREG); rz <= Math.floor((cz + 4) / MREG); rz++) {
+    const o = mansionAt(seed, G, rx, rz); if (!o || !st.inside(o.x - 26, o.z - 22, o.x + 26, o.z + 22)) continue;
+    const r = rng(o.seed), X0 = o.x - 24, Z0 = o.z - 20, y0 = o.h + 1, COLS = 6, ROWS = 5, FH = 7;
+    const put = (x, y, z, id, m = 0) => st(X0 + x, y, Z0 + z, id, m);
+    // which cells exist on each floor (the middle row is the corridor)
+    const has = [[], [], []];
+    for (let f = 0; f < 3; f++) for (let c = 0; c < COLS; c++) for (let w = 0; w < ROWS; w++) {
+      const edge = c === 0 || c === COLS - 1 || w === 0 || w === ROWS - 1;
+      has[f][c * ROWS + w] = f === 0 ? true : f === 1 ? !(edge && (c === 0 || c === COLS - 1) && (w === 0 || w === ROWS - 1)) && hash32(o.seed, c, w, 1) % 100 < 92 : !edge && hash32(o.seed, c, w, 2) % 100 < 85;
+    }
+    const cell = (f, c, w) => f >= 0 && f < 3 && c >= 0 && c < COLS && w >= 0 && w < ROWS && has[f][c * ROWS + w];
+    // ground: foundation, then clear the volume
+    for (let x = -1; x <= COLS * 8; x++) for (let z = -1; z <= ROWS * 8; z++) { for (let y = y0 - 6; y < y0; y++) put(x, y, z, B.cobblestone); for (let y = y0; y <= y0 + 3 * FH + 8; y++) put(x, y, z, 0); }
+    for (let f = 0; f < 3; f++) for (let c = 0; c < COLS; c++) for (let w = 0; w < ROWS; w++) {
+      if (!cell(f, c, w)) continue;
+      const bx = c * 8, bz = w * 8, by = y0 + f * FH, kind = w === 2 ? 'hall' : ['bed', 'library', 'store', 'dining', 'bed', 'library', 'secret'][hash32(o.seed, f, c, w) % (hash32(o.seed, c, w, 9) % 20 === 0 ? 7 : 6)];
+      for (let x = 0; x < 8; x++) for (let z = 0; z < 8; z++) {
+        put(bx + x, by, bz + z, f === 0 ? B.cobblestone : B.dark_oak_planks); // floor
+        if (!cell(f + 1, c, w)) put(bx + x, by + FH, bz + z, B.dark_oak_planks); // ceiling where nothing is above
+        if (kind !== 'hall' && (x + z) % 2 === 0 && f > 0) put(bx + x, by + 1, bz + z, 198, kind === 'library' ? 14 : kind === 'bed' ? 11 : 7);
+      }
+      // walls: logs at the corners; outer walls with windows; inner walls with a doorway toward the corridor
+      const walls = [[0, -1, (x, y) => [bx + x, y, bz]], [0, 1, (x, y) => [bx + x, y, bz + 7]], [-1, 0, (x, y) => [bx, y, bz + x]], [1, 0, (x, y) => [bx + 7, y, bz + x]]];
+      for (const [dc, dw, at] of walls) {
+        const outside = !cell(f, c + dc, w + dw), toHall = (w + dw === 2 && w !== 2) || (w === 2 && dw !== 0 && cell(f, c, w + dw));
+        for (let x = 0; x < 8; x++) for (let y = by + 1; y < by + FH; y++) {
+          const [px, py, pz] = at(x, y), corner = x === 0 || x === 7;
+          if (corner) { put(px, py, pz, B.dark_oak_log); continue; }
+          if (outside) { put(px, py, pz, (y === by + 3 || y === by + 4) && (x === 2 || x === 5) ? B.glass_pane : B.dark_oak_planks); continue; }
+          if (w === 2 && dw === 0) continue; // the corridor runs through
+          if (toHall && (x === 3 || x === 4) && y <= by + 3) { put(px, py, pz, 0); continue; } // doorway
+          if (toHall || hash32(o.seed, c * 2 + dc, w * 2 + dw, f) % 3) put(px, py, pz, B.birch_planks);
+        }
+      }
+      if (f === 0 && w === 0 && (c === 2 || c === 3)) for (let x = 2; x <= 5; x++) for (let y = by + 1; y <= by + 3; y++) put(bx + x, y, bz, 0); // the front door
+      // furniture
+      const ix = bx + 1, iz = bz + 1, y1 = by + 1;
+      if (kind === 'hall') { put(bx + 3, by + FH - 1, bz + 3, B.lantern, 1); put(bx + 4, by + FH - 1, bz + 4, B.lantern, 1); }
+      if (kind === 'library') for (let k = 0; k < 6; k++) for (let y = y1; y <= y1 + 2; y++) { put(ix + k, y, iz, B.bookshelf); if (hash32(o.seed, k, y, c) % 2) put(ix + k, y, iz + 5, B.bookshelf); }
+      if (kind === 'bed') { put(ix + 1, y1, iz + 1, B.red_bed, 2); put(ix + 1, y1, iz + 2, B.red_bed, 2 | 4); put(ix + 4, y1, iz + 1, B.crafting_table); if (hash32(o.seed, c, w, f + 5) % 3 === 0) { const tx = X0 + ix + 5, tz = Z0 + iz + 5; st(tx, y1, tz, 44, 1); if (st.get(tx, y1, tz) >= 0) tiles.push({ t: 'chest', i: tl(tx, y1, tz), loot: rollLoot(r, 'mansion', 5) }); } }
+      if (kind === 'store') for (let k = 0; k < 3; k++) { const tx = X0 + ix + 1 + k * 2, tz = Z0 + iz + 4; st(tx, y1, tz, 44, 2); if (st.get(tx, y1, tz) >= 0) tiles.push({ t: 'chest', i: tl(tx, y1, tz), loot: rollLoot(r, 'mansion', 4) }); put(ix + 1 + k * 2, y1, iz + 1, B.barrel); }
+      if (kind === 'dining') for (let k = 0; k < 4; k++) { put(ix + 1 + k, y1, iz + 2, B.oak_fence); put(ix + 1 + k, y1 + 1, iz + 2, B.stone_pressure_plate); }
+      if (kind === 'secret') { put(ix + 2, y1, iz + 2, f === 2 ? B.diamond_block : B.obsidian); put(ix + 3, y1, iz + 3, B.pumpkin); }
+      if (kind !== 'hall' && hash32(o.seed, c, w, f + 7) % 10 < 3 && st.get(X0 + ix + 3, y1, Z0 + iz + 3) >= 0) tiles.push({ t: 'mob', i: tl(X0 + ix + 3, y1, Z0 + iz + 3), mob: 'vindicator' });
+      if (f > 0 && kind === 'hall' && c % 3 === 1 && st.get(X0 + bx + 4, y1, Z0 + bz + 4) >= 0) tiles.push({ t: 'mob', i: tl(X0 + bx + 4, y1, Z0 + bz + 4), mob: 'evoker' });
+      // stairs between floors: a ladder in the corridor at the ends
+      if (w === 2 && (c === 0 || c === COLS - 1) && cell(f + 1, c, w)) for (let y = y1; y <= by + FH; y++) { put(bx + 4, y, bz + 6, B.ladder, 0); if (y === by + FH) put(bx + 4, y, bz + 6, B.ladder, 0); }
+      // a stepped roof over cells with nothing above
+      if (!cell(f + 1, c, w)) for (let k = 0; k < 4; k++) for (let x = k; x < 8 - k; x++) for (let z = k; z < 8 - k; z++) if (x === k || z === k || x === 7 - k || z === 7 - k) put(bx + x, by + FH + 1 + k, bz + z, k === 3 ? B.cobblestone : B.dark_oak_planks);
     }
   }
 }
@@ -2137,6 +2202,7 @@ function genChunk(seed, cx, cz, dim) {
   oceanDecor(seed, blocks, meta, biome, x0, z0, R);
   stampOceanStructures(seed, G, makeStamp(blocks, meta, x0, z0), blocks, cx, cz, tiles);
   stampTemples(seed, G, makeStamp(blocks, meta, x0, z0), cx, cz, tiles);
+  stampMansions(seed, G, makeStamp(blocks, meta, x0, z0), cx, cz, tiles);
   // structures: villages on the surface, strongholds underground
   const stamp = makeStamp(blocks, meta, x0, z0);
   for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
@@ -2632,7 +2698,7 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
@@ -10006,6 +10072,11 @@ function lootSpecial(key, wx, wz) {
 }
 // cartographers sell explorer maps
 TRADES.cartographer.push([['emerald', 13], ['ocean_explorer_map', 1]], [['emerald', 14], ['woodland_explorer_map', 1]]);
+function nearestMansion(wx, wz) {
+  const G = W.genCache || (W.genCache = S.makeGen(W.seed)), rx = Math.floor((wx >> 4) / S.MREG), rz = Math.floor((wz >> 4) / S.MREG); let best = null, bd = 1e9;
+  for (let i = rx - 4; i <= rx + 4; i++) for (let j = rz - 4; j <= rz + 4; j++) { const m = S.mansionAt(W.seed, G, i, j); if (m) { const d = Math.hypot(m.x - wx, m.z - wz); if (d < bd) { bd = d; best = [m.x, 0, m.z]; } } }
+  return best;
+}
 
 </script>
 <script>/* js/temples.js */

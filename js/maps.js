@@ -121,3 +121,8 @@ function lootSpecial(key, wx, wz) {
 }
 // cartographers sell explorer maps
 TRADES.cartographer.push([['emerald', 13], ['ocean_explorer_map', 1]], [['emerald', 14], ['woodland_explorer_map', 1]]);
+function nearestMansion(wx, wz) {
+  const G = W.genCache || (W.genCache = S.makeGen(W.seed)), rx = Math.floor((wx >> 4) / S.MREG), rz = Math.floor((wz >> 4) / S.MREG); let best = null, bd = 1e9;
+  for (let i = rx - 4; i <= rx + 4; i++) for (let j = rz - 4; j <= rz + 4; j++) { const m = S.mansionAt(W.seed, G, i, j); if (m) { const d = Math.hypot(m.x - wx, m.z - wz); if (d < bd) { bd = d; best = [m.x, 0, m.z]; } } }
+  return best;
+}
