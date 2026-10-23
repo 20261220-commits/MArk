@@ -668,6 +668,7 @@ function placeBlock(t, d) {
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
   if (S.isRail(id)) railPlaced(x, y, z, fd);
+  if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }

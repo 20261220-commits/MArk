@@ -695,6 +695,7 @@ function arrowTick(e) {
     if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
+      if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour
       if (e.trident) { tridentHit(e, o); break; }
       if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through

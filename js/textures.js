@@ -226,6 +226,10 @@ for (let st = 0; st < 4; st++) PAINT['sweet_berry_bush_stage' + st] = r => {
   for (let y = top; y < 16; y++) for (let x = 1; x < 15; x++) { const d = Math.abs(x - 7.5) / 7 + (16 - y) / (17 - top) * 0.4; if (r() < 0.75 - d * 0.35) P(x, y, quant(shade(hex(0x2a6a3a), 0.8 + r() * 0.4), 3)); }
   if (st >= 2) for (let k = 0; k < (st === 3 ? 9 : 6); k++) { const bx = 2 + Math.floor(r() * 12), by = top + 1 + Math.floor(r() * (14 - top)); P(bx, by, hex(st === 3 ? 0xd0202a : 0x6aa83a)); P(bx + 1, by, hex(st === 3 ? 0xa01018 : 0x4a882a)); }
 };
+// wither skeleton skull: charcoal bone with dark sockets on the front
+PAINT.wither_skull_side = r => fill((x, y) => quant(shade(hex(0x2e2e2e), 1 + (r() - .5) * .2), 3));
+PAINT.wither_skull_top = r => fill((x, y) => quant(shade(hex(0x343434), 1 + (r() - .5) * .2), 3));
+PAINT.wither_skull_front = r => { PAINT.wither_skull_side(r); for (const [x0, y0] of [[5, 9], [9, 9]]) for (let y = y0; y < y0 + 2; y++) for (let x = x0; x < x0 + 2; x++) P(x, y, hex(0x0a0a0a)); for (let x = 6; x < 10; x++) P(x, 13, hex(0x0a0a0a)); }; // boxes map 8 px of the tile, rows 8-15
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,

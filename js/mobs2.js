@@ -359,9 +359,9 @@ function blazeAnim(e, P, now) {
 function slimeAnim(e, P) { const s = 1 + (e.squish || 0) * 0.4, k = (e.size || 1); (e.mesh.userData.inner || e.mesh.children[0]).scale.set(k / s, k * s, k / s); }
 // ---------- ender dragon fight ----------
 let bossEl = null;
-function bossBar(e) {
+function bossBar(e, name) {
   if (!bossEl) { bossEl = document.createElement('div'); bossEl.id = 'bossbar'; bossEl.innerHTML = '<div class="bn">엔더 드래곤</div><div class="bb"><i></i></div>'; document.body.appendChild(bossEl); }
-  bossEl.hidden = !e; if (e) bossEl.querySelector('i').style.width = Math.max(0, e.hp / e.def.hp * 100) + '%';
+  bossEl.hidden = !e; if (e) bossEl.querySelector('.bn').textContent = name || '엔더 드래곤'; if (e) bossEl.querySelector('i').style.width = Math.max(0, e.hp / e.def.hp * 100) + '%';
 }
 function dragonHurt(e, dmg, attacker) {
   if (e.phase === 'dying' || e.inv > 0) return false;
