@@ -355,6 +355,8 @@ const BLOCK_ROWS = [
   [1055, 'soul_campfire', '영혼 모닥불', RT.BOX, 'campfire_log', 2, A, 0, {}],
   [1056, 'bell', '종', RT.BOX, 'bell_body', 5, P, 0, {}], // meta: attach (0 floor, 1 ceiling, 2 wall) | facing << 2 | powered << 4
   [1057, 'jukebox', '주크박스', C, ['jukebox_side', 'jukebox_top', 'jukebox_side'], 2, A, 0],
+  [1058, 'banner', '현수막', RT.BOX, null, 1, A, 0, { nosolid: 1, vars: COLV('wool'), vk: COLV('banner'), vn: COLN('현수막') }], // meta: colour | rotation << 4; the cloth is drawn by decor.js
+  [1059, 'wall_banner', '벽걸이 현수막', RT.BOX, null, 1, A, 0, { nosolid: 1, vars: COLV('wool'), vk: COLV('wall_banner'), vn: COLN('현수막') }], // meta: colour | facing << 4
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 // block ids are 16 bit: 0..255 are the original blocks, newer ones start at 1024 so their block items
@@ -454,6 +456,7 @@ function shapes(id, meta) {
     case 96: case 231: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
     case 1039: case 1040: return [[0, 8, 0, 16, 16, 16], [7, 0, 7, 9, 8, 9]]; // azalea: leafy top on a short stem
     case 1043: return [[0, 0, 0, 16, 1, 16]];
+    case 1058: case 1059: return [];
     case 1054: case 1055: { // campfire: two logs each way, embers, and two crossed flame planes when lit
       const f = meta & 3, b = [[1, 0, 0, 5, 4, 16], [11, 0, 0, 15, 4, 16], [0, 3, 11, 16, 7, 15], [0, 3, 1, 16, 7, 5], [5, 0, 5, 11, 1, 11]].map(x => rotBox(x, f));
       if (meta & 4) b.push([2, 1, 8, 14, 15, 8], [8, 1, 2, 8, 15, 14]);

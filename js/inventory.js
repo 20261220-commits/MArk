@@ -49,6 +49,11 @@ function buildSlots(type, ctx) {
     ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
     L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
+  } else if (type === 'loom') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 'lban', accepts: st => !st || (ITEMS[st.id].block && ITEMS[st.id].place === BID.banner), max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 'ldye', accepts: st => !st || ITEMS[st.id].key.endsWith('_dye') }));
+    L.push({ group: 'result', output: true, get: () => loomResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const d = ctx.items[1]; d.n--; if (!d.n) ctx.items[1] = null; play('click'); } });
   } else if (type === 'beacon') {
     ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
     L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
@@ -116,6 +121,7 @@ function quickMove(i) {
     else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
+    else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
     if (T === 'creative') targets = [];
@@ -133,7 +139,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }

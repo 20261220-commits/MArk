@@ -6,7 +6,7 @@ const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
-  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem']);
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
@@ -162,6 +162,7 @@ for (const [k, name, col, eff] of POTION_TYPES) {
   if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
 }
 item('nether_star', '네더의 별', { glint: 1 });
+item('painting', '그림'); item('armor_stand', '갑옷 거치대', { stack: 16 });
 // music discs (C418, Lena Raine); the tunes are synthesised in utility.js
 const DISCS = [['13', 0xf2e8a0], ['cat', 0x5ad83a], ['blocks', 0xd85a2a], ['chirp', 0xc82a2a], ['far', 0x8ae84a], ['mall', 0x8a5ad8], ['mellohi', 0xd8a8f0], ['stal', 0x2a2a2a], ['strad', 0xf0f0f0], ['ward', 0x3a8a3a], ['11', 0x4a4a4a], ['wait', 0x3ab8d8], ['pigstep', 0xc87a3a]];
 DISCS.forEach(([k, c], i) => item('music_disc_' + k, '음반', { stack: 1, disc: i + 1, dcol: c, lore: [(k === 'pigstep' ? 'Lena Raine' : 'C418') + ' - ' + k] }));
@@ -169,6 +170,7 @@ item('shield', '방패', { stack: 1, dur: 336 }); item('crossbow', '쇠뇌', { s
 item('trident', '삼지창', { stack: 1, dur: 250, tool: { type: TOOL.NONE, tier: 0, speed: 1, dmg: 9, as: 1.1, mat: 'trident', kind: 'trident' } });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
+S.COLORS.forEach((c, i) => { ITEMS[IID[c + '_banner']].sprite = c + '_banner_item'; ITEMS[IID[c + '_banner']].stack = 16; });
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
   'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'jungle_log', 'acacia_log', 'dark_oak_log', 'stripped_oak_log', 'stripped_spruce_log', 'stripped_birch_log', 'stripped_jungle_log', 'stripped_acacia_log', 'stripped_dark_oak_log',
@@ -336,6 +338,8 @@ shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
 shaped('shield', 1, ['WIW', 'WWW', ' W '], { W: 'planks', I: 'iron_ingot' }); shaped('tripwire_hook', 2, ['I', 'S', 'P'], { I: 'iron_ingot', S: 'stick', P: 'planks' });
 shaped('crossbow', 1, ['SIS', 'TJT', ' S '], { S: 'stick', I: 'iron_ingot', T: 'string', J: 'tripwire_hook' });
 shaped('glass_bottle', 3, ['G G', ' G '], { G: 'glass' });
+shaped('painting', 1, ['SSS', 'SWS', 'SSS'], { S: 'stick', W: 'wool' }); shaped('armor_stand', 1, ['SSS', ' S ', 'SPS'], { S: 'stick', P: 'smooth_stone_slab' });
+for (const c of S.COLORS) shaped(c + '_banner', 1, ['WWW', 'WWW', ' S '], { W: c + '_wool', S: 'stick' });
 shaped('campfire', 1, [' S ', 'SCS', 'LLL'], { S: 'stick', C: 'coals', L: 'logs' }); shaped('soul_campfire', 1, [' S ', 'SCS', 'LLL'], { S: 'stick', C: 'soul', L: 'logs' });
 shaped('jukebox', 1, ['PPP', 'PDP', 'PPP'], { P: 'planks', D: 'diamond' }); shaped('beacon', 1, ['GGG', 'GSG', 'OOO'], { G: 'glass', S: 'nether_star', O: 'obsidian' }); shaped('brewing_stand', 1, [' B ', 'CCC'], { B: 'blaze_rod', C: 'stone_crafting' });
 shapeless('fermented_spider_eye', 1, ['spider_eye', 'brown_mushroom', 'sugar']); shaped('glistering_melon_slice', 1, ['NNN', 'NMN', 'NNN'], { N: 'gold_nugget', M: 'melon_slice' });
@@ -553,6 +557,7 @@ function blockDrops(b, meta, stack) {
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
     case 'small_amethyst_bud': case 'medium_amethyst_bud': case 'large_amethyst_bud': break; // only with silk touch
     case 'cave_vines': if (meta & 1) add('glow_berries'); break;
+    case 'banner': case 'wall_banner': break; // dropped with its patterns when the tile goes (entities.js)
     case 'campfire': add('charcoal', 2); break;
     case 'soul_campfire': add('soul_soil'); break;
     case 'sculk_sensor': res.xp = 5; break; // the block itself only with silk touch

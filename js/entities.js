@@ -439,7 +439,7 @@ function explode(x, y, z, power, fire) {
 function dropTileContents(x, y, z, t) {
   if (t.items) for (const st of t.items) if (st) dropStack(x + .5, y + .5, z + .5, st);
 }
-W.onTileRemoved = (x, y, z, t) => dropTileContents(x, y, z, t);
+W.onTileRemoved = (x, y, z, t) => { dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
 W.onTntCheck = () => {};
 
 // ---------- mobs ----------
@@ -763,6 +763,8 @@ R.onChunkUnloaded = c => {
     if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant }]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
+    else if (e.kind === 'painting') keep.push(['painting', e.ax, e.ay, e.az, 0, 0, { f: e.f, motif: e.motif }]);
+    else if (e.kind === 'armor_stand') keep.push(['armor_stand', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, armor: e.armor }]);
     if (e === PL.riding) continue;
     removeEnt(e);
   }
@@ -775,7 +777,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
 };
 
 // ---------- render update (interpolated) ----------

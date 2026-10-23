@@ -220,6 +220,8 @@ function neighborUpdate(x, y, z) {
   }
   if ((b === 198 || b === 246) && S.candleOf(b, m)) { if (!supportedBy(below) || FLUID[getBlock(x, y + 1, z)] === 2) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.bell) { if (!bellSupported(x, y, z, m)) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.banner && !SOLID[below]) { setBlock(x, y, z, 0); return; }
+  if (b === BID.wall_banner) { const d = DIRS[(m >> 4) & 3]; if (!SOLID[getBlock(x - d[0], y, z - d[2])]) setBlock(x, y, z, 0); return; }
   if (S.BUD[b]) { // buds and clusters need the block they grow from (old saves without a facing: any side)
     if (m) { const d = S.DIR6[m - 1]; if (!OPQ[getBlock(x - d[0], y - d[1], z - d[2])]) breakNaturally(x, y, z, b, m); }
     else if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m);

@@ -19,6 +19,8 @@ function rot6Box(b, f) {
 }
 function selShape(id, m) {
   const rt = RTYPE[id];
+  if (id === BID.banner) return [[4, 0, 4, 12, 16, 12]];
+  if (id === BID.wall_banner) { const f = (m >> 4) & 3; return [[[0, 0, 14, 16, 16, 16], [0, 0, 0, 2, 16, 16], [0, 0, 0, 16, 16, 2], [14, 0, 0, 16, 16, 16]][f]]; }
   if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (S.BUD[id]) { const h = [3, 4, 5, 7][S.BUD[id] - 1]; return [rot6Box([3, 0, 3, 13, h, 13], m ? m - 1 : 1)]; } if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
   if (rt === RT.TORCH) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; const ox = d[0] * 5, oz = d[2] * 5; return [[5.5 + ox, 3, 5.5 + oz, 10.5 + ox, 13, 10.5 + oz]]; } return [[6, 0, 6, 10, 10, 10]]; }
   if (rt === RT.CROP) return [[0, 0, 0, 16, 2 + (m & 7) * 2, 16]];
@@ -422,6 +424,7 @@ function interactBlock(t, dry) {
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
+    case BID.loom: if (!dry) UI.openScreen('loom', { x, y, z }); return true;
     case BID.campfire: case BID.soul_campfire: { const h = PL.held(); if (dry) return !!(h && (campfireFood(h.id) || (ITEMS[h.id].tool && ITEMS[h.id].tool.type === S.TOOL.SHOVEL && (m & 4)) || ((h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !(m & 4)))); return campfireUse(x, y, z, m, h); }
     case BID.bell: if (!dry) ringBell(x, y, z); return true;
     case BID.jukebox: { const h = PL.held(), t = getTile(x, y, z); if (dry) return !!((t && t.items && t.items[0]) || (h && ITEMS[h.id].disc)); return jukeboxUse(x, y, z, h); }
@@ -488,6 +491,7 @@ function useItem(first) {
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'frame') { frameUse(e, h); return; }
+    if (e.kind === 'armor_stand') { const [, ldy] = lookDir(); standUse(e, h, PL.y + PL.eyeH + ldy * t.t); return; }
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
     if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
       removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
@@ -505,6 +509,9 @@ function useItem(first) {
   if (t && t.type === 'block') {
     if (first && interactBlock(t, false)) { swing(); vibrate(t.x + .5, t.y + .5, t.z + .5); return; }
     if (d && (h.id === IID.item_frame || h.id === IID.glow_item_frame)) { placeFrame(t, h.id === IID.glow_item_frame); return; }
+    if (d && h.id === IID.painting) { placePainting(t); return; }
+    if (d && h.id === IID.armor_stand) { if (t.ny === 1 && !SOLID[getBlock(t.x, t.y + 1, t.z)]) { spawnArmorStand(t.x + .5, t.y + 1, t.z + .5, Math.round(PL.yaw / (Math.PI / 4)) * Math.PI / 4 + Math.PI); consume(); swing(); play('place', { mat: 'wood' }); } return; }
+    if (d && d.place === BID.banner) { placeBanner(t, h); return; }
     if (first && lushUse(t, h, d)) return;
     if (first && d && bottleUse(t, h)) return;
     const { x, y, z, id } = t;
