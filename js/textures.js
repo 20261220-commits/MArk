@@ -251,6 +251,21 @@ for (const [k, c0] of Object.entries(CORAL_C)) for (const dead of [false, true])
 PAINT.flower_pot = r => fill((x, y) => quant(shade(hex(0x9a4a2e), 0.85 + r() * 0.25 + (y < 2 ? 0.15 : 0)), 3));
 PAINT.tripwire = r => { for (let x = 0; x < 16; x++) { P(x, 7, hex(0xd8d8d8)); P(x, 8, hex(0xa8a8a8)); } };
 PAINT.tripwire_hook = r => { for (let y = 1; y < 10; y++) for (let x = 6; x < 10; x++) P(x, y, quant(shade(hex(0x9c7b47), 0.85 + r() * 0.25), 3)); for (let y = 3; y < 7; y++) for (let x = 6; x < 10; x++) P(x, y, hex(0x8a8a8a)); };
+// mob heads: skin with a face on the front; bamboo; tall flowers; the carved pumpkin's face
+const MOB_HEAD_C = { skeleton_skull: [0xc8c8c0, '#3a3a3a'], zombie_head: [0x5d8f4c, '#1a2a12'], creeper_head: [0x5fbf4a, '#101010'], dragon_head: [0x2a2a30, '#c040e0'] };
+for (const [k, [c, ec]] of Object.entries(MOB_HEAD_C)) {
+  PAINT[k + '_side'] = r => fill((x, y) => quant(shade(hex(c), 0.85 + r() * 0.3), 3));
+  PAINT[k + '_front'] = r => { PAINT[k + '_side'](r); const e = hex(parseInt(ec.slice(1), 16)); if (k === 'creeper_head') { for (const [x0, y0, w, h] of [[5, 9, 2, 2], [9, 9, 2, 2], [7, 11, 2, 3], [6, 12, 1, 3], [9, 12, 1, 3]]) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) P(x, y, e); } else { for (const x0 of [5, 9]) for (let y = 10; y < 12; y++) for (let x = x0; x < x0 + 2; x++) P(x, y, e); for (let x = 6; x < 10; x++) P(x, 14, e); } };
+}
+PAINT.bamboo_stalk = r => fill((x, y) => quant(shade(hex(y % 8 === 0 ? 0x8aa83a : 0x5a9a2a), 0.85 + r() * 0.25 + (x % 3 === 0 ? 0.1 : 0)), 3));
+PAINT.bamboo_leaves = r => { for (let k = 0; k < 7; k++) { const x0 = 1 + Math.floor(r() * 12), y0 = Math.floor(r() * 12); for (let d = 0; d < 5; d++) { P(x0 + d, y0 + Math.floor(d / 2), quant(shade(hex(0x5aa832), 0.8 + r() * 0.4), 3)); P(x0 + d, y0 + Math.floor(d / 2) + 1, quant(shade(hex(0x4a8a2a), 0.8 + r() * 0.4), 3)); } } };
+PAINT.bamboo_small_leaves = r => { for (let k = 0; k < 4; k++) { const x0 = 3 + Math.floor(r() * 9), y0 = 2 + Math.floor(r() * 9); for (let d = 0; d < 4; d++) P(x0 + d, y0 + (d >> 1), quant(shade(hex(0x5aa832), 0.8 + r() * 0.4), 3)); } };
+const flowerStem = (r, x0) => { for (let y = 0; y < 16; y++) P(x0 + Math.round(Math.sin(y / 3) * 0.6), y, hex(0x3a7a2a)); for (const y of [4, 9, 13]) { P(x0 - 1, y, hex(0x4a9a32)); P(x0 + 1, y + 1, hex(0x4a9a32)); P(x0 - 2, y + 1, hex(0x4a9a32)); P(x0 + 2, y + 2, hex(0x4a9a32)); } };
+PAINT.sunflower_bottom = r => flowerStem(r, 7); PAINT.lilac_bottom = r => flowerStem(r, 7); PAINT.rose_bush_bottom = r => { flowerStem(r, 5); flowerStem(r, 10); }; PAINT.peony_bottom = r => { flowerStem(r, 6); flowerStem(r, 9); };
+PAINT.sunflower_top = r => { flowerStem(r, 7); for (let y = 0; y < 11; y++) for (let x = 2; x < 14; x++) { const d = Math.hypot(x - 7.5, y - 5); if (d < 5.5) P(x, y, d < 2.5 ? hex(0x6a4a1a) : hex(0xf0c820)); } };
+const blossom = (r, c1, c2) => { for (let k = 0; k < 40; k++) { const x = 2 + Math.floor(r() * 12), y = Math.floor(r() * 11); if (Math.hypot(x - 7.5, y - 5) < 6) P(x, y, r() < 0.6 ? hex(c1) : hex(c2)); } };
+PAINT.lilac_top = r => { flowerStem(r, 7); blossom(r, 0xc890d8, 0xa070b8); }; PAINT.rose_bush_top = r => { flowerStem(r, 5); flowerStem(r, 10); blossom(r, 0xd02020, 0x3a7a2a); }; PAINT.peony_top = r => { flowerStem(r, 6); flowerStem(r, 9); blossom(r, 0xf0b0d0, 0xd890b8); };
+PAINT.carved_pumpkin_face = r => { fill((x, y) => quant(shade(hex(0xe0901a), 0.85 + r() * 0.25 - (x % 4 === 0 ? 0.12 : 0)), 3)); for (const x0 of [3, 10]) for (let y = 4; y < 7; y++) for (let x = x0; x < x0 + 3; x++) P(x, y, hex(0x3a2a10)); for (let x = 3; x < 13; x++) P(x, 10, hex(0x3a2a10)); for (const x of [4, 7, 10]) P(x, 11, hex(0x3a2a10)); };
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
@@ -563,6 +578,7 @@ function cartSprite(load) {
 }
 Object.assign(SPR, {
   minecart: () => cartSprite(null),
+  bamboo_item: () => sprite(p => { for (let y = 1; y < 15; y++) { p(7, y, y % 5 === 0 ? hex(0x8aa83a) : hex(0x5a9a2a)); p(8, y, hex(0x4a8a22)); } for (let d = 0; d < 4; d++) { p(9 + d, 3 + (d >> 1), hex(0x5aa832)); p(6 - d, 8 + (d >> 1), hex(0x5aa832)); } }),
   heart_of_the_sea: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 6) p(x, y, d < 2 ? hex(0x9affff) : d < 4 ? hex(0x2ab8d8) : hex(0x1a6a8a)); } p(6, 6, hex(0xffffff)); }),
   nautilus_shell: () => sprite(p => { for (let a = 0; a < 60; a++) { const t = a / 60 * Math.PI * 3.2, rr = 1 + t * 1.2; p(Math.round(8 + Math.cos(t) * rr), Math.round(8 + Math.sin(t) * rr), a % 6 < 3 ? hex(0xe8d8c0) : hex(0xc87a4a)); } for (let y = 6; y < 11; y++) for (let x = 6; x < 11; x++) if (Math.hypot(x - 8, y - 8) < 2.5) p(x, y, hex(0xe8d8c0)); }),
   map: () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 2; x < 14; x++) p(x, y, x === 2 || y === 2 || x === 13 || y === 13 ? hex(0x9a7a4a) : hex(0xe8dcb8)); for (const y of [5, 8, 11]) for (let x = 4; x < 12; x++) if ((x + y) % 3) p(x, y, hex(0xb8a880)); }),

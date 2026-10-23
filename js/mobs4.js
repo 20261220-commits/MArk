@@ -132,7 +132,7 @@ function horseAnim(e, P) {
   for (const n of ['head', 'ah0', 'ah1', 'ah2', 'ah3', 'ear1', 'ear2']) { const p = P[n]; if (p) { p.rotation.x = hd; p.position.y = -hd * 0.3; p.position.z = -hd * 0.3; } }
 }
 const HORSE_DEF = (kind, name) => ({ hp: 20, w: 0.7, h: 1.6, speed: 0.08, xp: 2, snd: 'hmm', name, drops: [['leather', 0, 2]], parts: HORSE_M[kind].parts, tw: HORSE_M[kind].tw, th: HORSE_M[kind].th,
-  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
+  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => (Math.random() * 7) | 0 } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
   init: horseInit, save: horseSave, onBred: horseOnBred, anim: horseAnim, interact: horseInteract, onDeathDrops: horseDrops, armorMul: horseArmorMul });
 
 // ---------- cats ----------
@@ -184,7 +184,7 @@ function catAnim(e, P) {
   if (e.sitting) { e.mesh.position.y -= 0.15; for (const n of ['rleg2', 'lleg2']) if (P[n]) P[n].rotation.x = 1.4; if (P.body) P.body.rotation.x = -0.4; } else if (P.body) P.body.rotation.x = 0;
 }
 // creepers (and phantoms) keep away from cats
-const catNear = (e, r = 6) => ENT.some(o => o.type === 'cat' && !o.dead && !o.deathT && Math.hypot(o.x - e.x, o.z - e.z) < r && Math.abs(o.y - e.y) < 4);
+const catNear = (e, r = 6) => ENT.some(o => (o.type === 'cat' || o.type === 'ocelot') && !o.dead && !o.deathT && Math.hypot(o.x - e.x, o.z - e.z) < r && Math.abs(o.y - e.y) < 4);
 // waking up next to a tame cat: 70% chance of a morning gift
 const CAT_GIFTS = [['rabbit_hide', 16], ['rabbit_foot', 16], ['chicken', 16], ['feather', 16], ['rotten_flesh', 16], ['string', 10], ['phantom_membrane', 2]];
 function catGifts() {
@@ -295,7 +295,7 @@ MOBDEF.mule.drops = MOBDEF.horse.drops;
 // ---------- spawning ----------
 function spawnMoreForChunk(c) {
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 27)), b = c.biome[8 * 16 + 8];
-  const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 205 ? y + 1 : -1; };
+  const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 204 || g === 205 ? y + 1 : -1; };
   const group = (t, n, opts) => { const v = opts && opts.variant != null ? opts.variant : null; for (let i = 0; i < n; i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = ground(x, z); if (y > 0) spawnMob(t, x + .5, y, z + .5, v != null ? { variant: v } : {}); } };
   const B = S.BIO;
   if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) }); else group('donkey', 1 + R0.int(2)); }
@@ -305,4 +305,11 @@ function spawnMoreForChunk(c) {
   if ((b === B.OCEAN || b === B.WARM_OCEAN || b === B.LUKEWARM_OCEAN || b === B.COLD_OCEAN) && R0() < 0.04) for (let i = 1 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 56 + R0.int(5); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === BID.water) spawnMob('dolphin', x + .5, y, z + .5); }
   // stray cats in villages: one per chunk that got villagers
   if (c.hadVillagers && R0() < 0.4) group('cat', 1);
+  if (typeof MOBDEF.mooshroom !== 'object') return;
+  if (b === B.MUSHROOM && R0() < 0.3) group('mooshroom', 2 + R0.int(4));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < (b === B.BAMBOO_JUNGLE ? 0.12 : 0.02)) group('panda', 1 + R0.int(2));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < 0.05) group('parrot', 1 + R0.int(2));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < 0.03) group('ocelot', 1);
+  if ((b === B.ICE_SPIKES || b === B.TUNDRA) && R0() < 0.02) group('polar_bear', 1 + R0.int(2));
+  if ((b === B.MOUNTAINS || b === B.SAVANNA) && R0() < 0.025) group('llama', 2 + R0.int(3));
 }

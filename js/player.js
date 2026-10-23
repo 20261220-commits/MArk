@@ -523,6 +523,7 @@ function useItem(first) {
     if (d && d.place === BID.banner) { placeBanner(t, h); return; }
     if (first && lushUse(t, h, d)) return;
     if (first && oceanUse(t, h, d)) return;
+    if (first && biomeUse(t, h, d)) return;
     if (first && d && bottleUse(t, h)) return;
     const { x, y, z, id } = t;
     if (d) {
@@ -644,6 +645,7 @@ function placeBlock(t, d) {
   if (id === BID.pointed_dripstone) meta = t.ny === -1 ? 0 : 1;
   { const tm = tripPlace(t, d, x, y, z, fd); if (tm === false) return; if (tm != null) meta = tm; }
   if (typeof oceanPlace === 'function') { const om = oceanPlace(x, y, z, id, meta); if (om === false) return; meta = om; }
+  { const bm = biomePlace(x, y, z, id, meta); if (bm === false) return; meta = bm; }
   if (S.DOOR[id]) {
     if (getBlock(x, y + 1, z) && !REPL[getBlock(x, y + 1, z)] || !supportedBy(below)) return;
     if (entityBlocks(x, y, z) || entityBlocks(x, y + 1, z)) return;
@@ -675,6 +677,7 @@ function placeBlock(t, d) {
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
   if (S.isRail(id)) railPlaced(x, y, z, fd);
   if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
+  biomePlaced(x, y, z, id, meta);
   if (id === BID.tripwire || id === BID.tripwire_hook_block) tripRefresh(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);

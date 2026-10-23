@@ -10,7 +10,7 @@ const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furna
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
-  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
+  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', bamboo: 'bamboo_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
   ITEMS[b.id] = { id: b.id, key: b.key, name: b.name, stack: 64, place: b.id, block: b, sprite: SPRITE_BLOCKS[b.key] || null };
@@ -193,7 +193,7 @@ for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spru
   'spruce_fence', 'birch_fence', 'jungle_fence', 'acacia_fence', 'dark_oak_fence']) ITEMS[IID[k]].fuel = k.endsWith('_slab') ? 150 : 300;
 for (const k of ['jungle_sapling', 'acacia_sapling', 'dark_oak_sapling', 'fishing_rod', ...S.COLORS.map(c => c + '_wool'), ...S.COLORS.map(c => c + '_carpet')]) if (IID[k] != null) ITEMS[IID[k]].fuel = k.endsWith('carpet') ? 67 : 100;
 for (const k of ['oak_sapling', 'spruce_sapling', 'birch_sapling', 'white_wool']) ITEMS[IID[k]].fuel = 100;
-ITEMS[IID.dried_kelp_block].fuel = 4000; ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
+ITEMS[IID.dried_kelp_block].fuel = 4000; ITEMS[IID.bamboo].fuel = 50; ITEMS[IID.coal_block].fuel = 16000; ITEMS[IID.bow].fuel = 300; ITEMS[IID.bowl].fuel = 100;
 // netherite floats in lava and never burns; redstone dust places wire
 for (const k in IID) if (k.startsWith('netherite') || k === 'ancient_debris') ITEMS[IID[k]].fireproof = 1;
 ITEMS[IID.redstone].place = BID.redstone_wire;
@@ -356,6 +356,8 @@ shaped('leather_horse_armor', 1, ['L L', 'LLL', 'L L'], { L: 'leather' }); shape
 shaped('beehive', 1, ['PPP', 'HHH', 'PPP'], { P: 'planks', H: 'honeycomb' }); shaped('honey_block', 1, ['BB', 'BB'], { B: 'honey_bottle' }); shapeless('honey_bottle', 4, ['honey_block', 'glass_bottle', 'glass_bottle', 'glass_bottle', 'glass_bottle']);
 shaped('honeycomb_block', 1, ['HH', 'HH'], { H: 'honeycomb' }); shapeless('sugar', 3, ['honey_bottle']);
 ITEMS[IID.tripwire_hook].place = BID.tripwire_hook_block; ITEMS[IID.string].place = BID.tripwire;
+shaped('jack_o_lantern', 1, ['P', 'T'], { P: 'carved_pumpkin', T: 'torch' }); shaped('stick', 1, ['B', 'B'], { B: 'bamboo' });
+for (const [f, c] of [['sunflower', 'yellow'], ['lilac', 'magenta'], ['rose_bush', 'red'], ['peony', 'pink']]) shapeless(c + '_dye', 2, [f]);
 shaped('flower_pot', 1, ['B B', ' B '], { B: 'brick' });
 shaped('conduit', 1, ['NNN', 'NHN', 'NNN'], { N: 'nautilus_shell', H: 'heart_of_the_sea' }); shaped('dried_kelp_block', 1, ['KKK', 'KKK', 'KKK'], { K: 'dried_kelp' }); shapeless('dried_kelp', 9, ['dried_kelp_block']);
 shaped('map', 1, ['PPP', 'PCP', 'PPP'], { P: 'paper', C: 'compass' });
@@ -541,6 +543,7 @@ function blockDrops(b, meta, stack) {
   const t = toolOf(stack);
   if (d.key === 'kelp_plant') { add('kelp'); return res; }
   if (d.key === 'tripwire') { add('string'); return res; }
+  if (d.key === 'tall_flower') { if (!(meta & 8)) add(itemOfBlock(b, meta & 3)); return res; }
   if (d.key === 'tripwire_hook_block') { add('tripwire_hook'); return res; }
   if (d.key === 'flower_pot') { add('flower_pot'); if (meta && S.POT_PLANTS[meta]) add(S.POT_PLANTS[meta][0]); return res; }
   if (d.key === 'tall_seagrass') { if (shears) add('seagrass', 2); return res; }

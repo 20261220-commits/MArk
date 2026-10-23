@@ -182,6 +182,8 @@ function plantOK(b, x, y, z, m) {
     case 16: return OPQ[below]; // seagrass
     case 17: return m & 8 ? below === b : OPQ[below] && above === b; // tall seagrass
     case 18: return supportedBy(below); // corals, fans, sea pickles
+    case 19: return below === BID.bamboo || BAMBOO_SOIL.has(below); // bamboo
+    case 20: return m & 8 ? below === b : (below === BID.grass_block || below === BID.dirt || below === BID.podzol) && above === b; // tall flowers
   }
   return true;
 }
