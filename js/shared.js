@@ -22,7 +22,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
   'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ')
-  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom', 'exposed_cut_copper', 'weathered_cut_copper', 'oxidized_cut_copper', 'azalea_top', 'azalea_side', 'azalea_plant', 'flowering_azalea_top', 'flowering_azalea_side', 'azalea_leaves', 'azalea_leaves_o', 'flowering_azalea_leaves', 'flowering_azalea_leaves_o', 'cave_vines', 'cave_vines_lit', 'spore_blossom', 'big_dripleaf_top', 'big_dripleaf_stem', 'small_dripleaf', 'small_dripleaf_top', 'rooted_dirt', 'hanging_roots', 'sculk_sensor_top', 'sculk_sensor_side', 'sculk_sensor_bottom', 'sculk_sensor_tendril', 'sculk_sensor_tendril_active', 'brewing_stand', 'brewing_stand_base', 'brewing_bottle', 'beacon', 'campfire_log', 'campfire_log_lit', 'soul_campfire_log_lit', 'bell_body', 'jukebox_side', 'jukebox_top'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
+  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom', 'exposed_cut_copper', 'weathered_cut_copper', 'oxidized_cut_copper', 'azalea_top', 'azalea_side', 'azalea_plant', 'flowering_azalea_top', 'flowering_azalea_side', 'azalea_leaves', 'azalea_leaves_o', 'flowering_azalea_leaves', 'flowering_azalea_leaves_o', 'cave_vines', 'cave_vines_lit', 'spore_blossom', 'big_dripleaf_top', 'big_dripleaf_stem', 'small_dripleaf', 'small_dripleaf_top', 'rooted_dirt', 'hanging_roots', 'sculk_sensor_top', 'sculk_sensor_side', 'sculk_sensor_bottom', 'sculk_sensor_tendril', 'sculk_sensor_tendril_active', 'brewing_stand', 'brewing_stand_base', 'brewing_bottle', 'beacon', 'campfire_log', 'campfire_log_lit', 'soul_campfire_log_lit', 'bell_body', 'jukebox_side', 'jukebox_top', 'rail', 'rail_corner', 'powered_rail', 'powered_rail_on', 'detector_rail', 'detector_rail_on', 'activator_rail', 'activator_rail_on'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -357,6 +357,11 @@ const BLOCK_ROWS = [
   [1057, 'jukebox', '주크박스', C, ['jukebox_side', 'jukebox_top', 'jukebox_side'], 2, A, 0],
   [1058, 'banner', '현수막', RT.BOX, null, 1, A, 0, { nosolid: 1, vars: COLV('wool'), vk: COLV('banner'), vn: COLN('현수막') }], // meta: colour | rotation << 4; the cloth is drawn by decor.js
   [1059, 'wall_banner', '벽걸이 현수막', RT.BOX, null, 1, A, 0, { nosolid: 1, vars: COLV('wool'), vk: COLV('wall_banner'), vn: COLN('현수막') }], // meta: colour | facing << 4
+  // rails: drawn flat by rail() in the mesher. meta & 15 (plain) or & 7 (others) is the shape (see RAIL_ENDS), bit 8 = powered
+  [1060, 'rail', '레일', RT.WIRE, 'rail', 0.7, P, 0, { nosolid: 1, rail: 1 }],
+  [1061, 'powered_rail', '전동 레일', RT.WIRE, 'powered_rail', 0.7, P, 0, { nosolid: 1, rail: 2, rs: 'rail' }],
+  [1062, 'detector_rail', '감지 레일', RT.WIRE, 'detector_rail', 0.7, P, 0, { nosolid: 1, rail: 2, rs: 'rail' }],
+  [1063, 'activator_rail', '활성화 레일', RT.WIRE, 'activator_rail', 0.7, P, 0, { nosolid: 1, rail: 2, rs: 'rail' }],
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
 // block ids are 16 bit: 0..255 are the original blocks, newer ones start at 1024 so their block items
@@ -402,6 +407,11 @@ function candleOf(id, m) {
   return null;
 }
 function candleBlock(c, n, lit) { return c < 0 ? [246, 16 | (n - 1) | (lit ? 4 : 0)] : [198, c | ((1 + n - 1 + (lit ? 4 : 0)) << 4)]; }
+// rail shapes: 0 N-S, 1 E-W, 2-5 ascending east/west/north/south, 6 S-E, 7 S-W, 8 N-W, 9 N-E; the two ends as [dx, dy, dz]
+const RAIL_ENDS = [[[0, 0, -1], [0, 0, 1]], [[-1, 0, 0], [1, 0, 0]], [[-1, 0, 0], [1, 1, 0]], [[1, 0, 0], [-1, 1, 0]], [[0, 0, 1], [0, 1, -1]], [[0, 0, -1], [0, 1, 1]],
+  [[0, 0, 1], [1, 0, 0]], [[0, 0, 1], [-1, 0, 0]], [[0, 0, -1], [-1, 0, 0]], [[0, 0, -1], [1, 0, 0]]];
+const isRail = id => id >= 1060 && id <= 1063;
+const railShape = (id, m) => id === 1060 ? Math.min(9, m & 15) : m & 7;
 const isRod = (id, m) => id === 246 && ((m >> 3) & 15) === 1;
 // block light emitted by a block, including the meta-dependent ones (lit candles give 3 per candle)
 function emitOf(id, m) { if (id === 1054 || id === 1055) return m & 4 ? (id === 1054 ? 15 : 10) : 0; if (id === 1051) return (m & 3) === 1 ? 1 : 0; if (id === 1044) return m & 1 ? 14 : 0; if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
@@ -801,6 +811,7 @@ const LOOT = {
   house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
   stronghold: [['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
+  mineshaft: [['rail', 8], ['torch', 8], ['bread', 3], ['iron_ingot', 4], ['gold_ingot', 3], ['redstone', 8], ['lapis_lazuli', 8], ['coal', 8], ['diamond', 2], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['beetroot_seeds', 4], ['golden_apple', 1], ['name_tag', 1], ['powered_rail', 4], ['activator_rail', 4], ['detector_rail', 4], ['glow_berries', 6], ['iron_pickaxe', 1]],
   fortress: [['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['music_disc_pigstep', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
 function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
@@ -968,6 +979,47 @@ function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
     if (dz) { for (let x = ex - 3; x <= ex + 3; x++) for (let y = sy + 1; y <= sy + 4; y++) st(x, y, ez + 3, 47); st(ex, sy + 1, ez + 2, 44, 0); if (st.get(ex, sy + 1, ez + 2) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | (((ez + 2) & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 6) }); }
     else if (dx > 0) { for (let z = ez - 3; z <= ez + 3; z++) for (let y = sy + 1; y <= sy + 3; y++) st(ex, y, z, 173); }
     else { st(ex, sy + 1, ez, 44, 1); if (st.get(ex, sy + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 5) }); }
+  }
+}
+// ---- abandoned mineshafts: about one in three 160-block regions has a tree of 3x3 corridors deep underground,
+// with wooden supports, broken rail lines, cobwebs and chest minecarts (spawned from tiles of type 'mob' with `cart`) ----
+const MS_REG = 160, MS_CACHE = new Map();
+function mineshaftOf(seed, rx, rz) {
+  const key = rx + ',' + rz; if (MS_CACHE.has(key)) return MS_CACHE.get(key);
+  const r = rng(hash32(seed, rx, rz, 91)), segs = [];
+  if (r() < 0.35) {
+    const ox = rx * MS_REG + 40 + r.int(80), oz = rz * MS_REG + 40 + r.int(80), y = 14 + r.int(26);
+    const q = [[ox, oz, 0, 0], [ox, oz, 1, 0], [ox, oz, 2, 0], [ox, oz, 3, 0]];
+    while (q.length && segs.length < 36) {
+      const [x, z, d, depth] = q.shift(), [dx, , dz] = DIRS[d], len = 8 + r.int(22);
+      const ex = x + dx * len, ez = z + dz * len;
+      if (Math.abs(ex - ox) > 72 || Math.abs(ez - oz) > 72) continue;
+      segs.push({ x0: Math.min(x, ex), z0: Math.min(z, ez), x1: Math.max(x, ex), z1: Math.max(z, ez), y, ax: dx ? 1 : 0, seed: r.int(1 << 30) });
+      if (depth < 4) for (const nd of [d, (d + 1) & 3, (d + 3) & 3]) if (r() < (nd === d ? 0.5 : 0.4)) q.push([ex, ez, nd, depth + 1]);
+    }
+  }
+  MS_CACHE.set(key, segs); return segs;
+}
+function stampMineshafts(seed, st, cx, cz, tiles) {
+  const x0 = cx * 16, z0 = cz * 16, rx0 = Math.floor((x0 - 80) / MS_REG), rx1 = Math.floor((x0 + 95) / MS_REG), rz0 = Math.floor((z0 - 80) / MS_REG), rz1 = Math.floor((z0 + 95) / MS_REG);
+  const carve = (x, y, z) => { const b = st.get(x, y, z); if (b > 0 && b !== 7 && !FLUID[b] && !FLUID[st.get(x, y + 1, z)]) st(x, y, z, 0); };
+  for (let rx = rx0; rx <= rx1; rx++) for (let rz = rz0; rz <= rz1; rz++) for (const g of mineshaftOf(seed, rx, rz)) {
+    if (!st.inside(g.x0 - 1, g.z0 - 1, g.x1 + 1, g.z1 + 1)) continue;
+    const r = rng(g.seed), y = g.y, len = g.ax ? g.x1 - g.x0 : g.z1 - g.z0, cart = r() < 0.4 ? 2 + r.int(Math.max(1, len - 3)) : -1;
+    for (let s = 0; s <= len; s++) {
+      const cx2 = g.ax ? g.x0 + s : g.x0, cz2 = g.ax ? g.z0 : g.z0 + s, w = (o) => g.ax ? [cx2, cz2 + o] : [cx2 + o, cz2];
+      const rr = rng(hash32(g.seed, s, 0, 5)); // per-cell decisions stay the same whichever chunk is being built
+      for (let o = -1; o <= 1; o++) {
+        const [px, pz] = w(o);
+        for (let dy = 0; dy < 3; dy++) carve(px, y + dy, pz);
+        const fl = st.get(px, y - 1, pz); if (fl === 0 || FLUID[fl] === 2) st(px, y - 1, pz, 5); // planks bridge gaps and lava
+      }
+      if (s % 5 === 2 && s < len - 1) { const [ax, az] = w(-1), [bx, bz] = w(1); st(ax, y, az, 116); st(ax, y + 1, az, 116); st(bx, y, bz, 116); st(bx, y + 1, bz, 116); for (let o = -1; o <= 1; o++) { const [px, pz] = w(o); st(px, y + 2, pz, 5); } }
+      else { for (let o = -1; o <= 1; o++) { const [px, pz] = w(o); if (rr() < 0.04) st(px, y + 2 - (rr() < 0.3 ? 1 : 0), pz, 100); } }
+      const [mx, mz] = w(0);
+      if (st.get(mx, y, mz) === 0 && rr() < 0.7) st(mx, y, mz, 1060, g.ax ? 1 : 0);
+      if (s === cart && st.get(mx, y, mz) >= 0) tiles.push({ t: 'mob', i: (y << 8) | ((mz & 15) << 4) | (mx & 15), cart: 'chest', loot: rollLoot(r, 'mineshaft', 4 + r.int(4)) });
+    }
   }
 }
 // ---------- the Nether ----------
@@ -1495,6 +1547,7 @@ function genChunk(seed, cx, cz, dim) {
   // structures: villages on the surface, strongholds underground
   const stamp = makeStamp(blocks, meta, x0, z0);
   for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
+  stampMineshafts(seed, stamp, cx, cz, tiles);
   for (const [sx, sy, sz] of strongholdsOf(seed)) if (stamp.inside(sx - 44, sz - 44, sx + 44, sz + 44)) stampStronghold(seed, stamp, sx, sy, sz, R, tiles);
   if (vills.length) fixConnections(blocks, meta);
   // snow cover for cold biomes
@@ -1679,7 +1732,7 @@ function meshChunk(B, M, L, bio, opts) {
   const QU = new Uint16Array(8);
   // emits a quad; uvs given as [u0,v0,u1,v1] px within tile, rot 0..3
   const D6F = [3, 2, 5, 4, 1, 0]; // DIR6 index -> face index
-  const isRS = b => b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
+  const isRS = b => b === 1062 || b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
     QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
@@ -1791,7 +1844,7 @@ function meshChunk(B, M, L, bio, opts) {
     } else if (rt === RT.TBOX) {
       setTint(0); boxFaces(id, meta, x, y, z, shapes(id, meta), Tr, tFlip);
     } else if (rt === RT.WIRE) {
-      wire(x, y, z, meta);
+      if (id >= 1060) rail(id, meta, x, y, z); else wire(x, y, z, meta);
     } else if (rt === RT.FLUID) {
       fluid(id, meta, x, y, z);
     }
@@ -1829,6 +1882,21 @@ function meshChunk(B, M, L, bio, opts) {
       for (let k = 0; k < 4; k++) { const c = Fv.c[k]; CS[k][0] = x + dx + c[0]; CS[k][1] = y + c[1]; CS[k][2] = z + dz + c[2]; if (dx) CS[k][0] = x + (dx > 0 ? 1 - off : off); if (dz) CS[k][2] = z + (dz > 0 ? 1 - off : off); }
       quad(Cu, cFlip, CS, T.redstone_dust_line0, 0, 0, 16, 16, 0, L4, SH4, false);
     });
+  }
+  // rails: one quad just above the floor, tilted on slopes; the texture runs north-south (corner: south and east)
+  function rail(id, meta, x, y, z) {
+    const sh = railShape(id, meta), on = meta & 8;
+    const tile = id === 1060 ? (sh >= 6 ? T.rail_corner : T.rail) : id === 1061 ? (on ? T.powered_rail_on : T.powered_rail) : id === 1062 ? (on ? T.detector_rail_on : T.detector_rail) : (on ? T.activator_rail_on : T.activator_rail);
+    flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
+    const F = FACES[2], rot = sh >= 6 ? [0, 1, 2, 3][sh - 6] : (sh === 1 || sh === 2 || sh === 3) ? 1 : 0;
+    const up = sh === 2 ? [1, 0] : sh === 3 ? [-1, 0] : sh === 4 ? [0, -1] : sh === 5 ? [0, 1] : null;
+    for (let k = 0; k < 4; k++) {
+      const c = F.c[k]; CS[k][0] = x + c[0]; CS[k][2] = z + c[2];
+      let h = 1 / 16; if (up) h += (up[0] ? (up[0] > 0 ? c[0] : 1 - c[0]) : (up[1] > 0 ? c[2] : 1 - c[2]));
+      CS[k][1] = y + h;
+    }
+    quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false);
+    if (up) { for (let k = 0; k < 4; k++) CS[k][1] -= 1 / 32; const t = CS[1]; CS[1] = CS[3]; CS[3] = t; quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false); } // underside of a slope
   }
   function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {
@@ -1949,7 +2017,7 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

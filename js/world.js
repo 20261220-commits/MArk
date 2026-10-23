@@ -233,6 +233,7 @@ function neighborUpdate(x, y, z) {
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (b === BID.nether_portal) { if (!portalIntact(x, y, z)) setBlock(x, y, z, 0); return; }
   if (b === BID.fire) { if (!SOLID[below]) setBlock(x, y, z, 0); return; }
+  if (d.rail && !supportedBy(below)) { breakNaturally(x, y, z, b, m); return; }
   if (d.connect) updateConnections(x, y, z, b);
   if (d.rs || S.DOOR[b] || b === BID.tnt || b === BID.oak_trapdoor) {
     if (d.rs === 'torch' || d.rs === 'lever' || d.rs === 'button') { const a = d.rs === 'torch' ? torchAttach(x, y, z, m) : switchAttach(x, y, z, m); if (!SOLID[getBlock(a[0], a[1], a[2])] && !(d.rs === 'torch' && m === 0 && supportedBy(getBlock(a[0], a[1], a[2])))) { breakNaturally(x, y, z, b, m); rsNotify(x, y, z); return; } }

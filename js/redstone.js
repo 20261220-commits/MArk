@@ -20,6 +20,7 @@ function strongPower(x, y, z) {
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
     else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
+    else if (b === BID.detector_rail) { if (dy === 1 && (getMeta(nx, ny, nz) & 8)) return 15; } // like a pressure plate
     else if (b === BID.sculk_sensor && dy === 1) { const m = getMeta(nx, ny, nz); if ((m & 3) === 1) return m >> 4; } // an active sensor strongly powers the block it sits on
     else if (b === BID.chain) { const m = getMeta(nx, ny, nz); if (S.isRod(b, m) && (m & 128)) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } } // a struck lightning rod strongly powers what it stands on
   }
@@ -36,7 +37,7 @@ function wireConn(x, y, z) { // horizontal directions the dust visually connects
   const c = [0, 0, 0, 0], above = OPQ[getBlock(x, y + 1, z)];
   DIRS.forEach(([dx, , dz], d) => {
     const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if (nd && nd.rs && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
+    if (nd && nd.rs && (nd.rs !== 'rail' || n === BID.detector_rail) && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
     else if (n === BID.redstone_block) c[d] = 1;
     else if (!OPQ[n] && getBlock(x + dx, y - 1, z + dz) === RSB.wire) c[d] = 1;
     else if (!above && getBlock(x + dx, y + 1, z + dz) === RSB.wire) c[d] = 1;
@@ -65,6 +66,7 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.daylight_detector: case BID.target: return m & 15;
     case BID.chain: return S.isRod(b, m) && (m & 128) ? 15 : 0;
     case BID.sculk_sensor: return (m & 3) === 1 ? m >> 4 : 0;
+    case BID.detector_rail: return m & 8 ? 15 : 0;
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -132,6 +134,7 @@ function rsTick() {
 function rsComponent(x, y, z, b) {
   const m = getMeta(x, y, z);
   if (b === BID.bell) { bellPower(x, y, z, m); return; }
+  if (b === BID.powered_rail || b === BID.activator_rail) { railPower(x, y, z, b, m); return; }
   if (b === RSB.torch || b === RSB.torchOff) {
     const a = torchAttach(x, y, z, m), pw = isConductor(getBlock(a[0], a[1], a[2])) ? Math.max(strongPower(a[0], a[1], a[2]), weakPower(a[0], a[1], a[2])) : 0;
     if ((b === RSB.torch) === (pw > 0)) rsLater(x, y, z, 2);
@@ -188,6 +191,7 @@ function rsDelayed(x, y, z) {
   else if (b === BID.target && (m & 15)) { setMeta(x, y, z, m & ~15); rsNotify(x, y, z); }
   else if (S.isRod(b, m) && (m & 128)) { setMeta(x, y, z, m & ~128); rsNotify(x, y, z); }
   else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
+  else if (b === BID.detector_rail && (m & 8)) detectorCheck(x, y, z, m);
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);
     else { setMeta(x, y, z, 0); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
@@ -238,7 +242,7 @@ function pushEntities(x, y, z, n, dx, dy, dz) {
 function plateOccupied(x, y, z) {
   const inside = (e, w) => e.x + w > x && e.x - w < x + 1 && e.z + w > z && e.z - w < z + 1 && e.y >= y - 0.01 && e.y < y + 0.5;
   if (!spectator() && !PL.dead && inside(PL, PL.w)) return true;
-  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat') && inside(e, e.w)) return true;
+  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat' || e.kind === 'minecart') && inside(e, e.w)) return true;
   return false;
 }
 function plateCheck(e, w) {
@@ -262,6 +266,7 @@ function containerSignal(x, y, z) {
   const b = getBlock(x, y, z);
   if (b === BID.composter) return Math.min(15, (getMeta(x, y, z) & 15) * 2 - (getMeta(x, y, z) >= 8 ? 1 : 0));
   if (b === BID.cauldron) return getMeta(x, y, z) & 3;
+  if (b === BID.detector_rail) { const c = cartsAt(x, y, z).find(e => e.items); if (c) { let f = 0; for (const st of c.items) if (st) f += st.n / maxStack(st.id); return f ? Math.floor(1 + f / c.items.length * 14) : 0; } return -1; } // reads a chest or hopper minecart on it
   if (b === BID.jukebox) { const t = getTile(x, y, z), st = t && t.items && t.items[0]; return st ? ITEMS[st.id].disc : 0; } // the disc number
   const fr = typeof frameAt === 'function' && frameAt(x, y, z); if (fr) return fr.item ? fr.rot + 1 : 0; // item frame: its rotation
   const t = getTile(x, y, z); if (!t || !t.items) return -1;
@@ -308,10 +313,10 @@ function hopperTick(c, i, t) {
   const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
-  const below = getTile(x, y - 1, z);
+  const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
   if (below && below.items) { const k = t.items.findIndex(s => s); if (k >= 0) { const s = t.items[k], one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(below, one, below.type === 'furnace' ? [ITEMS[s.id].fuel && !SMELT[s.id] ? 1 : 0] : null)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(x, y - 1, z); } } }
-  const above = getTile(x, y + 1, z);
-  if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
+  const above = getTile(x, y + 1, z) || cartsAt(x, y + 1, z).find(e => e.items);
+  if (above && above.items) { if (above.loot) cartFillLoot(above); const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
   else for (const e of ENT) if (e.kind === 'item' && !e.dead && Math.abs(e.x - x - .5) < 0.7 && Math.abs(e.z - z - .5) < 0.7 && e.y >= y + 0.5 && e.y < y + 2) { if (insertItem(t, e.stack)) removeEnt(e); moved = true; break; }
   if (moved) { c.modified = c.edited = true; rsNotify(x, y, z); if (UI.screen) UI.renderScreen(); }
 }

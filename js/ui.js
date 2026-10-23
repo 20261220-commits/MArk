@@ -140,7 +140,7 @@ UI.renderScreen = () => {
     const opts = enchantOptions();
     h = `<div class="panel"><div class="cap">마법 부여</div><div class="row top ench"><div class="col"><div class="row">${slotHtml(0)}${slotHtml(1, 'lapis')}</div><p class="tip">책장 ${opts.shelves}개</p></div><div class="eopts">${opts.list.map((o, i) => `<button class="eopt ${o.ok ? '' : 'off'}" data-ench="${i}"><span>${o.text}</span><b>${o.cost}</b><small>${i + 1} 청금석 · ${i + 1} 레벨</small></button>`).join('')}</div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
   } else if (T === 'hopper') {
-    h = `<div class="panel"><div class="cap">호퍼</div><div class="row top hop">${[0, 1, 2, 3, 4].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '호퍼'}</div><div class="row top hop">${[0, 1, 2, 3, 4].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
   } else if (T === 'dispenser') {
     h = `<div class="panel"><div class="cap">${GUI.ctx.title || '발사기'}</div><div class="row top" style="justify-content:center"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div></div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'anvil') {

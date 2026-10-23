@@ -29,7 +29,7 @@ function buildSlots(type, ctx) {
     L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
     if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && st.id === BID.pumpkin), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
-    const t = getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
+    const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
   } else if (type === 'enchant') {
     ctx.items = ctx.items || [null, null];

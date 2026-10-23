@@ -25,6 +25,7 @@ function selShape(id, m) {
   if (rt === RT.TORCH) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; const ox = d[0] * 5, oz = d[2] * 5; return [[5.5 + ox, 3, 5.5 + oz, 10.5 + ox, 13, 10.5 + oz]]; } return [[6, 0, 6, 10, 10, 10]]; }
   if (rt === RT.CROP) return [[0, 0, 0, 16, 2 + (m & 7) * 2, 16]];
   if (rt === RT.BOX) return S.shapes(id, m);
+  if (rt === RT.WIRE) { const sh = S.isRail(id) ? S.railShape(id, m) : 0; return [[0, 0, 0, 16, sh >= 2 && sh <= 5 ? 8 : S.isRail(id) ? 2 : 1, 16]]; }
   return null;
 }
 // ray vs axis-aligned box: returns [t, face] or null
@@ -493,6 +494,7 @@ function useItem(first) {
     if (e.kind === 'frame') { frameUse(e, h); return; }
     if (e.kind === 'armor_stand') { const [, ldy] = lookDir(); standUse(e, h, PL.y + PL.eyeH + ldy * t.t); return; }
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
+    if (e.kind === 'minecart') { cartUse(e, h); return; }
     if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
       removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
       if (creative()) { if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } else INV.slots[INV.sel] = it;
@@ -551,6 +553,7 @@ function useItem(first) {
       }
       if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle || d.splash || d.lingering) { throwItem(h.id); return; }
       if (h.id === IID.fishing_rod) { useRod(); return; }
+      if (d.cart) { placeMinecart(t, d); return; }
       if (ITEMS[h.id].boat) { const fl = FLUID[id] === 1; if (!fl && t.ny !== 1) return; placeBoat(x + (fl ? 0 : t.nx) + .5, fl ? y + 0.88 : y + 1, z + (fl ? 0 : t.nz) + .5, PL.yaw, ITEMS[h.id].boat); consume(); swing(); return; }
       if (d.place != null) { placeBlock(t, d); return; }
     }
@@ -619,7 +622,7 @@ function placeBlock(t, d) {
   if (id === BID.lily_pad && below !== 27) return;
   if (id === BID.redstone_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.lever || id === BID.stone_button) { const a = S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === -t.ny && v[2] === -t.nz); if (a < 0 || !SOLID[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = a; }
-  if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate) && !supportedBy(below)) return;
+  if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate || S.isRail(id)) && !supportedBy(below)) return;
   if (id === BID.repeater) meta = fd;
   if (id === BID.piston || id === BID.sticky_piston) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.nether_wart && below !== BID.soul_sand) return;
@@ -660,6 +663,7 @@ function placeBlock(t, d) {
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
+  if (S.isRail(id)) railPlaced(x, y, z, fd);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }

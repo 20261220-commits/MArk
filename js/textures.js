@@ -185,6 +185,25 @@ PAINT.cauldron_side = r => fill((x, y) => quant(shade(CAUL, 1 + (r() - .5) * .14
 PAINT.cauldron_top = r => fill((x, y) => quant(shade(CAUL, 1.25 + (r() - .5) * .1), 3));
 PAINT.cauldron_inner = r => fill((x, y) => quant(shade(CAUL, 0.72 + (r() - .5) * .1), 3));
 PAINT.cauldron_bottom = r => fill((x, y) => quant(shade(CAUL, 0.85 + (r() - .5) * .12), 3));
+// rails: wooden ties under two metal bars running north-south (the corner piece bends from south to east)
+function railTex(r, bar, hi, tie, mid, corner) {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if ((y % 4 === 1 || y % 4 === 2) && x >= 1 && x <= 14) P(x, y, quant(shade(hex(tie), (y % 4 === 1 ? 1.05 : 0.85) + (r() - .5) * .1), 3));
+  const barAt = (x, y, c) => P(x, y, hex(c));
+  if (!corner) for (let y = 0; y < 16; y++) { barAt(2, y, hi); barAt(3, y, bar); barAt(12, y, hi); barAt(13, y, bar); }
+  else for (let t = 0; t < 64; t++) { // two quarter circles around the north-west corner of the tile... centred on (16, 16)
+    const a = t / 63 * Math.PI / 2;
+    for (const [rad, c] of [[13.5, hi], [12.5, bar], [3.5, hi], [2.5, bar]]) barAt(Math.round(16 - Math.cos(a) * rad - 0.5), Math.round(16 - Math.sin(a) * rad - 0.5), c);
+  }
+  if (mid) for (let y = 5; y < 11; y++) for (let x = 6; x < 10; x++) P(x, y, hex(mid));
+}
+PAINT.rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433);
+PAINT.rail_corner = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0, 1);
+PAINT.powered_rail = r => railTex(r, 0xb08a1a, 0xf0d040, 0x5a4428, 0x5a1a14);
+PAINT.powered_rail_on = r => railTex(r, 0xb08a1a, 0xf0d040, 0x5a4428, 0xff3a1a);
+PAINT.detector_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0x7a2a20);
+PAINT.detector_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0xff3a1a);
+PAINT.activator_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x7a2a20, 0x4a1a14);
+PAINT.activator_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0xb03a20, 0xff3a1a);
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
@@ -486,7 +505,20 @@ const SPR = {
   sugar_cane_item: () => sprite(p => { for (const x0 of [4, 8, 11]) for (let y = 1; y < 15; y++) { p(x0, y, (y + x0) % 5 === 0 ? hex(0xa8d878) : hex(0x88c060)); p(x0 + 1, y, hex(0x5a9a3a)); } }),
 };
 function candleSprite(col) { return sprite(p => { const c = hex(col); for (let y = 5; y < 15; y++) for (let x = 6; x < 10; x++) p(x, y, shade(c, x === 6 ? 1.15 : x === 9 ? 0.75 : 1)); for (let x = 6; x < 10; x++) p(x, 5, shade(c, 1.25)); p(7, 3, hex(0x2a2420)); p(7, 4, hex(0x2a2420)); }); }
+// minecart icons: an iron tub on two wheels, with the load showing above the rim
+function cartSprite(load) {
+  return sprite(p => {
+    if (load) load(p);
+    for (let y = 7; y < 12; y++) for (let x = 1 + (y - 7 > 3 ? 1 : 0); x < 15 - (y - 7 > 3 ? 1 : 0); x++) p(x, y, y === 7 ? hex(0xb8b8b8) : x === 1 || x === 14 || y === 11 ? hex(0x4a4a4a) : (y === 8 ? hex(0x8a8a8a) : hex(0x6e6e6e)));
+    for (const cx of [4, 11]) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) p(cx + dx - 1, 12 + dy, hex(0x2a2a2a));
+  });
+}
 Object.assign(SPR, {
+  minecart: () => cartSprite(null),
+  chest_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 ? hex(0x4a3418) : x === 3 || x === 12 || y === 2 ? hex(0x6b4a24) : hex(0xa8743a)); p(7, 4, hex(0xd8d8d8)); p(8, 4, hex(0xd8d8d8)); p(7, 5, hex(0x8a8a8a)); }),
+  hopper_minecart: () => cartSprite(p => { for (let y = 3; y < 8; y++) for (let x = 2; x < 14; x++) p(x, y, y === 3 ? hex(0x5a5a5e) : x === 2 || x === 13 ? hex(0x2a2a2e) : y === 4 && x > 3 && x < 12 ? hex(0x1a1a1e) : hex(0x46464a)); }),
+  tnt_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 || y === 5 ? (x % 3 === 0 ? hex(0x2a2a2a) : hex(0xe8e8e8)) : x === 3 || x === 12 ? hex(0x8a1a10) : hex(0xd8341a)); }),
+  furnace_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, x === 3 || x === 12 || y === 2 ? hex(0x5a5a5a) : y >= 4 && y <= 6 && x >= 6 && x <= 9 ? hex(0x1a1a1a) : hex(0x8a8a8a)); }),
   honeycomb: () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const dx = Math.abs(x - 7.5), dy = Math.abs(y - 8); if (dx + dy * 0.6 > 7) continue; const cell = ((x >> 1) + (y >> 2)) % 3 === 0; p(x, y, cell ? hex(0xb8701a) : (x + y) % 5 === 0 ? hex(0xffd860) : hex(0xf0a828)); } }),
   candle_item: () => candleSprite(CANDLE_COL.candle),
   lightning_rod_item: () => sprite(p => { for (let y = 5; y < 16; y++) { p(7, y, hex(0xe89a74)); p(8, y, hex(0xa8553a)); } for (let y = 1; y < 5; y++) for (let x = 6; x < 10; x++) p(x, y, x === 6 || y === 1 ? hex(0xf6b48a) : x === 9 ? hex(0x9c4d2f) : hex(0xd47a55)); }),

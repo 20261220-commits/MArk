@@ -194,7 +194,7 @@ function rideTick() {
   const e = PL.riding;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
   if (!e || e.dead) { PL.riding = null; return; }
-  PL.x = e.x; PL.y = e.y + 0.18; PL.z = e.z; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
+  PL.x = e.x; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
 function mobsForDimension(x, y, z, b, below) {
