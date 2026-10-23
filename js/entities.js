@@ -346,7 +346,7 @@ function buildModel(type, opts = {}) {
     const m = new THREE.Mesh(geo, mat); m.position.set(pivot[0] / 16, pivot[1] / 16, pivot[2] / 16);
     root.add(m); parts[name] = m;
   }
-  if (type === 'spider') for (let i = 0; i < 4; i++) { parts['leg' + i].rotation.set(0, (i - 1.5) * 0.35, -0.55); parts['legl' + i].rotation.set(0, -(i - 1.5) * 0.35, 0.55); }
+  if (type === 'spider' || type === 'cave_spider') for (let i = 0; i < 4; i++) { parts['leg' + i].rotation.set(0, (i - 1.5) * 0.35, -0.55); parts['legl' + i].rotation.set(0, -(i - 1.5) * 0.35, 0.55); }
   root.userData = { parts, mat, mats: [mat] };
   return root;
 }
@@ -456,7 +456,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
-  if (e.baby) e.mesh.scale.setScalar(0.5);
+  if (e.baby) e.mesh.scale.setScalar(0.5); else if (d.scale) e.mesh.scale.setScalar(d.scale);
   if (type === 'drowned' && Math.random() < 0.0625) e.hasTrident = true; // 6.25% carry a trident
   if (d.rideY) e.rideY = d.rideY;
   if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.initVariant ? d.initVariant(e) : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
@@ -488,6 +488,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.hp <= 0) {
     e.deathT = 20;
     if (e.def.slime) slimeDeath(e);
+    e.killedByPlayer = attacker === PL || src === 'player';
+    if (e.def.onDeath) e.def.onDeath(e);
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
@@ -530,13 +532,13 @@ function mobTick(e) {
   if (d.water) { squidTick(e); return; }
   if (e.cart && cartHold(e)) return;
   mobExtraTick(e, dist);
+  if (e.eff) effectTick(e);
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed;
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
-  if (e.eff) effectTick(e);
   if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
   if (e.target && (!plVisible || dist > 24)) e.target = null;
   if (e.target) {
@@ -621,7 +623,7 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); }
+  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 // ---------- per-tick update ----------
@@ -814,7 +816,7 @@ function entityRender(alpha, now) {
       if (e.def.fish && P.tail) P.tail.rotation.y = Math.sin(now / 90 + e.id) * 0.6;
       if (e.def.water && P.t0) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }
-      if (e.type === 'spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; const b1 = P['leg' + i].userData.base, b2 = P['legl' + i].userData.base; P['leg' + i].rotation.y = (b1 ? b1.y : (i - 1.5) * 0.35) + s; P['legl' + i].rotation.y = (b2 ? b2.y : -(i - 1.5) * 0.35) - s; }
+      if (e.type === 'spider' || e.type === 'cave_spider') for (let i = 0; i < 4; i++) { const s = Math.sin(e.walk + i * 1.6) * 0.3 * e.walkAmt; const b1 = P['leg' + i].userData.base, b2 = P['legl' + i].userData.base; P['leg' + i].rotation.y = (b1 ? b1.y : (i - 1.5) * 0.35) + s; P['legl' + i].rotation.y = (b2 ? b2.y : -(i - 1.5) * 0.35) - s; }
       if (e.def.anim) e.def.anim(e, P, now);
       if (!e.matOwn) { // per-mob copies of the shared materials so each mob can be lit / flash red on its own
         const map = new Map();
@@ -822,9 +824,9 @@ function entityRender(alpha, now) {
         e.mesh.userData.own = [...map.values()]; e.matOwn = true;
       }
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
-      const bb = e.def.glow ? Math.max(br, 0.9) : br;
+      const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb); }
-      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(1);
+      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.def.scale || 1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

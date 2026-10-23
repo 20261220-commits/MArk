@@ -481,6 +481,7 @@ function villagerAIExtra(e) {
   // villagers wander near home, gaze at the player and stay inside at night
   if (plTargetable() && Math.hypot(PL.x - e.x, PL.z - e.z) < 4 && !e.panic) { faceTo(e, PL.x, PL.z); e.goal = null; }
   if (e.trading) e.goal = null;
+  villagerFlee(e);
 }
 // ---------- per-mob hooks used by entities.js ----------
 function mobExtraTick(e, dist) {

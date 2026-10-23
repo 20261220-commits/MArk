@@ -68,6 +68,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #bossbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 #bossbar .bb{height:calc(5*var(--px));background:#3a0a3a;border:var(--px) solid #1a001a;margin-top:var(--px)}
 #bossbar .bb i{display:block;height:100%;background:linear-gradient(#ff6aff,#c018c0)}
+#raidbar{position:fixed;top:calc(24*var(--px));left:50%;transform:translateX(-50%);width:calc(182*var(--px));text-align:center;pointer-events:none;z-index:5}
+#raidbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
+#raidbar .bb{height:calc(5*var(--px));background:#3a0a0a;border:var(--px) solid #1a0000;margin-top:var(--px)}
+#raidbar .bb i{display:block;height:100%;background:linear-gradient(#ff6a6a,#c01818)}
 #ovSleep{background:#000;opacity:0}
 #ovSpy{background:radial-gradient(circle at center,transparent 0,transparent 32vmin,#000 32.4vmin)}
 #ovFire{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}
@@ -258,6 +262,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/minecarts.js"></script>
 <script src="js/mobs4.js"></script>
 <script src="js/mobs5.js"></script>
+<script src="js/mobs6.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/effects.js"></script>
 <script src="js/player.js"></script>

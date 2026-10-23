@@ -201,13 +201,13 @@ function smithResult(c) {
 // ---------- villager trading ----------
 function tradeResult(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
-  if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < o.an) return null;
+  if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
   const out = { id: o.b, n: o.bn }; if (o.ench) { if (!o.e) { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; o.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; } out.e = { ...o.e }; }
   return out;
 }
 function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
-  p.n -= o.an; if (p.n <= 0) c.items[0] = null;
+  p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
   o.uses++; if (o.ench) o.e = null;
   play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
   // refill the payment slot from the inventory, like Java does after a trade

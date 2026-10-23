@@ -107,7 +107,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
 }
 const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
-  PL.dead = true; PL.sleeping = 0;
+  PL.dead = true; PL.sleeping = 0; PL.rest = 0;
   if (!W.keepInv) {
     const all = [...INV.slots, ...INV.armor]; INV.slots.fill(null); INV.armor.fill(null);
     for (const s of all) if (s) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
@@ -148,7 +148,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);

@@ -217,7 +217,11 @@ function berryUse(t) {
 }
 // per tick: thorns of sweet berry bushes (not for foxes), the turtle shell's water breathing
 function animalTick() {
-  hiveTick();
+  hiveTick(); raidTick();
+  if (W.dim === 0 && !PL.sleeping && !PL.dead && !creative() && !spectator()) PL.rest = (PL.rest || 0) + 1; // ticks since the last sleep (phantoms)
+  if (W.tickN % 1200 === 600) trySpawnPhantoms();
+  if (W.tickN % 12000 === 6000) trySpawnPatrol();
+  if (W.tickN % 200 === 100) outpostSpawn();
   if (W.tickN % 10 === 0 && INV.armor[0] && INV.armor[0].id === IID.turtle_helmet && fluidAt(PL.x, PL.y + PL.eyeH, PL.z) !== 1) addEffect(PL, 'water_breathing', 200, 0);
 }
 function inBerryBush(e) { return boxBlocks(e, b => b === BID.sweet_berry_bush) ; }

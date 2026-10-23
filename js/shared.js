@@ -821,6 +821,7 @@ const LOOT = {
   stronghold: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
   mineshaft: [['rail', 8], ['torch', 8], ['bread', 3], ['iron_ingot', 4], ['gold_ingot', 3], ['redstone', 8], ['lapis_lazuli', 8], ['coal', 8], ['diamond', 2], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['beetroot_seeds', 4], ['golden_apple', 1], ['name_tag', 1], ['powered_rail', 4], ['activator_rail', 4], ['detector_rail', 4], ['glow_berries', 6], ['iron_pickaxe', 1]],
+  outpost: [['crossbow', 1], ['arrow', 9], ['wheat', 7], ['potato', 4], ['carrot', 4], ['dark_oak_log', 3], ['iron_ingot', 3], ['string', 6], ['experience_bottle', 2], ['tripwire_hook', 2]],
   fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['music_disc_pigstep', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
 function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
@@ -1014,7 +1015,7 @@ function stampMineshafts(seed, st, cx, cz, tiles) {
   const carve = (x, y, z) => { const b = st.get(x, y, z); if (b > 0 && b !== 7 && !FLUID[b] && !FLUID[st.get(x, y + 1, z)]) st(x, y, z, 0); };
   for (let rx = rx0; rx <= rx1; rx++) for (let rz = rz0; rz <= rz1; rz++) for (const g of mineshaftOf(seed, rx, rz)) {
     if (!st.inside(g.x0 - 1, g.z0 - 1, g.x1 + 1, g.z1 + 1)) continue;
-    const r = rng(g.seed), y = g.y, len = g.ax ? g.x1 - g.x0 : g.z1 - g.z0, cart = r() < 0.4 ? 2 + r.int(Math.max(1, len - 3)) : -1;
+    const r = rng(g.seed), y = g.y, len = g.ax ? g.x1 - g.x0 : g.z1 - g.z0, cart = r() < 0.4 ? 2 + r.int(Math.max(1, len - 3)) : -1, spawner = r() < 0.25 ? 1 + r.int(Math.max(1, len - 2)) : -1;
     for (let s = 0; s <= len; s++) {
       const cx2 = g.ax ? g.x0 + s : g.x0, cz2 = g.ax ? g.z0 : g.z0 + s, w = (o) => g.ax ? [cx2, cz2 + o] : [cx2 + o, cz2];
       const rr = rng(hash32(g.seed, s, 0, 5)); // per-cell decisions stay the same whichever chunk is being built
@@ -1027,8 +1028,55 @@ function stampMineshafts(seed, st, cx, cz, tiles) {
       else { for (let o = -1; o <= 1; o++) { const [px, pz] = w(o); if (rr() < 0.04) st(px, y + 2 - (rr() < 0.3 ? 1 : 0), pz, 100); } }
       const [mx, mz] = w(0);
       if (st.get(mx, y, mz) === 0 && rr() < 0.7) st(mx, y, mz, 1060, g.ax ? 1 : 0);
+      if (s === spawner && s !== cart && st.get(mx, y, mz) >= 0) { // a cave spider spawner wrapped in cobwebs
+        st(mx, y, mz, BID.spawner); tiles.push({ t: 'spawner', i: (y << 8) | ((mz & 15) << 4) | (mx & 15), mob: 'cave_spider' });
+        for (let o = -1; o <= 1; o++) for (let dy = 0; dy < 3; dy++) { const [px, pz] = w(o); if ((o || dy) && st.get(px, y + dy, pz) === 0 && rr() < 0.6) st(px, y + dy, pz, 100); }
+      }
       if (s === cart && st.get(mx, y, mz) >= 0) tiles.push({ t: 'mob', i: (y << 8) | ((mz & 15) << 4) | (mx & 15), cart: 'chest', loot: rollLoot(r, 'mineshaft', 4 + r.int(4)) });
     }
+  }
+}
+// ---- pillager outposts: a dark oak watchtower in open biomes, tried in 60% of the 24-chunk regions, kept away
+// from villages; pillagers are spawned around it (tiles of type 'mob', and outpostSpawn on the main thread) ----
+const OREG = 24, OP_CACHE = new Map();
+function outpostAt(seed, G, rx, rz) {
+  const key = rx + ',' + rz; if (OP_CACHE.has(key)) return OP_CACHE.get(key);
+  const r = rng(hash32(seed, rx, rz, 71)); let out = null;
+  if (r() < 0.6) {
+    const cx = rx * OREG + 4 + r.int(OREG - 8), cz = rz * OREG + 4 + r.int(OREG - 8), x = cx * 16 + 8, z = cz * 16 + 8, [h, b] = G.column(x, z);
+    const okB = b === BIO.PLAINS || b === BIO.DESERT || b === BIO.SAVANNA || b === BIO.TAIGA || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA;
+    let nearVillage = false;
+    for (let i = Math.floor((cx - 12) / VREG); i <= Math.floor((cx + 12) / VREG) && !nearVillage; i++) for (let j = Math.floor((cz - 12) / VREG); j <= Math.floor((cz + 12) / VREG); j++) { const v = villageAt(seed, G, i, j); if (v && Math.hypot(v.x - x, v.z - z) < 200) { nearVillage = true; break; } }
+    if (okB && h > SEA + 1 && h < 100 && !nearVillage) out = { x, y: h, z, seed: r.int(1 << 30) };
+  }
+  OP_CACHE.set(key, out); return out;
+}
+function stampOutposts(seed, G, st, cx, cz, tiles) {
+  const rx = Math.floor(cx / OREG), rz = Math.floor(cz / OREG);
+  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) {
+    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) continue;
+    const { x: ox, y: y0, z: oz } = o, r = rng(o.seed), LOG = BID.dark_oak_log, PLK = BID.dark_oak_planks, tile = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+      const x = ox + dx, z = oz + dz, edge = Math.abs(dx) === 3 || Math.abs(dz) === 3, corner = Math.abs(dx) === 3 && Math.abs(dz) === 3;
+      for (let y = y0 - 4; y <= y0; y++) st(x, y, z, BID.cobblestone);
+      for (let y = y0 + 1; y <= y0 + 14; y++) {
+        const fl = (y - y0) % 5 === 0, win = !corner && (dx === 0 || dz === 0) && (y - y0) % 5 === 3;
+        if (edge) st(x, y, z, corner ? LOG : win ? 0 : PLK);
+        else st(x, y, z, fl && !(dx === 2 && dz === 0) ? PLK : 0);
+      }
+    }
+    for (let y = y0 + 1; y <= y0 + 15; y++) st(ox + 2, y, oz, BID.ladder, 1);
+    st(ox, y0 + 1, oz - 3, 0); st(ox, y0 + 2, oz - 3, 0); // doorway
+    for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
+      const x = ox + dx, z = oz + dz, rim = Math.abs(dx) === 4 || Math.abs(dz) === 4;
+      if (!(dx === 2 && dz === 0)) st(x, y0 + 15, z, PLK);
+      for (let y = y0 + 16; y <= y0 + 19; y++) st(x, y, z, 0);
+      if (rim) st(x, y0 + 16, z, 116);
+      if (Math.abs(dx) <= 3 && Math.abs(dz) <= 3) st(x, y0 + 20, z, PLK);
+      if (Math.abs(dx) === 3 && Math.abs(dz) === 3) for (let y = y0 + 16; y <= y0 + 19; y++) st(x, y, z, LOG);
+    }
+    st(ox - 2, y0 + 16, oz + 2, 44, 2); if (st.get(ox - 2, y0 + 16, oz + 2) >= 0) tiles.push({ t: 'chest', i: tile(ox - 2, y0 + 16, oz + 2), loot: rollLoot(r, 'outpost', 6) });
+    for (const [dx, dy, dz] of [[0, 1, -5], [3, 1, -5], [0, 16, 0], [-2, 16, -2]]) if (st.get(ox + dx, y0 + dy, oz + dz) >= 0) tiles.push({ t: 'mob', i: tile(ox + dx, y0 + dy, oz + dz), mob: 'pillager' });
   }
 }
 // ---------- the Nether ----------
@@ -1562,6 +1610,7 @@ function genChunk(seed, cx, cz, dim) {
   const stamp = makeStamp(blocks, meta, x0, z0);
   for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
   stampMineshafts(seed, stamp, cx, cz, tiles);
+  stampOutposts(seed, G, stamp, cx, cz, tiles);
   for (const [sx, sy, sz] of strongholdsOf(seed)) if (stamp.inside(sx - 44, sz - 44, sx + 44, sz + 44)) stampStronghold(seed, stamp, sx, sy, sz, R, tiles);
   if (vills.length) fixConnections(blocks, meta);
   // snow cover for cold biomes
@@ -2034,7 +2083,7 @@ function meshChunk(B, M, L, bio, opts) {
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
