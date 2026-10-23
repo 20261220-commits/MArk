@@ -127,6 +127,9 @@ function fireballTick(e) {
 function spinRender(e, x, y, z, br, now) { e.mesh.position.set(x, y + e.h / 2, z); e.mesh.rotation.set(0, now / 200, now / 300); e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
 // thrown items: snowballs, eggs and ender pearls break on impact; eyes of ender fly toward a stronghold
 function onThrownHit(e, x, y, z, hitMob) {
+  const td = ITEMS[e.thrown];
+  if (td && td.splash) { splashPotion(e.thrown, x, y, z, hitMob); return; }
+  if (td && td.lingering) { play('break', { mat: 'glass' }); potionBurst(x, y, z, POTION[td.potion].col); spawnCloud(x, Math.floor(y) + 0.05, z, td.potion); return; }
   if (e.thrown === IID.ender_pearl && Math.random() < 0.05) spawnMob('endermite', x, y, z);
   if (e.thrown === IID.ender_pearl && e.owner === PL && !PL.dead) {
     for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.5, grav: 0 });
@@ -191,7 +194,7 @@ function rideTick() {
   const e = PL.riding;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
   if (!e || e.dead) { PL.riding = null; return; }
-  PL.x = e.x; PL.y = e.y + 0.18; PL.z = e.z; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
+  PL.x = e.x; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
 function mobsForDimension(x, y, z, b, below) {
@@ -356,9 +359,9 @@ function blazeAnim(e, P, now) {
 function slimeAnim(e, P) { const s = 1 + (e.squish || 0) * 0.4, k = (e.size || 1); (e.mesh.userData.inner || e.mesh.children[0]).scale.set(k / s, k * s, k / s); }
 // ---------- ender dragon fight ----------
 let bossEl = null;
-function bossBar(e) {
+function bossBar(e, name) {
   if (!bossEl) { bossEl = document.createElement('div'); bossEl.id = 'bossbar'; bossEl.innerHTML = '<div class="bn">엔더 드래곤</div><div class="bb"><i></i></div>'; document.body.appendChild(bossEl); }
-  bossEl.hidden = !e; if (e) bossEl.querySelector('i').style.width = Math.max(0, e.hp / e.def.hp * 100) + '%';
+  bossEl.hidden = !e; if (e) bossEl.querySelector('.bn').textContent = name || '엔더 드래곤'; if (e) bossEl.querySelector('i').style.width = Math.max(0, e.hp / e.def.hp * 100) + '%';
 }
 function dragonHurt(e, dmg, attacker) {
   if (e.phase === 'dying' || e.inv > 0) return false;
@@ -393,6 +396,7 @@ function dragonAI(e) {
     case 'perch':
       tx = e.x; ty = C[1] + 4; tz = e.z; sp = 0;
       if (plTargetable()) { faceTo(e, PL.x, PL.z); const d = Math.hypot(PL.x - e.x, PL.z - e.z); if (d < 9 && Math.abs(PL.y - e.y) < 6 && e.age % 30 === 0) { attackPlayer(e, 10, (PL.x - e.x) / d, (PL.z - e.z) / d); e.bite = 10; } }
+      if (e.phaseT === 70 || e.phaseT === 170) { const a = Math.atan2(PL.z - e.z, PL.x - e.x); spawnCloud(e.x + Math.cos(a) * 5, C[1] + 1.05, e.z + Math.sin(a) * 5, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 400 }); play('fireball', { vol: 0.6 }); } // dragon's breath
       if (e.phaseT > 260) { e.phase = 'takeoff'; e.phaseT = 0; }
       break;
     case 'takeoff': tx = e.x + Math.cos(e.ang) * 30; ty = 90; tz = e.z + Math.sin(e.ang) * 30; sp = 0.3; if (e.y > 82) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); } break;
@@ -451,7 +455,7 @@ function ensureDragon() {
 const TRADES = {
   farmer: [[['wheat', 20], ['emerald', 1]], [['emerald', 1], ['bread', 6]], [['emerald', 1], ['apple', 4]], [['pumpkin', 6], ['emerald', 1]], [['emerald', 3], ['golden_apple', 1]], [['melon', 4], ['emerald', 1]]],
   librarian: [[['paper', 24], ['emerald', 1]], [['emerald', 9], ['bookshelf', 1]], [['book', 4], ['emerald', 1]], [['emerald', 1], ['lantern', 1]], [['emerald', 5], ['glass', 4]], [['emerald', 20], ['enchanted_book', 1]]],
-  armorer: [[['emerald', 5], ['chainmail_chestplate', 1]], [['emerald', 3], ['chainmail_helmet', 1]], [['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
+  armorer: [[['emerald', 36], ['bell', 1]], [['emerald', 5], ['chainmail_chestplate', 1]], [['emerald', 3], ['chainmail_helmet', 1]], [['coal', 15], ['emerald', 1]], [['emerald', 7], ['iron_helmet', 1]], [['emerald', 9], ['iron_chestplate', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 8], ['diamond_boots', 1]]],
   toolsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 1], ['stone_axe', 1]], [['emerald', 1], ['stone_pickaxe', 1]], [['iron_ingot', 4], ['emerald', 1]], [['emerald', 13], ['diamond_pickaxe', 1]]],
   weaponsmith: [[['coal', 15], ['emerald', 1]], [['emerald', 3], ['iron_axe', 1]], [['emerald', 7], ['iron_sword', 1]], [['flint', 24], ['emerald', 1]], [['emerald', 13], ['diamond_sword', 1]]],
   butcher: [[['chicken', 14], ['emerald', 1]], [['porkchop', 7], ['emerald', 1]], [['emerald', 1], ['cooked_porkchop', 5]], [['emerald', 1], ['cooked_chicken', 8]], [['coal', 15], ['emerald', 1]]],
@@ -477,12 +481,14 @@ function villagerAIExtra(e) {
   // villagers wander near home, gaze at the player and stay inside at night
   if (plTargetable() && Math.hypot(PL.x - e.x, PL.z - e.z) < 4 && !e.panic) { faceTo(e, PL.x, PL.z); e.goal = null; }
   if (e.trading) e.goal = null;
+  villagerFlee(e);
 }
 // ---------- per-mob hooks used by entities.js ----------
 function mobExtraTick(e, dist) {
   const d = e.def;
   if (d.waterHurt && (e.inWater || (W.dim === 0 && W.rain > 0.5 && e.age % 20 === 0 && (getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15))) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   if (d.villager) villagerAIExtra(e);
+  if (e.hasTrident) drownedTrident(e, dist);
   swimAssist(e);
 }
 // slimes and magma cubes split when they die

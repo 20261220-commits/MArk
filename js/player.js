@@ -12,12 +12,20 @@ const USE = { t: 0, kind: null, placeCd: 0 };
 const creative = () => PL.mode === 'creative';
 const spectator = () => PL.mode === 'spectator';
 
+// a box authored pointing up, turned to point along DIR6 index f
+function rot6Box(b, f) {
+  const [x0, y0, z0, x1, y1, z1] = b, P = (x, y, z) => f === 1 ? [x, y, z] : f === 0 ? [x, 16 - y, z] : f === 2 ? [x, z, 16 - y] : f === 3 ? [x, z, y] : f === 4 ? [16 - y, x, z] : [y, x, z];
+  const a = P(x0, y0, z0), c = P(x1, y1, z1); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2]), Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])];
+}
 function selShape(id, m) {
   const rt = RTYPE[id];
-  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (id === BID.amethyst_cluster) return [[3, 0, 3, 13, 7, 13]]; if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
+  if (id === BID.banner) return [[4, 0, 4, 12, 16, 12]];
+  if (id === BID.wall_banner) { const f = (m >> 4) & 3; return [[[0, 0, 14, 16, 16, 16], [0, 0, 0, 2, 16, 16], [0, 0, 0, 16, 16, 2], [14, 0, 0, 16, 16, 16]][f]]; }
+  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (S.BUD[id]) { const h = [3, 4, 5, 7][S.BUD[id] - 1]; return [rot6Box([3, 0, 3, 13, h, 13], m ? m - 1 : 1)]; } if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
   if (rt === RT.TORCH) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; const ox = d[0] * 5, oz = d[2] * 5; return [[5.5 + ox, 3, 5.5 + oz, 10.5 + ox, 13, 10.5 + oz]]; } return [[6, 0, 6, 10, 10, 10]]; }
   if (rt === RT.CROP) return [[0, 0, 0, 16, 2 + (m & 7) * 2, 16]];
   if (rt === RT.BOX) return S.shapes(id, m);
+  if (rt === RT.WIRE) { const sh = S.isRail(id) ? S.railShape(id, m) : 0; return [[0, 0, 0, 16, sh >= 2 && sh <= 5 ? 8 : S.isRail(id) ? 2 : 1, 16]]; }
   return null;
 }
 // ray vs axis-aligned box: returns [t, face] or null
@@ -61,7 +69,7 @@ function raycast(reach, fluids) {
   // entities
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
-    const h = rayBox(ox, oy, oz, dx, dy, dz, [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
+    const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
     const lim = creative() ? 5 : 3;
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
@@ -70,11 +78,14 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
-function hurtPlayer(dmg, cause, attacker) {
+function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if (shieldBlocks(dmg, cause, attacker, from)) return false;
+  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
+  const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
@@ -88,15 +99,15 @@ function hurtPlayer(dmg, cause, attacker) {
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying (held anywhere in the hotbar: there is no off-hand)
     const k = INV.slots.findIndex((s, i) => i < 9 && s && s.id === IID.totem_of_undying);
-    if (k >= 0) { INV.slots[k] = null; PL.health = 1; PL.regen = 900; PL.absorb = 4; PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+    if (k >= 0) { INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) die(cause);
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
-  PL.dead = true; PL.sleeping = 0;
+  PL.dead = true; PL.sleeping = 0; PL.rest = 0;
   if (!W.keepInv) {
     const all = [...INV.slots, ...INV.armor]; INV.slots.fill(null); INV.armor.fill(null);
     for (const s of all) if (s) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
@@ -137,7 +148,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -146,10 +157,12 @@ function playerTick() {
   let web = false, snowB = false, ladder = false;
   if (!spec) inBlock(b => { if (b === BID.cobweb) web = true; if (b === BID.powder_snow) snowB = true; if (b === BID.ladder) ladder = true; });
   if (snowB && INV.armor[3] && INV.armor[3].id === IID.leather_boots && !PL.sneaking && getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.01), Math.floor(PL.z)) === BID.powder_snow) { snowB = false; UI.advance('snow'); }
+  PL.inSnowBody = snowB;
   PL.inSnow = snowB && getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z)) === BID.powder_snow;
   // input
   let f = IN.f, s = IN.s;
-  const using = USE.kind === 'eat' || USE.kind === 'bow';
+  const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
+  if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
   if (PL.sneaking) { f *= 0.3; s *= 0.3; }
   if (using) { f *= 0.2; s *= 0.2; }
@@ -157,7 +170,7 @@ function playerTick() {
   if ((IN.sprintKey || IN.wTap) && canSprint) PL.sprinting = true;
   if (PL.sprinting && (f < 0.8 || !canSprint || (PL.hitH && !inWater))) PL.sprinting = false;
   if (f <= 0) IN.wTap = false;
-  const sp = 0.1 * (PL.sprinting ? 1.3 : 1);
+  const sp = 0.1 * (PL.sprinting ? 1.3 : 1) * speedMul();
   const len = Math.hypot(f, s), fn = len > 1 ? f / len : f, sn = len > 1 ? s / len : s;
   const sin = Math.sin(PL.yaw), cos = Math.cos(PL.yaw);
   const accel = (a) => { PL.vx += (-sin * fn + cos * sn) * a * 0.98; PL.vz += (-cos * fn - sin * sn) * a * 0.98; };
@@ -169,7 +182,7 @@ function playerTick() {
     PL.vx *= 0.91; PL.vz *= 0.91; PL.vy *= 0.6; PL.fallDist = 0;
   } else if (elytraTick()) { // gliding handled entirely there
   } else if (inWater || inLava) {
-    accel(0.02 * (inWater && PL.sprinting ? 2 : 1));
+    accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1));
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
     const fr = inWater ? 0.8 : 0.5;
@@ -182,11 +195,12 @@ function playerTick() {
     accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
-      PL.vy = 0.42; USE.jumpCd = 10;
+      PL.vy = (0.42 + 0.1 * effLv(PL, 'jump_boost')) * (blockUnder() === BID.honey_block ? 0.5 : 1); USE.jumpCd = 10;
       if (PL.sprinting) { PL.vx += -sin * 0.2; PL.vz += -cos * 0.2; PL.exh += 0.2; } else PL.exh += 0.05;
     }
     let mx = PL.vx, my = PL.vy, mz = PL.vz;
-    if (PL.onGround && slipB === BID.soul_sand) { mx *= 0.4; mz *= 0.4; }
+    if (PL.onGround && (slipB === BID.soul_sand || slipB === BID.honey_block)) { mx *= 0.4; mz *= 0.4; }
+    if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
     // sneak edge protection
@@ -203,13 +217,16 @@ function playerTick() {
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround && blockUnder() === BID.slime_block && !PL.sneaking && my < -0.1) { PL.vy = -my * 0.95; PL.fallDist = 0; } // slime blocks bounce
     else if (PL.onGround) {
-      if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
+      if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
+      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
     PL.vx *= fr; PL.vz *= fr;
   }
-  if (PL.levitate > 0) { PL.levitate--; PL.vy = Math.max(PL.vy, 0.06); PL.fallDist = 0; } // shulker bullets
+  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) { PL.vy += (0.05 * lev - PL.vy) * 0.2; PL.fallDist = 0; } // shulker bullets
+  else if (effLv(PL, 'slow_falling') && PL.vy < -0.05 && !PL.flying) { PL.vy = Math.max(PL.vy, -0.08); PL.fallDist = 0; }
   IN.jumpWas = IN.jump;
   if (USE.jumpCd > 0) USE.jumpCd--;
   if (!IN.jump) USE.jumpCd = 0;
@@ -222,13 +239,18 @@ function playerTick() {
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();
+  dripleafStep(); stepVibration();
   interactTick();
 }
 function survivalTick(inWater, inLava, eyeF) {
   // air
-  if (eyeF === 1) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
+  effectTick(PL);
+  if (eyeF === 1 && !effLv(PL, 'water_breathing') && !effLv(PL, 'conduit_power')) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
+  campfireStand();
+  const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
+  if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
   if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'fire'); }
@@ -241,13 +263,14 @@ function survivalTick(inWater, inLava, eyeF) {
   const hb = getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z));
   if (OPQ[hb] && SOLID[hb] && hb !== BID.powder_snow && W.tickN % 10 === 0) hurtPlayer(1, 'suffocate');
   if (PL.y < -64) hurtPlayer(4, 'void');
-  if (PL.inSnow && W.tickN % 40 === 0 && PL.mode !== 'creative') hurtPlayer(1, 'fire');
+  // freezing (1.17): 140 ticks inside powder snow to freeze fully, thaws twice as fast; any leather armour piece or burning prevents it
+  const canFreeze = !creative() && PL.fire <= 0 && !INV.armor.some(s => s && ITEMS[s.id].armor.mat === 'leather');
+  PL.frozen = PL.inSnowBody && canFreeze ? Math.min(140, (PL.frozen || 0) + 1) : Math.max(0, (PL.frozen || 0) - 2);
+  if (PL.frozen >= 140 && W.tickN % 40 === 0) hurtPlayer(1, 'freeze');
   if (creative()) return;
   // hunger
   if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
   if (PL.exh >= 4) { PL.exh -= 4; if (PL.sat > 0) PL.sat = Math.max(0, PL.sat - 1); else if (PL.difficulty > 0) PL.food = Math.max(0, PL.food - 1); UI.hudDirty = true; }
-  if (PL.poison > 0) { PL.poison--; if (PL.poison % 25 === 0 && PL.health > 1) hurtPlayer(1, 'starve'); }
-  if (PL.regen > 0) { PL.regen--; if (PL.regen % 50 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); }
   PL.foodTimer++;
   if (PL.food >= 20 && PL.sat > 0 && PL.health < 20) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(20, PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food >= 18 && PL.health < 20) { if (PL.foodTimer >= 80) { PL.health = Math.min(20, PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
@@ -260,7 +283,7 @@ let TARGET = null;
 function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
   const held = PL.held();
-  TARGET = raycast(reach(), held && (held.id === IID.bucket || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
+  TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
   if (MINE.cd > 0) MINE.cd--;
   if (USE.placeCd > 0) USE.placeCd--;
   // mining
@@ -269,7 +292,7 @@ function interactTick() {
     if (creative()) { breakBlock(t.x, t.y, t.z); MINE.cd = 5; }
     else {
       if (MINE.x !== t.x || MINE.y !== t.y || MINE.z !== t.z || MINE.id !== t.id) { MINE.x = t.x; MINE.y = t.y; MINE.z = t.z; MINE.id = t.id; MINE.prog = 0; MINE.ticks = 0; }
-      const need = breakTicks(t.id, held, PL.onGround || PL.flying, PL.eyeFluid === 1);
+      const need = breakTicks(t.id, held, PL.onGround || PL.flying, PL.eyeFluid === 1, t.m);
       if (need === Infinity) MINE.prog = 0;
       else {
         MINE.prog += need === 0 ? 1 : 1 / need; MINE.ticks++;
@@ -286,6 +309,8 @@ function interactTick() {
       if (USE.t % 4 === 0 && USE.t > 8) { play('eat', { vol: 0.5 }); const h = PL.held(); if (h) for (let i = 0; i < 3; i++) R.simpleParticle(PL.x - Math.sin(PL.yaw) * .4, PL.y + 1.4, PL.z - Math.cos(PL.yaw) * .4, [0.8, 0.6, 0.4], { size: 0.06, vy: 1, life: 0.4 }); }
       if (USE.t >= 32) finishEat();
     } else if (USE.kind === 'bow') { USE.t++; R.hand.bow = Math.min(1, USE.t / 20); }
+    else if (USE.kind === 'shield' || USE.kind === 'trident') USE.t++;
+    else if (USE.kind === 'crossbow') { USE.t++; R.hand.bow = Math.min(1, USE.t / Math.max(1, crossbowCharge(PL.held()))); if (USE.t === crossbowCharge(PL.held())) play('click', { pitch: 1.4 }); }
     else if (USE.kind === 'spy') { R.hand.spy = true; }
     else if (USE.kind === 'place' && USE.placeCd <= 0) { useItem(false); }
   }
@@ -303,7 +328,7 @@ function attackEntity(e) {
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0), as = tool ? tool.as : 4;
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
-  let dmg = base * (0.2 + p * p * 0.8);
+  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { size: 0.08, vy: 1 }); }
   PL.attackT = 0;
@@ -315,6 +340,7 @@ function attackEntity(e) {
 function breakBlock(x, y, z) {
   const id = getBlock(x, y, z), m = getMeta(x, y, z); if (!id || BLOCKS[id].hard < 0 && !creative()) return;
   if (BLOCKS[id].hard < 0) return;
+  vibrate(x + .5, y + .5, z + .5);
   const held = PL.held();
   play('break', { mat: soundMat(id) });
   R.blockParticles(x, y, z, id, 24, lightBright(x + .5, y + 1, z + .5), m);
@@ -342,12 +368,13 @@ function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
   if (!h) return;
   const d = ITEMS[h.id];
-  if (h.id === IID.milk_bucket) { PL.regen = 0; INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
+  if (d.drink) { drinkPotion(h); return; }
+  if (h.id === IID.milk_bucket) { clearEffects(PL); INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
   PL.sat = Math.min(PL.food, PL.sat);
-  if (d.regen) { PL.regen = 100; PL.absorb = 4; }
-  if (d.poison && Math.random() < d.poison) PL.poison = 100;
+  if (d.cures && PL.eff && PL.eff[d.cures]) { delete PL.eff[d.cures]; UI.hudDirty = true; }
+  if (d.eff) for (const [k, dur, lv, ch] of d.eff) if (ch == null || Math.random() < ch) addEffect(PL, k, dur, lv);
   if (d.chorusTp) chorusTeleport();
   if (h.id === IID.rotten_flesh && Math.random() < 0.8) PL.exh += 4;
   play('burp');
@@ -358,10 +385,15 @@ function onUsePress() {
   const h = PL.held(), d = h && ITEMS[h.id];
   if (PL.sleeping) return;
   // eat / drink
-  if (d && (d.food || h.id === IID.milk_bucket) && (PL.food < 20 || d.always || creative() || h.id === IID.milk_bucket || PL.difficulty === 0)) {
+  const plantBerries = d && h.id === IID.glow_berries && TARGET && TARGET.type === 'block' && (TARGET.ny === -1 || TARGET.id === BID.cave_vines); // aimed at a ceiling: plant instead of eating
+  if (d && d.drink) { if (!(TARGET && TARGET.type === 'block' && (TARGET.id === BID.cauldron && h.id === POTION.water.items.potion || interactBlock(TARGET, true)))) { USE.kind = 'eat'; USE.t = 0; } return; }
+  if (d && !plantBerries && (d.food || h.id === IID.milk_bucket) && (PL.food < 20 || d.always || creative() || h.id === IID.milk_bucket || PL.difficulty === 0)) {
     if (!(TARGET && TARGET.type === 'block' && interactBlock(TARGET, true))) { USE.kind = 'eat'; USE.t = 0; return; }
   }
-  if (d && h.id === IID.bow) { if (creative() || INV.count(IID.arrow) > 0) { USE.kind = 'bow'; USE.t = 0; } return; }
+  if (d && h.id === IID.bow) { if (creative() || arrowSlot() >= 0) { USE.kind = 'bow'; USE.t = 0; } return; }
+  if (d && h.id === IID.shield) { if (!(PL.shieldCd > 0)) { USE.kind = 'shield'; USE.t = 0; } return; }
+  if (d && h.id === IID.crossbow) { if (h.ch) crossbowFire(h); else if (creative() || arrowSlot() >= 0) { USE.kind = 'crossbow'; USE.t = 0; } return; }
+  if (d && h.id === IID.trident) { USE.kind = 'trident'; USE.t = 0; return; }
   if (d && h.id === IID.spyglass) { USE.kind = 'spy'; UI.advance('spyglass'); return; }
   USE.kind = 'place';
   useItem(true);
@@ -372,17 +404,37 @@ function onUseRelease() {
     if (f >= 0.1) {
       const [dx, dy, dz] = lookDir(); const v = f * 3;
       const bowSt = PL.held(), pw = enchLv(bowSt, 'power');
-      shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
-      if (!creative()) { if (!enchLv(bowSt, 'infinity')) INV.remove(IID.arrow, 1); damageItem(INV.slots, INV.sel, 1); }
+      const ai = arrowSlot(), ast = ai >= 0 ? INV.slots[ai] : null;
+      const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
+      if (ast && ITEMS[ast.id].tipped != null) { arr.potion = ITEMS[ast.id].tipped; arr.item = ast.id; }
+      if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }
+  if (USE.kind === 'crossbow' && PL.held() && PL.held().id === IID.crossbow) crossbowRelease(PL.held());
+  if (USE.kind === 'trident' && PL.held() && PL.held().id === IID.trident) tridentRelease(PL.held());
   if (USE.kind === 'eat') R.hand.eat = 0;
   USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0;
 }
 function interactBlock(t, dry) {
   if (PL.sneaking && PL.held()) return false;
   const { x, y, z, id, m } = t;
+  if (isHive(id)) { const h = PL.held(); if ((m >> 2) >= 5 && h && (h.id === IID.glass_bottle || h.id === IID.shears)) { if (!dry) hiveUse(t, h); return true; } return false; }
+  if (id === BID.sweet_berry_bush && (m & 3) >= 2 && !(PL.held() && PL.held().id === IID.bone_meal)) { if (!dry) berryUse(t); return true; }
   switch (id) {
+    case 198: case 246: { const cd = S.candleOf(id, m); if (!cd || !cd.lit || PL.held()) return false; if (!dry) { setBlock(x, y, z, ...S.candleBlock(cd.c, cd.n, 0)); play('fizz', { vol: 0.4 }); } return true; }
+    case BID.cauldron: { // buckets fill and empty it (water, lava, powder snow)
+      const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
+      const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
+      if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
+      return false;
+    }
+    case BID.loom: if (!dry) UI.openScreen('loom', { x, y, z }); return true;
+    case BID.campfire: case BID.soul_campfire: { const h = PL.held(); if (dry) return !!(h && (campfireFood(h.id) || (ITEMS[h.id].tool && ITEMS[h.id].tool.type === S.TOOL.SHOVEL && (m & 4)) || ((h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !(m & 4)))); return campfireUse(x, y, z, m, h); }
+    case BID.bell: if (!dry) ringBell(x, y, z); return true;
+    case BID.jukebox: { const h = PL.held(), t = getTile(x, y, z); if (dry) return !!((t && t.items && t.items[0]) || (h && ITEMS[h.id].disc)); return jukeboxUse(x, y, z, h); }
+    case BID.beacon: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'beacon' }); UI.openScreen('beacon', { x, y, z }); } return true;
+    case BID.brewing_stand: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newBrewing()); UI.openScreen('brewing', { x, y, z }); } return true;
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.blast_furnace: case BID.smoker: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace(BLOCKS[id].furnace)); UI.openScreen('furnace', { x, y, z }); } return true;
@@ -412,7 +464,7 @@ function trySleep(x, y, z) {
   if (W.dim !== 0) { setBlock(x, y, z, 0); explode(x + .5, y + .5, z + .5, 5, true); return; } // beds explode outside the Overworld
   const t = ((W.time % 24000) + 24000) % 24000;
   PL.spawn = [x, y + 1, z]; UI.flash('리스폰 지점이 설정되었습니다');
-  if (t < 12542 || t > 23460) { if (W.rain < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } }
+  if (t < 12542 || t > 23460) { if (W.thunder < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } } // plain rain is not enough (Java)
   if (ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - x) < 8 && Math.abs(e.y - y) < 5 && Math.abs(e.z - z) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
   PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0;
 }
@@ -443,24 +495,45 @@ function useItem(first) {
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (t && t.type === 'ent') {
     const e = t.e;
+    if (e.kind === 'frame') { frameUse(e, h); return; }
+    if (e.kind === 'armor_stand') { const [, ldy] = lookDir(); standUse(e, h, PL.y + PL.eyeH + ldy * t.t); return; }
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
+    if (e.kind === 'minecart') { cartUse(e, h); return; }
+    if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
+      removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
+      if (creative()) { if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } else INV.slots[INV.sel] = it;
+      play('splash'); swing(); UI.hudDirty = true; return;
+    }
     if (e.kind === 'mob' && mobInteract(e, h, d)) return;
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
-    if (d && h.id === IID.bucket && e.type === 'cow' && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
-    if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
+    if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
+    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }
   if (t && t.type === 'block') {
-    if (first && interactBlock(t, false)) { swing(); return; }
+    if (first && interactBlock(t, false)) { swing(); vibrate(t.x + .5, t.y + .5, t.z + .5); return; }
+    if (d && (h.id === IID.item_frame || h.id === IID.glow_item_frame)) { placeFrame(t, h.id === IID.glow_item_frame); return; }
+    if (d && h.id === IID.painting) { placePainting(t); return; }
+    if (d && h.id === IID.armor_stand) { if (t.ny === 1 && !SOLID[getBlock(t.x, t.y + 1, t.z)]) { spawnArmorStand(t.x + .5, t.y + 1, t.z + .5, Math.round(PL.yaw / (Math.PI / 4)) * Math.PI / 4 + Math.PI); consume(); swing(); play('place', { mat: 'wood' }); } return; }
+    if (d && d.place === BID.banner) { placeBanner(t, h); return; }
+    if (first && lushUse(t, h, d)) return;
+    if (first && d && bottleUse(t, h)) return;
     const { x, y, z, id } = t;
     if (d) {
-      // tools on blocks
+      // candles: stack up to four of the same colour, or light one with flint and steel
+      const cdT = S.candleOf(id, t.m);
+      if (d.candle != null && cdT && cdT.c === d.candle && cdT.n < 4) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n + 1, cdT.lit)); consume(); play('place', { mat: 'wool' }); swing(); return; }
+      if (d.candle != null) { placeCandle(t, d.candle); return; }
+      if (cdT && !cdT.lit && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !FLUID[getBlock(x, y + 1, z)]) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n, 1)); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      // copper (1.17): honeycomb waxes it (no more oxidation), an axe scrapes the wax off before any oxidation
+      if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
+      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
-      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape, BLOCKS[id].wax ? t.m : 0); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (h.id === IID.bone_meal) { if (boneMeal(x, y, z, id)) { consume(); swing(); } return; }
       if (h.id === IID.flint_and_steel || h.id === IID.fire_charge) {
         const px = x + t.nx, py = y + t.ny, pz = z + t.nz, cur = getBlock(px, py, pz);
@@ -473,37 +546,48 @@ function useItem(first) {
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
       if (h.id === IID.bucket) { if (FLUID[id] && getMeta(x, y, z) === 0) { setBlock(x, y, z, 0); consume(); const it = { id: id === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; if (creative()) {} else if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); play('splash'); swing(); } else if (id === BID.powder_snow) { setBlock(x, y, z, 0); consume(); const it = { id: IID.powder_snow_bucket, n: 1 }; if (!PL.held()) INV.slots[INV.sel] = it; else INV.add(it); swing(); } return; }
-      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket) {
+      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket || h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
-        const fl = h.id === IID.water_bucket ? 27 : h.id === IID.lava_bucket ? 28 : BID.powder_snow;
+        const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
+        if (h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) spawnMob(h.id === IID.axolotl_bucket ? 'axolotl' : 'tropical_fish', px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true });
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
         play('splash'); swing(); return;
       }
-      if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle) { throwItem(h.id); return; }
+      if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle || d.splash || d.lingering) { throwItem(h.id); return; }
       if (h.id === IID.fishing_rod) { useRod(); return; }
+      if (d.cart) { placeMinecart(t, d); return; }
       if (ITEMS[h.id].boat) { const fl = FLUID[id] === 1; if (!fl && t.ny !== 1) return; placeBoat(x + (fl ? 0 : t.nx) + .5, fl ? y + 0.88 : y + 1, z + (fl ? 0 : t.nz) + .5, PL.yaw, ITEMS[h.id].boat); consume(); swing(); return; }
       if (d.place != null) { placeBlock(t, d); return; }
     }
   } else if (d && h.id === IID.fishing_rod) { useRod(); return; }
-  else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
+  else if (d && bottleUse(null, h)) return;
+  else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle || d.splash || d.lingering)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
   else if (d && h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
 }
 function throwItem(id) {
   const [dx, dy, dz] = lookDir();
-  const e = shootArrow(PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4, dx * 1.5, dy * 1.5 + 0.1, dz * 1.5, PL, 0);
+  const v = ITEMS[id].splash || ITEMS[id].lingering ? 0.75 : 1.5; // potions are thrown softer
+  const e = shootArrow(PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4, dx * v, dy * v + 0.1, dz * v, PL, 0);
   e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh);
   consume(); swing();
 }
 function boneMeal(x, y, z, id) {
   for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
+  const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
   if (id === BID.wheat) { setMeta(x, y, z, Math.min(7, getMeta(x, y, z) + 2 + Math.floor(Math.random() * 4))); return true; }
   if (id === BID.crops2) { const m = getMeta(x, y, z); setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
   const sap = { 38: 0, 39: 3, 40: 2, [BID.jungle_sapling]: 4, [BID.acacia_sapling]: 5, [BID.dark_oak_sapling]: 6 }[id];
   if (sap != null) { if (Math.random() < 0.45) growTreeAt(x, y, z, sap); return true; }
   if (id === 2) { for (let k = 0; k < 40; k++) { const tx = x + Math.floor((Math.random() - .5) * 7), tz = z + Math.floor((Math.random() - .5) * 7); for (let ty = y + 2; ty >= y - 2; ty--) if (getBlock(tx, ty, tz) === 2 && getBlock(tx, ty + 1, tz) === 0) { setBlock(tx, ty + 1, tz, Math.random() < 0.85 ? 29 : [31, 32, 33, 34][Math.floor(Math.random() * 4)]); break; } } return true; }
   return false;
+}
+function placeCandle(t, c) {
+  let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
+  const tgt = getBlock(t.x, t.y, t.z); if (REPL[tgt] && !FLUID[tgt]) { x = t.x; y = t.y; z = t.z; }
+  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < 0 || y >= CH) return;
+  setBlock(x, y, z, ...S.candleBlock(c, 1, 0)); consume(); play('place', { mat: 'wool' }); swing();
 }
 function placeBlock(t, d) {
   let id = d.place, meta = d.pmeta || 0;
@@ -512,13 +596,14 @@ function placeBlock(t, d) {
   const tgt = getBlock(t.x, t.y, t.z);
   if (REPL[tgt] && !FLUID[tgt] && !(tgt === BID.snow && id === BID.snow)) { x = t.x; y = t.y; z = t.z; }
   // slab merging / snow stacking
+  // slab merging keeps the wax: a waxed copper slab doubles into waxed cut copper
   const slabFull = BLOCKS[id].slab || (BLOCKS[id].slabv && BLOCKS[id].full[vi]);
   const sameSlab = m => !BLOCKS[id].slabv || (m >> 1) === vi;
-  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
+  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
   if (id === BID.snow && tgt === BID.snow && (t.m & 7) < 7) { setBlock(t.x, t.y, t.z, BID.snow, t.m + 1); consume(); swing(); return; }
   if (y < 0 || y >= CH) return;
   const cur = getBlock(x, y, z); if (cur && !REPL[cur]) return;
-  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull); consume(); swing(); return; }
+  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0); consume(); swing(); return; }
   const below = getBlock(x, y - 1, z), fd = facingDir();
   const b = BLOCKS[id];
   // placement rules
@@ -530,7 +615,10 @@ function placeBlock(t, d) {
   if (id === BID.torch || id === BID.soul_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
-  if (id === BID.end_rod) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
+  if (isCampfire(id)) meta = fd | 4; // placed lit
+  if (id === BID.bell) { meta = bellAttach(t, fd); if (!bellSupported(x, y, z, meta)) return; }
+  if (id === BID.end_rod || (id === BID.chain && vi === 1)) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
+  if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
@@ -538,7 +626,7 @@ function placeBlock(t, d) {
   if (id === BID.lily_pad && below !== 27) return;
   if (id === BID.redstone_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.lever || id === BID.stone_button) { const a = S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === -t.ny && v[2] === -t.nz); if (a < 0 || !SOLID[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = a; }
-  if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate) && !supportedBy(below)) return;
+  if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate || S.isRail(id)) && !supportedBy(below)) return;
   if (id === BID.repeater) meta = fd;
   if (id === BID.piston || id === BID.sticky_piston) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.nether_wart && below !== BID.soul_sand) return;
@@ -571,12 +659,18 @@ function placeBlock(t, d) {
   if (id === BID.furnace) setTile(x, y, z, newFurnace());
   if (id === BID.blast_furnace || id === BID.smoker) setTile(x, y, z, newFurnace(BLOCKS[id].furnace));
   if (id === BID.barrel) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
+  if (id === BID.brewing_stand) setTile(x, y, z, newBrewing());
+  if (id === BID.beacon) setTile(x, y, z, { type: 'beacon' });
+  if (isCampfire(id)) setTile(x, y, z, newCampfire());
+  if (id === BID.jukebox) setTile(x, y, z, { type: 'jukebox', items: [null] });
   if (id === BID.hopper) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 });
   if (id === BID.dispenser || id === BID.dropper) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) });
   if (id === BID.daylight_detector) setTile(x, y, z, { type: 'daylight' });
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
+  if (S.isRail(id)) railPlaced(x, y, z, fd);
+  if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
-  consume(); play('place', { mat: soundMat(id) }); swing();
+  consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }
 function pickBlock() {
   const t = TARGET; if (!t || t.type !== 'block') return;
@@ -591,13 +685,15 @@ function pickBlock() {
 function dropHeld(all) {
   const h = PL.held(); if (!h) return;
   const n = all ? h.n : 1; const [dx, dy, dz] = lookDir();
-  dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d);
+  dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d, h);
   h.n -= n; if (h.n <= 0) INV.slots[INV.sel] = null; swing(); UI.hudDirty = true;
 }
 // ---------- furnaces ----------
 function furnaceTick() {
   for (const c of W.chunks.values()) if (c.hasFurnace !== false) for (const [i, t] of c.tiles) {
     if (c.hasFurnace === undefined) c.hasFurnace = false; // re-flagged below (or by setTile) when a furnace exists
+    if (t.type === 'brewing') { c.hasFurnace = true; brewTick(c, i, t); continue; }
+    if (t.type === 'campfire') { c.hasFurnace = true; campfireTick(c, i, t); continue; }
     if (t.type !== 'furnace') continue;
     c.hasFurnace = true;
     const [inp, fuel, out] = t.items;
@@ -634,7 +730,7 @@ function useRod() {
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
     if (b.bite > 0) {
-      const r = Math.random(), loot = r < 0.6 ? 'cod' : r < 0.85 ? 'salmon' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book'][Math.floor(Math.random() * 4)];
+      const r = Math.random(), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book'][Math.floor(Math.random() * 4)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
       if (it && loot === 'enchanted_book') { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; it.stack.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; }
       spawnXP(PL.x, PL.y + 1, PL.z, 1 + Math.floor(Math.random() * 6)); play('splash', { vol: 0.5 });

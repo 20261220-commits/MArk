@@ -171,6 +171,73 @@ PAINT.exposed_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r);
 PAINT.weathered_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r);
 PAINT.oxidized_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r);
 PAINT.cut_copper = r => copperTex(hex(0xbf6a4f), null, r, true);
+PAINT.exposed_cut_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r, true);
+PAINT.weathered_cut_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r, true);
+PAINT.oxidized_cut_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r, true);
+// amethyst buds grow from a small nub to nearly a full cluster
+function budTex(cr) { for (const [x, top] of cr) for (let y = top; y <= 15; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 1) P(x - 1, y, hex(0x7f55b4)); } }
+PAINT.small_amethyst_bud = r => budTex([[7, 12], [5, 14], [9, 13]]);
+PAINT.medium_amethyst_bud = r => budTex([[7, 9], [4, 12], [10, 11], [6, 13]]);
+PAINT.large_amethyst_bud = r => budTex([[7, 5], [4, 9], [10, 8], [2, 12], [12, 11]]);
+// cauldron: dark iron, a rim on top, the bowl darker inside
+const CAUL = hex(0x4a4a4e);
+PAINT.cauldron_side = r => fill((x, y) => quant(shade(CAUL, 1 + (r() - .5) * .14 + (y === 0 ? .25 : 0) + (x === 0 || x === 15 ? -.12 : 0)), 3));
+PAINT.cauldron_top = r => fill((x, y) => quant(shade(CAUL, 1.25 + (r() - .5) * .1), 3));
+PAINT.cauldron_inner = r => fill((x, y) => quant(shade(CAUL, 0.72 + (r() - .5) * .1), 3));
+PAINT.cauldron_bottom = r => fill((x, y) => quant(shade(CAUL, 0.85 + (r() - .5) * .12), 3));
+// rails: wooden ties under two metal bars running north-south (the corner piece bends from south to east)
+function railTex(r, bar, hi, tie, mid, corner) {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if ((y % 4 === 1 || y % 4 === 2) && x >= 1 && x <= 14) P(x, y, quant(shade(hex(tie), (y % 4 === 1 ? 1.05 : 0.85) + (r() - .5) * .1), 3));
+  const barAt = (x, y, c) => P(x, y, hex(c));
+  if (!corner) for (let y = 0; y < 16; y++) { barAt(2, y, hi); barAt(3, y, bar); barAt(12, y, hi); barAt(13, y, bar); }
+  else for (let t = 0; t < 64; t++) { // two quarter circles around the north-west corner of the tile... centred on (16, 16)
+    const a = t / 63 * Math.PI / 2;
+    for (const [rad, c] of [[13.5, hi], [12.5, bar], [3.5, hi], [2.5, bar]]) barAt(Math.round(16 - Math.cos(a) * rad - 0.5), Math.round(16 - Math.sin(a) * rad - 0.5), c);
+  }
+  if (mid) for (let y = 5; y < 11; y++) for (let x = 6; x < 10; x++) P(x, y, hex(mid));
+}
+PAINT.rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433);
+PAINT.rail_corner = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0, 1);
+PAINT.powered_rail = r => railTex(r, 0xb08a1a, 0xf0d040, 0x5a4428, 0x5a1a14);
+PAINT.powered_rail_on = r => railTex(r, 0xb08a1a, 0xf0d040, 0x5a4428, 0xff3a1a);
+PAINT.detector_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0x7a2a20);
+PAINT.detector_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0xff3a1a);
+PAINT.activator_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x7a2a20, 0x4a1a14);
+PAINT.activator_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0xb03a20, 0xff3a1a);
+// turtle eggs, bee nests and hives, honey
+PAINT.turtle_egg = r => fill((x, y) => quant(shade((x * 7 + y * 3) % 11 < 2 ? hex(0x6aa85a) : hex(0xe8e4c8), 1 + (r() - .5) * .1), 3));
+const NEST = hex(0xc89a4a), NEST_D = hex(0x8a5a24);
+PAINT.bee_nest_side = r => fill((x, y) => quant(shade(y % 4 === 0 ? NEST_D : NEST, 1 + (r() - .5) * .15), 3));
+PAINT.bee_nest_top = r => fill((x, y) => quant(shade(Math.hypot(x - 7.5, y - 7.5) < 6 && Math.hypot(x - 7.5, y - 7.5) > 4.5 ? NEST_D : NEST, 1 + (r() - .5) * .15), 3));
+PAINT.bee_nest_bottom = r => PAINT.bee_nest_top(r);
+PAINT.bee_nest_front = r => { PAINT.bee_nest_side(r); for (let y = 6; y < 10; y++) for (let x = 5; x < 11; x++) P(x, y, hex(0x2a1a0a)); };
+PAINT.bee_nest_front_honey = r => { PAINT.bee_nest_front(r); for (let y = 10; y < 14; y++) for (let x = 6; x < 10; x++) if (y < 13 || x === 7) P(x, y, hex(0xf0a020)); for (let x = 5; x < 11; x++) P(x, 9, hex(0xf8b830)); };
+const HIVE = hex(0xc29d62);
+PAINT.beehive_side = r => fill((x, y) => quant(shade(y === 0 || y === 15 || x === 0 || x === 15 ? shade(HIVE, 0.75) : y % 5 === 2 ? shade(HIVE, 0.88) : HIVE, 1 + (r() - .5) * .1), 3));
+PAINT.beehive_end = r => fill((x, y) => quant(shade(x === 0 || x === 15 || y === 0 || y === 15 ? shade(HIVE, 0.75) : (x + y) % 6 === 0 ? shade(HIVE, 0.9) : HIVE, 1 + (r() - .5) * .1), 3));
+PAINT.beehive_front = r => { PAINT.beehive_side(r); for (let y = 7; y < 10; y++) for (let x = 4; x < 12; x++) P(x, y, hex(0x3a2410)); };
+PAINT.beehive_front_honey = r => { PAINT.beehive_front(r); for (let y = 10; y < 14; y++) for (let x = 5; x < 11; x++) if (y < 12 || x % 3 === 0) P(x, y, hex(0xf0a020)); };
+PAINT.honey_block_side = r => fill((x, y) => quant(shade(x === 0 || y === 0 || x === 15 || y === 15 ? hex(0xf8c040) : hex(0xe89a18), 1 + (r() - .5) * .08), 3));
+PAINT.honey_block_top = r => fill((x, y) => quant(shade(x < 2 || y < 2 || x > 13 || y > 13 ? hex(0xf8c040) : hex(0xf0a828), 1 + (r() - .5) * .08), 3));
+PAINT.honeycomb_block = r => fill((x, y) => quant(shade(((x >> 2) + (y >> 2)) % 2 === 0 && (x % 4 === 0 || y % 4 === 0) ? hex(0xb8701a) : hex(0xe8a030), 1 + (r() - .5) * .1), 3));
+// sweet berry bush: a leafy bush that fills out, then carries green and finally red berries
+for (let st = 0; st < 4; st++) PAINT['sweet_berry_bush_stage' + st] = r => {
+  const top = [10, 6, 3, 2][st];
+  for (let y = top; y < 16; y++) for (let x = 1; x < 15; x++) { const d = Math.abs(x - 7.5) / 7 + (16 - y) / (17 - top) * 0.4; if (r() < 0.75 - d * 0.35) P(x, y, quant(shade(hex(0x2a6a3a), 0.8 + r() * 0.4), 3)); }
+  if (st >= 2) for (let k = 0; k < (st === 3 ? 9 : 6); k++) { const bx = 2 + Math.floor(r() * 12), by = top + 1 + Math.floor(r() * (14 - top)); P(bx, by, hex(st === 3 ? 0xd0202a : 0x6aa83a)); P(bx + 1, by, hex(st === 3 ? 0xa01018 : 0x4a882a)); }
+};
+// wither skeleton skull: charcoal bone with dark sockets on the front
+PAINT.wither_skull_side = r => fill((x, y) => quant(shade(hex(0x2e2e2e), 1 + (r() - .5) * .2), 3));
+PAINT.wither_skull_top = r => fill((x, y) => quant(shade(hex(0x343434), 1 + (r() - .5) * .2), 3));
+PAINT.wither_skull_front = r => { PAINT.wither_skull_side(r); for (const [x0, y0] of [[5, 9], [9, 9]]) for (let y = y0; y < y0 + 2; y++) for (let x = x0; x < x0 + 2; x++) P(x, y, hex(0x0a0a0a)); for (let x = 6; x < 10; x++) P(x, 13, hex(0x0a0a0a)); }; // boxes map 8 px of the tile, rows 8-15
+PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
+// candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
+const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
+  light_gray: 0x9a9a94, cyan: 0x188a96, purple: 0x7a30b0, blue: 0x3448a0, brown: 0x7a4c28, green: 0x4a6a1c, red: 0xa82a24, black: 0x26242c };
+function candleTex(col, r) { const c = hex(col); fill((x, y) => quant(shade(c, 1 + (x % 2 ? -0.08 : 0.06) + (y % 5 === 0 ? 0.05 : 0) + (r() - .5) * .06), 3)); }
+for (const k in CANDLE_COL) PAINT[k === 'candle' ? 'candle' : k + '_candle'] = r => candleTex(CANDLE_COL[k], r);
+PAINT.candle_wick = r => fill(() => hex(0x2a2420));
+PAINT.candle_flame = r => fill((x, y) => y < 6 ? hex(0xfff2b0) : y < 11 ? hex(0xffc040) : hex(0xff8a20));
 function rawBlock(cols, r) { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .3; return v > .65 ? cols[0] : v > .35 ? cols[1] : cols[2]; }); }
 PAINT.raw_iron_block = r => rawBlock([hex(0xe6c7ad), hex(0xa68166), hex(0x6e5444)], r);
 PAINT.raw_gold_block = r => rawBlock([hex(0xfff17a), hex(0xdea52b), hex(0x8f6514)], r);
@@ -180,6 +247,43 @@ PAINT.budding_amethyst = r => { PAINT.amethyst_block(r); for (let i = 0; i < 6; 
 PAINT.amethyst_cluster = r => { const cr = [[7, 2, 15], [4, 6, 15], [10, 5, 15], [2, 10, 15], [12, 9, 15]]; for (const [x, top, bot] of cr) for (let y = top; y <= bot; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 2) P(x - 1, y, hex(0x7f55b4)); } };
 PAINT.dripstone_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x86685a), 1 + (nz(x, y * 0.4) - .5) * .25 + ((x * 3) % 5 === 0 ? -0.08 : 0) + (r() - .5) * .08), 3)); };
 PAINT.pointed_dripstone = r => { for (let y = 0; y < 16; y++) { const w = Math.max(0, Math.round((16 - y) / 4)); for (let x = 8 - w; x <= 7 + w; x++) P(x, y, shade(hex(0x86685a), 1 + (r() - .5) * .2 + (x < 8 ? .08 : -0.08))); } };
+// ---- lush caves (1.17) ----
+const AZ = [hex(0x5e7a2a), hex(0x6e8c34), hex(0x4c6522), hex(0x7d9b3c)], AZFL = [hex(0xd86aa8), hex(0xf09ac8), hex(0xb24a86)];
+function azaleaLeafy(r, rows, flowers, holes) { fill((x, y) => { if (y >= rows) return null; if (holes && r() < 0.18) return null; return quant(shade(pal(r, AZ), 1 + (r() - .5) * .15), 3); }); if (flowers) for (let i = 0; i < 7; i++) { const x = r.int(15), y = r.int(Math.max(1, rows - 1)); P(x, y, pal(r, AZFL)); P(x + 1, y, AZFL[2]); if (y + 1 < rows) P(x, y + 1, AZFL[0]); } }
+PAINT.azalea_top = r => azaleaLeafy(r, 16, false); PAINT.azalea_side = r => azaleaLeafy(r, 8, false);
+PAINT.flowering_azalea_top = r => azaleaLeafy(r, 16, true); PAINT.flowering_azalea_side = r => azaleaLeafy(r, 8, true);
+PAINT.azalea_plant = r => fill((x, y) => quant(shade(hex(0x6a4f2e), 1 + ((x % 4) === 0 ? -.2 : 0) + (r() - .5) * .12), 3));
+PAINT.azalea_leaves = r => azaleaLeafy(r, 16, false, true); PAINT.azalea_leaves_o = r => azaleaLeafy(r, 16, false, false);
+PAINT.flowering_azalea_leaves = r => azaleaLeafy(r, 16, true, true); PAINT.flowering_azalea_leaves_o = r => azaleaLeafy(r, 16, true, false);
+function vine(r, berries) {
+  for (let y = 0; y < 16; y++) { const x = 7 + Math.round(Math.sin(y * 0.7) * 1.2); P(x, y, hex(0x4a6a24)); P(x + 1, y, hex(0x3a5a1c)); if (y % 3 === 0) { P(x - 1, y, hex(0x6a9a34)); P(x - 2, y + 1, hex(0x5a8a2c)); } if (y % 3 === 1) { P(x + 2, y, hex(0x6a9a34)); P(x + 3, y + 1, hex(0x5a8a2c)); } }
+  if (berries) for (const [x, y] of [[4, 4], [10, 9], [5, 13]]) { P(x, y, hex(0xffb030)); P(x + 1, y, hex(0xf08a20)); P(x, y + 1, hex(0xe07a10)); P(x + 1, y + 1, hex(0xffd060)); }
+}
+PAINT.cave_vines = r => vine(r, false); PAINT.cave_vines_lit = r => vine(r, true);
+PAINT.spore_blossom = r => fill((x, y) => { const dx = x - 7.5, dy = y - 7.5, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); if (d > 7.5) return null; if (d < 2) return hex(0x6a9a34); const petal = Math.cos(a * 4) > 0.2; return petal ? quant(shade(hex(0xe87ab8), 1 - d / 30 + (r() - .5) * .1), 3) : d < 4 ? hex(0x8ab83c) : null; });
+PAINT.big_dripleaf_top = r => fill((x, y) => { const vein = x === 7 || x === 8 || (Math.abs(x - 7.5) - Math.abs(y - 14) * 0.6 < 0.6 && Math.abs(x - 7.5) - Math.abs(y - 14) * 0.6 > -0.6); const edge = x === 0 || x === 15 || y === 0 || y === 15; return quant(shade(hex(0x6aa83a), edge ? 0.78 : vein ? 1.18 : 1 + (r() - .5) * .1), 3); });
+PAINT.big_dripleaf_stem = r => fill((x, y) => x < 6 || x > 9 ? null : quant(shade(hex(0x5a8a2c), 1 + (x === 6 ? .12 : x === 9 ? -.15 : 0) + (r() - .5) * .08), 3)); // a thin stalk in the middle
+PAINT.small_dripleaf = r => { for (const [x0, lean] of [[6, -0.15], [9, 0.15]]) for (let y = 0; y < 16; y++) P(Math.round(x0 + (15 - y) * lean), y, hex(0x5a8a2c)); };
+PAINT.small_dripleaf_top = r => { for (let y = 8; y < 16; y++) { P(6, y, hex(0x5a8a2c)); P(9, y, hex(0x5a8a2c)); } for (const [cx, cy] of [[4, 5], [11, 4]]) for (let dx = -3; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) if (dx * dx / 9 + dy * dy / 4 <= 1) P(cx + dx, cy + dy, shade(hex(0x6aa83a), 1 + (r() - .5) * .15)); };
+PAINT.rooted_dirt = r => { PAINT.dirt(r); for (let i = 0; i < 5; i++) { let x = r.int(16), y = r.int(16); for (let k = 0; k < 5; k++) { P(x, y, hex(0xb08a5a)); x = (x + (r() < .5 ? 1 : 0)) & 15; y = (y + 1) & 15; } } };
+PAINT.hanging_roots = r => { for (const x0 of [3, 6, 9, 12]) { let x = x0; for (let y = 0; y < 10 + r.int(6); y++) { P(x, y, hex(0x9a7448)); if (r() < 0.25) x += r() < .5 ? -1 : 1; } } };
+// sculk sensor (1.17): dark teal with glowing cyan spots
+const SCULK = [hex(0x0b2f34), hex(0x0f3d44), hex(0x08262a)];
+PAINT.sculk_sensor_side = r => fill((x, y) => y < 8 ? (r() < 0.12 ? hex(0x1a8a96) : pal(r, SCULK)) : pal(r, SCULK));
+PAINT.sculk_sensor_top = r => fill((x, y) => { const d = Math.hypot(x - 7.5, y - 7.5); return d < 3 ? hex(0x2ad1d8) : d < 4.2 ? hex(0x137a84) : r() < 0.08 ? hex(0x1a8a96) : pal(r, SCULK); });
+PAINT.sculk_sensor_bottom = r => fill(() => pal(r, SCULK));
+PAINT.sculk_sensor_tendril = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x14646c) : null);
+PAINT.sculk_sensor_tendril_active = r => fill((x, y) => (x + y) % 5 === 0 || r() < 0.4 ? hex(0x5af0f4) : null);
+PAINT.brewing_stand = r => fill((x, y) => x >= 6 && x <= 9 ? quant(shade(hex(0xc8a24a), 1 + (x === 6 ? .15 : x === 9 ? -.2 : 0) + (r() - .5) * .1), 3) : null);
+PAINT.brewing_stand_base = r => stoneLike(hex(0x5a5a5a), r, 0.2);
+PAINT.brewing_bottle = r => fill((x, y) => [200 + r.int(30), 220 + r.int(20), 240, 150]);
+PAINT.beacon = r => fill((x, y) => { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return d > 6 ? hex(0x6ad8d0) : quant(shade(hex(0xd8fff8), 1 - d / 20 + (r() - .5) * .08), 3); });
+PAINT.campfire_log = r => fill((x, y) => quant(shade(hex(0x6a5030), 1 + ((y + (x >> 2)) % 4 === 0 ? -.25 : 0) + (r() - .5) * .12), 3));
+PAINT.campfire_log_lit = r => fill((x, y) => r() < 0.35 ? hex(0xff9a30) : quant(shade(hex(0x4a3420), 1 + (r() - .5) * .2), 3));
+PAINT.soul_campfire_log_lit = r => fill((x, y) => r() < 0.35 ? hex(0x5ae8f0) : quant(shade(hex(0x4a3420), 1 + (r() - .5) * .2), 3));
+PAINT.bell_body = r => fill((x, y) => quant(shade(hex(0xf0c838), 1 + (x < 3 ? .2 : x > 12 ? -.25 : 0) + (y < 2 ? .15 : 0) + (r() - .5) * .08), 3));
+PAINT.jukebox_side = r => { planks(hex(0x8a5a3a), r); for (let i = 0; i < 16; i++) { P(i, 0, hex(0x5a3a22)); P(i, 15, hex(0x5a3a22)); P(0, i, hex(0x5a3a22)); P(15, i, hex(0x5a3a22)); } };
+PAINT.jukebox_top = r => { PAINT.jukebox_side(r); for (let x = 3; x < 13; x++) { P(x, 7, hex(0x1a1a1a)); P(x, 8, hex(0x2a2a2a)); } };
 PAINT.moss_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x5a7a2c), 1 + (nz(x, y) - .5) * .3 + (r() - .5) * .2), 3)); };
 PAINT.bricks = r => fill((x, y) => { if (y % 4 === 3) return gray(0x9c + r.int(10)); const off = (y >> 2) % 2 ? 4 : 0; if ((x + off) % 8 === 7) return gray(0xa0); return quant(shade(pal(r, [hex(0x965040), hex(0xa25a47), hex(0x8a4636)]), 1 + (r() - .5) * .1), 3); });
 PAINT.stone_bricks = r => { stoneLike(hex(0x7c7c7c), r, 0.18); for (let x = 0; x < 16; x++) { P(x, 7, gray(0x4a)); P(x, 15, gray(0x4a)); P(x, 0, gray(0x95)); P(x, 8, gray(0x95)); } for (let y = 0; y < 8; y++) { P(15, y, gray(0x4a)); P(0, y, gray(0x95)); } for (let y = 8; y < 16; y++) { P(7, y, gray(0x4a)); P(8, y, gray(0x95)); } };
@@ -337,6 +441,7 @@ function maskDraw(p, pts, cols) {
 }
 const MATC = { wooden: [hex(0xc29d62), hex(0x9c7b47), hex(0x6b5433), hex(0x46351d)], stone: [hex(0xa8a8a8), hex(0x838383), hex(0x5c5c5c), hex(0x3a3a3a)],
   iron: [hex(0xffffff), hex(0xd8d8d8), hex(0x9a9a9a), hex(0x4f4f4f)], golden: [hex(0xfffd9e), hex(0xf2d43a), hex(0xbf8f1b), hex(0x6e4e0a)],
+  turtle: [hex(0x8ad88a), hex(0x4aa84a), hex(0x2a7a2a), hex(0x154a15)],
   diamond: [hex(0xd2fff8), hex(0x4aedd9), hex(0x1aa59a), hex(0x0c5c55)], leather: [hex(0xc88a5a), hex(0xa0603a), hex(0x7a4424), hex(0x4f2a14)],
   netherite: [hex(0x6a6266), hex(0x4d4649), hex(0x3a3436), hex(0x221e1f)], chainmail: [hex(0xd0d0d0), hex(0x9a9a9a), hex(0x6a6a6a), hex(0x3a3a3a)], elytra: [hex(0xa8a0c0), hex(0x7a7090), hex(0x5a5070), hex(0x3a3050)] };
 const HANDLE = [hex(0x8a6a3b), hex(0x5e4422)];
@@ -426,6 +531,72 @@ const SPR = {
   lantern_item: () => sprite(p => { for (let x = 5; x < 11; x++) for (let y = 5; y < 13; y++) p(x, y, (y === 5 || y === 12 || x === 5 || x === 10) ? hex(0x3a3d44) : hex(0xffc84a)); for (let x = 6; x < 10; x++) p(x, 4, hex(0x3a3d44)); p(7, 2, hex(0x3a3d44)); p(8, 2, hex(0x3a3d44)); p(7, 3, hex(0x2a2d33)); p(8, 3, hex(0x2a2d33)); }),
   sugar_cane_item: () => sprite(p => { for (const x0 of [4, 8, 11]) for (let y = 1; y < 15; y++) { p(x0, y, (y + x0) % 5 === 0 ? hex(0xa8d878) : hex(0x88c060)); p(x0 + 1, y, hex(0x5a9a3a)); } }),
 };
+function candleSprite(col) { return sprite(p => { const c = hex(col); for (let y = 5; y < 15; y++) for (let x = 6; x < 10; x++) p(x, y, shade(c, x === 6 ? 1.15 : x === 9 ? 0.75 : 1)); for (let x = 6; x < 10; x++) p(x, 5, shade(c, 1.25)); p(7, 3, hex(0x2a2420)); p(7, 4, hex(0x2a2420)); }); }
+// minecart icons: an iron tub on two wheels, with the load showing above the rim
+function cartSprite(load) {
+  return sprite(p => {
+    if (load) load(p);
+    for (let y = 7; y < 12; y++) for (let x = 1 + (y - 7 > 3 ? 1 : 0); x < 15 - (y - 7 > 3 ? 1 : 0); x++) p(x, y, y === 7 ? hex(0xb8b8b8) : x === 1 || x === 14 || y === 11 ? hex(0x4a4a4a) : (y === 8 ? hex(0x8a8a8a) : hex(0x6e6e6e)));
+    for (const cx of [4, 11]) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) p(cx + dx - 1, 12 + dy, hex(0x2a2a2a));
+  });
+}
+Object.assign(SPR, {
+  minecart: () => cartSprite(null),
+  rabbit: () => meat([hex(0xf0b8a8), hex(0xd88a7a), hex(0xa85a4a), hex(0x6a2a1a)]), cooked_rabbit: () => meat([hex(0xd8a070), hex(0xb07a48), hex(0x7a4a24), hex(0x4a2a10)]),
+  rabbit_stew: () => bowl(hex(0xb8743a)),
+  rabbit_foot: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 6; x < 10; x++) p(x, y, y > 10 ? hex(0xe8c8a0) : x === 6 ? hex(0xb08860) : hex(0x9a7048)); for (const [x, y] of [[5, 12], [10, 12], [6, 13], [9, 13]]) p(x, y, hex(0xe8c8a0)); for (let x = 6; x < 10; x++) p(x, 2, hex(0xd8d0c8)); }),
+  rabbit_hide: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) if (!((x === 3 || x === 12) && (y === 3 || y === 12))) p(x, y, (x + y) % 4 ? hex(0xa88a60) : hex(0x8a6a48)); }),
+  phantom_membrane: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) if (Math.abs(x - 7.5) < 6 - Math.abs(y - 8) * 0.6) p(x, y, (x + y) % 3 ? hex(0xd8d0b8) : hex(0xb0a890)); }),
+  scute: () => sprite(p => { for (let y = 4; y < 12; y++) for (let x = 3; x < 13; x++) if (Math.abs(x - 7.5) + Math.abs(y - 7.5) * 1.2 < 6.5) p(x, y, (x + y) % 3 ? hex(0x4aa84a) : hex(0x2a7a2a)); }),
+  ...Object.fromEntries([['leather', 0xa0603a], ['iron', 0xd8d8d8], ['golden', 0xf2d43a], ['diamond', 0x4aedd9]].map(([k, c]) => [k + '_horse_armor', () => sprite(p => {
+    for (let y = 4; y < 11; y++) for (let x = 2; x < 13; x++) if (x < 12 - (y > 8 ? 2 : 0)) p(x, y, y === 4 ? shade(hex(c), 1.15) : x === 2 ? shade(hex(c), 0.7) : hex(c));
+    for (let y = 2; y < 6; y++) for (let x = 11; x < 15; x++) p(x, y, shade(hex(c), 0.9)); p(13, 3, hex(0x202020));
+    for (const lx of [3, 9]) for (let y = 11; y < 14; y++) p(lx, y, shade(hex(c), 0.75));
+  })])),
+  chest_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 ? hex(0x4a3418) : x === 3 || x === 12 || y === 2 ? hex(0x6b4a24) : hex(0xa8743a)); p(7, 4, hex(0xd8d8d8)); p(8, 4, hex(0xd8d8d8)); p(7, 5, hex(0x8a8a8a)); }),
+  hopper_minecart: () => cartSprite(p => { for (let y = 3; y < 8; y++) for (let x = 2; x < 14; x++) p(x, y, y === 3 ? hex(0x5a5a5e) : x === 2 || x === 13 ? hex(0x2a2a2e) : y === 4 && x > 3 && x < 12 ? hex(0x1a1a1e) : hex(0x46464a)); }),
+  tnt_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 || y === 5 ? (x % 3 === 0 ? hex(0x2a2a2a) : hex(0xe8e8e8)) : x === 3 || x === 12 ? hex(0x8a1a10) : hex(0xd8341a)); }),
+  furnace_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, x === 3 || x === 12 || y === 2 ? hex(0x5a5a5a) : y >= 4 && y <= 6 && x >= 6 && x <= 9 ? hex(0x1a1a1a) : hex(0x8a8a8a)); }),
+  honeycomb: () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const dx = Math.abs(x - 7.5), dy = Math.abs(y - 8); if (dx + dy * 0.6 > 7) continue; const cell = ((x >> 1) + (y >> 2)) % 3 === 0; p(x, y, cell ? hex(0xb8701a) : (x + y) % 5 === 0 ? hex(0xffd860) : hex(0xf0a828)); } }),
+  candle_item: () => candleSprite(CANDLE_COL.candle),
+  lightning_rod_item: () => sprite(p => { for (let y = 5; y < 16; y++) { p(7, y, hex(0xe89a74)); p(8, y, hex(0xa8553a)); } for (let y = 1; y < 5; y++) for (let x = 6; x < 10; x++) p(x, y, x === 6 || y === 1 ? hex(0xf6b48a) : x === 9 ? hex(0x9c4d2f) : hex(0xd47a55)); }),
+  tropical_fish: () => sprite(p => { for (let y = 5; y < 12; y++) for (let x = 3; x < 12; x++) if (((x - 7) / 4.5) ** 2 + ((y - 8.5) / 3.2) ** 2 < 1) p(x, y, x === 7 || x === 8 ? hex(0xf4f4f4) : hex(0xf08a20)); for (let y = 6; y < 12; y++) p(12 + (Math.abs(y - 8.5) > 1.5 ? 1 : 0), y, hex(0xf08a20)); p(5, 7, hex(0x101010)); }),
+  axolotl_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6], [5, 4], [10, 4]]) p(x, y, hex(0xf5a0c4)); p(7, 5, hex(0x2a1a2a)); }),
+  tropical_fish_bucket: () => sprite(p => { const b = SPR.water_bucket(); const d = b._px; for (let i = 0; i < 256; i++) if (d[i * 4 + 3]) p(i & 15, i >> 4, [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [9, 5], [7, 6], [8, 6]]) p(x, y, x === 7 ? hex(0xf4f4f4) : hex(0xf08a20)); }),
+});
+for (const c of S.COLORS) SPR[c + '_candle_item'] = () => candleSprite(CANDLE_COL[c]);
+// potions: bottle (drinkable), round splash flask, lingering flask with a long neck, tipped arrow with a coloured head
+function potionSprite(col, form) {
+  const c = hex(col), glass = hex(0xd8e8f4), dark = shade(c, 0.6), light = mixc(c, [255, 255, 255], 0.4);
+  if (form === 3) return sprite(p => { line(p, 3, 12, 11, 4, hex(0x8a6a3b)); for (const [x, y] of [[11, 4], [12, 3], [10, 3], [12, 5], [11, 3], [12, 4], [13, 2]]) p(x, y, c); for (const [x, y] of [[2, 13], [3, 14], [1, 12], [2, 11], [4, 13], [3, 12]]) p(x, y, hex(0xf0f0f0)); });
+  return sprite(p => {
+    const neck = form === 2 ? 5 : 3, top = 2;
+    for (let y = top; y < top + neck; y++) { p(7, y, glass); p(8, y, glass); }
+    p(6, top, hex(0x8a6a3b)); p(7, top, hex(0x8a6a3b)); p(8, top, hex(0x8a6a3b)); p(9, top, hex(0x8a6a3b));
+    const cy = form === 1 ? 10 : 10.5, rx = form === 1 ? 5 : 4.5, ry = form === 1 ? 4.5 : 4.5;
+    for (let y = top + neck; y < 16; y++) for (let x = 1; x < 15; x++) { const d = ((x + .5 - 8) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2; if (d > 1) continue; p(x, y, d > 0.72 ? glass : y < cy - 1 ? light : x < 7 ? c : dark); }
+    p(6, Math.round(cy) - 1, hex(0xffffff));
+  });
+}
+for (const d of ITEMS) if (d && d.pcol != null) SPR[d.key] = () => potionSprite(d.pcol, d.form);
+SPR.glass_bottle = () => potionSprite(0xd8e8f4, 0); SPR.dragon_breath = () => potionSprite(0xc87ad8, 0);
+SPR.fermented_spider_eye = () => sprite(p => { blob(p, 8, 9, 5, 4.5, [hex(0xc86a5a), hex(0x9a3a3a), hex(0x6a1a2a), hex(0x3a0a1a)]); p(6, 8, hex(0x2a0a0a)); p(9, 8, hex(0x2a0a0a)); p(5, 6, hex(0xa8805a)); p(10, 6, hex(0xa8805a)); });
+SPR.glistering_melon_slice = () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const d = Math.hypot(x - 2, y - 14); if (d < 11 && d > 9.6) p(x, y, hex(0xe8c040)); else if (d <= 9.6 && x - 2 > 0 && 14 - y > 0) p(x, y, (x * 3 + y) % 5 === 0 ? hex(0xfff090) : hex(0xe8402a)); } });
+SPR.rabbit_foot = () => sprite(p => { blob(p, 8, 10, 3, 4, [hex(0xd8c8a8), hex(0xb8a080), hex(0x8a7058), hex(0x5a4830)]); line(p, 8, 2, 8, 6, hex(0xb8a080)); });
+SPR.pufferfish = () => sprite(p => { blob(p, 8, 8, 5, 5, [hex(0xf8e060), hex(0xe8c030), hex(0xb89020), hex(0x7a5a10)]); for (const [x, y] of [[8, 2], [3, 8], [13, 8], [8, 14], [4, 4], [12, 4], [4, 12], [12, 12]]) p(x, y, hex(0xf0f0e0)); p(6, 7, hex(0x101010)); p(10, 7, hex(0x101010)); });
+const frameSprite = edge => sprite(p => { for (let y = 1; y < 15; y++) for (let x = 1; x < 15; x++) p(x, y, x < 3 || y < 3 || x > 12 || y > 12 ? edge : hex(0x8a5a2a)); });
+SPR.glow_berries = () => sprite(p => { line(p, 8, 1, 8, 5, hex(0x4a6a24)); for (const [cx, cy] of [[6, 8], [10, 8], [8, 12]]) { blob(p, cx, cy, 2.6, 2.6, [hex(0xffd060), hex(0xf8a028), hex(0xe07a10), hex(0x9a4a08)]); p(cx - 1, cy - 1, hex(0xfff0b0)); } });
+SPR.shield = () => sprite(p => { for (let y = 2; y < 15; y++) for (let x = 3; x < 13; x++) { if (y > 11 && Math.abs(x - 7.5) > 15 - y) continue; const edge = x === 3 || x === 12 || y === 2 || (y > 10 && Math.abs(x - 7.5) > 14 - y); p(x, y, edge ? hex(0x8a8a8a) : (x + y) % 4 === 0 ? hex(0x7a5a30) : hex(0x9c7b47)); } line(p, 7, 3, 7, 13, hex(0x6a6a6a)); });
+SPR.crossbow = () => sprite(p => { line(p, 3, 12, 12, 3, hex(0x6b5433)); line(p, 4, 12, 13, 3, hex(0x8a6a3b)); for (let i = 0; i < 9; i++) { p(2 + i, 6 - Math.round(Math.sin(i / 8 * Math.PI) * 3) + 4 - i % 1, hex(0xb8b8b8)); } line(p, 2, 8, 8, 2, hex(0x9a9a9a)); line(p, 8, 14, 14, 8, hex(0x9a9a9a)); line(p, 2, 8, 8, 14, hex(0xdddddd)); });
+SPR.trident = () => sprite(p => { line(p, 2, 13, 11, 4, hex(0x3a8a7a)); line(p, 3, 13, 12, 4, hex(0x5ab8a0)); for (const [x, y] of [[11, 1], [12, 2], [13, 3], [14, 4], [9, 3], [10, 2], [13, 5], [12, 6], [14, 1], [11, 4]]) p(x, y, hex(0x8ae8d0)); });
+SPR.tripwire_hook = () => sprite(p => { for (let y = 3; y < 9; y++) for (let x = 6; x < 10; x++) p(x, y, x === 6 || y === 3 ? hex(0xc8c8c8) : hex(0x8a8a8a)); line(p, 8, 9, 8, 14, hex(0x8a6a3b)); line(p, 7, 9, 7, 14, hex(0x6b5433)); });
+function discSprite(col) { return sprite(p => { for (let y = 1; y < 15; y++) for (let x = 1; x < 15; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d > 6.8) continue; p(x, y, d < 1 ? hex(0x101010) : d < 2.8 ? hex(col) : d > 6 ? hex(0x2a2a2a) : (x + y) % 3 === 0 ? hex(0x3a3a3a) : hex(0x1a1a1a)); } }); }
+for (const d of ITEMS) if (d && d.disc) SPR[d.key] = () => discSprite(d.dcol);
+const BANNER_DYE = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
+S.COLORS.forEach((c, i) => { SPR[c + '_banner_item'] = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 1, hex(0x8a6a3b)); for (let y = 2; y < 15; y++) for (let x = 4; x < 12; x++) p(x, y, shade(hex(BANNER_DYE[i]), x === 4 ? 1.1 : x === 11 ? 0.8 : 1)); line(p, 7, 15, 8, 15, hex(0x8a6a3b)); }); });
+SPR.painting = () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 1; x < 15; x++) p(x, y, x < 2 || x > 13 || y < 3 || y > 12 ? hex(0x8a6a3b) : y < 8 ? hex(0x6ab0e8) : x < 8 ? hex(0x5aa84a) : hex(0xe8c040)); });
+SPR.armor_stand = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 14, hex(0x9a9a9a)); line(p, 7, 2, 7, 13, hex(0xa8865a)); line(p, 8, 2, 8, 13, hex(0x8a6a3b)); for (let x = 4; x < 12; x++) p(x, 5, hex(0xa8865a)); for (let x = 5; x < 11; x++) p(x, 9, hex(0xa8865a)); });
+SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));
 function ingot(c) { return sprite(p => { const pts = []; for (let y = 5; y < 12; y++) { const pad = Math.max(0, 8 - y); for (let x = 2 + pad; x <= 13 - Math.max(0, y - 9); x++) pts.push([x, y]); } maskDraw(p, pts, c); }); }
 function apple(c) { return sprite(p => { blob(p, 8, 9, 5.5, 5, c); p(8, 3, hex(0x5a3a1a)); p(8, 4, hex(0x5a3a1a)); p(9, 3, hex(0x3a8a2a)); p(10, 2, hex(0x3a8a2a)); p(6, 7, hex(0xffffff)); }); }
 function meat(c) { return sprite(p => { const pts = []; for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) if (((x - 8) / 6) ** 2 + ((y - 7.5) / 4.5) ** 2 < 1 - ((x + y) % 4) * 0.04) pts.push([x, y]); maskDraw(p, pts, c); for (let i = 0; i < 4; i++) p(5 + i * 2, 6 + (i & 1), hex(0xf8f0e8)); }); }
@@ -458,7 +629,7 @@ function buildIcons() {
     iconIndex[id] = cell;
     let spr = null;
     if (d.block && !d.sprite && !PACKPX.items[d.key]) {
-      const h = id === S.BID.snow ? 0.18 : (id >= 109 && id <= 111) ? 0.5 : id === S.BID.farmland ? 0.94 : 1;
+      const h = id === S.BID.snow ? 0.18 : (id >= 109 && id <= 111) || (id >= 1031 && id <= 1034) ? 0.5 : id === S.BID.farmland ? 0.94 : 1;
       isoBlock(g, id, ox, oy, ICON, h);
       continue;
     }

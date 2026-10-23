@@ -138,7 +138,7 @@ function bulletTick(e) {
   e.vx += (dx / d * sp - e.vx) * 0.15; e.vy += (dy / d * sp - e.vy) * 0.15; e.vz += (dz / d * sp - e.vz) * 0.15;
   e.x += e.vx; e.y += e.vy; e.z += e.vz;
   if (SOLID[getBlock(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z))]) { removeEnt(e); return; }
-  if (d < 0.8) { removeEnt(e); if (hurtPlayer(4 * DIFF_MUL(), 'mob', e.owner)) PL.levitate = 200; }
+  if (d < 0.8) { removeEnt(e); if (hurtPlayer(4 * DIFF_MUL(), 'mob', e.owner)) addEffect(PL, 'levitation', 200, 0); }
   if (Math.random() < 0.3) R.simpleParticle(e.x, e.y + 0.15, e.z, [1, 1, 0.9], { size: 0.08, vy: 0, grav: 0, life: 0.3 });
 }
 function wolfAI(e, dist) {
@@ -178,6 +178,7 @@ function batAnim(e, P, now) { const f = Math.sin(now / 40) * 1.1; if (P.rwing) {
 function swimAssist(e) { if (e.def.swim && e.inWater && e.target) { e.vy += Math.sign(PL.y - e.y) * 0.03; e.vy = Math.max(-0.12, Math.min(0.12, e.vy)); } }
 // ---------- player interaction with the new mobs ----------
 function mobInteract(e, h, d) {
+  if (e.def.interact && e.def.interact(e, h, d)) return true;
   if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
@@ -191,6 +192,7 @@ function overworldReplace(t, x, y, z) {
   if (t === 'zombie' && (b === S.BIO.DESERT || b === S.BIO.BADLANDS) && Math.random() < 0.8 && (getLight(x, y, z) >> 4) > 8) return 'husk';
   if (t === 'skeleton' && (b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FROZEN_OCEAN) && Math.random() < 0.8) return 'stray';
   if (t === 'zombie' && FLUID[getBlock(x, y, z)] === 1) return 'drowned';
+  if (t === 'zombie' && Math.random() < 0.05) return 'witch';
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
 }

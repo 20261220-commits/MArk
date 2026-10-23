@@ -55,10 +55,23 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #ovSnow{background:radial-gradient(ellipse at center,rgba(230,240,250,.5),rgba(240,248,255,.95))}
 #ovHurt{background:radial-gradient(ellipse at center,transparent 45%,rgba(180,0,0,.9));opacity:0}
 #ovPortal{background:radial-gradient(ellipse at center,rgba(120,40,200,.35),rgba(90,0,170,.85));opacity:0}
+.brew{justify-content:center;gap:calc(14*var(--px))}.brew .bmid{align-items:center}.fuelbar{width:calc(18*var(--px));height:calc(4*var(--px));background:#3a2a10;margin-top:calc(2*var(--px))}.fuelbar i{display:block;height:100%;background:#e8a020}.bprog{width:calc(5*var(--px));height:calc(18*var(--px));background:#555;margin:calc(2*var(--px)) 0;display:flex;align-items:flex-end}.bprog i{display:block;width:100%;background:#f0f0f0}
+#tooltip small.lore{color:#5555ff}
+.beacon{gap:calc(10*var(--px))}.btier{display:flex;align-items:center;gap:calc(3*var(--px));margin-bottom:calc(3*var(--px))}.btier small{width:calc(26*var(--px));color:#404040}
+.bpow{display:flex;align-items:center;gap:calc(2*var(--px));font:inherit;font-size:calc(7*var(--px));padding:calc(2*var(--px)) calc(4*var(--px));background:#8b8b8b;border:var(--px) solid #373737;color:#fff;cursor:pointer}.bpow i{width:calc(6*var(--px));height:calc(6*var(--px));display:inline-block}.bpow.on{background:#2f8f2f}.bpow.off{opacity:.4;pointer-events:none}.bok{font:inherit;padding:calc(3*var(--px)) calc(6*var(--px));margin-left:calc(4*var(--px));cursor:pointer}
+.loom{gap:calc(6*var(--px))}.lpats{display:grid;grid-template-columns:repeat(7,calc(11*var(--px)));gap:var(--px);max-height:calc(64*var(--px));overflow:auto}.lpat{width:calc(11*var(--px));height:calc(20*var(--px));background-size:100% 100%;image-rendering:pixelated;border:var(--px) solid #373737;cursor:pointer;padding:0}.lpat.on{outline:var(--px) solid #fff}
+#effects{position:fixed;top:calc(4*var(--px));right:calc(4*var(--px));pointer-events:none;z-index:5;display:flex;flex-direction:column;gap:var(--px);align-items:flex-end}
+#effects .ef{background:rgba(0,0,0,.55);color:#fff;font-size:calc(7*var(--px));padding:calc(2*var(--px)) calc(4*var(--px));display:flex;align-items:center;gap:calc(3*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
+#effects .ef i{display:inline-block;width:calc(6*var(--px));height:calc(6*var(--px));border:var(--px) solid #000}
+#effects .ef b{font-weight:normal;color:#ddd}
 #bossbar{position:fixed;top:calc(4*var(--px));left:50%;transform:translateX(-50%);width:calc(182*var(--px));text-align:center;pointer-events:none;z-index:5}
 #bossbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 #bossbar .bb{height:calc(5*var(--px));background:#3a0a3a;border:var(--px) solid #1a001a;margin-top:var(--px)}
 #bossbar .bb i{display:block;height:100%;background:linear-gradient(#ff6aff,#c018c0)}
+#raidbar{position:fixed;top:calc(24*var(--px));left:50%;transform:translateX(-50%);width:calc(182*var(--px));text-align:center;pointer-events:none;z-index:5}
+#raidbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
+#raidbar .bb{height:calc(5*var(--px));background:#3a0a0a;border:var(--px) solid #1a0000;margin-top:var(--px)}
+#raidbar .bb i{display:block;height:100%;background:linear-gradient(#ff6a6a,#c01818)}
 #ovSleep{background:#000;opacity:0}
 #ovSpy{background:radial-gradient(circle at center,transparent 0,transparent 32vmin,#000 32.4vmin)}
 #ovFire{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}
@@ -197,6 +210,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
   <div id="chatLog"></div>
   <div id="heldName"></div>
   <div id="toast"></div>
+  <div id="effects"></div>
   <div id="bottom">
     <div id="bars"><div id="armorbar"></div><div id="air"></div><div id="hearts"></div><div id="food"></div></div>
     <div id="xpbar"><i></i><b id="xplvl"></b></div>
@@ -233,8 +247,25 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/redstone.js"></script>
 <script src="js/mobs2.js"></script>
 <script src="js/mobs3.js"></script>
+<script src="js/axolotl.js"></script>
 <script src="js/dims.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/ambient.js"></script>
+<script src="js/lush.js"></script>
+<script src="js/sculk.js"></script>
+<script src="js/frames.js"></script>
+<script src="js/potions.js"></script>
+<script src="js/beacon.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/utility.js"></script>
+<script src="js/decor.js"></script>
+<script src="js/minecarts.js"></script>
+<script src="js/mobs4.js"></script>
+<script src="js/mobs5.js"></script>
+<script src="js/mobs6.js"></script>
+<script src="js/mobs7.js"></script>
 <script src="js/inventory.js"></script>
+<script src="js/effects.js"></script>
 <script src="js/player.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

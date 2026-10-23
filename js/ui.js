@@ -31,7 +31,7 @@ function icon(id, n, d, e) {
   if (!id) return '';
   const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
   let s = `<i class="ic" style="${st}"></i>`;
-  if (e) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
+  if (e || (def && def.glint)) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
   if (def && def.dur && d) { const f = 1 - d / def.dur; s += `<u style="--f:${f};--c:hsl(${f * 120},100%,45%)"></u>`; }
   return s;
@@ -125,15 +125,25 @@ UI.renderScreen = () => {
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
-    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(27).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(27)}</div>`;
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(GUI.slots.length - 36).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(GUI.slots.length - 36)}</div>`;
   } else if (T === 'furnace') {
     const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / (t.kind ? 100 : 200);
     h = `<div class="panel"><div class="cap">${t.kind === 'blast' ? '용광로' : t.kind === 'smoker' ? '훈연기' : '화로'}</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'loom') {
+    h = loomHtml();
+  } else if (T === 'horse') {
+    const e = GUI.ctx.horse, n = e.chest ? e.items.length : 0; horseGearChanged(e);
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title}</div><div class="row top"><div class="col">${slotHtml(0)}${e.type === 'horse' ? slotHtml(1) : ''}</div><div class="col"><p class="tip">체력 ${Math.ceil(e.hp)}/${e.hpMax} · 속도 ${(e.spd * 43).toFixed(1)} m/s · 점프 ${(e.jumpS * e.jumpS * 7.1).toFixed(1)} 블록</p>${n ? `<div class="grid9" style="grid-template-columns:repeat(5,calc(18 * var(--px)))">${[...Array(n).keys()].map(i => slotHtml(2 + i)).join('')}</div>` : ''}</div></div><div class="cap">인벤토리</div>${invRows(2 + n)}</div>`;
+  } else if (T === 'beacon') {
+    h = beaconHtml();
+  } else if (T === 'brewing') {
+    const t = GUI.ctx.tile, prog = t.time ? 1 - t.time / 400 : 0;
+    h = `<div class="panel"><div class="cap">양조기</div><div class="row top brew"><div class="col">${slotHtml(4, 'bfuel')}<div class="fuelbar"><i style="width:${t.fuel / 20 * 100}%"></i></div></div><div class="col bmid">${slotHtml(3)}<div class="bprog"><i style="height:${prog * 100}%"></i></div><div class="row">${slotHtml(0)}${slotHtml(1)}${slotHtml(2)}</div></div></div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
   } else if (T === 'enchant') {
     const opts = enchantOptions();
     h = `<div class="panel"><div class="cap">마법 부여</div><div class="row top ench"><div class="col"><div class="row">${slotHtml(0)}${slotHtml(1, 'lapis')}</div><p class="tip">책장 ${opts.shelves}개</p></div><div class="eopts">${opts.list.map((o, i) => `<button class="eopt ${o.ok ? '' : 'off'}" data-ench="${i}"><span>${o.text}</span><b>${o.cost}</b><small>${i + 1} 청금석 · ${i + 1} 레벨</small></button>`).join('')}</div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
   } else if (T === 'hopper') {
-    h = `<div class="panel"><div class="cap">호퍼</div><div class="row top hop">${[0, 1, 2, 3, 4].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '호퍼'}</div><div class="row top hop">${[0, 1, 2, 3, 4].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(5)}</div>`;
   } else if (T === 'dispenser') {
     h = `<div class="panel"><div class="cap">${GUI.ctx.title || '발사기'}</div><div class="row top" style="justify-content:center"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div></div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'anvil') {
@@ -143,7 +153,7 @@ UI.renderScreen = () => {
     h = `<div class="panel"><div class="cap">네더라이트 장비로 업그레이드</div><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">다이아몬드 장비 + 네더라이트 주괴</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'trade') {
     const c = GUI.ctx, offers = villagerOffers(c.e);
-    h = `<div class="panel trade"><div class="cap">${PROF_NAME[c.e.prof] || '주민'}</div><div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, o.an)}</span><i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.ench ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}<div class="arrow"></div>${slotHtml(1, 'big')}</div><p class="tip">${(() => { const o = offers[c.sel]; return o ? itemName(o.a) + ' ' + o.an + '개 → ' + (o.ench ? '마법이 부여된 책' : itemName(o.b)) + ' ' + o.bn + '개' + (o.uses >= o.max ? ' (품절)' : '') : ''; })()}</p></div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
+    h = `<div class="panel trade"><div class="cap">${PROF_NAME[c.e.prof] || '주민'}</div><div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span><i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.ench ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}<div class="arrow"></div>${slotHtml(1, 'big')}</div><p class="tip">${(() => { const o = offers[c.sel]; return o ? itemName(o.a) + ' ' + o.an + '개 → ' + (o.ench ? '마법이 부여된 책' : itemName(o.b)) + ' ' + o.bn + '개' + (o.uses >= o.max ? ' (품절)' : '') : ''; })()}</p></div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
@@ -166,7 +176,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();
@@ -215,7 +225,7 @@ $('screen').addEventListener('pointermove', screenMouse);
 $('screen').addEventListener('pointerdown', e => { screenMouse(e); screenDown(e); });
 addEventListener('pointerup', e => { if (UI.screen) screenUp(e); });
 $('screen').addEventListener('contextmenu', e => e.preventDefault());
-setInterval(() => { if (UI.screen === 'furnace' || UI.screen === 'hopper') UI.renderScreen(); }, 250);
+setInterval(() => { if (UI.screen === 'furnace' || UI.screen === 'hopper' || UI.screen === 'brewing') UI.renderScreen(); }, 250);
 
 // ---------- menus ----------
 const SPLASHES = ['동굴과 절벽!', '구리도 산화돼요!', '자수정 정동 발견!', '100% 순수 자바스크립트!', '크롬북에서도 쌩쌩!', '염소가 들이받아요!', '망원경으로 멀리!', '크리퍼 조심!', '다이아몬드!', '블록 위의 블록!', '오프라인에서도 OK!', '눈가루에 빠지지 마세요!'];
@@ -293,10 +303,10 @@ function runCommand(cmd) {
   if (!W.cheats && c !== 'help' && c !== 'seed') return err('이 세계에서는 명령어가 허용되지 않습니다');
   const num = (v, base) => v && v[0] === '~' ? base + (+(v.slice(1)) || 0) : +v;
   switch (c) {
-    case 'help': ok('/gamemode <survival|creative|spectator> · /time set <day|noon|night|midnight|숫자> · /weather <clear|rain> · /give <아이템> [개수] · /tp <x> <y> <z> · /summon <몹> · /kill · /seed · /difficulty <0-3> · /xp <양> · /spawnpoint · /clear · /keepinventory · /locate <village|stronghold|fortress|end_city>'); break;
+    case 'help': ok('/gamemode <survival|creative|spectator> · /time set <day|noon|night|midnight|숫자> · /weather <clear|rain|thunder> · /give <아이템> [개수] · /tp <x> <y> <z> · /summon <몹> · /kill · /seed · /difficulty <0-3> · /xp <양> · /spawnpoint · /clear · /keepinventory · /locate <village|stronghold|fortress|end_city>'); break;
     case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
     case 'time': { const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
-    case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.rainTimer = 6000 + Math.random() * 12000; ok('날씨를 변경했습니다'); break;
+    case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.thunderOn = a[0] === 'thunder'; W.rainTimer = W.thunderTimer = 6000 + Math.random() * 12000; ok(a[0] === 'thunder' ? '날씨를 뇌우로 변경했습니다' : '날씨를 변경했습니다'); break;
     case 'give': { const k = (a[0] || '').replace('minecraft:', ''); const id = IID[k] != null ? IID[k] : ITEMS.findIndex(d => d && d.name === a[0]); if (id == null || id < 0 || !ITEMS[id]) return err('알 수 없는 아이템: ' + a[0]); const n = Math.max(1, Math.min(6400, +a[1] || 1)); let left = n; while (left > 0) { const m = Math.min(left, maxStack(id)); INV.giveOrDrop({ id, n: m }); left -= m; } ok(`[${itemName(id)}] ${n}개를 주었습니다`); break; }
     case 'tp': { const x = num(a[0], PL.x), y = num(a[1], PL.y), z = num(a[2], PL.z); if ([x, y, z].some(isNaN)) return err('좌표가 잘못되었습니다'); PL.x = PL.px = x; PL.y = PL.py = y; PL.z = PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; ok(`${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}(으)로 순간이동했습니다`); break; }
     case 'summon': { const t = (a[0] || '').replace('minecraft:', ''); if (!MOBDEF[t] || t === 'player') return err('알 수 없는 몹: ' + a[0]); const [dx, , dz] = lookDir(); spawnMob(t, PL.x + dx * 3, PL.y, PL.z + dz * 3); ok(t + ' 소환'); break; }
@@ -401,6 +411,8 @@ function enchantOptions() {
   return { shelves, list };
 }
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-trade]'); if (b && UI.screen === 'trade') selectTrade(+b.dataset.trade); });
+$('screen').addEventListener('click', e => { const b = e.target.closest('[data-loom]'); if (b && UI.screen === 'loom') { GUI.ctx.pat = b.dataset.loom; UI.renderScreen(); } });
+$('screen').addEventListener('click', e => { const b = e.target.closest('[data-beacon]'); if (!b || UI.screen !== 'beacon') return; const [slot, k] = b.dataset.beacon.split(':'); if (slot === 'ok') beaconConfirm(); else beaconPick(slot, k); });
 $('screen').addEventListener('click', e => {
   const b = e.target.closest('[data-ench]'); if (!b || UI.screen !== 'enchant') return;
   const i = +b.dataset.ench, o = enchantOptions().list[i]; if (!o || !o.ok) return;
