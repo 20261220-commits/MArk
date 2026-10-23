@@ -193,6 +193,7 @@ function overworldReplace(t, x, y, z) {
   if (t === 'skeleton' && (b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FROZEN_OCEAN) && Math.random() < 0.8) return 'stray';
   if (t === 'zombie' && FLUID[getBlock(x, y, z)] === 1) return 'drowned';
   if (t === 'zombie' && Math.random() < 0.05) return 'witch';
+  if (t === 'zombie' && Math.random() < 0.05) return 'zombie_villager';
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
 }

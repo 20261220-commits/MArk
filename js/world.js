@@ -238,6 +238,8 @@ function neighborUpdate(x, y, z) {
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (b === BID.nether_portal) { if (!portalIntact(x, y, z)) setBlock(x, y, z, 0); return; }
   if (b === BID.fire) { if (!SOLID[below]) setBlock(x, y, z, 0); return; }
+  if ((b === BID.tripwire || b === BID.flower_pot) && !supportedBy(below)) { breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.tripwire_hook_block) { const [ax, , az] = DIRS[m & 3]; if (!OPQ[getBlock(x - ax, y, z - az)]) { breakNaturally(x, y, z, b, m); return; } }
   if (d.rail && !supportedBy(below)) { breakNaturally(x, y, z, b, m); return; }
   if (d.connect) updateConnections(x, y, z, b);
   if (d.rs || S.DOOR[b] || b === BID.tnt || b === BID.oak_trapdoor) {
@@ -498,6 +500,8 @@ function addChunk(cx, cz, d, tiles) {
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
     if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) { const sp = typeof lootSpecial === 'function' && lootSpecial(key, cx * 16 + (t.i & 15), cz * 16 + ((t.i >> 4) & 15)); if (sp) items[slot] = sp; else if (IID[key] != null) items[slot] = { id: IID[key], n }; } c.tiles.set(t.i, { type: 'chest', items }); }
+    else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
+    else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
     else if (t.type) c.tiles.set(t.i, t);

@@ -429,6 +429,7 @@ function interactBlock(t, dry) {
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
+    case BID.flower_pot: { const h = PL.held(); if (m ? h : !(h && S.POT_PLANTS.some(p => p && IID[p[0]] === h.id))) return false; if (!dry) potUse(t, h); return true; }
     case BID.loom: if (!dry) UI.openScreen('loom', { x, y, z }); return true;
     case BID.campfire: case BID.soul_campfire: { const h = PL.held(); if (dry) return !!(h && (campfireFood(h.id) || (ITEMS[h.id].tool && ITEMS[h.id].tool.type === S.TOOL.SHOVEL && (m & 4)) || ((h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !(m & 4)))); return campfireUse(x, y, z, m, h); }
     case BID.bell: if (!dry) ringBell(x, y, z); return true;
@@ -640,6 +641,7 @@ function placeBlock(t, d) {
   if (b.leaves) meta = 1;
   if (vi != null && S.HASV[id]) meta = (meta & ((1 << vsh) - 1)) | (vi << vsh); // colour / material lives above the shape bits
   if (id === BID.pointed_dripstone) meta = t.ny === -1 ? 0 : 1;
+  { const tm = tripPlace(t, d, x, y, z, fd); if (tm === false) return; if (tm != null) meta = tm; }
   if (typeof oceanPlace === 'function') { const om = oceanPlace(x, y, z, id, meta); if (om === false) return; meta = om; }
   if (S.DOOR[id]) {
     if (getBlock(x, y + 1, z) && !REPL[getBlock(x, y + 1, z)] || !supportedBy(below)) return;
@@ -672,6 +674,7 @@ function placeBlock(t, d) {
   if (id === BID.concrete_powder) neighborUpdate(x, y, z);
   if (S.isRail(id)) railPlaced(x, y, z, fd);
   if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
+  if (id === BID.tripwire || id === BID.tripwire_hook_block) tripRefresh(x, y, z);
   if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }

@@ -258,6 +258,7 @@ const MCMODELS = {
 const entTex = {};
 function packTexture(key) {
   if (entTex[key]) return entTex[key];
+  if (key === 'zombie_villager' && typeof zombieVillagerTexture === 'function') return zombieVillagerTexture();
   const e = PACKPX.ent[key]; if (!e) return null;
   const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
@@ -490,6 +491,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.def.slime) slimeDeath(e);
     e.killedByPlayer = attacker === PL || src === 'player';
     if (e.def.onDeath) e.def.onDeath(e);
+    if (e.type === 'villager' && typeof zombifyVillager === 'function') zombifyVillager(e, attacker);
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
@@ -790,7 +792,7 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
-    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }

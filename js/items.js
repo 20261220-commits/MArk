@@ -6,7 +6,7 @@ const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
-  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass']);
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass', 'tripwire', 'tripwire_hook_block']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
@@ -355,6 +355,8 @@ shapeless('rabbit_stew', 1, ['cooked_rabbit', 'carrot', 'baked_potato', 'brown_m
 shaped('leather_horse_armor', 1, ['L L', 'LLL', 'L L'], { L: 'leather' }); shaped('turtle_helmet', 1, ['SSS', 'S S'], { S: 'scute' });
 shaped('beehive', 1, ['PPP', 'HHH', 'PPP'], { P: 'planks', H: 'honeycomb' }); shaped('honey_block', 1, ['BB', 'BB'], { B: 'honey_bottle' }); shapeless('honey_bottle', 4, ['honey_block', 'glass_bottle', 'glass_bottle', 'glass_bottle', 'glass_bottle']);
 shaped('honeycomb_block', 1, ['HH', 'HH'], { H: 'honeycomb' }); shapeless('sugar', 3, ['honey_bottle']);
+ITEMS[IID.tripwire_hook].place = BID.tripwire_hook_block; ITEMS[IID.string].place = BID.tripwire;
+shaped('flower_pot', 1, ['B B', ' B '], { B: 'brick' });
 shaped('conduit', 1, ['NNN', 'NHN', 'NNN'], { N: 'nautilus_shell', H: 'heart_of_the_sea' }); shaped('dried_kelp_block', 1, ['KKK', 'KKK', 'KKK'], { K: 'dried_kelp' }); shapeless('dried_kelp', 9, ['dried_kelp_block']);
 shaped('map', 1, ['PPP', 'PCP', 'PPP'], { P: 'paper', C: 'compass' });
 shaped('rail', 16, ['I I', 'ISI', 'I I'], { I: 'iron_ingot', S: 'stick' });
@@ -538,6 +540,9 @@ function blockDrops(b, meta, stack) {
   const shears = stack && stack.id === IID.shears;
   const t = toolOf(stack);
   if (d.key === 'kelp_plant') { add('kelp'); return res; }
+  if (d.key === 'tripwire') { add('string'); return res; }
+  if (d.key === 'tripwire_hook_block') { add('tripwire_hook'); return res; }
+  if (d.key === 'flower_pot') { add('flower_pot'); if (meta && S.POT_PLANTS[meta]) add(S.POT_PLANTS[meta][0]); return res; }
   if (d.key === 'tall_seagrass') { if (shears) add('seagrass', 2); return res; }
   if ((d.key === 'coral' || d.key === 'coral_fan') && !enchLv(stack, 'silk_touch')) return res; // corals need silk touch
   if (d.key === 'coral_block' && !enchLv(stack, 'silk_touch')) { if (canHarvest(b, stack)) add(itemOfBlock(b, (meta % 5) + 5)); return res; } // drops as dead coral

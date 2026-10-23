@@ -247,6 +247,10 @@ for (const [k, c0] of Object.entries(CORAL_C)) for (const dead of [false, true])
   PAINT[pre + '_coral_fan'] = r => { for (let a = 0; a < 7; a++) { const t = Math.PI * (0.12 + a * 0.127); for (let d = 1; d < 8; d++) P(Math.round(7.5 + Math.cos(t) * d), Math.round(15 - Math.sin(t) * d), shade(col, 0.8 + r() * 0.4)); } };
   PAINT[pre + '_coral_block'] = r => fill((x, y) => quant(shade(col, 0.8 + r() * 0.35 - ((x * 7 + y * 5) % 9 === 0 ? 0.35 : 0)), 3));
 }
+// flower pot (brick-coloured clay), tripwire string, tripwire hook
+PAINT.flower_pot = r => fill((x, y) => quant(shade(hex(0x9a4a2e), 0.85 + r() * 0.25 + (y < 2 ? 0.15 : 0)), 3));
+PAINT.tripwire = r => { for (let x = 0; x < 16; x++) { P(x, 7, hex(0xd8d8d8)); P(x, 8, hex(0xa8a8a8)); } };
+PAINT.tripwire_hook = r => { for (let y = 1; y < 10; y++) for (let x = 6; x < 10; x++) P(x, y, quant(shade(hex(0x9c7b47), 0.85 + r() * 0.25), 3)); for (let y = 3; y < 7; y++) for (let x = 6; x < 10; x++) P(x, y, hex(0x8a8a8a)); };
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,

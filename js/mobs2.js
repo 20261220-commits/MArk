@@ -489,6 +489,7 @@ function mobExtraTick(e, dist) {
   if (d.waterHurt && (e.inWater || (W.dim === 0 && W.rain > 0.5 && e.age % 20 === 0 && (getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)) >> 4) === 15))) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   if (d.villager) villagerAIExtra(e);
   if (e.hasTrident) drownedTrident(e, dist);
+  if (e.type === 'zombie_villager') zombieVillagerTick(e);
   swimAssist(e);
 }
 // slimes and magma cubes split when they die

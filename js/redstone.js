@@ -20,6 +20,7 @@ function strongPower(x, y, z) {
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
     else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
+    else if (b === BID.tripwire_hook_block) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = DIRS[m & 3]; if (nx - d[0] === x && ny === y && nz - d[2] === z) return 15; } } // a tripped hook strongly powers its wall
     else if (b === BID.detector_rail) { if (dy === 1 && (getMeta(nx, ny, nz) & 8)) return 15; } // like a pressure plate
     else if (b === BID.sculk_sensor && dy === 1) { const m = getMeta(nx, ny, nz); if ((m & 3) === 1) return m >> 4; } // an active sensor strongly powers the block it sits on
     else if (b === BID.chain) { const m = getMeta(nx, ny, nz); if (S.isRod(b, m) && (m & 128)) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } } // a struck lightning rod strongly powers what it stands on
@@ -37,7 +38,7 @@ function wireConn(x, y, z) { // horizontal directions the dust visually connects
   const c = [0, 0, 0, 0], above = OPQ[getBlock(x, y + 1, z)];
   DIRS.forEach(([dx, , dz], d) => {
     const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if (nd && nd.rs && (nd.rs !== 'rail' || n === BID.detector_rail) && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
+    if (nd && nd.rs && nd.rs !== 'trip' && (nd.rs !== 'rail' || n === BID.detector_rail) && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
     else if (n === BID.redstone_block) c[d] = 1;
     else if (!OPQ[n] && getBlock(x + dx, y - 1, z + dz) === RSB.wire) c[d] = 1;
     else if (!above && getBlock(x + dx, y + 1, z + dz) === RSB.wire) c[d] = 1;
@@ -67,6 +68,7 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.chain: return S.isRod(b, m) && (m & 128) ? 15 : 0;
     case BID.sculk_sensor: return (m & 3) === 1 ? m >> 4 : 0;
     case BID.detector_rail: return m & 8 ? 15 : 0;
+    case BID.tripwire_hook_block: return m & 8 ? 15 : 0;
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -192,6 +194,7 @@ function rsDelayed(x, y, z) {
   else if (S.isRod(b, m) && (m & 128)) { setMeta(x, y, z, m & ~128); rsNotify(x, y, z); }
   else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
   else if (b === BID.detector_rail && (m & 8)) detectorCheck(x, y, z, m);
+  else if (b === BID.tripwire_hook_block && (m & 8)) hookDelayed(x, y, z, m);
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);
     else { setMeta(x, y, z, 0); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
