@@ -500,7 +500,7 @@ function addChunk(cx, cz, d, tiles) {
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
-  if (d.fromSave && TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
+  if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
 }
 function requestGen(cx, cz) {

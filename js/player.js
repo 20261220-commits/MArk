@@ -105,7 +105,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -195,11 +195,12 @@ function playerTick() {
     accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
-      PL.vy = 0.42 + 0.1 * effLv(PL, 'jump_boost'); USE.jumpCd = 10;
+      PL.vy = (0.42 + 0.1 * effLv(PL, 'jump_boost')) * (blockUnder() === BID.honey_block ? 0.5 : 1); USE.jumpCd = 10;
       if (PL.sprinting) { PL.vx += -sin * 0.2; PL.vz += -cos * 0.2; PL.exh += 0.2; } else PL.exh += 0.05;
     }
     let mx = PL.vx, my = PL.vy, mz = PL.vz;
-    if (PL.onGround && slipB === BID.soul_sand) { mx *= 0.4; mz *= 0.4; }
+    if (PL.onGround && (slipB === BID.soul_sand || slipB === BID.honey_block)) { mx *= 0.4; mz *= 0.4; }
+    if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
     // sneak edge protection
@@ -218,7 +219,7 @@ function playerTick() {
     else if (PL.onGround) {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
-      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
@@ -372,6 +373,7 @@ function finishEat() {
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
   PL.sat = Math.min(PL.food, PL.sat);
+  if (d.cures && PL.eff && PL.eff[d.cures]) { delete PL.eff[d.cures]; UI.hudDirty = true; }
   if (d.eff) for (const [k, dur, lv, ch] of d.eff) if (ch == null || Math.random() < ch) addEffect(PL, k, dur, lv);
   if (d.chorusTp) chorusTeleport();
   if (h.id === IID.rotten_flesh && Math.random() < 0.8) PL.exh += 4;
@@ -416,6 +418,8 @@ function onUseRelease() {
 function interactBlock(t, dry) {
   if (PL.sneaking && PL.held()) return false;
   const { x, y, z, id, m } = t;
+  if (isHive(id)) { const h = PL.held(); if ((m >> 2) >= 5 && h && (h.id === IID.glass_bottle || h.id === IID.shears)) { if (!dry) hiveUse(t, h); return true; } return false; }
+  if (id === BID.sweet_berry_bush && (m & 3) >= 2 && !(PL.held() && PL.held().id === IID.bone_meal)) { if (!dry) berryUse(t); return true; }
   switch (id) {
     case 198: case 246: { const cd = S.candleOf(id, m); if (!cd || !cd.lit || PL.held()) return false; if (!dry) { setBlock(x, y, z, ...S.candleBlock(cd.c, cd.n, 0)); play('fizz', { vol: 0.4 }); } return true; }
     case BID.cauldron: { // buckets fill and empty it (water, lava, powder snow)

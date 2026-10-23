@@ -204,6 +204,28 @@ PAINT.detector_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0x7a2a20);
 PAINT.detector_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x6b5433, 0xff3a1a);
 PAINT.activator_rail = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0x7a2a20, 0x4a1a14);
 PAINT.activator_rail_on = r => railTex(r, 0x6e6e6e, 0xb8b8b8, 0xb03a20, 0xff3a1a);
+// turtle eggs, bee nests and hives, honey
+PAINT.turtle_egg = r => fill((x, y) => quant(shade((x * 7 + y * 3) % 11 < 2 ? hex(0x6aa85a) : hex(0xe8e4c8), 1 + (r() - .5) * .1), 3));
+const NEST = hex(0xc89a4a), NEST_D = hex(0x8a5a24);
+PAINT.bee_nest_side = r => fill((x, y) => quant(shade(y % 4 === 0 ? NEST_D : NEST, 1 + (r() - .5) * .15), 3));
+PAINT.bee_nest_top = r => fill((x, y) => quant(shade(Math.hypot(x - 7.5, y - 7.5) < 6 && Math.hypot(x - 7.5, y - 7.5) > 4.5 ? NEST_D : NEST, 1 + (r() - .5) * .15), 3));
+PAINT.bee_nest_bottom = r => PAINT.bee_nest_top(r);
+PAINT.bee_nest_front = r => { PAINT.bee_nest_side(r); for (let y = 6; y < 10; y++) for (let x = 5; x < 11; x++) P(x, y, hex(0x2a1a0a)); };
+PAINT.bee_nest_front_honey = r => { PAINT.bee_nest_front(r); for (let y = 10; y < 14; y++) for (let x = 6; x < 10; x++) if (y < 13 || x === 7) P(x, y, hex(0xf0a020)); for (let x = 5; x < 11; x++) P(x, 9, hex(0xf8b830)); };
+const HIVE = hex(0xc29d62);
+PAINT.beehive_side = r => fill((x, y) => quant(shade(y === 0 || y === 15 || x === 0 || x === 15 ? shade(HIVE, 0.75) : y % 5 === 2 ? shade(HIVE, 0.88) : HIVE, 1 + (r() - .5) * .1), 3));
+PAINT.beehive_end = r => fill((x, y) => quant(shade(x === 0 || x === 15 || y === 0 || y === 15 ? shade(HIVE, 0.75) : (x + y) % 6 === 0 ? shade(HIVE, 0.9) : HIVE, 1 + (r() - .5) * .1), 3));
+PAINT.beehive_front = r => { PAINT.beehive_side(r); for (let y = 7; y < 10; y++) for (let x = 4; x < 12; x++) P(x, y, hex(0x3a2410)); };
+PAINT.beehive_front_honey = r => { PAINT.beehive_front(r); for (let y = 10; y < 14; y++) for (let x = 5; x < 11; x++) if (y < 12 || x % 3 === 0) P(x, y, hex(0xf0a020)); };
+PAINT.honey_block_side = r => fill((x, y) => quant(shade(x === 0 || y === 0 || x === 15 || y === 15 ? hex(0xf8c040) : hex(0xe89a18), 1 + (r() - .5) * .08), 3));
+PAINT.honey_block_top = r => fill((x, y) => quant(shade(x < 2 || y < 2 || x > 13 || y > 13 ? hex(0xf8c040) : hex(0xf0a828), 1 + (r() - .5) * .08), 3));
+PAINT.honeycomb_block = r => fill((x, y) => quant(shade(((x >> 2) + (y >> 2)) % 2 === 0 && (x % 4 === 0 || y % 4 === 0) ? hex(0xb8701a) : hex(0xe8a030), 1 + (r() - .5) * .1), 3));
+// sweet berry bush: a leafy bush that fills out, then carries green and finally red berries
+for (let st = 0; st < 4; st++) PAINT['sweet_berry_bush_stage' + st] = r => {
+  const top = [10, 6, 3, 2][st];
+  for (let y = top; y < 16; y++) for (let x = 1; x < 15; x++) { const d = Math.abs(x - 7.5) / 7 + (16 - y) / (17 - top) * 0.4; if (r() < 0.75 - d * 0.35) P(x, y, quant(shade(hex(0x2a6a3a), 0.8 + r() * 0.4), 3)); }
+  if (st >= 2) for (let k = 0; k < (st === 3 ? 9 : 6); k++) { const bx = 2 + Math.floor(r() * 12), by = top + 1 + Math.floor(r() * (14 - top)); P(bx, by, hex(st === 3 ? 0xd0202a : 0x6aa83a)); P(bx + 1, by, hex(st === 3 ? 0xa01018 : 0x4a882a)); }
+};
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,

@@ -301,6 +301,8 @@ function spawnMoreForChunk(c) {
   if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) }); else group('donkey', 1 + R0.int(2)); }
   if ((b === B.DESERT || b === B.TUNDRA || b === B.SNOWY_TAIGA || b === B.FOREST || b === B.TAIGA) && R0() < 0.025) group('rabbit', 2 + R0.int(2));
   if ((b === B.TAIGA || b === B.SNOWY_TAIGA) && R0() < 0.03) group('fox', 2 + R0.int(2));
+  if (b === B.BEACH && R0() < 0.12) group('turtle', 2 + R0.int(4));
+  if (b === B.OCEAN && R0() < 0.04) for (let i = 1 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 56 + R0.int(5); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === BID.water) spawnMob('dolphin', x + .5, y, z + .5); }
   // stray cats in villages: one per chunk that got villagers
   if (c.hadVillagers && R0() < 0.4) group('cat', 1);
 }

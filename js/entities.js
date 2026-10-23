@@ -441,7 +441,7 @@ function explode(x, y, z, power, fire) {
 function dropTileContents(x, y, z, t) {
   if (t.items) for (const st of t.items) if (st) dropStack(x + .5, y + .5, z + .5, st);
 }
-W.onTileRemoved = (x, y, z, t) => { dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
+W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
 W.onTntCheck = () => {};
 
 // ---------- mobs ----------
@@ -515,7 +515,7 @@ function mobTick(e) {
   const d = e.def;
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
-  if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
+  if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
   const dx = PL.x - e.x, dz = PL.z - e.z, dist = Math.hypot(dx, dz, PL.y - e.y);
   // despawn
   if (d.hostile && !e.persistent) { if (dist > 128 || (dist > 32 && Math.random() < 1 / 800)) { removeEnt(e); return; } }
