@@ -31,6 +31,11 @@ function buildSlots(type, ctx) {
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+  } else if (type === 'horse') {
+    const e = ctx.horse;
+    L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));
+    L.push(slotRef(e.gear, 1, { group: 'harm', accepts: st => !st || (e.type === 'horse' && !!HARMOR[ITEMS[st.id].key]), max: 1 }));
+    if (e.chest) for (let i = 0; i < e.items.length; i++) L.push(slotRef(e.items, i, { group: 'cont' }));
   } else if (type === 'enchant') {
     ctx.items = ctx.items || [null, null];
     L.push(slotRef(ctx.items, 0, { group: 'ein', accepts: st => !st || (enchKinds(st.id).length && !st.e && st.id !== IID.shield), max: 1 }));

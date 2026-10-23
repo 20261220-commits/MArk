@@ -168,6 +168,12 @@ const DISCS = [['13', 0xf2e8a0], ['cat', 0x5ad83a], ['blocks', 0xd85a2a], ['chir
 DISCS.forEach(([k, c], i) => item('music_disc_' + k, '음반', { stack: 1, disc: i + 1, dcol: c, lore: [(k === 'pigstep' ? 'Lena Raine' : 'C418') + ' - ' + k] }));
 item('shield', '방패', { stack: 1, dur: 336 }); item('crossbow', '쇠뇌', { stack: 1, dur: 465 }); item('tripwire_hook', '철사 덫 갈고리');
 item('trident', '삼지창', { stack: 1, dur: 250, tool: { type: TOOL.NONE, tier: 0, speed: 1, dmg: 9, as: 1.1, mat: 'trident', kind: 'trident' } });
+// mob drops and gear (mobs4.js / mobs5.js)
+item('rabbit', '익히지 않은 토끼고기', { food: [3, 1.8] }); item('cooked_rabbit', '익힌 토끼고기', { food: [5, 6] });
+item('rabbit_stew', '토끼 스튜', { food: [10, 12], stack: 1, leaves: 'bowl' }); item('rabbit_foot', '토끼발'); item('rabbit_hide', '토끼 가죽');
+for (const [k, n] of [['leather', '가죽'], ['iron', '철'], ['golden', '금'], ['diamond', '다이아몬드']]) item(k + '_horse_armor', n + ' 말 갑옷', { stack: 1, horseArmor: k });
+item('phantom_membrane', '팬텀 막'); item('scute', '인갑');
+item('turtle_helmet', '거북 등딱지', { stack: 1, dur: 275, armor: { slot: 0, pts: 2, tough: 0, mat: 'turtle' } });
 // minecarts (cart: the kind spawned by minecarts.js)
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
@@ -341,6 +347,8 @@ shaped('moss_carpet', 3, ['##'], { '#': 'moss_block' });
 shaped('item_frame', 1, ['SSS', 'SLS', 'SSS'], { S: 'stick', L: 'leather' });
 shaped('shield', 1, ['WIW', 'WWW', ' W '], { W: 'planks', I: 'iron_ingot' }); shaped('tripwire_hook', 2, ['I', 'S', 'P'], { I: 'iron_ingot', S: 'stick', P: 'planks' });
 shaped('crossbow', 1, ['SIS', 'TJT', ' S '], { S: 'stick', I: 'iron_ingot', T: 'string', J: 'tripwire_hook' });
+shapeless('rabbit_stew', 1, ['cooked_rabbit', 'carrot', 'baked_potato', 'brown_mushroom', 'bowl']); shaped('leather', 1, ['HH', 'HH'], { H: 'rabbit_hide' });
+shaped('leather_horse_armor', 1, ['L L', 'LLL', 'L L'], { L: 'leather' }); shaped('turtle_helmet', 1, ['SSS', 'S S'], { S: 'scute' });
 shaped('rail', 16, ['I I', 'ISI', 'I I'], { I: 'iron_ingot', S: 'stick' });
 shaped('powered_rail', 6, ['G G', 'GSG', 'GRG'], { G: 'gold_ingot', S: 'stick', R: 'redstone' });
 shaped('detector_rail', 6, ['I I', 'IPI', 'IRI'], { I: 'iron_ingot', P: 'stone_pressure_plate', R: 'redstone' });
@@ -478,7 +486,7 @@ const SMELT = {};
  ['oak_log', 'charcoal', 0.15], ['spruce_log', 'charcoal', 0.15], ['birch_log', 'charcoal', 0.15],
  ['raw_iron', 'iron_ingot', 0.7], ['raw_gold', 'gold_ingot', 1], ['raw_copper', 'copper_ingot', 0.7],
  ['iron_ore', 'iron_ingot', 0.7], ['gold_ore', 'gold_ingot', 1], ['copper_ore', 'copper_ingot', 0.7],
- ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35],
+ ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35], ['rabbit', 'cooked_rabbit', 0.35],
  ['wet_sponge', 'sponge', 0], ['clay', 'terracotta', 0.35], ['cactus', 'green_dye', 1], ['potato', 'baked_potato', 0.35], ['cod', 'cooked_cod', 0.35], ['salmon', 'cooked_salmon', 0.35],
  ['chorus_fruit', 'popped_chorus_fruit', 0.1], ['nether_bricks', 'cracked_nether_bricks', 0.1], ['red_sand', 'glass', 0.1], ['jungle_log', 'charcoal', 0.15], ['acacia_log', 'charcoal', 0.15], ['dark_oak_log', 'charcoal', 0.15], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
  ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]

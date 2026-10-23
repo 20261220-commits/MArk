@@ -125,12 +125,15 @@ UI.renderScreen = () => {
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
-    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(27).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(27)}</div>`;
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(GUI.slots.length - 36).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(GUI.slots.length - 36)}</div>`;
   } else if (T === 'furnace') {
     const t = GUI.ctx.tile; const burn = t.burnMax ? t.burn / t.burnMax : 0, cook = t.cook / (t.kind ? 100 : 200);
     h = `<div class="panel"><div class="cap">${t.kind === 'blast' ? '용광로' : t.kind === 'smoker' ? '훈연기' : '화로'}</div><div class="row top furn"><div class="col">${slotHtml(0)}<div class="flame" style="--p:${burn}"></div>${slotHtml(1)}</div><div class="arrow prog" style="--p:${cook}"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'loom') {
     h = loomHtml();
+  } else if (T === 'horse') {
+    const e = GUI.ctx.horse, n = e.chest ? e.items.length : 0; horseGearChanged(e);
+    h = `<div class="panel"><div class="cap">${GUI.ctx.title}</div><div class="row top"><div class="col">${slotHtml(0)}${e.type === 'horse' ? slotHtml(1) : ''}</div><div class="col"><p class="tip">체력 ${Math.ceil(e.hp)}/${e.hpMax} · 속도 ${(e.spd * 43).toFixed(1)} m/s · 점프 ${(e.jumpS * e.jumpS * 7.1).toFixed(1)} 블록</p>${n ? `<div class="grid9" style="grid-template-columns:repeat(5,calc(18 * var(--px)))">${[...Array(n).keys()].map(i => slotHtml(2 + i)).join('')}</div>` : ''}</div></div><div class="cap">인벤토리</div>${invRows(2 + n)}</div>`;
   } else if (T === 'beacon') {
     h = beaconHtml();
   } else if (T === 'brewing') {

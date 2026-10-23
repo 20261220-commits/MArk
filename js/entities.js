@@ -66,7 +66,7 @@ function lightBright(x, y, z) {
 }
 
 // ---------- mob model textures (MC box UV layout) ----------
-function mobCanvas(paint) { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); paint(g); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false; return t; }
+function mobCanvas(paint, w = 64, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); paint(g); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false; return t; }
 function boxRegions(u, v, w, h, d) {
   return { top: [u + d, v, w, d], bottom: [u + d + w, v, w, d], right: [u, v + d, d, h], front: [u + d, v + d, w, h], left: [u + d + w, v + d, d, h], back: [u + d + w + d, v + d, w, h] };
 }
@@ -342,7 +342,7 @@ function buildModel(type, opts = {}) {
   const root = new THREE.Group(), parts = {};
   for (const [name, pivot, box, uv, infl] of def.parts) {
     const key = type + ':' + name;
-    const geo = mobGeoCache[key] || (mobGeoCache[key] = boxGeo(box[3], box[4], box[5], uv[0], uv[1], box[0], box[1], box[2], infl || 0));
+    const geo = mobGeoCache[key] || (mobGeoCache[key] = boxGeo(box[3], box[4], box[5], uv[0], uv[1], box[0], box[1], box[2], infl || 0, def.tw || 64, def.th || def.tw || 64));
     const m = new THREE.Mesh(geo, mat); m.position.set(pivot[0] / 16, pivot[1] / 16, pivot[2] / 16);
     root.add(m); parts[name] = m;
   }
@@ -351,6 +351,8 @@ function buildModel(type, opts = {}) {
   return root;
 }
 
+// a mob's breeding food: one item key or a list of them
+const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id) : IID[d.food] === id;
 // ---------- entity base ----------
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
@@ -456,8 +458,10 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5);
   if (type === 'drowned' && Math.random() < 0.0625) e.hasTrident = true; // 6.25% carry a trident
-  if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
+  if (d.rideY) e.rideY = d.rideY;
+  if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.initVariant ? d.initVariant(e) : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
   if (type === 'sheep' && e.sheared) setSheared(e);
+  if (d.init) d.init(e, opts);
   return addEnt(e);
 }
 function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e.mesh.userData.parts)) if (n.startsWith('fur_') || n === 'wool' || n === 'whead') { p.visible = false; p.scale.set(0, 0, 0); } } // bones: scale 0 hides a part
@@ -466,6 +470,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
   if (e.inv > 0) return false;
   if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
+  if (e.def.armorMul) dmg *= e.def.armorMul(e);
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
   const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
@@ -483,11 +488,14 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.hp <= 0) {
     e.deathT = 20;
     if (e.def.slime) slimeDeath(e);
+    if (e.def.onDeathDrops) e.def.onDeathDrops(e);
+    if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
     if (attacker === PL || src === 'player') {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
       const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
-      if (!noDrop) for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
+      if (!noDrop) for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { rabbit: 'cooked_rabbit', porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
+      if (e.def.extraDrop && !e.baby) for (const [k, p] of e.def.extraDrop) if (Math.random() < p + loot * 0.03 && IID[k] != null) dropItem(e.x, e.y + .5, e.z, IID[k], 1);
       if (e.type === 'sheep' && !e.sheared && !e.baby) dropItem(e.x, e.y + .5, e.z, BID.white_wool, 1);
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
@@ -522,6 +530,7 @@ function mobTick(e) {
   if (d.water) { squidTick(e); return; }
   if (e.cart && cartHold(e)) return;
   mobExtraTick(e, dist);
+  if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed;
@@ -542,6 +551,7 @@ function mobTick(e) {
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
         shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, 1.2);
       }
+    } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
       if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); explode(e.x, e.y + 0.8, e.z, 3); return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
@@ -551,10 +561,10 @@ function mobTick(e) {
       if (d.climb && e.hitH) { e.vy = 0.2; }
     }
   } else {
-    const food = d.food && PL.held() && PL.held().id === IID[d.food] && dist < 8 && plVisible;
+    const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
     if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
-    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; spawnMob(e.type, e.x, e.y, e.z, { baby: true }); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -761,7 +771,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant }]);
+    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }]);
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
@@ -774,7 +784,8 @@ R.onChunkUnloaded = c => {
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
-  if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); }
+  if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
+  if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
     c.spawns = null; c.modified = true;

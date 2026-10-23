@@ -148,7 +148,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -505,7 +505,7 @@ function useItem(first) {
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
     if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
-    if (d && e.def.food && h.id === IID[e.def.food] && !e.baby && e.love <= 0) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
+    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }
   if (t && t.type === 'block') {

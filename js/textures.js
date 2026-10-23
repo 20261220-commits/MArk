@@ -415,6 +415,7 @@ function maskDraw(p, pts, cols) {
 }
 const MATC = { wooden: [hex(0xc29d62), hex(0x9c7b47), hex(0x6b5433), hex(0x46351d)], stone: [hex(0xa8a8a8), hex(0x838383), hex(0x5c5c5c), hex(0x3a3a3a)],
   iron: [hex(0xffffff), hex(0xd8d8d8), hex(0x9a9a9a), hex(0x4f4f4f)], golden: [hex(0xfffd9e), hex(0xf2d43a), hex(0xbf8f1b), hex(0x6e4e0a)],
+  turtle: [hex(0x8ad88a), hex(0x4aa84a), hex(0x2a7a2a), hex(0x154a15)],
   diamond: [hex(0xd2fff8), hex(0x4aedd9), hex(0x1aa59a), hex(0x0c5c55)], leather: [hex(0xc88a5a), hex(0xa0603a), hex(0x7a4424), hex(0x4f2a14)],
   netherite: [hex(0x6a6266), hex(0x4d4649), hex(0x3a3436), hex(0x221e1f)], chainmail: [hex(0xd0d0d0), hex(0x9a9a9a), hex(0x6a6a6a), hex(0x3a3a3a)], elytra: [hex(0xa8a0c0), hex(0x7a7090), hex(0x5a5070), hex(0x3a3050)] };
 const HANDLE = [hex(0x8a6a3b), hex(0x5e4422)];
@@ -515,6 +516,17 @@ function cartSprite(load) {
 }
 Object.assign(SPR, {
   minecart: () => cartSprite(null),
+  rabbit: () => meat([hex(0xf0b8a8), hex(0xd88a7a), hex(0xa85a4a), hex(0x6a2a1a)]), cooked_rabbit: () => meat([hex(0xd8a070), hex(0xb07a48), hex(0x7a4a24), hex(0x4a2a10)]),
+  rabbit_stew: () => bowl(hex(0xb8743a)),
+  rabbit_foot: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 6; x < 10; x++) p(x, y, y > 10 ? hex(0xe8c8a0) : x === 6 ? hex(0xb08860) : hex(0x9a7048)); for (const [x, y] of [[5, 12], [10, 12], [6, 13], [9, 13]]) p(x, y, hex(0xe8c8a0)); for (let x = 6; x < 10; x++) p(x, 2, hex(0xd8d0c8)); }),
+  rabbit_hide: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) if (!((x === 3 || x === 12) && (y === 3 || y === 12))) p(x, y, (x + y) % 4 ? hex(0xa88a60) : hex(0x8a6a48)); }),
+  phantom_membrane: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 2; x < 14; x++) if (Math.abs(x - 7.5) < 6 - Math.abs(y - 8) * 0.6) p(x, y, (x + y) % 3 ? hex(0xd8d0b8) : hex(0xb0a890)); }),
+  scute: () => sprite(p => { for (let y = 4; y < 12; y++) for (let x = 3; x < 13; x++) if (Math.abs(x - 7.5) + Math.abs(y - 7.5) * 1.2 < 6.5) p(x, y, (x + y) % 3 ? hex(0x4aa84a) : hex(0x2a7a2a)); }),
+  ...Object.fromEntries([['leather', 0xa0603a], ['iron', 0xd8d8d8], ['golden', 0xf2d43a], ['diamond', 0x4aedd9]].map(([k, c]) => [k + '_horse_armor', () => sprite(p => {
+    for (let y = 4; y < 11; y++) for (let x = 2; x < 13; x++) if (x < 12 - (y > 8 ? 2 : 0)) p(x, y, y === 4 ? shade(hex(c), 1.15) : x === 2 ? shade(hex(c), 0.7) : hex(c));
+    for (let y = 2; y < 6; y++) for (let x = 11; x < 15; x++) p(x, y, shade(hex(c), 0.9)); p(13, 3, hex(0x202020));
+    for (const lx of [3, 9]) for (let y = 11; y < 14; y++) p(lx, y, shade(hex(c), 0.75));
+  })])),
   chest_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 ? hex(0x4a3418) : x === 3 || x === 12 || y === 2 ? hex(0x6b4a24) : hex(0xa8743a)); p(7, 4, hex(0xd8d8d8)); p(8, 4, hex(0xd8d8d8)); p(7, 5, hex(0x8a8a8a)); }),
   hopper_minecart: () => cartSprite(p => { for (let y = 3; y < 8; y++) for (let x = 2; x < 14; x++) p(x, y, y === 3 ? hex(0x5a5a5e) : x === 2 || x === 13 ? hex(0x2a2a2e) : y === 4 && x > 3 && x < 12 ? hex(0x1a1a1e) : hex(0x46464a)); }),
   tnt_minecart: () => cartSprite(p => { for (let y = 2; y < 8; y++) for (let x = 3; x < 13; x++) p(x, y, y === 4 || y === 5 ? (x % 3 === 0 ? hex(0x2a2a2a) : hex(0xe8e8e8)) : x === 3 || x === 12 ? hex(0x8a1a10) : hex(0xd8341a)); }),
