@@ -171,6 +171,17 @@ PAINT.exposed_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r);
 PAINT.weathered_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r);
 PAINT.oxidized_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r);
 PAINT.cut_copper = r => copperTex(hex(0xbf6a4f), null, r, true);
+// amethyst buds grow from a small nub to nearly a full cluster
+function budTex(cr) { for (const [x, top] of cr) for (let y = top; y <= 15; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 1) P(x - 1, y, hex(0x7f55b4)); } }
+PAINT.small_amethyst_bud = r => budTex([[7, 12], [5, 14], [9, 13]]);
+PAINT.medium_amethyst_bud = r => budTex([[7, 9], [4, 12], [10, 11], [6, 13]]);
+PAINT.large_amethyst_bud = r => budTex([[7, 5], [4, 9], [10, 8], [2, 12], [12, 11]]);
+// cauldron: dark iron, a rim on top, the bowl darker inside
+const CAUL = hex(0x4a4a4e);
+PAINT.cauldron_side = r => fill((x, y) => quant(shade(CAUL, 1 + (r() - .5) * .14 + (y === 0 ? .25 : 0) + (x === 0 || x === 15 ? -.12 : 0)), 3));
+PAINT.cauldron_top = r => fill((x, y) => quant(shade(CAUL, 1.25 + (r() - .5) * .1), 3));
+PAINT.cauldron_inner = r => fill((x, y) => quant(shade(CAUL, 0.72 + (r() - .5) * .1), 3));
+PAINT.cauldron_bottom = r => fill((x, y) => quant(shade(CAUL, 0.85 + (r() - .5) * .12), 3));
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,

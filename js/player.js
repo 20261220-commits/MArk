@@ -12,9 +12,14 @@ const USE = { t: 0, kind: null, placeCd: 0 };
 const creative = () => PL.mode === 'creative';
 const spectator = () => PL.mode === 'spectator';
 
+// a box authored pointing up, turned to point along DIR6 index f
+function rot6Box(b, f) {
+  const [x0, y0, z0, x1, y1, z1] = b, P = (x, y, z) => f === 1 ? [x, y, z] : f === 0 ? [x, 16 - y, z] : f === 2 ? [x, z, 16 - y] : f === 3 ? [x, z, y] : f === 4 ? [16 - y, x, z] : [y, x, z];
+  const a = P(x0, y0, z0), c = P(x1, y1, z1); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2]), Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])];
+}
 function selShape(id, m) {
   const rt = RTYPE[id];
-  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (id === BID.amethyst_cluster) return [[3, 0, 3, 13, 7, 13]]; if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
+  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (S.BUD[id]) { const h = [3, 4, 5, 7][S.BUD[id] - 1]; return [rot6Box([3, 0, 3, 13, h, 13], m ? m - 1 : 1)]; } if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
   if (rt === RT.TORCH) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; const ox = d[0] * 5, oz = d[2] * 5; return [[5.5 + ox, 3, 5.5 + oz, 10.5 + ox, 13, 10.5 + oz]]; } return [[6, 0, 6, 10, 10, 10]]; }
   if (rt === RT.CROP) return [[0, 0, 0, 16, 2 + (m & 7) * 2, 16]];
   if (rt === RT.BOX) return S.shapes(id, m);
@@ -94,7 +99,7 @@ function hurtPlayer(dmg, cause, attacker) {
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -204,6 +209,8 @@ function playerTick() {
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround && blockUnder() === BID.slime_block && !PL.sneaking && my < -0.1) { PL.vy = -my * 0.95; PL.fallDist = 0; } // slime blocks bounce
     else if (PL.onGround) {
+      const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
+      if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
       if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
@@ -230,6 +237,8 @@ function survivalTick(inWater, inLava, eyeF) {
   if (eyeF === 1) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
+  const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
+  if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
   if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'fire'); }
@@ -388,6 +397,13 @@ function interactBlock(t, dry) {
   const { x, y, z, id, m } = t;
   switch (id) {
     case 198: case 246: { const cd = S.candleOf(id, m); if (!cd || !cd.lit || PL.held()) return false; if (!dry) { setBlock(x, y, z, ...S.candleBlock(cd.c, cd.n, 0)); play('fizz', { vol: 0.4 }); } return true; }
+    case BID.cauldron: { // buckets fill and empty it (water, lava, powder snow)
+      const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
+      const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
+      if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
+      return false;
+    }
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.blast_furnace: case BID.smoker: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace(BLOCKS[id].furnace)); UI.openScreen('furnace', { x, y, z }); } return true;
@@ -555,6 +571,7 @@ function placeBlock(t, d) {
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
   if (id === BID.end_rod || (id === BID.chain && vi === 1)) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
+  if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);

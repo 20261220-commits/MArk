@@ -147,3 +147,15 @@ function spawnWarmFish(c) {
   const v = R0.int(TFISH_COL.length);
   for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
 }
+// glow squid (1.17): dark water at y 30 and below
+function trySpawnGlowSquid() {
+  if (W.dim !== 0 || countMobs(e => e.type === 'glow_squid' && Math.hypot(e.x - PL.x, e.z - PL.z) < 64) >= 5) return;
+  const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 32, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);
+  if (!isLoaded(x, z)) return;
+  for (let y = 30; y > 2; y--) {
+    if (getBlock(x, y, z) !== BID.water || getBlock(x, y + 1, z) !== BID.water) continue;
+    if (getLight(x, y, z) !== 0) return;
+    for (let i = 1 + ((Math.random() * 3) | 0); i > 0; i--) spawnMob('glow_squid', x + .5, y, z + .5);
+    return;
+  }
+}

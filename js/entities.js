@@ -710,7 +710,7 @@ function spawnAnimalsForChunk(c) {
   if (R0() > 0.1) return;
   let types;
   if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
-    const t = R0() < 0.3 ? 'glow_squid' : 'squid';
+    const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
   }

@@ -9,7 +9,7 @@ const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furna
   'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
-  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
+  amethyst_cluster: 'amethyst_cluster', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
   oak_door: 'oak_door_item', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
@@ -24,8 +24,8 @@ ITEMS[BID.tnt].fuel = 0;
 let nextId = 256;
 function item(key, name, o = {}) { const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
 // one item per variant of colour/material blocks (variant 0 lives at the block id)
-const VARITEM = new Int32Array(256 * 16).fill(-1);
-for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
+const VARITEM = new Int32Array(S.NB * 16).fill(-1);
+for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late && b.id < S.NEWB) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
 // the item a block (with its meta) drops or is picked as
 const itemOfBlock = (b, m) => { const d = BLOCKS[b]; if (!d) return b; const cd = (b === 198 || b === 246) && S.candleOf(b, m); if (cd) return cd.c < 0 ? IID.candle : IID[S.COLORS[cd.c] + '_candle']; if (d.vars) { const i = VARITEM[b * 16 + ((m >> (d.vshift || 0)) & 15)]; return i >= 0 ? i : b; } return b; };
 // materials: [name prefix, harvest tier, mining speed, durability, colors]
@@ -122,6 +122,8 @@ S.COLORS.forEach((c, i) => item(c + '_candle', S.COLKO[i] + ' 양초', { candle:
 item('tropical_fish', '열대어', { food: [1, 0.2] });
 item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
 Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
+// ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
+for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
   'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'jungle_log', 'acacia_log', 'dark_oak_log', 'stripped_oak_log', 'stripped_spruce_log', 'stripped_birch_log', 'stripped_jungle_log', 'stripped_acacia_log', 'stripped_dark_oak_log',
@@ -281,6 +283,7 @@ shaped('waxed_cut_copper', 4, ['##', '##'], { '#': 'waxed_copper_block' });
 shaped('lightning_rod', 1, ['#', '#', '#'], { '#': 'copper_ingot' });
 shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
 for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
+shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 
 // ---------- 1.17 expansion recipes ----------
 [['jungle_log', 'jungle_planks'], ['acacia_log', 'acacia_planks'], ['dark_oak_log', 'dark_oak_planks'], ['stripped_oak_log', 'oak_planks'], ['stripped_spruce_log', 'spruce_planks'], ['stripped_birch_log', 'birch_planks'],
@@ -446,7 +449,8 @@ function blockDrops(b, meta, stack) {
   if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(itemOfBlock(b, meta)); return res; }
   const fortune = enchLv(stack, 'fortune');
   const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore', 'nether_quartz_ore', 'nether_gold_ore', 'glowstone'].includes(d.key);
-  if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1; for (const it of r0.items) res.items.push([it[0], it[1] * mul]); res.xp = r0.xp; return res; }
+  // fortune: redstone gets +0..level (uniform bonus), the other ores multiply
+  if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1, flat = d.key.endsWith('redstone_ore'); for (const it of r0.items) res.items.push([it[0], flat ? it[1] + Math.floor(Math.random() * (fortune + 1)) : it[1] * mul]); res.xp = r0.xp; return res; }
   if (!canHarvest(b, stack)) {
     if (b === BID.cobweb && t && t.type === TOOL.SWORD) add('string');
     else if (b === BID.cobweb && shears) add('cobweb');
@@ -483,6 +487,7 @@ function blockDrops(b, meta, stack) {
     case 'bookshelf': add('book', 3); break;
     case 'ice': break;
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
+    case 'small_amethyst_bud': case 'medium_amethyst_bud': case 'large_amethyst_bud': break; // only with silk touch
     case 'spawner': res.xp = ri(15, 43); break;
     case 'lit_furnace': add('furnace'); break;
     case 'glowstone': add('glowstone_dust', ri(2, 4)); break;
@@ -522,4 +527,32 @@ function blockDrops(b, meta, stack) {
     default: if (ITEMS[b]) add(itemOfBlock(b, meta));
   }
   return res;
+}
+
+// ---------- item id table ----------
+// Item ids are positions in ITEMS. Saved data is tagged with a hash of the key list it was written with
+// (world meta keeps each list), so ids can change between versions: loading remaps them by key.
+// Untagged data comes from before this table existed and uses today's order.
+const ITEM_KEYS = Array.from(ITEMS, d => d ? d.key : null);
+const ITEM_TABLE = (() => { let h = 5381; for (const k of ITEM_KEYS) for (const ch of (k || '-') + ',') h = (h * 33 + ch.charCodeAt(0)) >>> 0; return h.toString(36); })();
+const remapCache = {};
+function itemRemapFor(tag) {
+  if (!tag || tag === ITEM_TABLE) return null;
+  if (remapCache[tag] !== undefined) return remapCache[tag];
+  const keys = W.meta && W.meta.itables && W.meta.itables[tag]; if (!keys) return remapCache[tag] = null;
+  const byKey = {}; ITEMS.forEach((d, i) => { if (d) byKey[d.key] = i; });
+  return remapCache[tag] = Int32Array.from(keys, k => k != null && byKey[k] != null ? byKey[k] : -1);
+}
+// rewrites item ids in place: stacks ({id, n}) and villager offers ({a, an, b, bn}); unknown items vanish
+function remapItems(o, m) {
+  if (!m || !o || typeof o !== 'object') return o;
+  const map = i => i >= 0 && i < m.length ? m[i] : -1;
+  if (typeof o.id === 'number' && typeof o.n === 'number') o.id = map(o.id);
+  if (typeof o.a === 'number' && typeof o.an === 'number') { o.a = map(o.a); o.b = map(o.b); }
+  for (const k in o) {
+    const v = o[k]; if (!v || typeof v !== 'object') continue;
+    remapItems(v, m);
+    if (Array.isArray(o) && typeof v.id === 'number' && typeof v.n === 'number' && v.id < 0) o[k] = null;
+  }
+  return o;
 }

@@ -118,6 +118,7 @@ async function startWorld(id, meta) {
   if (!meta) { const all = await listWorlds(); meta = (all || []).find(w => w.id === id); if (!meta) return; }
   showMenu('loading', '세계를 불러오는 중');
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
+  for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   await loadSavedKeys(meta.id);
   const p = meta.player;
@@ -126,6 +127,7 @@ async function startWorld(id, meta) {
   Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, sleeping: 0, absorb: 0, regen: 0, inv: 40 });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
+    remapItems(p, itemRemapFor(p.it));
     Object.assign(PL, p.s);
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
@@ -171,7 +173,8 @@ function finishLoading() {
 function saveWorldMeta() {
   if (!W.active || !W.meta) return;
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel };
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE };
+  (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
@@ -211,6 +214,8 @@ function gameTick() {
   if (W.tickN % 100 === 0) trySpawnStrider();
   if (W.tickN % 200 === 50) trySpawnAmbient();
   if (W.tickN % 200 === 150) trySpawnAxolotl();
+  if (W.tickN % 200 === 100) trySpawnGlowSquid();
+  displayTick();
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
   if (W.tickN % 600 === 0) saveAll();

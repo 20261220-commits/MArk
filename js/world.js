@@ -201,7 +201,11 @@ function neighborUpdate(x, y, z) {
     return;
   }
   if ((b === 198 || b === 246) && S.candleOf(b, m)) { if (!supportedBy(below) || FLUID[getBlock(x, y + 1, z)] === 2) breakNaturally(x, y, z, b, m); return; }
-  if (b === BID.amethyst_cluster) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
+  if (S.BUD[b]) { // buds and clusters need the block they grow from (old saves without a facing: any side)
+    if (m) { const d = S.DIR6[m - 1]; if (!OPQ[getBlock(x - d[0], y - d[1], z - d[2])]) breakNaturally(x, y, z, b, m); }
+    else if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m);
+    return;
+  }
   if (b === BID.concrete_powder) { if (N6.some(([dx, dy, dz]) => dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27)) setBlock(x, y, z, BID.concrete, m); else if (below === 0 || FLUID[below] || REPL[below]) schedule(x, y, z, 2); return; }
   if (b === BID.glow_lichen || b === BID.vine) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
   if (b === BID.lantern || b === BID.soul_lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
@@ -379,12 +383,51 @@ function leafSearch(x, y, z) {
 RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   let wet = false;
   for (let dx = -4; dx <= 4 && !wet; dx++) for (let dz = -4; dz <= 4 && !wet; dz++) for (let dy = 0; dy <= 1; dy++) if (getBlock(x + dx, y + dy, z + dz) === 27) { wet = true; break; }
-  if (wet || W.rain > 0.5) { if (m !== 7) setMeta(x, y, z, 7); }
+  if (wet || (W.rain > 0.5 && W.dim === 0 && (getLight(x, y + 1, z) >> 4) === 15)) { if (m !== 7) setMeta(x, y, z, 7); } // rain only reaches farmland open to the sky
   else if (m > 0) setMeta(x, y, z, m - 1);
   else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
 };
 for (const id of [63, 64, 65]) RANDOM_TICK[id] = (x, y, z, b, m) => { if (!(m & 1) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[b].oxid); }; // meta 1: waxed, never oxidises
-RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => { if (Math.random() > 0.2) return; const [dx, dy, dz] = N6[(Math.random() * 6) | 0]; if (getBlock(x + dx, y + dy, z + dz) === 0) setBlock(x + dx, y + dy, z + dz, BID.amethyst_cluster); };
+// budding amethyst (1.17): small bud -> medium -> large -> cluster, each pointing away from the budding block
+const BUD_STAGES = [BID.small_amethyst_bud, BID.medium_amethyst_bud, BID.large_amethyst_bud, BID.amethyst_cluster];
+RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => {
+  if (Math.random() > 0.2) return;
+  const f = (Math.random() * 6) | 0, d = S.DIR6[f], tx = x + d[0], ty = y + d[1], tz = z + d[2], tb = getBlock(tx, ty, tz);
+  if (tb === 0 || (tb === BID.water && getMeta(tx, ty, tz) === 0)) setBlock(tx, ty, tz, BUD_STAGES[0], 1 + f);
+  else { const k = BUD_STAGES.indexOf(tb); if (k >= 0 && k < 3 && getMeta(tx, ty, tz) === 1 + f) setBlock(tx, ty, tz, BUD_STAGES[k + 1], 1 + f); }
+};
+// pointed dripstone (1.17): a stalactite tip under a fluid drips into a cauldron below; one fed by water through a dripstone block slowly grows
+const isTip = (x, y, z) => getBlock(x, y, z) === BID.pointed_dripstone && getMeta(x, y, z) === 0 && getBlock(x, y - 1, z) !== BID.pointed_dripstone;
+function dripSource(x, y, z) { // the fluid above the block this stalactite hangs from: [fluid id, root y]
+  let ry = y; while (ry < CH - 2 && getBlock(x, ry + 1, z) === BID.pointed_dripstone && getMeta(x, ry + 1, z) === 0) ry++;
+  if (y - ry > 10) return null;
+  const f = getBlock(x, ry + 2, z); return FLUID[f] && getMeta(x, ry + 2, z) === 0 ? [f, ry + 1] : null;
+}
+RANDOM_TICK[BID.pointed_dripstone] = (x, y, z, b, m) => {
+  if (!isTip(x, y, z)) return;
+  const src = dripSource(x, y, z); if (!src) return;
+  const [fl, root] = src;
+  // fill a cauldron within 11 blocks below
+  if (Math.random() < (fl === 27 ? 0.17578125 : 0.05859375)) for (let cy = y - 1; cy > y - 12 && cy > 0; cy--) {
+    const cb = getBlock(x, cy, z); if (cb === 0) continue;
+    if (cb === BID.cauldron) { const cm = getMeta(x, cy, z), lv = cm & 3, k = (cm >> 2) & 3; if (fl === 27 && (lv === 0 || (k === 0 && lv < 3))) setMeta(x, cy, z, lv + 1); else if (fl === 28 && lv === 0) setMeta(x, cy, z, 3 | 4); }
+    break;
+  }
+  // growth: only with water above a dripstone block
+  if (fl !== 27 || getBlock(x, root, z) !== BID.dripstone_block || Math.random() >= 0.011) return;
+  if (root - y < 7 && getBlock(x, y - 1, z) === 0 && getBlock(x, y - 2, z) === 0 && Math.random() < 0.5) { setBlock(x, y - 1, z, BID.pointed_dripstone, 0); return; }
+  for (let fy = y - 1; fy > y - 11 && fy > 1; fy--) { // otherwise the stalagmite below grows by one
+    const fb = getBlock(x, fy, z); if (fb === 0) continue;
+    if ((fb === BID.pointed_dripstone && getMeta(x, fy, z) === 1) || OPQ[fb]) { if (getBlock(x, fy + 1, z) === 0 && fy + 1 < y - 1) setBlock(x, fy + 1, z, BID.pointed_dripstone, 1); }
+    return;
+  }
+};
+// cauldrons fill up in rain (water) or snow (powder snow) when open to the sky
+RANDOM_TICK[BID.cauldron] = (x, y, z, b, m) => {
+  if (W.dim !== 0 || W.rain < 0.5 || (getLight(x, y + 1, z) >> 4) !== 15) return;
+  const lv = m & 3, k = (m >> 2) & 3, cold = S.BIOMES[biomeAt(x, z)][4] <= 0.15, kind = cold ? 2 : 0;
+  if (lv < 3 && (lv === 0 || k === kind) && Math.random() < (cold ? 0.1 : 0.05)) setMeta(x, y, z, (lv + 1) | (kind << 2));
+};
 RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, 27); };
 RANDOM_TICK[BID.snow] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11) setBlock(x, y, z, 0); };
 
@@ -396,7 +439,7 @@ const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
 const bufPool = [];
-for (let i = 0; i < 4; i++) bufPool.push([new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
+for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
 function onWorker(w, m) {
   w.busy--;
@@ -442,7 +485,7 @@ function requestGen(cx, cz) {
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
 function requestMesh(c, opts) {
   const w = idleWorker(3); if (!w) return false;
-  const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint8Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
+  const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
   let top = 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) top = Math.max(top, chunkAt(c.cx + dx, c.cz + dz).maxY);
@@ -495,14 +538,14 @@ async function deleteWorld(id) {
 async function loadSavedKeys(id) { const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys(IDBKeyRange.bound(id + ':', id + ':￿'))); W.saved = new Set((keys || []).map(k => k.slice(id.length + 1))); }
 function serTiles(c) { const a = []; for (const [i, t] of c.tiles) a.push([i, t]); return a; }
 // run-length encoding: chunk arrays are mostly long runs (air, stone, sky light)
-function rleEnc(a) {
-  const out = new Uint8Array(a.length * 2); let n = 0;
+function rleEnc(a) { // keeps the element type: block ids are 16 bit, meta and light 8 bit
+  const out = new a.constructor(a.length * 2); let n = 0;
   for (let i = 0; i < a.length;) { const v = a[i]; let r = 1; while (r < 255 && i + r < a.length && a[i + r] === v) r++; out[n++] = r; out[n++] = v; i += r; }
   return out.slice(0, n);
 }
-function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
+function rleDec(b, len, T = Uint8Array) { const a = new T(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 // RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
-const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:2,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
 const savePending = new Map(), saveWaiters = new Map();
 saveWorker.onmessage = e => {
   const { k, rec } = e.data;
@@ -518,11 +561,11 @@ function saveChunk(c, unloading, sync) {
   if (!c.modified || W.pano) return; c.modified = false;
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
-  if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, mobs: c.mobs || null }, dk)); return; }
-  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
   const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
   savePending.set(dk, (savePending.get(dk) || 0) + 1);
-  saveWorker.postMessage({ k: dk, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
+  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
@@ -532,10 +575,12 @@ async function loadChunk(cx, cz) {
   const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + dk));
   if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
+  if (rec) { const rm = itemRemapFor(rec.it); if (rm) { remapItems(rec.t, rm); remapItems(rec.mobs, rm); } }
   if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
-  const dec = (a, fill) => { const n = 256 * oldH, src = rec.v === 2 ? rleDec(a, n) : a, out = new Uint8Array(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
+  // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
+  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
+  W.inbox.push({ cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first

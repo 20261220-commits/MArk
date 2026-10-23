@@ -255,7 +255,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
   'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ')
-  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
+  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -357,7 +357,7 @@ const BLOCK_ROWS = [
   [70, 'raw_copper_block', '구리 원석 블록', C, 'raw_copper_block', 5, P, 2],
   [71, 'amethyst_block', '자수정 블록', C, 'amethyst_block', 1.5, P, 0],
   [72, 'budding_amethyst', '싹트는 자수정', C, 'budding_amethyst', 1.5, P, 99],
-  [73, 'amethyst_cluster', '자수정 군집', X, 'amethyst_cluster', 1.5, P, 0, { light: 5, nosolid: 1 }],
+  [73, 'amethyst_cluster', '자수정 군집', X, 'amethyst_cluster', 1.5, P, 0, { light: 5, nosolid: 1, bud: 4 }], // meta: 1 + DIR6 index it points to (0: old saves, upright)
   [74, 'calcite', '방해석', C, 'calcite', 0.75, P, 1],
   [75, 'tuff', '응회암', C, 'tuff', 1.5, P, 1],
   [76, 'deepslate', '심층암', C, ['deepslate', 'deepslate_top', 'deepslate_top'], 3, P, 1],
@@ -551,9 +551,16 @@ const BLOCK_ROWS = [
   [253, 'wall', '담장', RT.BOX, null, 2, P, 1, { connect: 4, vshift: 4, vars: WALLS.map(s => s[0]), vk: WALLS.map(s => s[1] + '_wall'), vn: WALLS.map(s => s[2] + ' 담장') }],
   [254, 'stained_glass_pane', '색유리판', RT.TBOX, null, 0.3, N, 0, { connect: 2, vshift: 4, vars: COLV('stained_glass'), vk: COLK('stained_glass_pane'), vn: COLN('색유리판') }],
   [255, 'crops2', '작물', RT.CROP, 'carrots_stage0', 0, N, 0, { plant: 5, crops2: 1 }],
+  // ---- 1.17, part 2 (16-bit ids, see NEWB) ----
+  [1024, 'small_amethyst_bud', '작은 자수정 싹', X, 'small_amethyst_bud', 1.5, P, 0, { light: 1, nosolid: 1, bud: 1 }],
+  [1025, 'medium_amethyst_bud', '중간 자수정 싹', X, 'medium_amethyst_bud', 1.5, P, 0, { light: 2, nosolid: 1, bud: 2 }],
+  [1026, 'large_amethyst_bud', '큰 자수정 싹', X, 'large_amethyst_bud', 1.5, P, 0, { light: 4, nosolid: 1, bud: 3 }],
+  [1027, 'cauldron', '가마솥', RT.BOX, ['cauldron_side', 'cauldron_top', 'cauldron_bottom'], 2, P, 1, { tint: 3 }], // meta: level (0-3) | contents << 2 (0 water, 1 lava, 2 powder snow)
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
-const NB = 256;
+// block ids are 16 bit: 0..255 are the original blocks, newer ones start at 1024 so their block items
+// (item id = block id) never collide with plain items, which are numbered from 256 upwards
+const NB = 1536, NEWB = 1024;
 const BLOCKS = new Array(NB).fill(null);
 const BID = {};
 const RTYPE = new Uint8Array(NB), OPQ = new Uint8Array(NB), LOP = new Uint8Array(NB), LEM = new Uint8Array(NB);
@@ -561,7 +568,7 @@ const SOLID = new Uint8Array(NB), TINT = new Uint8Array(NB), FLUID = new Uint8Ar
 const SELFCULL = new Uint8Array(NB), FACING = new Uint8Array(NB), LOGAX = new Uint8Array(NB);
 const FT = new Int16Array(NB * 4); // side, top, bottom, front
 // variant blocks (colours, materials): tile = VT[id * 16 + ((meta >> VSH[id]) & 15)]
-const VT = new Int16Array(NB * 16), VSH = new Uint8Array(NB), HASV = new Uint8Array(NB), LEAF = new Uint8Array(NB), DOOR = new Uint8Array(NB);
+const VT = new Int16Array(NB * 16), VSH = new Uint8Array(NB), HASV = new Uint8Array(NB), LEAF = new Uint8Array(NB), DOOR = new Uint8Array(NB), BUD = new Uint8Array(NB);
 for (const r of BLOCK_ROWS) {
   const [id, key, name, rt, tx, hard, tool, tier, ex = {}] = r;
   const d = { id, key, name, rt, hard, tool, tier, ...ex };
@@ -573,7 +580,7 @@ for (const r of BLOCK_ROWS) {
   SOLID[id] = rt === RT.AIR || ex.nosolid || rt === RT.CROSS || rt === RT.CROP || rt === RT.TORCH ? 0 : 1;
   TINT[id] = ex.tint || 0; FLUID[id] = ex.fluid || 0;
   REPL[id] = rt === RT.AIR ? 1 : (ex.repl || 0);
-  SELFCULL[id] = ex.selfcull || 0; FACING[id] = ex.facing || 0; LOGAX[id] = ex.log || 0; LEAF[id] = ex.leaves || 0; DOOR[id] = id === 96 || ex.door ? 1 : 0;
+  SELFCULL[id] = ex.selfcull || 0; FACING[id] = ex.facing || 0; LOGAX[id] = ex.log || 0; LEAF[id] = ex.leaves || 0; DOOR[id] = id === 96 || ex.door ? 1 : 0; BUD[id] = ex.bud || 0;
   if (ex.vars) {
     HASV[id] = 1; VSH[id] = ex.vshift || 0;
     ex.vars.forEach((t, k) => { if (T[t] == null) throw new Error('tile ' + t); VT[id * 16 + k] = T[t]; });
@@ -596,7 +603,7 @@ function candleOf(id, m) {
 function candleBlock(c, n, lit) { return c < 0 ? [246, 16 | (n - 1) | (lit ? 4 : 0)] : [198, c | ((1 + n - 1 + (lit ? 4 : 0)) << 4)]; }
 const isRod = (id, m) => id === 246 && ((m >> 3) & 15) === 1;
 // block light emitted by a block, including the meta-dependent ones (lit candles give 3 per candle)
-function emitOf(id, m) { if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
+function emitOf(id, m) { if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
 const CANDLE_POS = [[[7, 7]], [[5, 6], [9, 7]], [[7, 5], [5, 9], [9, 8]], [[6, 5], [9, 5], [5, 8], [8, 8]]], CANDLE_H = [[6], [6, 5], [6, 5, 4], [6, 5, 4, 5]];
 function candleBoxes(cd) { // bodies first, then one wick (or flame) per candle
   const pos = CANDLE_POS[cd.n - 1], hs = CANDLE_H[cd.n - 1], b = pos.map(([x, z], k) => [x, 0, z, x + 2, hs[k], z + 2]);
@@ -646,6 +653,11 @@ function shapes(id, meta) {
     case 51: return [[0, 0, 0, 16, ((meta & 7) + 1) * 2, 16]];
     case 95: return [[0, 3, 0, 16, 9, 16], [0, 0, 0, 3, 3, 3], [13, 0, 0, 16, 3, 3], [0, 0, 13, 3, 3, 16], [13, 0, 13, 16, 3, 16]];
     case 96: case 231: { const f = (meta & 3), open = meta & 4; return [doorBox(open ? (f + 1) & 3 : f)]; }
+    case 1027: { // cauldron: walls, floor, legs, then the contents
+      const b = [[0, 3, 0, 2, 16, 16], [14, 3, 0, 16, 16, 16], [2, 3, 0, 14, 16, 2], [2, 3, 14, 14, 16, 16], [2, 3, 2, 14, 4, 14], [0, 0, 0, 4, 3, 4], [12, 0, 0, 16, 3, 4], [0, 0, 12, 4, 3, 16], [12, 0, 12, 16, 3, 16]];
+      const lv = meta & 3; if (lv) b.push([2, 4, 2, 14, ((meta >> 2) & 3) === 1 ? 15 : 6 + lv * 3, 14]);
+      return b;
+    }
     case 198: { const cd = candleOf(198, meta); return cd ? candleBoxes(cd) : [[0, 0, 0, 16, 1, 16]]; }
     case 215: { const a = meta & 7; return a < 2 ? [[6, 0, 6, 10, 1, 10], [7, 1, 7, 9, 16, 9]] : a < 4 ? [[6, 6, 0, 10, 10, 1], [7, 7, 1, 9, 9, 16]] : [[0, 6, 6, 1, 10, 10], [1, 7, 7, 16, 9, 9]]; }
     case 216: return [[3, 0, 3, 13, 16, 13]];
@@ -1173,7 +1185,7 @@ function stampFortress(f, st, R, tiles) {
   st(f.x, f.y + 1, f.z, 108); if (st.get(f.x, f.y + 1, f.z) >= 0) tiles.push({ t: 'spawner', i: ((f.y + 1) << 8) | ((f.z & 15) << 4) | (f.x & 15), mob: 'blaze' });
 }
 function genNether(seed, cx, cz) {
-  const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256), tiles = [];
+  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256), tiles = [];
   const nA = makeNoise(seed + 101), nB = makeNoise(seed + 102), nb = makeNoise(seed + 103);
   const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x, R = rng(hash32(seed, cx, cz, 7));
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) biome[z * 16 + x] = netherBiome(nb, x0 + x, z0 + z);
@@ -1304,7 +1316,7 @@ function stampEndCity(c, st, R, tiles) {
   for (let x = cx + 5; x < sx - 6; x++) { const y = by + h + Math.round((x - cx - 5) / (sx - 6 - cx - 5) * 4); st(x, y, sz, P); st(x, y, sz - 1, P); }
 }
 function genEnd(seed, cx, cz) {
-  const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256).fill(18), tiles = [];
+  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256).fill(18), tiles = [];
   const nA = makeNoise(seed + 201), nB = makeNoise(seed + 202);
   const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x;
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -1369,7 +1381,7 @@ function genChunk(seed, cx, cz, dim) {
   if (dim === -1) return genNether(seed, cx, cz);
   if (dim === 1) return genEnd(seed, cx, cz);
   const G = makeGen(seed);
-  const blocks = new Uint8Array(CVOL), meta = new Uint8Array(CVOL);
+  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
   const biome = new Uint8Array(256), hgt = new Int16Array(18 * 18), bpad = new Uint8Array(18 * 18);
   const x0 = cx * CW, z0 = cz * CW;
   for (let z = -1; z <= 16; z++) for (let x = -1; x <= 16; x++) { const c = G.column(x0 + x, z0 + z); hgt[(z + 1) * 18 + x + 1] = c[0]; bpad[(z + 1) * 18 + x + 1] = c[1]; }
@@ -1465,9 +1477,9 @@ function genChunk(seed, cx, cz, dim) {
   }
   const uni = (lo, hi) => lo + R.int(hi - lo + 1);
   const tri = (c, s) => c + R.int(s) - R.int(s);
-  // dirt/gravel: MC spreads 10/8 blobs over 256 blocks of height; this world is 128 high
-  for (let i = 0; i < 5; i++) vein(3, 33, uni(0, 127), 1);
-  for (let i = 0; i < 4; i++) vein(10, 33, uni(0, 127), 1);
+  // dirt/gravel: 1.17 spreads 10/8 blobs over the full 0..255 height
+  for (let i = 0; i < 10; i++) vein(3, 33, uni(0, 255), 1);
+  for (let i = 0; i < 8; i++) vein(10, 33, uni(0, 255), 1);
   for (const id of [91, 92, 93]) for (let i = 0; i < 10; i++) vein(id, 33, uni(0, 79), 1);
   for (let i = 0; i < 2; i++) vein(75, 33, uni(0, 16), 0);
   for (let i = 0; i < 20; i++) vein(13, 17, uni(0, 127));
@@ -1495,8 +1507,8 @@ function genChunk(seed, cx, cz, dim) {
       }
       for (let x = gx - 5; x <= gx + 5; x++) for (let y = gy - 5; y <= gy + 5; y++) for (let z = gz - 5; z <= gz + 5; z++) {
         if (x < 1 || z < 1 || x > 14 || z > 14 || y < 2 || blocks[I(x, y, z)] !== 72) continue;
-        for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
-          const j = I(x + dx, y + dy, z + dz); if (blocks[j] === 0 && R() < 0.35) blocks[j] = 73;
+        for (const [dx, dy, dz, f] of [[1, 0, 0, 5], [-1, 0, 0, 4], [0, 1, 0, 1], [0, -1, 0, 0], [0, 0, 1, 3], [0, 0, -1, 2]]) {
+          const j = I(x + dx, y + dy, z + dz); if (blocks[j] === 0 && R() < 0.35) { const s = R.int(4); blocks[j] = s === 3 ? 73 : 1024 + s; meta[j] = 1 + f; }
         }
       }
     }
@@ -1541,6 +1553,12 @@ function genChunk(seed, cx, cz, dim) {
       if (blocks[I(x, y, z)] === 0 && blocks[I(x, y + 1, z)] === 1) {
         blocks[I(x, y + 1, z)] = 85; blocks[I(x, y, z)] = 86;
         if (R() < 0.5 && y > 2 && blocks[I(x, y - 1, z)] === 0) blocks[I(x, y - 1, z)] = 86;
+        // a stalagmite (meta 1: pointing up) often grows on the floor right below
+        if (R() < 0.6) for (let fy = y - 2; fy > 2 && fy > y - 14; fy--) {
+          const fb = blocks[I(x, fy, z)]; if (fb === 0) continue;
+          if (OPQ[fb]) for (let k = 1, n = 1 + R.int(2); k <= n && blocks[I(x, fy + k, z)] === 0 && blocks[I(x, fy + k + 1, z)] === 0; k++) { blocks[I(x, fy + k, z)] = 86; meta[I(x, fy + k, z)] = 1; }
+          break;
+        }
         break;
       }
     }
@@ -1885,9 +1903,11 @@ function meshChunk(B, M, L, bio, opts) {
       let ox = 0, oz = 0;
       if (id === 29 || id === 30 || (id >= 31 && id <= 34)) { const hh = ((x * 3129871) ^ (z * 116129781) ^ y) >>> 0; ox = ((hh & 15) / 15 - 0.5) * 0.4; oz = (((hh >> 4) & 15) / 15 - 0.5) * 0.4; }
       const vflip = id === 86 && !(meta & 1);
+      const bf = BUD[id] && meta ? meta - 1 : 1; // amethyst buds and clusters grow out of any face
+      const ori = (lx, lh, lz) => bf === 1 ? [x + lx, y + lh, z + lz] : bf === 0 ? [x + lx, y + 1 - lh, z + lz] : bf === 2 ? [x + lx, y + lz, z + 1 - lh] : bf === 3 ? [x + lx, y + lz, z + lh] : bf === 4 ? [x + 1 - lh, y + lx, z + lz] : [x + lh, y + lx, z + lz];
       for (const [a, b] of planes) {
         const p0 = [x + a[0] + ox, y + yo, z + a[1] + oz], p1 = [x + b[0] + ox, y + yo, z + b[1] + oz];
-        const cs = [[p0[0], p0[1], p0[2]], [p1[0], p1[1], p1[2]], [p1[0], p1[1] + 1, p1[2]], [p0[0], p0[1] + 1, p0[2]]];
+        const cs = BUD[id] ? [ori(a[0], 0, a[1]), ori(b[0], 0, b[1]), ori(b[0], 1, b[1]), ori(a[0], 1, a[1])] : [[p0[0], p0[1], p0[2]], [p1[0], p1[1], p1[2]], [p1[0], p1[1] + 1, p1[2]], [p0[0], p0[1] + 1, p0[2]]];
         const cb2 = [cs[1], cs[0], cs[3], cs[2]];
         quad(Cu, cFlip, cs, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
         quad(Cu, cFlip, cb2, tile, 0, vflip ? 16 : 0, 16, vflip ? 0 : 16, 0, L4, sh, false);
@@ -2008,6 +2028,12 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 233 && bi > 0 && F.n[1] > 0) { tile = T.composter_top; }
         else if (id === 224 && bi === 0 && f === 2) { tile = T.hopper_top; }
         else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
+        else if (id === 1027) {
+          if (bi === 4) tile = F.n[1] < 0 ? T.cauldron_bottom : T.cauldron_inner;
+          else if (bi >= 5 && bi < 9) tile = F.n[1] < 0 ? T.cauldron_bottom : T.cauldron_side;
+          else if (bi === 9) { const k = (meta >> 2) & 3; tile = k === 1 ? T.lava : k === 2 ? T.powder_snow : T.water; }
+          else if (F.n[1] === 0 && ((bi === 0 && f === 0) || (bi === 1 && f === 1) || (bi === 2 && f === 4) || (bi === 3 && f === 5))) tile = T.cauldron_inner; // the faces looking into the bowl
+        }
         else if (id === 246 || id === 198) {
           const cd = candleOf(id, meta);
           if (cd) tile = bi < cd.n ? (cd.c < 0 ? T.candle : T[COLORS[cd.c] + '_candle']) : cd.lit ? T.candle_flame : T.candle_wick;
@@ -2057,8 +2083,8 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
-  COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, tileFor, candleOf, candleBlock, isRod, emitOf,
+return { NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+  COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
@@ -2096,7 +2122,7 @@ const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furna
   'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
-  amethyst_cluster: 'amethyst_cluster', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
+  amethyst_cluster: 'amethyst_cluster', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
   oak_door: 'oak_door_item', red_bed: 'bed_item', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
@@ -2111,8 +2137,8 @@ ITEMS[BID.tnt].fuel = 0;
 let nextId = 256;
 function item(key, name, o = {}) { const id = nextId++; ITEMS[id] = { id, key, name, stack: 64, ...o }; IID[key] = id; return id; }
 // one item per variant of colour/material blocks (variant 0 lives at the block id)
-const VARITEM = new Int32Array(256 * 16).fill(-1);
-for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
+const VARITEM = new Int32Array(S.NB * 16).fill(-1);
+for (const b of BLOCKS) if (b && b.vars && !NO_ITEM.has(b.key)) { VARITEM[b.id * 16] = b.id; if (!b.late && b.id < S.NEWB) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b }); }
 // the item a block (with its meta) drops or is picked as
 const itemOfBlock = (b, m) => { const d = BLOCKS[b]; if (!d) return b; const cd = (b === 198 || b === 246) && S.candleOf(b, m); if (cd) return cd.c < 0 ? IID.candle : IID[S.COLORS[cd.c] + '_candle']; if (d.vars) { const i = VARITEM[b * 16 + ((m >> (d.vshift || 0)) & 15)]; return i >= 0 ? i : b; } return b; };
 // materials: [name prefix, harvest tier, mining speed, durability, colors]
@@ -2209,6 +2235,8 @@ S.COLORS.forEach((c, i) => item(c + '_candle', S.COLKO[i] + ' 양초', { candle:
 item('tropical_fish', '열대어', { food: [1, 0.2] });
 item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
 Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
+// ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
+for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
 for (const k of ['oak_planks', 'spruce_planks', 'birch_planks', 'oak_log', 'spruce_log', 'birch_log', 'crafting_table', 'chest', 'bookshelf', 'oak_door', 'ladder', 'oak_slab', 'oak_stairs', 'oak_fence',
   'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'jungle_log', 'acacia_log', 'dark_oak_log', 'stripped_oak_log', 'stripped_spruce_log', 'stripped_birch_log', 'stripped_jungle_log', 'stripped_acacia_log', 'stripped_dark_oak_log',
@@ -2368,6 +2396,7 @@ shaped('waxed_cut_copper', 4, ['##', '##'], { '#': 'waxed_copper_block' });
 shaped('lightning_rod', 1, ['#', '#', '#'], { '#': 'copper_ingot' });
 shaped('candle', 1, ['S', 'H'], { S: 'string', H: 'honeycomb' });
 for (const c of S.COLORS) shapeless(c + '_candle', 1, ['candle', c + '_dye']);
+shaped('cauldron', 1, ['# #', '# #', '###'], { '#': 'iron_ingot' });
 
 // ---------- 1.17 expansion recipes ----------
 [['jungle_log', 'jungle_planks'], ['acacia_log', 'acacia_planks'], ['dark_oak_log', 'dark_oak_planks'], ['stripped_oak_log', 'oak_planks'], ['stripped_spruce_log', 'spruce_planks'], ['stripped_birch_log', 'birch_planks'],
@@ -2533,7 +2562,8 @@ function blockDrops(b, meta, stack) {
   if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(itemOfBlock(b, meta)); return res; }
   const fortune = enchLv(stack, 'fortune');
   const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore', 'nether_quartz_ore', 'nether_gold_ore', 'glowstone'].includes(d.key);
-  if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1; for (const it of r0.items) res.items.push([it[0], it[1] * mul]); res.xp = r0.xp; return res; }
+  // fortune: redstone gets +0..level (uniform bonus), the other ores multiply
+  if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1, flat = d.key.endsWith('redstone_ore'); for (const it of r0.items) res.items.push([it[0], flat ? it[1] + Math.floor(Math.random() * (fortune + 1)) : it[1] * mul]); res.xp = r0.xp; return res; }
   if (!canHarvest(b, stack)) {
     if (b === BID.cobweb && t && t.type === TOOL.SWORD) add('string');
     else if (b === BID.cobweb && shears) add('cobweb');
@@ -2570,6 +2600,7 @@ function blockDrops(b, meta, stack) {
     case 'bookshelf': add('book', 3); break;
     case 'ice': break;
     case 'amethyst_cluster': add('amethyst_shard', t && t.type === TOOL.PICK ? 4 : 2); break;
+    case 'small_amethyst_bud': case 'medium_amethyst_bud': case 'large_amethyst_bud': break; // only with silk touch
     case 'spawner': res.xp = ri(15, 43); break;
     case 'lit_furnace': add('furnace'); break;
     case 'glowstone': add('glowstone_dust', ri(2, 4)); break;
@@ -2609,6 +2640,34 @@ function blockDrops(b, meta, stack) {
     default: if (ITEMS[b]) add(itemOfBlock(b, meta));
   }
   return res;
+}
+
+// ---------- item id table ----------
+// Item ids are positions in ITEMS. Saved data is tagged with a hash of the key list it was written with
+// (world meta keeps each list), so ids can change between versions: loading remaps them by key.
+// Untagged data comes from before this table existed and uses today's order.
+const ITEM_KEYS = Array.from(ITEMS, d => d ? d.key : null);
+const ITEM_TABLE = (() => { let h = 5381; for (const k of ITEM_KEYS) for (const ch of (k || '-') + ',') h = (h * 33 + ch.charCodeAt(0)) >>> 0; return h.toString(36); })();
+const remapCache = {};
+function itemRemapFor(tag) {
+  if (!tag || tag === ITEM_TABLE) return null;
+  if (remapCache[tag] !== undefined) return remapCache[tag];
+  const keys = W.meta && W.meta.itables && W.meta.itables[tag]; if (!keys) return remapCache[tag] = null;
+  const byKey = {}; ITEMS.forEach((d, i) => { if (d) byKey[d.key] = i; });
+  return remapCache[tag] = Int32Array.from(keys, k => k != null && byKey[k] != null ? byKey[k] : -1);
+}
+// rewrites item ids in place: stacks ({id, n}) and villager offers ({a, an, b, bn}); unknown items vanish
+function remapItems(o, m) {
+  if (!m || !o || typeof o !== 'object') return o;
+  const map = i => i >= 0 && i < m.length ? m[i] : -1;
+  if (typeof o.id === 'number' && typeof o.n === 'number') o.id = map(o.id);
+  if (typeof o.a === 'number' && typeof o.an === 'number') { o.a = map(o.a); o.b = map(o.b); }
+  for (const k in o) {
+    const v = o[k]; if (!v || typeof v !== 'object') continue;
+    remapItems(v, m);
+    if (Array.isArray(o) && typeof v.id === 'number' && typeof v.n === 'number' && v.id < 0) o[k] = null;
+  }
+  return o;
 }
 
 </script>
@@ -2786,6 +2845,17 @@ PAINT.exposed_copper = r => copperTex(hex(0xa77e67), hex(0x6a9a7d), r);
 PAINT.weathered_copper = r => copperTex(hex(0x5f9a6f), hex(0xa77e67), r);
 PAINT.oxidized_copper = r => copperTex(hex(0x52a284), hex(0x3f8e74), r);
 PAINT.cut_copper = r => copperTex(hex(0xbf6a4f), null, r, true);
+// amethyst buds grow from a small nub to nearly a full cluster
+function budTex(cr) { for (const [x, top] of cr) for (let y = top; y <= 15; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 1) P(x - 1, y, hex(0x7f55b4)); } }
+PAINT.small_amethyst_bud = r => budTex([[7, 12], [5, 14], [9, 13]]);
+PAINT.medium_amethyst_bud = r => budTex([[7, 9], [4, 12], [10, 11], [6, 13]]);
+PAINT.large_amethyst_bud = r => budTex([[7, 5], [4, 9], [10, 8], [2, 12], [12, 11]]);
+// cauldron: dark iron, a rim on top, the bowl darker inside
+const CAUL = hex(0x4a4a4e);
+PAINT.cauldron_side = r => fill((x, y) => quant(shade(CAUL, 1 + (r() - .5) * .14 + (y === 0 ? .25 : 0) + (x === 0 || x === 15 ? -.12 : 0)), 3));
+PAINT.cauldron_top = r => fill((x, y) => quant(shade(CAUL, 1.25 + (r() - .5) * .1), 3));
+PAINT.cauldron_inner = r => fill((x, y) => quant(shade(CAUL, 0.72 + (r() - .5) * .1), 3));
+PAINT.cauldron_bottom = r => fill((x, y) => quant(shade(CAUL, 0.85 + (r() - .5) * .12), 3));
 PAINT.lightning_rod = r => copperTex(hex(0xd47a55), hex(0xe89a74), r);
 // candles (1.17): plain wax plus the 16 dye colours; the mesher maps candle boxes onto these pixel-exactly
 const CANDLE_COL = { candle: 0xe8d8a8, white: 0xe4e8ea, orange: 0xe8792a, magenta: 0xb84ab8, light_blue: 0x4aa8d8, yellow: 0xf0c430, lime: 0x78c030, pink: 0xe88aa8, gray: 0x50585c,
@@ -3420,7 +3490,11 @@ function neighborUpdate(x, y, z) {
     return;
   }
   if ((b === 198 || b === 246) && S.candleOf(b, m)) { if (!supportedBy(below) || FLUID[getBlock(x, y + 1, z)] === 2) breakNaturally(x, y, z, b, m); return; }
-  if (b === BID.amethyst_cluster) { if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m); return; }
+  if (S.BUD[b]) { // buds and clusters need the block they grow from (old saves without a facing: any side)
+    if (m) { const d = S.DIR6[m - 1]; if (!OPQ[getBlock(x - d[0], y - d[1], z - d[2])]) breakNaturally(x, y, z, b, m); }
+    else if (!N6.some(([dx, dy, dz]) => OPQ[getBlock(x + dx, y + dy, z + dz)])) breakNaturally(x, y, z, b, m);
+    return;
+  }
   if (b === BID.concrete_powder) { if (N6.some(([dx, dy, dz]) => dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27)) setBlock(x, y, z, BID.concrete, m); else if (below === 0 || FLUID[below] || REPL[below]) schedule(x, y, z, 2); return; }
   if (b === BID.glow_lichen || b === BID.vine) { const [dx, dy, dz] = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][m % 6]; if (!OPQ[getBlock(x + dx, y + dy, z + dz)]) setBlock(x, y, z, 0); return; }
   if (b === BID.lantern || b === BID.soul_lantern) { const sup = m & 1 ? getBlock(x, y + 1, z) : below; if (!SOLID[sup]) breakNaturally(x, y, z, b, m); return; }
@@ -3598,12 +3672,51 @@ function leafSearch(x, y, z) {
 RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   let wet = false;
   for (let dx = -4; dx <= 4 && !wet; dx++) for (let dz = -4; dz <= 4 && !wet; dz++) for (let dy = 0; dy <= 1; dy++) if (getBlock(x + dx, y + dy, z + dz) === 27) { wet = true; break; }
-  if (wet || W.rain > 0.5) { if (m !== 7) setMeta(x, y, z, 7); }
+  if (wet || (W.rain > 0.5 && W.dim === 0 && (getLight(x, y + 1, z) >> 4) === 15)) { if (m !== 7) setMeta(x, y, z, 7); } // rain only reaches farmland open to the sky
   else if (m > 0) setMeta(x, y, z, m - 1);
   else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
 };
 for (const id of [63, 64, 65]) RANDOM_TICK[id] = (x, y, z, b, m) => { if (!(m & 1) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[b].oxid); }; // meta 1: waxed, never oxidises
-RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => { if (Math.random() > 0.2) return; const [dx, dy, dz] = N6[(Math.random() * 6) | 0]; if (getBlock(x + dx, y + dy, z + dz) === 0) setBlock(x + dx, y + dy, z + dz, BID.amethyst_cluster); };
+// budding amethyst (1.17): small bud -> medium -> large -> cluster, each pointing away from the budding block
+const BUD_STAGES = [BID.small_amethyst_bud, BID.medium_amethyst_bud, BID.large_amethyst_bud, BID.amethyst_cluster];
+RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => {
+  if (Math.random() > 0.2) return;
+  const f = (Math.random() * 6) | 0, d = S.DIR6[f], tx = x + d[0], ty = y + d[1], tz = z + d[2], tb = getBlock(tx, ty, tz);
+  if (tb === 0 || (tb === BID.water && getMeta(tx, ty, tz) === 0)) setBlock(tx, ty, tz, BUD_STAGES[0], 1 + f);
+  else { const k = BUD_STAGES.indexOf(tb); if (k >= 0 && k < 3 && getMeta(tx, ty, tz) === 1 + f) setBlock(tx, ty, tz, BUD_STAGES[k + 1], 1 + f); }
+};
+// pointed dripstone (1.17): a stalactite tip under a fluid drips into a cauldron below; one fed by water through a dripstone block slowly grows
+const isTip = (x, y, z) => getBlock(x, y, z) === BID.pointed_dripstone && getMeta(x, y, z) === 0 && getBlock(x, y - 1, z) !== BID.pointed_dripstone;
+function dripSource(x, y, z) { // the fluid above the block this stalactite hangs from: [fluid id, root y]
+  let ry = y; while (ry < CH - 2 && getBlock(x, ry + 1, z) === BID.pointed_dripstone && getMeta(x, ry + 1, z) === 0) ry++;
+  if (y - ry > 10) return null;
+  const f = getBlock(x, ry + 2, z); return FLUID[f] && getMeta(x, ry + 2, z) === 0 ? [f, ry + 1] : null;
+}
+RANDOM_TICK[BID.pointed_dripstone] = (x, y, z, b, m) => {
+  if (!isTip(x, y, z)) return;
+  const src = dripSource(x, y, z); if (!src) return;
+  const [fl, root] = src;
+  // fill a cauldron within 11 blocks below
+  if (Math.random() < (fl === 27 ? 0.17578125 : 0.05859375)) for (let cy = y - 1; cy > y - 12 && cy > 0; cy--) {
+    const cb = getBlock(x, cy, z); if (cb === 0) continue;
+    if (cb === BID.cauldron) { const cm = getMeta(x, cy, z), lv = cm & 3, k = (cm >> 2) & 3; if (fl === 27 && (lv === 0 || (k === 0 && lv < 3))) setMeta(x, cy, z, lv + 1); else if (fl === 28 && lv === 0) setMeta(x, cy, z, 3 | 4); }
+    break;
+  }
+  // growth: only with water above a dripstone block
+  if (fl !== 27 || getBlock(x, root, z) !== BID.dripstone_block || Math.random() >= 0.011) return;
+  if (root - y < 7 && getBlock(x, y - 1, z) === 0 && getBlock(x, y - 2, z) === 0 && Math.random() < 0.5) { setBlock(x, y - 1, z, BID.pointed_dripstone, 0); return; }
+  for (let fy = y - 1; fy > y - 11 && fy > 1; fy--) { // otherwise the stalagmite below grows by one
+    const fb = getBlock(x, fy, z); if (fb === 0) continue;
+    if ((fb === BID.pointed_dripstone && getMeta(x, fy, z) === 1) || OPQ[fb]) { if (getBlock(x, fy + 1, z) === 0 && fy + 1 < y - 1) setBlock(x, fy + 1, z, BID.pointed_dripstone, 1); }
+    return;
+  }
+};
+// cauldrons fill up in rain (water) or snow (powder snow) when open to the sky
+RANDOM_TICK[BID.cauldron] = (x, y, z, b, m) => {
+  if (W.dim !== 0 || W.rain < 0.5 || (getLight(x, y + 1, z) >> 4) !== 15) return;
+  const lv = m & 3, k = (m >> 2) & 3, cold = S.BIOMES[biomeAt(x, z)][4] <= 0.15, kind = cold ? 2 : 0;
+  if (lv < 3 && (lv === 0 || k === kind) && Math.random() < (cold ? 0.1 : 0.05)) setMeta(x, y, z, (lv + 1) | (kind << 2));
+};
 RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, 27); };
 RANDOM_TICK[BID.snow] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11) setBlock(x, y, z, 0); };
 
@@ -3615,7 +3728,7 @@ const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
 const bufPool = [];
-for (let i = 0; i < 4; i++) bufPool.push([new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
+for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
 function onWorker(w, m) {
   w.busy--;
@@ -3661,7 +3774,7 @@ function requestGen(cx, cz) {
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
 function requestMesh(c, opts) {
   const w = idleWorker(3); if (!w) return false;
-  const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint8Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
+  const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
   let top = 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) top = Math.max(top, chunkAt(c.cx + dx, c.cz + dz).maxY);
@@ -3714,14 +3827,14 @@ async function deleteWorld(id) {
 async function loadSavedKeys(id) { const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys(IDBKeyRange.bound(id + ':', id + ':￿'))); W.saved = new Set((keys || []).map(k => k.slice(id.length + 1))); }
 function serTiles(c) { const a = []; for (const [i, t] of c.tiles) a.push([i, t]); return a; }
 // run-length encoding: chunk arrays are mostly long runs (air, stone, sky light)
-function rleEnc(a) {
-  const out = new Uint8Array(a.length * 2); let n = 0;
+function rleEnc(a) { // keeps the element type: block ids are 16 bit, meta and light 8 bit
+  const out = new a.constructor(a.length * 2); let n = 0;
   for (let i = 0; i < a.length;) { const v = a[i]; let r = 1; while (r < 255 && i + r < a.length && a[i + r] === v) r++; out[n++] = r; out[n++] = v; i += r; }
   return out.slice(0, n);
 }
-function rleDec(b, len) { const a = new Uint8Array(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
+function rleDec(b, len, T = Uint8Array) { const a = new T(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 // RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
-const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:2,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
 const savePending = new Map(), saveWaiters = new Map();
 saveWorker.onmessage = e => {
   const { k, rec } = e.data;
@@ -3737,11 +3850,11 @@ function saveChunk(c, unloading, sync) {
   if (!c.modified || W.pano) return; c.modified = false;
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
-  if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, mobs: c.mobs || null }, dk)); return; }
-  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
   const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
   savePending.set(dk, (savePending.get(dk) || 0) + 1);
-  saveWorker.postMessage({ k: dk, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
+  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
@@ -3751,10 +3864,12 @@ async function loadChunk(cx, cz) {
   const rec = await dbReq('chunks', 'readonly', st => st.get(wid + ':' + dk));
   if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
+  if (rec) { const rm = itemRemapFor(rec.it); if (rm) { remapItems(rec.t, rm); remapItems(rec.mobs, rm); } }
   if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
-  const dec = (a, fill) => { const n = 256 * oldH, src = rec.v === 2 ? rleDec(a, n) : a, out = new Uint8Array(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx, cz, blocks: dec(rec.b), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
+  // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
+  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
+  W.inbox.push({ cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
@@ -4967,7 +5082,7 @@ function spawnAnimalsForChunk(c) {
   if (R0() > 0.1) return;
   let types;
   if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
-    const t = R0() < 0.3 ? 'glow_squid' : 'squid';
+    const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
   }
@@ -6340,6 +6455,18 @@ function spawnWarmFish(c) {
   const v = R0.int(TFISH_COL.length);
   for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
 }
+// glow squid (1.17): dark water at y 30 and below
+function trySpawnGlowSquid() {
+  if (W.dim !== 0 || countMobs(e => e.type === 'glow_squid' && Math.hypot(e.x - PL.x, e.z - PL.z) < 64) >= 5) return;
+  const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 32, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);
+  if (!isLoaded(x, z)) return;
+  for (let y = 30; y > 2; y--) {
+    if (getBlock(x, y, z) !== BID.water || getBlock(x, y + 1, z) !== BID.water) continue;
+    if (getLight(x, y, z) !== 0) return;
+    for (let i = 1 + ((Math.random() * 3) | 0); i > 0; i--) spawnMob('glow_squid', x + .5, y, z + .5);
+    return;
+  }
+}
 
 </script>
 <script>/* js/dims.js */
@@ -6549,6 +6676,22 @@ function boltTick() { // lives a few ticks and flickers once, like the Java bolt
   for (let i = BOLTS.length - 1; i >= 0; i--) {
     const b = BOLTS[i]; b.life--; b.line.visible = b.life !== 4;
     if (b.life <= 0) { scene.remove(b.line); b.line.geometry.dispose(); BOLTS.splice(i, 1); }
+  }
+}
+
+</script>
+<script>/* js/ambient.js */
+// Client-side ambience (Java's animateTick): random blocks near the player drip, puff spores and so on.
+function displayTick() {
+  if (UI.paused || PL.dead) return;
+  const px = Math.floor(PL.x), py = Math.floor(PL.y), pz = Math.floor(PL.z);
+  for (let i = 0; i < 300; i++) {
+    const x = px + ((Math.random() * 21) | 0) - 10, y = py + ((Math.random() * 21) | 0) - 10, z = pz + ((Math.random() * 21) | 0) - 10;
+    const b = getBlock(x, y, z); if (!b) continue;
+    if (b === BID.pointed_dripstone && Math.random() < 0.3 && isTip(x, y, z)) { // dripstone: a drop of the fluid above falls from the tip
+      const src = dripSource(x, y, z);
+      if (src) R.simpleParticle(x + .5, y + 0.05, z + .5, src[0] === 28 ? [1, 0.45, 0.1] : [0.25, 0.45, 0.95], { size: 0.06, vx: 1e-4, vy: 0, vz: 1e-4, grav: 1, life: 1.2 });
+    }
   }
 }
 
@@ -6773,9 +6916,14 @@ const USE = { t: 0, kind: null, placeCd: 0 };
 const creative = () => PL.mode === 'creative';
 const spectator = () => PL.mode === 'spectator';
 
+// a box authored pointing up, turned to point along DIR6 index f
+function rot6Box(b, f) {
+  const [x0, y0, z0, x1, y1, z1] = b, P = (x, y, z) => f === 1 ? [x, y, z] : f === 0 ? [x, 16 - y, z] : f === 2 ? [x, z, 16 - y] : f === 3 ? [x, z, y] : f === 4 ? [16 - y, x, z] : [y, x, z];
+  const a = P(x0, y0, z0), c = P(x1, y1, z1); return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2]), Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])];
+}
 function selShape(id, m) {
   const rt = RTYPE[id];
-  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (id === BID.amethyst_cluster) return [[3, 0, 3, 13, 7, 13]]; if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
+  if (rt === RT.CROSS) { if (id === BID.sugar_cane) return [[2, 0, 2, 14, 16, 14]]; if (id === BID.cobweb) return null; if (S.BUD[id]) { const h = [3, 4, 5, 7][S.BUD[id] - 1]; return [rot6Box([3, 0, 3, 13, h, 13], m ? m - 1 : 1)]; } if (id === BID.pointed_dripstone) return [[5, 0, 5, 11, 16, 11]]; return [[3, 0, 3, 13, 13, 13]]; }
   if (rt === RT.TORCH) { if (m >= 1 && m <= 4) { const d = DIRS[m - 1]; const ox = d[0] * 5, oz = d[2] * 5; return [[5.5 + ox, 3, 5.5 + oz, 10.5 + ox, 13, 10.5 + oz]]; } return [[6, 0, 6, 10, 10, 10]]; }
   if (rt === RT.CROP) return [[0, 0, 0, 16, 2 + (m & 7) * 2, 16]];
   if (rt === RT.BOX) return S.shapes(id, m);
@@ -6855,7 +7003,7 @@ function hurtPlayer(dmg, cause, attacker) {
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -6965,6 +7113,8 @@ function playerTick() {
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround && blockUnder() === BID.slime_block && !PL.sneaking && my < -0.1) { PL.vy = -my * 0.95; PL.fallDist = 0; } // slime blocks bounce
     else if (PL.onGround) {
+      const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
+      if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
       if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
@@ -6991,6 +7141,8 @@ function survivalTick(inWater, inLava, eyeF) {
   if (eyeF === 1) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
+  const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
+  if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
   if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'fire'); }
@@ -7149,6 +7301,13 @@ function interactBlock(t, dry) {
   const { x, y, z, id, m } = t;
   switch (id) {
     case 198: case 246: { const cd = S.candleOf(id, m); if (!cd || !cd.lit || PL.held()) return false; if (!dry) { setBlock(x, y, z, ...S.candleBlock(cd.c, cd.n, 0)); play('fizz', { vol: 0.4 }); } return true; }
+    case BID.cauldron: { // buckets fill and empty it (water, lava, powder snow)
+      const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
+      const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
+      if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
+      return false;
+    }
     case BID.crafting_table: if (!dry) UI.openScreen('craft', { x, y, z }); return true;
     case BID.enchanting_table: if (!dry) UI.openScreen('enchant', { x, y, z }); return true;
     case BID.blast_furnace: case BID.smoker: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace(BLOCKS[id].furnace)); UI.openScreen('furnace', { x, y, z }); } return true;
@@ -7316,6 +7475,7 @@ function placeBlock(t, d) {
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
   if (id === BID.end_rod || (id === BID.chain && vi === 1)) meta = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz);
+  if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
@@ -7995,6 +8155,7 @@ async function startWorld(id, meta) {
   if (!meta) { const all = await listWorlds(); meta = (all || []).find(w => w.id === id); if (!meta) return; }
   showMenu('loading', '세계를 불러오는 중');
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
+  for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   await loadSavedKeys(meta.id);
   const p = meta.player;
@@ -8003,6 +8164,7 @@ async function startWorld(id, meta) {
   Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, sleeping: 0, absorb: 0, regen: 0, inv: 40 });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
+    remapItems(p, itemRemapFor(p.it));
     Object.assign(PL, p.s);
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
@@ -8048,7 +8210,8 @@ function finishLoading() {
 function saveWorldMeta() {
   if (!W.active || !W.meta) return;
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel };
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE };
+  (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
@@ -8088,6 +8251,8 @@ function gameTick() {
   if (W.tickN % 100 === 0) trySpawnStrider();
   if (W.tickN % 200 === 50) trySpawnAmbient();
   if (W.tickN % 200 === 150) trySpawnAxolotl();
+  if (W.tickN % 200 === 100) trySpawnGlowSquid();
+  displayTick();
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
   if (W.tickN % 600 === 0) saveAll();
