@@ -380,6 +380,8 @@ addEventListener('resize', resize); resize();
 R.resize = resize;
 const NETHER_FOG = { 13: new THREE.Color(0x330808), 14: new THREE.Color(0x330303), 15: new THREE.Color(0x1a051a), 16: new THREE.Color(0x1b4745), 17: new THREE.Color(0x685f70) };
 const FLASH_SKY = new THREE.Color(0xdde4ff);
+// night vision lifts the darkness (and flickers in its last 10 seconds, like Java)
+const nightVision = () => { const e = PL.eff && (PL.eff.night_vision || (PL.eff.conduit_power && PL.eyeFluid === 1 && PL.eff.conduit_power)); if (!e) return 0.035; return e.t > 200 || Math.sin(e.t * 0.3) > 0 ? 0.8 : 0.035; };
 const END_SKY = new THREE.Color(0x0b0811), netherFog = new THREE.Color(0x330808);
 function renderFrame(dt, eye, under) {
   if (W.dim) return renderOtherDim(dt, eye, under);
@@ -401,6 +403,7 @@ function renderFrame(dt, eye, under) {
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (under === 'snow') { fog.color.setRGB(0.85, 0.9, 0.95); fog.near = 0; fog.far = 2; }
   else { fog.color.copy(fogCol); fog.near = rd * (W.rain > 0.5 ? 0.35 : 0.6); fog.far = rd * (W.rain > 0.5 ? 0.85 : 1.0); }
+  if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; } // blindness: thick black fog
   renderer.setClearColor(fog.color);
   sky.visible = !under; sky.position.copy(camera.position);
   sun.position.copy(camera.position).addScaledVector(sunDir, 300); sun.lookAt(camera.position);
@@ -412,7 +415,7 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment
-  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = 0.035; m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = nightVision(); m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();

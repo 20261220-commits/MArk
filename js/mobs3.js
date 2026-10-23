@@ -138,7 +138,7 @@ function bulletTick(e) {
   e.vx += (dx / d * sp - e.vx) * 0.15; e.vy += (dy / d * sp - e.vy) * 0.15; e.vz += (dz / d * sp - e.vz) * 0.15;
   e.x += e.vx; e.y += e.vy; e.z += e.vz;
   if (SOLID[getBlock(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z))]) { removeEnt(e); return; }
-  if (d < 0.8) { removeEnt(e); if (hurtPlayer(4 * DIFF_MUL(), 'mob', e.owner)) PL.levitate = 200; }
+  if (d < 0.8) { removeEnt(e); if (hurtPlayer(4 * DIFF_MUL(), 'mob', e.owner)) addEffect(PL, 'levitation', 200, 0); }
   if (Math.random() < 0.3) R.simpleParticle(e.x, e.y + 0.15, e.z, [1, 1, 0.9], { size: 0.08, vy: 0, grav: 0, life: 0.3 });
 }
 function wolfAI(e, dist) {

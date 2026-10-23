@@ -80,6 +80,8 @@ function hurtPlayer(dmg, cause, attacker) {
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
+  const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
@@ -93,13 +95,13 @@ function hurtPlayer(dmg, cause, attacker) {
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying (held anywhere in the hotbar: there is no off-hand)
     const k = INV.slots.findIndex((s, i) => i < 9 && s && s.id === IID.totem_of_undying);
-    if (k >= 0) { INV.slots[k] = null; PL.health = 1; PL.regen = 900; PL.absorb = 4; PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+    if (k >= 0) { INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) die(cause);
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
+const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', kill: '죽었습니다' };
 function die(cause) {
   PL.dead = true; PL.sleeping = 0;
   if (!W.keepInv) {
@@ -163,7 +165,7 @@ function playerTick() {
   if ((IN.sprintKey || IN.wTap) && canSprint) PL.sprinting = true;
   if (PL.sprinting && (f < 0.8 || !canSprint || (PL.hitH && !inWater))) PL.sprinting = false;
   if (f <= 0) IN.wTap = false;
-  const sp = 0.1 * (PL.sprinting ? 1.3 : 1);
+  const sp = 0.1 * (PL.sprinting ? 1.3 : 1) * speedMul();
   const len = Math.hypot(f, s), fn = len > 1 ? f / len : f, sn = len > 1 ? s / len : s;
   const sin = Math.sin(PL.yaw), cos = Math.cos(PL.yaw);
   const accel = (a) => { PL.vx += (-sin * fn + cos * sn) * a * 0.98; PL.vz += (-cos * fn - sin * sn) * a * 0.98; };
@@ -175,7 +177,7 @@ function playerTick() {
     PL.vx *= 0.91; PL.vz *= 0.91; PL.vy *= 0.6; PL.fallDist = 0;
   } else if (elytraTick()) { // gliding handled entirely there
   } else if (inWater || inLava) {
-    accel(0.02 * (inWater && PL.sprinting ? 2 : 1));
+    accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1));
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
     const fr = inWater ? 0.8 : 0.5;
@@ -188,7 +190,7 @@ function playerTick() {
     accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
-      PL.vy = 0.42; USE.jumpCd = 10;
+      PL.vy = 0.42 + 0.1 * effLv(PL, 'jump_boost'); USE.jumpCd = 10;
       if (PL.sprinting) { PL.vx += -sin * 0.2; PL.vz += -cos * 0.2; PL.exh += 0.2; } else PL.exh += 0.05;
     }
     let mx = PL.vx, my = PL.vy, mz = PL.vz;
@@ -211,13 +213,14 @@ function playerTick() {
     else if (PL.onGround) {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
-      if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       PL.fallDist = 0;
     } else if (PL.y < oy) PL.fallDist += oy - PL.y;
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
     PL.vx *= fr; PL.vz *= fr;
   }
-  if (PL.levitate > 0) { PL.levitate--; PL.vy = Math.max(PL.vy, 0.06); PL.fallDist = 0; } // shulker bullets
+  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) { PL.vy += (0.05 * lev - PL.vy) * 0.2; PL.fallDist = 0; } // shulker bullets
+  else if (effLv(PL, 'slow_falling') && PL.vy < -0.05 && !PL.flying) { PL.vy = Math.max(PL.vy, -0.08); PL.fallDist = 0; }
   IN.jumpWas = IN.jump;
   if (USE.jumpCd > 0) USE.jumpCd--;
   if (!IN.jump) USE.jumpCd = 0;
@@ -235,7 +238,8 @@ function playerTick() {
 }
 function survivalTick(inWater, inLava, eyeF) {
   // air
-  if (eyeF === 1) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
+  effectTick(PL);
+  if (eyeF === 1 && !effLv(PL, 'water_breathing') && !effLv(PL, 'conduit_power')) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
   const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
@@ -260,8 +264,6 @@ function survivalTick(inWater, inLava, eyeF) {
   // hunger
   if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
   if (PL.exh >= 4) { PL.exh -= 4; if (PL.sat > 0) PL.sat = Math.max(0, PL.sat - 1); else if (PL.difficulty > 0) PL.food = Math.max(0, PL.food - 1); UI.hudDirty = true; }
-  if (PL.poison > 0) { PL.poison--; if (PL.poison % 25 === 0 && PL.health > 1) hurtPlayer(1, 'starve'); }
-  if (PL.regen > 0) { PL.regen--; if (PL.regen % 50 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); }
   PL.foodTimer++;
   if (PL.food >= 20 && PL.sat > 0 && PL.health < 20) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(20, PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food >= 18 && PL.health < 20) { if (PL.foodTimer >= 80) { PL.health = Math.min(20, PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
@@ -317,7 +319,7 @@ function attackEntity(e) {
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0), as = tool ? tool.as : 4;
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
-  let dmg = base * (0.2 + p * p * 0.8);
+  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { size: 0.08, vy: 1 }); }
   PL.attackT = 0;
@@ -357,12 +359,11 @@ function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
   if (!h) return;
   const d = ITEMS[h.id];
-  if (h.id === IID.milk_bucket) { PL.regen = 0; INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
+  if (h.id === IID.milk_bucket) { clearEffects(PL); INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
   PL.sat = Math.min(PL.food, PL.sat);
-  if (d.regen) { PL.regen = 100; PL.absorb = 4; }
-  if (d.poison && Math.random() < d.poison) PL.poison = 100;
+  if (d.eff) for (const [k, dur, lv, ch] of d.eff) if (ch == null || Math.random() < ch) addEffect(PL, k, dur, lv);
   if (d.chorusTp) chorusTeleport();
   if (h.id === IID.rotten_flesh && Math.random() < 0.8) PL.exh += 4;
   play('burp');

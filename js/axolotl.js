@@ -98,7 +98,7 @@ function axolotlAI(e, dist) {
     physMove(e, e.vx, e.vy, e.vz, 0.6);
     if (e.target && e.attackCd <= 0 && gl < e.w + e.target.w + 0.6) {
       e.attackCd = 20; const t = e.target; hurtMob(t, 2, e);
-      if (t.hp <= 0 && W.tickN - (t.plHitT || -1e9) < 200) PL.regen = Math.min(2400, (PL.regen || 0) + 100); // helped the player: Regeneration I
+      if (t.hp <= 0 && W.tickN - (t.plHitT || -1e9) < 200) addEffect(PL, 'regeneration', Math.min(2400, ((PL.eff && PL.eff.regeneration && PL.eff.regeneration.lv === 0 ? PL.eff.regeneration.t : 0)) + 100), 0); // helped the player: Regeneration I
     }
     const hs = Math.hypot(e.vx, e.vy, e.vz); e.walkAmt += (Math.min(1, hs * 10) - e.walkAmt) * 0.3; e.walk += hs * 5;
   } else {

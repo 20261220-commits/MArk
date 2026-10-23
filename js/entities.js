@@ -522,7 +522,8 @@ function mobTick(e) {
   let mx = 0, mz = 0, speed = d.speed;
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
-  if (hostileNow && plVisible && dist < 16 && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
+  if (e.eff) effectTick(e);
+  if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
   if (e.target && (!plVisible || dist > 24)) e.target = null;
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
@@ -605,7 +606,7 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); }
+  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 // ---------- per-tick update ----------
@@ -622,7 +623,7 @@ function entityTick() {
       if (fl) { e.vy += 0.01; e.vy *= 0.9; e.vx *= 0.9; e.vz *= 0.9; } else e.vy -= 0.04;
       // push out of solid blocks
       if (SOLID[getBlock(Math.floor(e.x), Math.floor(e.y + 0.1), Math.floor(e.z))] && !S.collide(getBlock(Math.floor(e.x), Math.floor(e.y + 0.1), Math.floor(e.z)), 0)) e.y += 0.1;
-      if (e.kind === 'xp') { const dx = PL.x - e.x, dy = PL.y + 0.8 - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz); if (d < 8 && !PL.dead && PL.mode !== 'spectator') { const f = (1 - d / 8) ** 2 * 0.1; e.vx += dx / d * f; e.vy += dy / d * f; e.vz += dz / d * f; } if (d < 1 && !PL.dead) { addXP(e.value); removeEnt(e); continue; } }
+      if (e.kind === 'xp') { const dx = PL.x - e.x, dy = PL.y + 0.8 - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz); if (d < 8 && !PL.dead && PL.mode !== 'spectator') { const f = (1 - d / 8) ** 2 * 0.1; e.vx += dx / d * f; e.vy += dy / d * f; e.vz += dz / d * f; } if (d < 1 && !PL.dead) { const v = mendWithXP(e.value); if (v > 0) addXP(v); else play('xp'); removeEnt(e); continue; } }
       physMove(e, e.vx, e.vy, e.vz);
       const fr = e.onGround ? 0.6 * 0.98 : 0.98; e.vx *= fr; e.vz *= fr; e.vy *= 0.98;
       if (e.pickup > 0) e.pickup--;
@@ -669,7 +670,7 @@ function arrowTick(e) {
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
-      if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner); const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner) && e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {

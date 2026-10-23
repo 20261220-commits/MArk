@@ -55,12 +55,12 @@ item('wheat_seeds', '밀 씨앗', { place: BID.wheat, plant: 1 });
 item('wheat', '밀');
 item('bread', '빵', { food: [5, 6] });
 item('apple', '사과', { food: [4, 2.4] });
-item('golden_apple', '황금 사과', { food: [4, 9.6], always: 1, regen: 1 });
+item('golden_apple', '황금 사과', { food: [4, 9.6], always: 1, eff: [['regeneration', 100, 1], ['absorption', 2400, 0]] });
 item('porkchop', '익히지 않은 돼지고기', { food: [3, 1.8] }); item('cooked_porkchop', '익힌 돼지고기', { food: [8, 12.8] });
 item('beef', '익히지 않은 소고기', { food: [3, 1.8] }); item('cooked_beef', '스테이크', { food: [8, 12.8] });
-item('chicken', '익히지 않은 닭고기', { food: [2, 1.2] }); item('cooked_chicken', '익힌 닭고기', { food: [6, 7.2] });
+item('chicken', '익히지 않은 닭고기', { food: [2, 1.2], eff: [['hunger', 600, 0, 0.3]] }); item('cooked_chicken', '익힌 닭고기', { food: [6, 7.2] });
 item('mutton', '익히지 않은 양고기', { food: [2, 1.2] }); item('cooked_mutton', '익힌 양고기', { food: [6, 9.6] });
-item('rotten_flesh', '썩은 살점', { food: [4, 0.8] });
+item('rotten_flesh', '썩은 살점', { food: [4, 0.8], eff: [['hunger', 600, 0, 0.8]] });
 item('melon_slice', '수박 조각', { food: [2, 1.2] });
 item('mushroom_stew', '버섯 스튜', { food: [6, 7.2], stack: 1, leaves: 'bowl' });
 item('bowl', '그릇');
@@ -90,13 +90,13 @@ S.COLORS.forEach((c, i) => item(c + '_dye', S.COLKO[i] + ' 염료'));
 item('cocoa_beans', '코코아 콩');
 item('carrot', '당근', { food: [3, 3.6], place: BID.crops2, pmeta: 0, plant: 1 });
 item('potato', '감자', { food: [1, 0.6], place: BID.crops2, pmeta: 8, plant: 1 });
-item('baked_potato', '구운 감자', { food: [5, 6] }); item('poisonous_potato', '독이 있는 감자', { food: [2, 1.2], poison: 0.6 });
+item('baked_potato', '구운 감자', { food: [5, 6] }); item('poisonous_potato', '독이 있는 감자', { food: [2, 1.2], eff: [['poison', 100, 0, 0.6]] });
 item('beetroot', '비트', { food: [1, 1.2] }); item('beetroot_seeds', '비트 씨앗', { place: BID.crops2, pmeta: 16, plant: 1 });
 item('beetroot_soup', '비트 수프', { food: [6, 7.2], stack: 1, leaves: 'bowl' }); item('golden_carrot', '황금 당근', { food: [6, 14.4] });
 item('cookie', '쿠키', { food: [2, 0.4] }); item('pumpkin_pie', '호박 파이', { food: [8, 4.8] });
 item('cod', '익히지 않은 대구', { food: [2, 0.4] }); item('cooked_cod', '익힌 대구', { food: [5, 6] });
 item('salmon', '익히지 않은 연어', { food: [2, 0.4] }); item('cooked_salmon', '익힌 연어', { food: [6, 9.6] });
-item('dried_kelp', '말린 켈프', { food: [1, 0.6] }); item('spider_eye', '거미 눈', { food: [2, 3.2], poison: 1 });
+item('dried_kelp', '말린 켈프', { food: [1, 0.6] }); item('spider_eye', '거미 눈', { food: [2, 3.2], eff: [['poison', 100, 0]] });
 item('chorus_fruit', '후렴과', { food: [4, 2.4], always: 1, chorusTp: 1 }); item('popped_chorus_fruit', '튀긴 후렴과');
 // treasure and tools
 item('prismarine_shard', '프리즈머린 조각'); item('prismarine_crystals', '프리즈머린 수정'); item('shulker_shell', '셜커 껍데기');
@@ -124,6 +124,7 @@ item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_f
 Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
 item('glow_berries', '발광 열매', { food: [2, 0.4] });
+item('enchanted_golden_apple', '마법이 부여된 황금 사과', { food: [4, 9.6], always: 1, glint: 1, sprite: 'golden_apple', eff: [['regeneration', 400, 1], ['absorption', 2400, 3], ['resistance', 6000, 0], ['fire_resistance', 6000, 0]] });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 // fuel for wooden blocks
@@ -149,8 +150,9 @@ const ENCH = {
   efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow']],
   fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel']],
   sharpness: ['날카로움', 5, ['sword', 'axe']], knockback: ['밀치기', 2, ['sword']], looting: ['약탈', 3, ['sword']],
-  protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']] };
-const ENCH_EXCL = [['fortune', 'silk_touch']];
+  protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']],
+  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow'], 1] }; // 4th field: treasure (never from the enchanting table)
+const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity']];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
 function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
@@ -161,7 +163,7 @@ function rollEnchant(id, level, seed) {
   const ability = d.tool ? ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10, netherite: 15 })[d.tool.mat] : d.armor ? ({ leather: 15, golden: 25, iron: 9, diamond: 10, netherite: 15 })[d.armor.mat] : 1;
   let L = level + 1 + r.int(Math.floor(ability / 4) + 1) + r.int(Math.floor(ability / 4) + 1);
   L = Math.max(1, Math.round(L * (1 + (r() + r() - 1) * 0.15)));
-  const pool = Object.keys(ENCH).filter(k => ENCH[k][2].some(t => kinds.includes(t)));
+  const pool = Object.keys(ENCH).filter(k => !ENCH[k][3] && ENCH[k][2].some(t => kinds.includes(t)));
   const out = {};
   const pick = () => { const opts = pool.filter(k => !out[k] && !ENCH_EXCL.some(g => g.includes(k) && g.some(o => out[o]))); if (!opts.length) return false; const k = opts[r.int(opts.length)]; out[k] = Math.max(1, Math.min(ENCH[k][1], Math.ceil(L / 30 * ENCH[k][1] + (r() - 0.3)))); return true; };
   pick(); while (r.int(50) <= L) { if (!pick()) break; L = Math.floor(L / 2); }
@@ -433,7 +435,8 @@ function breakTicks(b, stack, onGround, inWater, meta = 0) {
   if (hard === 0) return 0;
   const t = toolOf(stack);
   let speed = 1;
-  if (t && t.type === d.tool) { speed = t.speed; const ef = enchLv(stack, 'efficiency'); if (ef && canHarvest(b, stack)) speed += ef * ef + 1; }
+  if (typeof digMul === 'function') speed = digMul();
+  if (t && t.type === d.tool) { speed = t.speed * speed; const ef = enchLv(stack, 'efficiency'); if (ef && canHarvest(b, stack)) speed += ef * ef + 1; }
   if (stack && stack.id === IID.shears && (d.leaves || b === BID.cobweb || b === BID.white_wool)) speed = b === BID.white_wool ? 5 : 15;
   if (t && t.type === TOOL.SWORD && b === BID.cobweb) speed = 15;
   if (t && t.type === TOOL.SWORD && d.leaves) speed = 1.5;

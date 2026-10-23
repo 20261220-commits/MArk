@@ -1345,7 +1345,7 @@ function genChunk(seed, cx, cz, dim) {
         let walls = 0; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocks[I(x + ax, dy, z + az)] !== 0) walls++;
         if (walls !== 1) continue;
         blocks[i2] = 44; meta[i2] = R.int(4);
-        const loot = [], pool = [['saddle', 0], ['bread', 1], ['wheat', 4], ['gunpowder', 4], ['string', 4], ['bucket', 1], ['golden_apple', 1], ['redstone', 4], ['iron_ingot', 4], ['coal', 4], ['bone', 6], ['rotten_flesh', 6], ['name_tag', 0], ['wheat_seeds', 4]];
+        const loot = [], pool = [['saddle', 0], ['bread', 1], ['wheat', 4], ['gunpowder', 4], ['string', 4], ['bucket', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1], ['redstone', 4], ['iron_ingot', 4], ['coal', 4], ['bone', 6], ['rotten_flesh', 6], ['name_tag', 0], ['wheat_seeds', 4]];
         for (let k = 1 + R.int(3) + 2; k > 0; k--) { const [it, mx] = pool[R.int(pool.length)]; if (mx) loot.push([R.int(27), it, 1 + R.int(mx)]); }
         tiles.push({ t: 'chest', i: i2, loot });
         break;

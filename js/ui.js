@@ -31,7 +31,7 @@ function icon(id, n, d, e) {
   if (!id) return '';
   const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
   let s = `<i class="ic" style="${st}"></i>`;
-  if (e) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
+  if (e || (def && def.glint)) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
   if (def && def.dur && d) { const f = 1 - d / def.dur; s += `<u style="--f:${f};--c:hsl(${f * 120},100%,45%)"></u>`; }
   return s;

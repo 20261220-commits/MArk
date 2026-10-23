@@ -124,7 +124,7 @@ async function startWorld(id, meta) {
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null;
-  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, sleeping: 0, absorb: 0, regen: 0, inv: 40 });
+  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, sleeping: 0, absorb: 0, eff: {}, inv: 40 });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
@@ -172,7 +172,7 @@ function finishLoading() {
 }
 function saveWorldMeta() {
   if (!W.active || !W.meta) return;
-  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead']) s[k] = PL[k];
+  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff']) s[k] = PL[k];
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE };
   (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
@@ -217,7 +217,7 @@ function gameTick() {
   if (W.tickN % 200 === 100) trySpawnGlowSquid();
   displayTick();
   spawnerTick();
-  if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); }
+  if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); }
   if (W.tickN % 600 === 0) saveAll();
 }
 
