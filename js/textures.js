@@ -390,6 +390,37 @@ PAINT.enchanting_table_side = r => { PAINT.obsidian(r); for (let x = 0; x < 16; 
 PAINT.glow_lichen = r => { const nz = tnoise(r, 4); fill((x, y) => { const v = nz(x, y) + (r() - .5) * .35; return v > 0.62 ? (r() < 0.25 ? hex(0xd8ffe0) : hex(0x86c8a0)) : v > 0.5 ? hex(0x5f9478) : null; }); };
 
 PAINT.end_portal = r => fill(() => { const v = r(); return v > 0.96 ? pal(r, [hex(0x9fe8d8), hex(0xd8f0ff), hex(0x6fc8ff)]) : v > 0.9 ? hex(0x1b3a40) : pal(r, [hex(0x050a10), hex(0x08101a), hex(0x0a1420)]); });
+// ---------- S6 blocks: nether vines, frosted ice, cake, ender chest, shulker boxes, respawn anchor, scaffolding, glazed terracotta ----------
+const DYE16 = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
+function netherVine(r, col, tip, up) { for (const x0 of [5, 9]) for (let y = 0; y < 16; y++) { const yy = up ? 15 - y : y; if (tip && y > 11) continue; P(x0 + Math.round(Math.sin((y + x0) / 2.5)), yy, shade(hex(col), 0.75 + r() * 0.45)); if (r() < 0.3) P(x0 + 1 + Math.round(Math.sin((y + x0) / 2.5)), yy, shade(hex(col), 0.6 + r() * 0.3)); }
+  if (tip) for (let k = 0; k < 7; k++) P(4 + Math.floor(r() * 8), up ? 1 + Math.floor(r() * 4) : 11 + Math.floor(r() * 4), shade(hex(col), 1.1 + r() * 0.2)); }
+PAINT.weeping_vines_plant = r => netherVine(r, 0x9a1a1a, false, false); PAINT.weeping_vines = r => netherVine(r, 0xb02424, true, false);
+PAINT.twisting_vines_plant = r => netherVine(r, 0x14968a, false, true); PAINT.twisting_vines = r => netherVine(r, 0x18b0a0, true, true);
+PAINT.frosted_ice = r => fill((x, y) => quant(shade(hex(0x8cb4f8), 0.9 + r() * 0.2 + ((x * 3 + y * 7) % 11 === 0 ? 0.25 : 0)), 3));
+PAINT.cake_top = r => fill((x, y) => x === 0 || y === 0 || x === 15 || y === 15 ? null : (x * 7 + y * 13) % 23 === 0 ? hex(0xd02020) : quant(shade(hex(0xf6f2ea), 0.94 + r() * 0.08), 3));
+PAINT.cake_side = r => fill((x, y) => x === 0 || x === 15 ? null : y < 8 ? null : y < 10 ? quant(shade(hex(0xf6f2ea), 0.95 + r() * 0.06), 3) : y === 12 && x % 3 === 0 ? hex(0xd02020) : quant(shade(hex(0xa8683a), 0.85 + r() * 0.25), 3));
+PAINT.cake_bottom = r => fill((x, y) => x === 0 || y === 0 || x === 15 || y === 15 ? null : quant(shade(hex(0x9a5a30), 0.85 + r() * 0.2), 3));
+PAINT.cake_inner = r => fill((x, y) => y < 8 ? null : y < 10 ? hex(0xf6f2ea) : quant(shade(hex(0xd8a060), 0.85 + r() * 0.25 + (r() < 0.05 ? -0.4 : 0)), 3));
+const ENDC = hex(0x1c2a2a), ENDC2 = hex(0x2c4440);
+PAINT.ender_chest_side = r => fill((x, y) => y === 4 || y === 5 ? hex(0x0e1616) : quant(shade(mixc(ENDC, ENDC2, r()), 0.85 + r() * 0.3), 3));
+PAINT.ender_chest_top = r => fill((x, y) => x === 0 || y === 0 || x === 15 || y === 15 ? hex(0x0e1616) : quant(shade(mixc(ENDC, ENDC2, r()), 0.85 + r() * 0.3), 3));
+PAINT.ender_chest_front = r => { PAINT.ender_chest_side(r); for (let y = 3; y < 8; y++) for (let x = 6; x < 10; x++) P(x, y, (x === 6 || x === 9 || y === 3 || y === 7) ? hex(0x2a8a4a) : hex(0x50e090)); };
+function shulkerTex(col, r) { const c = hex(col); fill((x, y) => { const lid = y < 9, edge = y === 8 || y === 9 || x === 0 || x === 15 || y === 0 || y === 15; return quant(shade(c, (edge ? 0.72 : 1) * (lid ? 1.05 : 0.92) * (0.92 + r() * 0.14)), 3); }); }
+PAINT.shulker_box = r => shulkerTex(0x976997, r);
+S.COLORS.forEach((c, i) => { PAINT[c + '_shulker_box'] = r => shulkerTex(DYE16[i], r); });
+// glazed terracotta: a four-fold pinwheel of the dye colour with lighter and darker strokes
+S.COLORS.forEach((c, i) => { PAINT[c + '_glazed_terracotta'] = r => { const b = hex(DYE16[i]), lt = mixc(b, [255, 255, 255], 0.45), dk = shade(b, 0.55);
+  fill((x, y) => { const u = x < 8 ? x : 15 - y, v = x < 8 ? y : x, q = ((x < 8) !== (y < 8)) ? (u + v) % 8 : (u * 2 + v) % 8; const k = (q + (i % 3)) % 8; return quant(shade(k < 2 ? dk : k < 4 ? lt : b, 0.94 + r() * 0.1), 3); });
+  for (let k = 0; k < 16; k++) { P(k, k, dk); P(15 - k, k, lt); } }; });
+const ANCH = hex(0x241a38);
+PAINT.respawn_anchor_side = r => fill((x, y) => y < 3 || y > 12 ? quant(shade(hex(0x16101e), 0.85 + r() * 0.3), 3) : quant(shade(mixc(ANCH, hex(0x4a1e8a), (x * 5 + y * 3) % 7 === 0 ? 0.8 : 0.1), 0.85 + r() * 0.3), 3));
+PAINT.respawn_anchor_bottom = r => fill(() => quant(shade(hex(0x16101e), 0.85 + r() * 0.3), 3));
+PAINT.respawn_anchor_top_off = r => fill((x, y) => { const c = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return c < 4 ? hex(0x100a18) : quant(shade(hex(0x16101e), 0.85 + r() * 0.3), 3); });
+PAINT.respawn_anchor_top = r => fill((x, y) => { const c = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return c < 4 ? quant(shade(hex(0xa040f0), 0.8 + r() * 0.4 + (c < 2 ? 0.3 : 0)), 3) : quant(shade(hex(0x16101e), 0.85 + r() * 0.3), 3); });
+const SCAF_C = hex(0xd8b45a);
+PAINT.scaffolding_side = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || Math.abs(x - y) < 1.5) ? quant(shade(SCAF_C, (x < 2 || x > 13 ? 0.85 : 1) * (0.9 + r() * 0.15)), 3) : null);
+PAINT.scaffolding_top = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || (x + y) % 5 === 0) ? quant(shade(SCAF_C, 0.9 + r() * 0.15), 3) : null);
+PAINT.scaffolding_bottom = PAINT.scaffolding_top;
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
     curTile = i;

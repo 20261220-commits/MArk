@@ -15,7 +15,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
     for (let y = ay; y <= by; y++) {
       if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
-      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); else if (id === BID.scaffolding && PHYS.scafTop && PHYS.feetY >= y + 1 - 1e-3) pushBox(x, y + 0.875, z, x + 1, y + 1, z + 1); continue; } // scaffolding: stand on top unless sneaking
       const bs = S.collide(id, getMeta(x, y, z));
       if (!bs) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       for (const b of bs) pushBox(x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16);
@@ -25,7 +25,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
 }
 // move an AABB entity (x,y,z = feet centre, w = half width, h = height); stepUp for players/mobs
 function physMove(e, dx, dy, dz, stepUp = 0) {
-  const w = e.w, h = e.h, eps = 1e-7;
+  const w = e.w, h = e.h, eps = 1e-7; PHYS.feetY = e.y;
   const n = gatherBoxes(e.x - w + Math.min(dx, 0) - eps, e.y + Math.min(dy, 0), e.z - w + Math.min(dz, 0) - eps, e.x + w + Math.max(dx, 0) + eps, e.y + h + Math.max(dy, 0) + stepUp, e.z + w + Math.max(dz, 0) + eps);
   const odx = dx, ody = dy, odz = dz;
   const clipY = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 3] <= x - w + eps || BX[i] >= x + w - eps || BX[i + 5] <= z - w + eps || BX[i + 2] >= z + w - eps) continue; if (d > 0 && BX[i + 1] >= y + h - eps) d = Math.min(d, BX[i + 1] - (y + h)); else if (d < 0 && BX[i + 4] <= y + eps) d = Math.max(d, BX[i + 4] - y); } return d; };

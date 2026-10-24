@@ -6,7 +6,7 @@ const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
 const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
-  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass', 'tripwire', 'tripwire_hook_block']);
+  'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass', 'tripwire', 'tripwire_hook_block', 'frosted_ice']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
@@ -503,6 +503,16 @@ const SMELT = {};
  ['chorus_fruit', 'popped_chorus_fruit', 0.1], ['nether_bricks', 'cracked_nether_bricks', 0.1], ['red_sand', 'glass', 0.1], ['jungle_log', 'charcoal', 0.15], ['acacia_log', 'charcoal', 0.15], ['dark_oak_log', 'charcoal', 0.15], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
  ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
   .forEach(([a, b, xp]) => { if (IID[a] != null && IID[b] != null) SMELT[IID[a]] = [IID[b], xp]; });
+// S6 blocks
+for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_fence_gate', 1, ['SPS', 'SPS'], { S: 'stick', P: w + '_planks' }); if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_fence_gate']].fuel = 300; }
+shaped('cake', 1, ['MMM', 'SES', 'WWW'], { M: 'milk_bucket', S: 'sugar', E: 'egg', W: 'wheat' }); ITEMS[BID.cake].stack = 1;
+shaped('ender_chest', 1, ['OOO', 'OEO', 'OOO'], { O: 'obsidian', E: 'ender_eye' });
+shaped('shulker_box', 1, ['S', 'C', 'S'], { S: 'shulker_shell', C: 'chest' });
+const SHULKER_KEYS = ['shulker_box', ...S.COLORS.filter(c => c !== 'purple').map(c => c + '_shulker_box')];
+for (const c of S.COLORS) { const to = c === 'purple' ? 'shulker_box' : c + '_shulker_box'; for (const from of SHULKER_KEYS) if (from !== to) shapeless(to, 1, [from, c + '_dye']); SMELT[IID[c + '_terracotta']] = [IID[c + '_glazed_terracotta'], 0.1]; }
+for (const k in IID) if (ITEMS[IID[k]].place === BID.shulker_box || IID[k] === BID.shulker_box) ITEMS[IID[k]].stack = 1;
+shaped('respawn_anchor', 1, ['CCC', 'GGG', 'CCC'], { C: 'crying_obsidian', G: 'glowstone' });
+shaped('scaffolding', 6, ['BSB', 'B B', 'B B'], { B: 'bamboo', S: 'string' }); ITEMS[BID.scaffolding].fuel = 50;
 
 // ---------- drops ----------
 function toolOf(stack) { const d = stack && ITEMS[stack.id]; return d && d.tool ? d.tool : null; }
@@ -542,6 +552,9 @@ function blockDrops(b, meta, stack) {
   const shears = stack && stack.id === IID.shears;
   const t = toolOf(stack);
   if (d.key === 'kelp_plant') { add('kelp'); return res; }
+  if (d.key === 'shulker_box') return res; // dropped with its contents by blocks6Break
+  if ((d.key === 'weeping_vines' || d.key === 'twisting_vines') && !shears && !enchLv(stack, 'silk_touch')) { if (Math.random() < 0.33) add(b); return res; }
+  if (d.key === 'ender_chest' && !enchLv(stack, 'silk_touch')) { if (canHarvest(b, stack)) add('obsidian', 8); return res; }
   if (d.key === 'tripwire') { add('string'); return res; }
   if (d.key === 'tall_flower') { if (!(meta & 8)) add(itemOfBlock(b, meta & 3)); return res; }
   if (d.key === 'tripwire_hook_block') { add('tripwire_hook'); return res; }

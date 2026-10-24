@@ -22,7 +22,8 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
   'diorite andesite tnt_side tnt_top tnt_bottom bed_head bed_foot bed_side oak_door_top oak_door_bottom ladder powder_snow lantern cobweb ' +
   'coal_block lapis_block emerald_block redstone_block smooth_basalt brown_mushroom red_mushroom spawner hay_side hay_top melon_stem glow_lichen enchanting_table_top enchanting_table_side ' +
   'redstone_dust_dot redstone_dust_line0 redstone_dust_line1 redstone_torch redstone_torch_off redstone_lamp redstone_lamp_on lever repeater repeater_on piston_side piston_top piston_top_sticky piston_bottom piston_inner anvil anvil_top smithing_table_top smithing_table_side smithing_table_front smithing_table_bottom dirt_path_top dirt_path_side netherrack nether_quartz_ore nether_gold_ore soul_sand soul_soil glowstone magma basalt_side basalt_top blackstone blackstone_top nether_bricks crimson_nylium crimson_nylium_side warped_nylium warped_nylium_side crimson_stem crimson_stem_top warped_stem warped_stem_top nether_wart_block warped_wart_block shroomlight crimson_fungus warped_fungus crimson_roots warped_roots nether_portal ancient_debris_side ancient_debris_top netherite_block quartz_block_side quartz_block_top crying_obsidian nether_wart0 nether_wart1 nether_wart2 fire crimson_planks warped_planks end_stone end_portal_frame_top end_portal_frame_side end_portal_frame_eye end_portal end_stone_bricks dragon_egg mossy_stone_bricks cracked_stone_bricks iron_bars slime_block' + ' jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3 jungle_leaves_o acacia_leaves_o dark_oak_leaves_o').split(' ')
-  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom', 'exposed_cut_copper', 'weathered_cut_copper', 'oxidized_cut_copper', 'azalea_top', 'azalea_side', 'azalea_plant', 'flowering_azalea_top', 'flowering_azalea_side', 'azalea_leaves', 'azalea_leaves_o', 'flowering_azalea_leaves', 'flowering_azalea_leaves_o', 'cave_vines', 'cave_vines_lit', 'spore_blossom', 'big_dripleaf_top', 'big_dripleaf_stem', 'small_dripleaf', 'small_dripleaf_top', 'rooted_dirt', 'hanging_roots', 'sculk_sensor_top', 'sculk_sensor_side', 'sculk_sensor_bottom', 'sculk_sensor_tendril', 'sculk_sensor_tendril_active', 'brewing_stand', 'brewing_stand_base', 'brewing_bottle', 'beacon', 'campfire_log', 'campfire_log_lit', 'soul_campfire_log_lit', 'bell_body', 'jukebox_side', 'jukebox_top', 'rail', 'rail_corner', 'powered_rail', 'powered_rail_on', 'detector_rail', 'detector_rail_on', 'activator_rail', 'activator_rail_on', 'turtle_egg', 'bee_nest_side', 'bee_nest_top', 'bee_nest_bottom', 'bee_nest_front', 'bee_nest_front_honey', 'beehive_side', 'beehive_end', 'beehive_front', 'beehive_front_honey', 'honey_block_side', 'honey_block_top', 'honeycomb_block', 'sweet_berry_bush_stage0', 'sweet_berry_bush_stage1', 'sweet_berry_bush_stage2', 'sweet_berry_bush_stage3', 'wither_skull_side', 'wither_skull_top', 'wither_skull_front', 'kelp', 'kelp_plant', 'seagrass', 'tall_seagrass_bottom', 'tall_seagrass_top', 'sea_pickle', 'conduit', 'dried_kelp_side', 'dried_kelp_top', 'flower_pot', 'tripwire', 'tripwire_hook', 'skeleton_skull_side', 'skeleton_skull_front', 'zombie_head_side', 'zombie_head_front', 'creeper_head_side', 'creeper_head_front', 'dragon_head_side', 'dragon_head_front', 'bamboo_stalk', 'bamboo_leaves', 'bamboo_small_leaves', 'sunflower_bottom', 'sunflower_top', 'lilac_bottom', 'lilac_top', 'rose_bush_bottom', 'rose_bush_top', 'peony_bottom', 'peony_top', 'carved_pumpkin_face', 'tube_coral', 'brain_coral', 'bubble_coral', 'fire_coral', 'horn_coral', 'dead_tube_coral', 'dead_brain_coral', 'dead_bubble_coral', 'dead_fire_coral', 'dead_horn_coral', 'tube_coral_fan', 'brain_coral_fan', 'bubble_coral_fan', 'fire_coral_fan', 'horn_coral_fan', 'dead_tube_coral_fan', 'dead_brain_coral_fan', 'dead_bubble_coral_fan', 'dead_fire_coral_fan', 'dead_horn_coral_fan', 'tube_coral_block', 'brain_coral_block', 'bubble_coral_block', 'fire_coral_block', 'horn_coral_block', 'dead_tube_coral_block', 'dead_brain_coral_block', 'dead_bubble_coral_block', 'dead_fire_coral_block', 'dead_horn_coral_block'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'));
+  .concat(['lightning_rod', 'candle', 'candle_wick', 'candle_flame', 'small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'cauldron_side', 'cauldron_top', 'cauldron_inner', 'cauldron_bottom', 'exposed_cut_copper', 'weathered_cut_copper', 'oxidized_cut_copper', 'azalea_top', 'azalea_side', 'azalea_plant', 'flowering_azalea_top', 'flowering_azalea_side', 'azalea_leaves', 'azalea_leaves_o', 'flowering_azalea_leaves', 'flowering_azalea_leaves_o', 'cave_vines', 'cave_vines_lit', 'spore_blossom', 'big_dripleaf_top', 'big_dripleaf_stem', 'small_dripleaf', 'small_dripleaf_top', 'rooted_dirt', 'hanging_roots', 'sculk_sensor_top', 'sculk_sensor_side', 'sculk_sensor_bottom', 'sculk_sensor_tendril', 'sculk_sensor_tendril_active', 'brewing_stand', 'brewing_stand_base', 'brewing_bottle', 'beacon', 'campfire_log', 'campfire_log_lit', 'soul_campfire_log_lit', 'bell_body', 'jukebox_side', 'jukebox_top', 'rail', 'rail_corner', 'powered_rail', 'powered_rail_on', 'detector_rail', 'detector_rail_on', 'activator_rail', 'activator_rail_on', 'turtle_egg', 'bee_nest_side', 'bee_nest_top', 'bee_nest_bottom', 'bee_nest_front', 'bee_nest_front_honey', 'beehive_side', 'beehive_end', 'beehive_front', 'beehive_front_honey', 'honey_block_side', 'honey_block_top', 'honeycomb_block', 'sweet_berry_bush_stage0', 'sweet_berry_bush_stage1', 'sweet_berry_bush_stage2', 'sweet_berry_bush_stage3', 'wither_skull_side', 'wither_skull_top', 'wither_skull_front', 'kelp', 'kelp_plant', 'seagrass', 'tall_seagrass_bottom', 'tall_seagrass_top', 'sea_pickle', 'conduit', 'dried_kelp_side', 'dried_kelp_top', 'flower_pot', 'tripwire', 'tripwire_hook', 'skeleton_skull_side', 'skeleton_skull_front', 'zombie_head_side', 'zombie_head_front', 'creeper_head_side', 'creeper_head_front', 'dragon_head_side', 'dragon_head_front', 'bamboo_stalk', 'bamboo_leaves', 'bamboo_small_leaves', 'sunflower_bottom', 'sunflower_top', 'lilac_bottom', 'lilac_top', 'rose_bush_bottom', 'rose_bush_top', 'peony_bottom', 'peony_top', 'carved_pumpkin_face', 'tube_coral', 'brain_coral', 'bubble_coral', 'fire_coral', 'horn_coral', 'dead_tube_coral', 'dead_brain_coral', 'dead_bubble_coral', 'dead_fire_coral', 'dead_horn_coral', 'tube_coral_fan', 'brain_coral_fan', 'bubble_coral_fan', 'fire_coral_fan', 'horn_coral_fan', 'dead_tube_coral_fan', 'dead_brain_coral_fan', 'dead_bubble_coral_fan', 'dead_fire_coral_fan', 'dead_horn_coral_fan', 'tube_coral_block', 'brain_coral_block', 'bubble_coral_block', 'fire_coral_block', 'horn_coral_block', 'dead_tube_coral_block', 'dead_brain_coral_block', 'dead_bubble_coral_block', 'dead_fire_coral_block', 'dead_horn_coral_block'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].map(c => c + '_candle'))
+  .concat(['weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -389,6 +390,17 @@ const BLOCK_ROWS = [
   [1085, 'carved_pumpkin', '조각된 호박', C, ['pumpkin_side', 'pumpkin_top', 'pumpkin_top', 'carved_pumpkin_face'], 1, A, 0, { facing: 1 }],
   [1086, 'bamboo', '대나무', RT.BOX, 'bamboo_stalk', 1, A, 0, { plant: 19 }],
   [1087, 'tall_flower', '큰 꽃', X, null, 0, N, 0, { plant: 20, vars: ['sunflower_bottom', 'lilac_bottom', 'rose_bush_bottom', 'peony_bottom'], vk: ['sunflower', 'lilac', 'rose_bush', 'peony'], vn: ['해바라기', '라일락', '장미 덤불', '모란'] }],
+  // 1.17 blocks still missing (S6): gates, glazed terracotta, nether vines, frosted ice, cake, ender chests, shulker boxes, respawn anchors, scaffolding
+  [1088, 'oak_fence_gate', '참나무 울타리 문', RT.BOX, null, 2, A, 0, { vshift: 3, gate: 1, vars: ['oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'crimson_planks', 'warped_planks'], vk: ['oak_fence_gate', 'spruce_fence_gate', 'birch_fence_gate', 'jungle_fence_gate', 'acacia_fence_gate', 'dark_oak_fence_gate', 'crimson_fence_gate', 'warped_fence_gate'], vn: ['참나무 울타리 문', '가문비나무 울타리 문', '자작나무 울타리 문', '정글 나무 울타리 문', '아카시아 나무 울타리 문', '짙은 참나무 울타리 문', '진홍빛 울타리 문', '뒤틀린 울타리 문'] }], // meta: facing | open << 2 | wood << 3
+  [1089, 'glazed_terracotta', '유약 바른 테라코타', C, null, 1.4, P, 1, { vars: COLV('glazed_terracotta'), vk: COLK('glazed_terracotta'), vn: COLN('유약 바른 테라코타') }],
+  [1090, 'weeping_vines', '우는 덩굴', X, 'weeping_vines', 0, N, 0, { plant: 21, climb: 1 }], // meta 1: the tip
+  [1091, 'twisting_vines', '뒤틀린 덩굴', X, 'twisting_vines', 0, N, 0, { plant: 22, climb: 1 }],
+  [1092, 'frosted_ice', '서리 얼음', RT.TRANS, 'frosted_ice', 0.5, P, 99, { lop: 2, selfcull: 1, slip: 1 }], // meta: age 0-3
+  [1093, 'cake', '케이크', RT.BOX, ['cake_side', 'cake_top', 'cake_bottom'], 0.5, N, 99, { plant: 23 }], // meta: slices eaten 0-6
+  [1094, 'ender_chest', '엔더 상자', RT.BOX, ['ender_chest_side', 'ender_chest_top', 'ender_chest_top', 'ender_chest_front'], 22.5, P, 1, { facing: 1, light: 7 }],
+  [1095, 'shulker_box', '셜커 상자', RT.BOX, null, 2, P, 0, { vars: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vk: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vn: ['셜커 상자', '하얀색 셜커 상자', '주황색 셜커 상자', '자홍색 셜커 상자', '하늘색 셜커 상자', '노란색 셜커 상자', '연두색 셜커 상자', '분홍색 셜커 상자', '회색 셜커 상자', '회백색 셜커 상자', '청록색 셜커 상자', '파란색 셜커 상자', '갈색 셜커 상자', '초록색 셜커 상자', '빨간색 셜커 상자', '검은색 셜커 상자'] }],
+  [1096, 'respawn_anchor', '리스폰 정박기', C, ['respawn_anchor_side', 'respawn_anchor_top_off', 'respawn_anchor_bottom'], 50, P, 4], // meta: charges 0-4
+  [1097, 'scaffolding', '비계', RT.BOX, ['scaffolding_side', 'scaffolding_top', 'scaffolding_bottom'], 0, N, 0, { nosolid: 1, climb: 1, plant: 24 }], // meta: distance 0-7
   [1069, 'sweet_berry_bush', '달콤한 열매 덤불', X, 'sweet_berry_bush_stage0', 0, N, 0, { plant: 1 }], // meta: age 0-3
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
@@ -450,7 +462,7 @@ const isRail = id => id >= 1060 && id <= 1063;
 const railShape = (id, m) => id === 1060 ? Math.min(9, m & 15) : m & 7;
 const isRod = (id, m) => id === 246 && ((m >> 3) & 15) === 1;
 // block light emitted by a block, including the meta-dependent ones (lit candles give 3 per candle)
-function emitOf(id, m) { if (id === 1078) return m & 16 ? 6 + (m & 3) * 3 : 0; if (id === 1054 || id === 1055) return m & 4 ? (id === 1054 ? 15 : 10) : 0; if (id === 1051) return (m & 3) === 1 ? 1 : 0; if (id === 1044) return m & 1 ? 14 : 0; if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
+function emitOf(id, m) { if (id === 1096) return [0, 3, 7, 11, 15][Math.min(4, m & 7)]; if (id === 1078) return m & 16 ? 6 + (m & 3) * 3 : 0; if (id === 1054 || id === 1055) return m & 4 ? (id === 1054 ? 15 : 10) : 0; if (id === 1051) return (m & 3) === 1 ? 1 : 0; if (id === 1044) return m & 1 ? 14 : 0; if (id === 1027) return ((m >> 2) & 3) === 1 && (m & 3) ? 15 : 0; if (id === 198 || id === 246) { const cd = candleOf(id, m); return cd && cd.lit ? cd.n * 3 : 0; } return LEM[id]; }
 const CANDLE_POS = [[[7, 7]], [[5, 6], [9, 7]], [[7, 5], [5, 9], [9, 8]], [[6, 5], [9, 5], [5, 8], [8, 8]]], CANDLE_H = [[6], [6, 5], [6, 5, 4], [6, 5, 4, 5]];
 function candleBoxes(cd) { // bodies first, then one wick (or flame) per candle
   const pos = CANDLE_POS[cd.n - 1], hs = CANDLE_H[cd.n - 1], b = pos.map(([x, z], k) => [x, 0, z, x + 2, hs[k], z + 2]);
@@ -571,6 +583,17 @@ function shapes(id, meta) {
       if (meta & 1) b.push([5, 0, 0, 11, 14, 4]); if (meta & 2) b.push([12, 0, 5, 16, 14, 11]); if (meta & 4) b.push([5, 0, 12, 11, 14, 16]); if (meta & 8) b.push([0, 0, 5, 4, 14, 11]);
       return b;
     }
+    case 1088: { // fence gates: posts at both ends, closed bars between them or open bars swung inward
+      const ax = meta & 1, open = meta & 4, R = b => ax ? [b[2], b[1], b[0], b[5], b[4], b[3]] : b;
+      const out = [R([0, 5, 7, 2, 16, 9]), R([14, 5, 7, 16, 16, 9])];
+      if (!open) out.push(R([2, 6, 7, 14, 9, 9]), R([2, 12, 7, 14, 15, 9]), R([6, 9, 7, 10, 12, 9]));
+      else { const s = (meta & 2) ? -1 : 1, z0 = s > 0 ? 9 : 1, z1 = s > 0 ? 15 : 7; out.push(R([0, 6, z0, 2, 9, z1]), R([0, 12, z0, 2, 15, z1]), R([14, 6, z0, 16, 9, z1]), R([14, 12, z0, 16, 15, z1])); }
+      return out;
+    }
+    case 1093: return [[1 + (meta & 7) * 2, 0, 1, 15, 8, 15]];
+    case 1094: return [[1, 0, 1, 15, 14, 15]];
+    case 1095: return [[0, 0, 0, 16, 16, 16]];
+    case 1097: return [[0, 14, 0, 16, 16, 16], [0, 0, 0, 2, 14, 2], [14, 0, 0, 16, 14, 2], [0, 0, 14, 2, 14, 16], [14, 0, 14, 16, 14, 16]];
     case 97: return [ladderBox(meta & 3)];
     case 99: case 244: return meta & 1 ? [[5, 1, 5, 11, 8, 11], [6, 8, 6, 10, 10, 10], [7, 10, 7, 9, 16, 9]] : [[5, 0, 5, 11, 7, 11], [6, 7, 6, 10, 9, 10]];
     case 109: case 110: case 111: case 250: case 1031: case 1032: case 1033: case 1034: return (meta & 1) ? [[0, 8, 0, 16, 16, 16]] : [[0, 0, 0, 16, 8, 16]];
@@ -631,6 +654,7 @@ function collide(id, meta) {
   if (id === 1046) { const t = (meta >> 2) & 3; return t === 3 ? [] : t === 2 ? [[0, 11, 0, 16, 13, 16]] : [[0, 11, 0, 16, 15, 16]]; } // a fully tilted dripleaf drops you
   if (id === 1039 || id === 1040) return [[0, 0, 0, 16, 16, 16]];
   if (id === 1051) return [[0, 0, 0, 16, 8, 16]];
+  if (id === 1088) return meta & 4 ? [] : meta & 1 ? [[6, 0, 0, 10, 24, 16]] : [[0, 0, 6, 16, 24, 10]]; // closed gates are fence height
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
   if (id === 138) return [[0, 0, 0, 16, 14, 16]]; // soul sand slows by sinking you slightly
   if (id === 128) return [[0, 0, 0, 16, 2, 16]];
@@ -1630,9 +1654,29 @@ function genNether(seed, cx, cz) {
             blocks[ii] = dy < 1 && R() < 0.08 ? 151 : (dy < 0 && R() < 0.25 ? 0 : wart);
           }
         } else if (v < 0.1) blocks[I(x, y + 1, z)] = crimson ? (v < 0.03 ? 152 : 154) : (v < 0.03 ? 153 : 155);
+        else if (!crimson && v < 0.115) { const n = 1 + R.int(6); for (let k = 1; k <= n && y + k < 121 && blocks[I(x, y + k, z)] === 0; k++) { blocks[I(x, y + k, z)] = 1091; meta[I(x, y + k, z)] = k === n ? 1 : 0; } }
       } else if (b === 135 && bio === NETHER_BIO.WASTES && v < 0.004) { blocks[I(x, y + 1, z)] = 162; }
       else if (b === 138 && bio === NETHER_BIO.SOUL && v < 0.002) { for (let k = 1; k < 6; k++) blocks[I(x, y + k, z)] = 142; }
       else if (b === 135 && v < 0.002) { blocks[I(x, y + 1, z)] = R() < 0.5 ? 106 : 107; }
+    }
+  }
+  // weeping vines hang from crimson ceilings
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    if (biome[z * 16 + x] !== NETHER_BIO.CRIMSON) continue;
+    for (let y = 40; y < 121; y++) {
+      const up = blocks[I(x, y + 1, z)]; if (blocks[I(x, y, z)] !== 0 || !(up === 135 || up === 149) || R() > 0.06) continue;
+      const n = 1 + R.int(8); let k = 0; for (; k < n && y - k > 32 && blocks[I(x, y - k, z)] === 0; k++) blocks[I(x, y - k, z)] = 1090;
+      if (k) meta[I(x, y - k + 1, z)] = 1;
+    }
+  }
+  // nether fossils: arches of bone in soul sand valleys
+  if (R() < 0.3) { const fx = 3 + R.int(10), fz = 3 + R.int(10);
+    if (biome[fz * 16 + fx] === NETHER_BIO.SOUL) for (let y = 33; y < 100; y++) {
+      const b = blocks[I(fx, y, fz)]; if (!(b === 138 || b === 139) || blocks[I(fx, y + 1, fz)] !== 0) continue;
+      const ax = R() < 0.5, h = 3 + R.int(4), w = 2 + R.int(3), put = (a, yy, m) => { const x = ax ? fx + a : fx, z = ax ? fz : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15) return; const ii = I(x, yy, z); if (blocks[ii] === 0) { blocks[ii] = BID.bone_block; meta[ii] = m; } };
+      for (let k = 1; k <= h; k++) { put(0, y + k, 0); put(w, y + k - (k > h - 1 ? 0 : 0), 0); }
+      for (let a = 0; a <= w; a++) put(a, y + h + 1, ax ? 1 : 2);
+      break;
     }
   }
   // fortresses
@@ -1914,6 +1958,29 @@ function genChunk(seed, cx, cz, dim) {
         for (let k = 1 + R.int(3) + 2; k > 0; k--) { const [it, mx] = pool[R.int(pool.length)]; if (mx) loot.push([R.int(27), it, 1 + R.int(mx)]); }
         tiles.push({ t: 'chest', i: i2, loot });
         break;
+      }
+    }
+  }
+  // 5b. fossils: a spine with ribs of bone blocks buried deep (some bones are coal ore), more often under deserts and swamps
+  { const cb = bpad[9 * 18 + 9];
+    if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64)) {
+      const fx = 4 + R.int(8), fz = 4 + R.int(8), fy = 15 + R.int(30), ax = R() < 0.5, len = 3 + R.int(3);
+      const bone = (a, y, b, m) => { const x = ax ? fx + a : fx + b, z = ax ? fz + b : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 2) return; const i2 = I(x, y, z); if (!blocks[i2] || blocks[i2] === WATER || blocks[i2] === LAVA) return; blocks[i2] = R() < 0.1 ? (y < 8 ? BID.deepslate_coal_ore : 13) : BID.bone_block; meta[i2] = R() < 0.1 ? 0 : m; };
+      for (let a = -len; a <= len; a++) { bone(a, fy, 0, ax ? 1 : 2); if ((a + len) % 2 === 0 && Math.abs(a) < len) for (const sd of [-1, 1]) { bone(a, fy + 1, sd, 0); bone(a, fy + 2, sd * 2, 0); bone(a, fy + 3, sd * 2, 0); bone(a, fy + 4, sd, ax ? 2 : 1); } }
+    }
+  }
+  // 5c. desert wells: a sandstone basin with water, four posts and a roof
+  { const wx = 5 + R.int(6), wz = 5 + R.int(6), wh = hgt[(wz + 1) * 18 + wx + 1];
+    if (bpad[(wz + 1) * 18 + wx + 1] === BIO.DESERT && wh > SEA && R() < 1 / 300 && blocks[I(wx, wh, wz)] === 9) {
+      let flat = true; for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (Math.abs(hgt[(wz + dz + 1) * 18 + wx + dx + 1] - wh) > 1) flat = false;
+      if (flat) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const x = wx + dx, z = wz + dz, edge = Math.abs(dx) === 2 || Math.abs(dz) === 2, ring = Math.max(Math.abs(dx), Math.abs(dz)) === 1, corner = Math.abs(dx) === 1 && Math.abs(dz) === 1;
+        for (let y = wh - 2; y <= wh; y++) blocks[I(x, y, z)] = 26;
+        if (!dx && !dz) { blocks[I(x, wh, z)] = WATER; blocks[I(x, wh - 1, z)] = WATER; }
+        for (let y = wh + 1; y <= wh + 5; y++) blocks[I(x, y, z)] = 0;
+        if (edge) { blocks[I(x, wh + 1, z)] = 250; meta[I(x, wh + 1, z)] = 2; }
+        else if (ring) { blocks[I(x, wh + 1, z)] = 26; if (corner) { blocks[I(x, wh + 2, z)] = 26; blocks[I(x, wh + 3, z)] = 26; } }
+        if (!edge) { blocks[I(x, wh + 4, z)] = ring ? 250 : 26; meta[I(x, wh + 4, z)] = ring ? 2 : 0; }
       }
     }
   }
@@ -2268,6 +2335,7 @@ function meshChunk(B, M, L, bio, opts) {
       return f === 2 || f === 3 ? T.furnace_top : T.furnace_side;
     }
     if ((id === 1065 || id === 1066) && (meta >> 2) >= 5 && f === DIR_FACE[meta & 3]) return id === 1065 ? T.bee_nest_front_honey : T.beehive_front_honey;
+    if (id === 1096 && f === 2) return meta & 7 ? T.respawn_anchor_top : T.respawn_anchor_top_off;
     if ((id === 235 || id === 236) && (meta & 4) && f === DIR_FACE[meta & 3]) return id === 235 ? T.blast_furnace_front_on : T.smoker_front_on;
     const base = id * 4;
     let slot = f === 2 ? 1 : f === 3 ? 2 : 0;
@@ -2317,7 +2385,7 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.CROSS || rt === RT.CROP) {
       const age = meta & 7, stg = age >= 7 ? 3 : age >= 4 ? 2 : age >= 2 ? 1 : 0;
-      const tile = id === 1087 ? T[['sunflower', 'lilac', 'rose_bush', 'peony'][meta & 3] + (meta & 8 ? '_top' : '_bottom')] : id === 1074 ? (meta & 8 ? T.tall_seagrass_top : T.tall_seagrass_bottom) : id === 1069 ? T['sweet_berry_bush_stage' + (meta & 3)] : id === 1044 ? (meta & 1 ? T.cave_vines_lit : T.cave_vines) : id === 1048 ? (meta & 8 ? T.small_dripleaf_top : T.small_dripleaf) : id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : id === 255 ? T[['carrots', 'potatoes', 'beetroots', 'carrots'][(meta >> 3) & 3] + '_stage' + stg] : HASV[id] ? VT[id * 16 + (meta & 15)] : FT[id * 4];
+      const tile = id === 1090 ? (meta & 1 ? T.weeping_vines : T.weeping_vines_plant) : id === 1091 ? (meta & 1 ? T.twisting_vines : T.twisting_vines_plant) : id === 1087 ? T[['sunflower', 'lilac', 'rose_bush', 'peony'][meta & 3] + (meta & 8 ? '_top' : '_bottom')] : id === 1074 ? (meta & 8 ? T.tall_seagrass_top : T.tall_seagrass_bottom) : id === 1069 ? T['sweet_berry_bush_stage' + (meta & 3)] : id === 1044 ? (meta & 1 ? T.cave_vines_lit : T.cave_vines) : id === 1048 ? (meta & 8 ? T.small_dripleaf_top : T.small_dripleaf) : id === 58 ? T['wheat' + Math.min(7, meta)] : id === 161 ? T['nether_wart' + (meta >= 3 ? 2 : meta >= 1 ? 1 : 0)] : id === 255 ? T[['carrots', 'potatoes', 'beetroots', 'carrots'][(meta >> 3) & 3] + '_stage' + stg] : HASV[id] ? VT[id * 16 + (meta & 15)] : FT[id * 4];
       flatLight(x, y, z);
       const sh = SH4; sh[0] = sh[1] = sh[2] = sh[3] = 1;
       const planes = rt === RT.CROSS
@@ -2492,6 +2560,8 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
         else if (id === 1054 || id === 1055) { if (bi === 4) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit; else if (bi >= 5) { tile = id === 1055 ? T.soul_fire : T.fire; u0 = 0; u1 = 16; v0 = 0; v1 = 16; } else if ((meta & 4) && F.n[1] > 0) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit; }
         else if (id === 1056) { if (bi >= 2) tile = T.dark_oak_planks; }
+        else if (id === 1093) { if (F.n[0] < 0 && (meta & 7)) tile = T.cake_inner; else if (F.n[1] === 0) { v0 = 8; v1 = 16; } }
+        else if (id === 1097 && bi > 0) { tile = T.scaffolding_side; u0 = 0; u1 = 2; v0 = 2; v1 = 16; }
         else if (id === 1084) { if (f === DIR_FACE[meta & 3]) tile = T[['skeleton_skull', 'zombie_head', 'creeper_head', 'dragon_head'][(meta >> 2) & 3] + '_front']; }
         else if (id === 1053) tile = bi === 0 ? T.obsidian : bi === 1 ? T.beacon : T.glass;
         else if (id === 1052) { if (bi === 0) tile = F.n[1] ? T.brewing_stand_base : T.brewing_stand_base; else if (bi === 1) { tile = T.brewing_stand; u0 = 7; u1 = 9; } else tile = T.brewing_bottle; }

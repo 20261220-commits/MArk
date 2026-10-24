@@ -20,7 +20,7 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); return r ? { id: r.out, n: r.n } : null; }
+function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'inv' || type === 'craft') {
@@ -30,7 +30,7 @@ function buildSlots(type, ctx) {
     if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
-    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes
   } else if (type === 'horse') {
     const e = ctx.horse;
     L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));

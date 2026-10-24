@@ -184,6 +184,7 @@ function plantOK(b, x, y, z, m) {
     case 18: return supportedBy(below); // corals, fans, sea pickles
     case 19: return below === BID.bamboo || BAMBOO_SOIL.has(below); // bamboo
     case 20: return m & 8 ? below === b : (below === BID.grass_block || below === BID.dirt || below === BID.podzol) && above === b; // tall flowers
+    default: if (typeof plant6OK === 'function') return plant6OK(b, x, y, z, m, below, above);
   }
   return true;
 }
