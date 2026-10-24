@@ -89,8 +89,12 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
-    const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0); dmg *= 1 - Math.min(20, epf) * 0.04; // protection
+    if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
     for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
+  }
+  if (cause !== 'void' && cause !== 'kill' && cause !== 'starve' && cause !== 'drown') { // protection, and the kinds that guard against one cause
+    const sp = cause === 'fire' || cause === 'lava' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
+    const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * 2 : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
   PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
@@ -110,7 +114,7 @@ function die(cause) {
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
   if (!W.keepInv) {
     const all = [...INV.slots, ...INV.armor]; INV.slots.fill(null); INV.armor.fill(null);
-    for (const s of all) if (s) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
+    for (const s of all) if (s && !enchLv(s, 'vanishing_curse')) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
     PL.level = 0; PL.xpP = 0; PL.xpTotal = 0;
   }
@@ -187,10 +191,11 @@ function playerTick() {
     PL.vx *= 0.91; PL.vz *= 0.91; PL.vy *= 0.6; PL.fallDist = 0;
   } else if (elytraTick()) { // gliding handled entirely there
   } else if (inWater || inLava) {
-    accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1));
+    const ds = inWater ? enchLv(INV.armor[3], 'depth_strider') : 0;
+    accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1) * (1 + ds * 0.6));
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
-    const fr = inWater ? 0.8 : 0.5;
+    const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
     PL.vx *= fr; PL.vz *= fr; PL.vy *= fr; PL.vy -= 0.02;
     if (PL.hitH && noCollision(PL.x + PL.vx, PL.y + 0.6, PL.z + PL.vz) && !fluidAt(PL.x, PL.y + 1.2, PL.z)) PL.vy = 0.3; // climb out of water onto a ledge
     PL.fallDist = 0;
@@ -205,7 +210,9 @@ function playerTick() {
       if (PL.sprinting) { PL.vx += -sin * 0.2; PL.vz += -cos * 0.2; PL.exh += 0.2; } else PL.exh += 0.05;
     }
     let mx = PL.vx, my = PL.vy, mz = PL.vz;
-    if (PL.onGround && (slipB === BID.soul_sand || slipB === BID.honey_block)) { mx *= 0.4; mz *= 0.4; }
+    const ssp = (slipB === BID.soul_sand || slipB === BID.soul_soil) && enchLv(INV.armor[3], 'soul_speed');
+    if (PL.onGround && ssp) { mx *= 1.3 + ssp * 0.105; mz *= 1.3 + ssp * 0.105; if (Math.random() < 0.04) damageItem(INV.armor, 3, 1); }
+    else if (PL.onGround && (slipB === BID.soul_sand || slipB === BID.honey_block)) { mx *= 0.4; mz *= 0.4; }
     if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
@@ -251,7 +258,7 @@ function playerTick() {
 function survivalTick(inWater, inLava, eyeF) {
   // air
   effectTick(PL);
-  if (eyeF === 1 && !effLv(PL, 'water_breathing') && !effLv(PL, 'conduit_power')) { PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
+  if (eyeF === 1 && !effLv(PL, 'water_breathing') && !effLv(PL, 'conduit_power')) { const rs = enchLv(INV.armor[0], 'respiration'); if (!rs || Math.random() < 1 / (rs + 1)) PL.air--; if (PL.air <= -20) { PL.air = 0; hurtPlayer(2, 'drown'); } }
   else PL.air = Math.min(300, PL.air + 4);
   // fire & lava
   campfireStand();
@@ -332,7 +339,8 @@ function attackEntity(e) {
   if (e.kind !== 'mob') { if (e.onHit) e.onHit(e); PL.attackT = 0; return; }
   PL.lastAttacked = e;
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
-  const sharp = enchLv(h, 'sharpness'), base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0), as = tool ? tool.as : 4;
+  const sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4, ARTH = e.type === 'spider' || e.type === 'cave_spider' || e.type === 'bee' || e.type === 'silverfish' || e.type === 'endermite';
+  const base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
@@ -340,6 +348,9 @@ function attackEntity(e) {
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
+  const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
+  if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
+  if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
   if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
   if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
 }
@@ -416,6 +427,7 @@ function onUseRelease() {
       const ai = arrowSlot(), ast = ai >= 0 ? INV.slots[ai] : null;
       const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
       if (ast && ITEMS[ast.id].tipped != null) { arr.potion = ITEMS[ast.id].tipped; arr.item = ast.id; }
+      arr.flame = enchLv(bowSt, 'flame') > 0; arr.punch = enchLv(bowSt, 'punch');
       if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }
@@ -457,7 +469,7 @@ function interactBlock(t, dry) {
     case BID.note_block: if (!dry) { const tile = getTile(x, y, z) || { type: 'note', n: 0 }; tile.n = ((tile.n || 0) + 1) % 25; setTile(x, y, z, tile); playNote(x, y, z, tile.n); } return true;
     case BID.comparator: if (!dry) { setMeta(x, y, z, m ^ 4); play('click', { pitch: 0.55 }); rsMark(x, y, z); } return true;
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
-    case BID.grindstone: { const h = PL.held(); if (h && h.e) { if (!dry) { let xp = 0; for (const lv of Object.values(h.e)) xp += lv * 3; delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
+    case BID.grindstone: { const h = PL.held(); if (h && h.e && Object.keys(h.e).some(k => !k.endsWith('_curse'))) { if (!dry) { let xp = 0; const curses = {}; for (const [k, lv] of Object.entries(h.e)) if (k.endsWith('_curse')) curses[k] = lv; else xp += lv * 3; if (Object.keys(curses).length) h.e = curses; else delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
     case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.iron_door: return false;
@@ -751,7 +763,7 @@ function useRod() {
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
     if (b.bite > 0) {
-      const r = Math.random(), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book', 'nautilus_shell'][Math.floor(Math.random() * 5)];
+      const r = Math.min(0.9999, Math.random() + enchLv(PL.held(), 'luck_of_the_sea') * 0.021), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book', 'nautilus_shell'][Math.floor(Math.random() * 5)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
       if (it && loot === 'enchanted_book') { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; it.stack.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; }
       spawnXP(PL.x, PL.y + 1, PL.z, 1 + Math.floor(Math.random() * 6)); play('splash', { vol: 0.5 });
@@ -759,7 +771,7 @@ function useRod() {
     removeEnt(b); damageItem(INV.slots, INV.sel, 1); return;
   }
   const [dx, dy, dz] = lookDir();
-  const e = Ent('bobber', PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4); e.kind = 'bobber'; e.w = 0.12; e.h = 0.25; e.vx = dx * 0.6; e.vy = dy * 0.6 + 0.15; e.vz = dz * 0.6; e.bite = 0; e.wait = 100 + Math.floor(Math.random() * 400);
+  const e = Ent('bobber', PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4); e.kind = 'bobber'; e.w = 0.12; e.h = 0.25; e.vx = dx * 0.6; e.vy = dy * 0.6 + 0.15; e.vz = dz * 0.6; e.bite = 0; e.wait = Math.max(20, 100 + Math.floor(Math.random() * 400) - 100 * enchLv(PL.held(), 'lure'));
   e.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
   e.tick = bobberTick; e.render = (e, x, y, z) => e.mesh.position.set(x, y + 0.06, z);
   addEnt(e); play('bow', { vol: 0.3 });

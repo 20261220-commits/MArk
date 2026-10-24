@@ -27,7 +27,7 @@ function buildSlots(type, ctx) {
     const grid = type === 'inv' ? INV.craft2 : INV.craft3, w = type === 'inv' ? 2 : 3;
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));
     L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
-    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
+    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', canTake: () => creative() || !enchLv(INV.armor[i], 'binding_curse'), accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes

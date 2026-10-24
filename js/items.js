@@ -215,11 +215,17 @@ const ENCH = {
   protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']],
   mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield'], 1],
   quick_charge: ['빠른 장전', 3, ['crossbow']], multishot: ['다중 발사', 1, ['crossbow']], piercing: ['관통', 4, ['crossbow']],
-  loyalty: ['충성', 3, ['trident']], riptide: ['급류', 3, ['trident']], channeling: ['집전', 1, ['trident']], impaling: ['찌르기', 5, ['trident']] }; // 4th field: treasure (never from the enchanting table)
-const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity'], ['multishot', 'piercing'], ['riptide', 'loyalty'], ['riptide', 'channeling']];
+  loyalty: ['충성', 3, ['trident']], riptide: ['급류', 3, ['trident']], channeling: ['집전', 1, ['trident']], impaling: ['찌르기', 5, ['trident']],
+  smite: ['강타', 5, ['sword', 'axe']], bane_of_arthropods: ['살충', 5, ['sword', 'axe']], fire_aspect: ['발화', 2, ['sword']], sweeping: ['휩쓸기', 3, ['sword']],
+  flame: ['화염', 1, ['bow']], punch: ['밀어내기', 2, ['bow']], thorns: ['가시', 3, ['armor']], respiration: ['호흡', 3, ['helmet']], aqua_affinity: ['친수성', 1, ['helmet']],
+  depth_strider: ['물갈퀴', 3, ['boots']], fire_protection: ['화염으로부터 보호', 4, ['armor']], blast_protection: ['폭발로부터 보호', 4, ['armor']], projectile_protection: ['발사체로부터 보호', 4, ['armor']],
+  luck_of_the_sea: ['바다의 행운', 3, ['fishing_rod']], lure: ['미끼', 3, ['fishing_rod']], soul_speed: ['영혼 가속', 3, ['boots'], 1],
+  binding_curse: ['귀속 저주', 1, ['armor'], 1], vanishing_curse: ['소실 저주', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield', 'fishing_rod'], 1] }; // 4th field: treasure (never from the enchanting table)
+const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity'], ['multishot', 'piercing'], ['riptide', 'loyalty'], ['riptide', 'channeling'], ['sharpness', 'smite', 'bane_of_arthropods'],
+  ['protection', 'fire_protection', 'blast_protection', 'projectile_protection'], ['depth_strider', 'frost_walker']];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
-function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : ['armor']; if (id === IID.bow) return ['bow']; return []; }
+function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : d.armor.slot === 0 ? ['armor', 'helmet'] : ['armor']; if (id === IID.bow) return ['bow']; if (id === IID.fishing_rod) return ['fishing_rod']; return []; }
 function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) => ENCH[k][0] + (ENCH[k][1] > 1 ? ' ' + ROMAN[l] : '')) : []; }
 // Java-like roll: modified level -> weighted pick of applicable enchantments
 function rollEnchant(id, level, seed) {
@@ -551,7 +557,7 @@ function breakTicks(b, stack, onGround, inWater, meta = 0) {
   if (stack && stack.id === IID.shears && (d.leaves || b === BID.cobweb || b === BID.white_wool)) speed = b === BID.white_wool ? 5 : 15;
   if (t && t.type === TOOL.SWORD && b === BID.cobweb) speed = 15;
   if (t && t.type === TOOL.SWORD && d.leaves) speed = 1.5;
-  if (inWater) speed /= 5;
+  if (inWater && !enchLv(INV.armor[0], 'aqua_affinity')) speed /= 5;
   if (!onGround) speed /= 5;
   const harvest = canHarvest(b, stack) || (b === BID.cobweb && t && t.type === TOOL.SWORD);
   const dmg = speed / hard / (harvest ? 30 : 100);
