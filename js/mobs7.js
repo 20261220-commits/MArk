@@ -69,7 +69,7 @@ function witherAnim(e, P, now) {
   if (e.charge > 0) e.mesh.position.y += Math.sin(now / 50) * 0.05;
 }
 function witherHurt(e, dmg, attacker, src) {
-  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // its own blasts (and other unattributed damage) do not hurt it
+  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // not while it charges up; fire and other unattributed damage do not hurt it, explosions (TNT) do
   e.hp -= dmg; e.hurt = 10; e.inv = 10; e.smash = 1; play('hurt', { vol: 0.8, pitch: 0.6 });
   if (attacker === PL) { e.target = PL; e.plHit = true; }
   if (e.hp <= 0) {

@@ -1401,7 +1401,7 @@ function outpostAt(seed, G, rx, rz) {
 function stampOutposts(seed, G, st, cx, cz, tiles) {
   const rx = Math.floor(cx / OREG), rz = Math.floor(cz / OREG);
   for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) {
-    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) continue;
+    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 13, o.z + 5)) continue;
     const { x: ox, y: y0, z: oz } = o, r = rng(o.seed), LOG = BID.dark_oak_log, PLK = BID.dark_oak_planks, tile = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
     for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
       const x = ox + dx, z = oz + dz, edge = Math.abs(dx) === 3 || Math.abs(dz) === 3, corner = Math.abs(dx) === 3 && Math.abs(dz) === 3;
@@ -1424,6 +1424,16 @@ function stampOutposts(seed, G, st, cx, cz, tiles) {
     }
     st(ox - 2, y0 + 16, oz + 2, 44, 2); if (st.get(ox - 2, y0 + 16, oz + 2) >= 0) tiles.push({ t: 'chest', i: tile(ox - 2, y0 + 16, oz + 2), loot: rollLoot(r, 'outpost', 6) });
     for (const [dx, dy, dz] of [[0, 1, -5], [3, 1, -5], [0, 16, 0], [-2, 16, -2]]) if (st.get(ox + dx, y0 + dy, oz + dz) >= 0) tiles.push({ t: 'mob', i: tile(ox + dx, y0 + dy, oz + dz), mob: 'pillager' });
+    if (hash32(seed, i, j, 81) % 2 === 0) { // a dark oak cage beside the tower with an iron golem shut in it
+      const cx0 = ox + 11, cz0 = oz;
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const x = cx0 + dx, z = cz0 + dz, edge = Math.abs(dx) === 2 || Math.abs(dz) === 2, corner = Math.abs(dx) === 2 && Math.abs(dz) === 2;
+        for (let y = y0 - 3; y <= y0; y++) st(x, y, z, BID.cobblestone);
+        for (let y = y0 + 1; y <= y0 + 3; y++) st(x, y, z, corner ? LOG : edge ? 116 : 0);
+        st(x, y0 + 4, z, PLK); for (let y = y0 + 5; y <= y0 + 6; y++) st(x, y, z, 0);
+      }
+      if (st.get(cx0, y0 + 1, cz0) >= 0) tiles.push({ t: 'mob', i: tile(cx0, y0 + 1, cz0), mob: 'iron_golem' });
+    }
   }
 }
 // ---------- the sea: kelp forests, seagrass meadows, coral reefs, icebergs ----------
@@ -6042,7 +6052,7 @@ function explode(x, y, z, power, fire) {
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
     if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
-    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
+    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
   hit(PL, true);
@@ -9166,22 +9176,34 @@ const lighter = (c, f) => { const a = hex(c); return (Math.min(255, a[0] * f) <<
 const HORSE_COL = [0xe8e4dc, 0xc8a060, 0x9a5a2a, 0x6a4024, 0x2e2622, 0x7a7470, 0x3e2a1a];
 const HARMOR = { leather_horse_armor: [3, 0x9a5a32], iron_horse_armor: [5, 0xc8c8c8], golden_horse_armor: [7, 0xe8c840], diamond_horse_armor: [11, 0x5ae0d8] };
 const HARMOR_KEYS = Object.keys(HARMOR);
+// horse variants: colour in the low 4 bits, markings above (0 none, 1 white socks and blaze, 2 white field, 3 white dots, 4 black dots)
+function horseMark(mk, c, part) {
+  if (!mk) return null;
+  return (k, x, y, w, h) => {
+    const n = ((x * 73856093) ^ (y * 19349663) ^ (k.length * 83492791)) >>> 0;
+    if (mk === 1) return part === 'leg' && y > 6 ? hex(0xf0ece4) : part === 'head' && k === 'front' && x >= 2 && x <= 3 ? hex(0xf0ece4) : hex(c);
+    if (mk === 2) return (n % 7) < 4 && part !== 'leg' ? hex(0xf0ece4) : hex(c);
+    if (mk === 3) return n % 11 === 0 ? hex(0xf8f6f0) : hex(c);
+    return n % 9 === 0 ? hex(0x1a1614) : hex(c);
+  };
+}
 function horseSpec(kind) {
   return v => {
+    const mk = kind === 'horse' ? (v >> 4) & 7 : 0; v &= 15;
     const c = kind === 'donkey' ? 0x8a7e72 : kind === 'mule' ? 0x5a3a24 : HORSE_COL[v] || HORSE_COL[2];
     const mane = kind === 'horse' ? lighter(c, v === 0 ? 0.8 : 0.6) : lighter(c, 0.7), belly = kind === 'donkey' ? 0xb8b0a4 : c;
     const ear = kind === 'horse' ? [1, 2, 1] : [2, 6, 1];
     const parts = [
-      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], (k) => k === 'bottom' ? hex(belly) : hex(c)],
-      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], c],
-      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
+      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], horseMark(mk, c, 'body') || ((k) => k === 'bottom' ? hex(belly) : hex(c))],
+      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], horseMark(mk, c, 'neck') || c],
+      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], horseMark(mk, c, 'head') || c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
       ['ear1', [0, 0, 0], [-3, 30, -13, ...ear], c], ['ear2', [0, 0, 0], [3 - ear[0], 30, -13, ...ear], c],
       ['mane', [0, 0, 0], [-1, 19, -8, 2, 12, 2], mane],
       ['tail', [0, 20, 11], [-1.5, -10, 0, 3, 10, 3], mane],
-      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
+      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
       ['saddle', [0, 0, 0], [-5, 21, -5, 10, 1, 9], (k, x, y) => hex(x === 0 || y === 0 ? 0x4a2a14 : 0x7a4a24), 0.15],
       ['rchest', [0, 0, 0], [5, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)], ['lchest', [0, 0, 0], [-8, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)],
     ];
@@ -9271,7 +9293,7 @@ function horseAnim(e, P) {
   for (const n of ['head', 'ah0', 'ah1', 'ah2', 'ah3', 'ear1', 'ear2']) { const p = P[n]; if (p) { p.rotation.x = hd; p.position.y = -hd * 0.3; p.position.z = -hd * 0.3; } }
 }
 const HORSE_DEF = (kind, name) => ({ hp: 20, w: 0.7, h: 1.6, speed: 0.08, xp: 2, snd: 'hmm', name, drops: [['leather', 0, 2]], parts: HORSE_M[kind].parts, tw: HORSE_M[kind].tw, th: HORSE_M[kind].th,
-  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => (Math.random() * 7) | 0 } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
+  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => ((Math.random() * 7) | 0) | (((Math.random() * 5) | 0) << 4) } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
   init: horseInit, save: horseSave, onBred: horseOnBred, anim: horseAnim, interact: horseInteract, onDeathDrops: horseDrops, armorMul: horseArmorMul });
 
 // ---------- cats ----------
@@ -9437,7 +9459,7 @@ function spawnMoreForChunk(c) {
   const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 204 || g === 205 ? y + 1 : -1; };
   const group = (t, n, opts) => { const v = opts && opts.variant != null ? opts.variant : null; for (let i = 0; i < n; i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = ground(x, z); if (y > 0) spawnMob(t, x + .5, y, z + .5, v != null ? { variant: v } : {}); } };
   const B = S.BIO;
-  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) }); else group('donkey', 1 + R0.int(2)); }
+  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) | (R0.int(5) << 4) }); else group('donkey', 1 + R0.int(2)); }
   if ((b === B.DESERT || b === B.TUNDRA || b === B.SNOWY_TAIGA || b === B.FOREST || b === B.TAIGA) && R0() < 0.025) group('rabbit', 2 + R0.int(2));
   if ((b === B.TAIGA || b === B.SNOWY_TAIGA) && R0() < 0.03) group('fox', 2 + R0.int(2));
   if (b === B.BEACH && R0() < 0.12) group('turtle', 2 + R0.int(4));
@@ -10088,7 +10110,7 @@ function witherAnim(e, P, now) {
   if (e.charge > 0) e.mesh.position.y += Math.sin(now / 50) * 0.05;
 }
 function witherHurt(e, dmg, attacker, src) {
-  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // its own blasts (and other unattributed damage) do not hurt it
+  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // not while it charges up; fire and other unattributed damage do not hurt it, explosions (TNT) do
   e.hp -= dmg; e.hurt = 10; e.inv = 10; e.smash = 1; play('hurt', { vol: 0.8, pitch: 0.6 });
   if (attacker === PL) { e.target = PL; e.plHit = true; }
   if (e.hp <= 0) {
@@ -11217,12 +11239,11 @@ function craftExtra(out, grid) {
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
 // a saddle drawn on saddled pigs and striders (the resource pack has no saddle layer)
-const SADDLE_MAT = new THREE.MeshLambertMaterial({ color: 0x7a4a24 });
 function saddleTick() {
   if (W.tickN % 10) return;
   for (const e of ENT) {
     if (e.kind !== 'mob' || !(e.type === 'pig' || e.type === 'strider') || !e.mesh) continue;
-    if (e.saddle && !e.saddleMesh) { const pig = e.type === 'pig', m = new THREE.Mesh(new THREE.BoxGeometry(pig ? 0.62 : 0.9, 0.06, pig ? 0.5 : 0.7), SADDLE_MAT); m.position.set(0, pig ? 0.82 : 1.06, pig ? 0.05 : 0); e.mesh.add(m); e.saddleMesh = m; }
+    if (e.saddle && !e.saddleMesh) { const pig = e.type === 'pig', m = tintedBox(pig ? 0.64 : 0.95, 0.07, pig ? 0.5 : 0.75, 0x6a3e1e); m.position.set(0, pig ? 0.92 : 1.2, pig ? 0.05 : 0); e.mesh.add(m); e.saddleMesh = m; }
     else if (!e.saddle && e.saddleMesh) { e.mesh.remove(e.saddleMesh); e.saddleMesh = null; }
   }
 }
@@ -11327,6 +11348,129 @@ function playerArmorTick(model, light) {
   }
   for (const m of PLA.meshes) m.material.color.copy(m.userData.col).multiplyScalar(light);
 }
+
+</script>
+<script>/* js/mobs9.js */
+// Finer mob behaviour: parrots on the player's shoulders and dancing to records, panda personalities, llamas that
+// spit, wear carpets and walk in caravans, zombie horses.
+
+// ---------- parrots ----------
+const SHOULDER = { l: null, r: null };
+function parrotPerch(e) {
+  const side = e === SHOULDER.l ? -1 : 1, s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
+  e.x = PL.x + c * 0.38 * side; e.z = PL.z - s * 0.38 * side; e.y = PL.y + (PL.sneaking ? 1.15 : 1.42); e.yaw = PL.yaw; e.vx = e.vy = e.vz = 0; e.flying = false;
+}
+function parrotOff(e) { if (SHOULDER.l === e) SHOULDER.l = null; if (SHOULDER.r === e) SHOULDER.r = null; e.perched = false; e.perchCd = 60; }
+const nearJukebox = e => { for (let dx = -3; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -3; dz <= 3; dz++) { const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz; if (getBlock(x, y, z) === BID.jukebox) { const t = getTile(x, y, z); if (t && t.playing) return true; } } return false; };
+const parrotBaseAI = MOBDEF.parrot.ai;
+MOBDEF.parrot.ai = (e, dist) => {
+  if (e.perched) {
+    // shoulder parrots hop off when the player jumps into water, flies, sleeps, rides, or is hurt
+    if (PL.dead || PL.inWater || PL.flying || PL.sleeping || PL.riding || PL.hurtT > 0 || e.owner !== 'player' || PL.gliding) parrotOff(e); else { parrotPerch(e); return; }
+  }
+  if (e.perchCd > 0) e.perchCd--;
+  if (e.owner === 'player' && !e.sitting && !e.perchCd && dist < 1.4 && PL.onGround === false && PL.vy < 0 && (!SHOULDER.l || !SHOULDER.r)) { // lands on you as you come down from a jump
+    if (!SHOULDER.l) SHOULDER.l = e; else SHOULDER.r = e; e.perched = true; play('hmm', { pitch: 1.9, vol: 0.4 }); parrotPerch(e); return;
+  }
+  if (e.age % 20 === 0) e.dancing = nearJukebox(e);
+  if (e.dancing && !e.sitting) { walkPhysics(e, 0, 0, 0); return; }
+  // now and then a parrot imitates a monster close by
+  if (e.age % 200 === 0 && Math.random() < 0.3) { const m = ENT.find(o => o.kind === 'mob' && o.def.hostile && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 20); if (m) play(m.def.snd || 'hmm', { pitch: 1.8, vol: 0.4 }); }
+  parrotBaseAI(e, dist);
+};
+const parrotBaseAnim = MOBDEF.parrot.anim;
+MOBDEF.parrot.anim = (e, P, now) => {
+  parrotBaseAnim(e, P, now);
+  if (P.body && P.head) { const d = e.dancing ? Math.sin(now / 120) * 0.35 : 0; P.head.rotation.z = d; P.body.rotation.z = d * 0.5; }
+};
+
+// ---------- pandas: each has a main gene that sets its manner ----------
+const PANDA_GENES = ['normal', 'lazy', 'worried', 'playful', 'aggressive', 'weak'];
+const PANDA_GENE_KO = { normal: '보통', lazy: '게으름', worried: '걱정 많음', playful: '장난기', aggressive: '공격적', weak: '약함', brown: '갈색' };
+const pandaBaseAI = MOBDEF.panda.ai;
+MOBDEF.panda.ai = (e, dist) => {
+  const g = e.gene || (e.gene = e.variant === 1 ? 'brown' : PANDA_GENES[(Math.random() * PANDA_GENES.length) | 0]);
+  if (e.roll > 0) { e.roll--; walkPhysics(e, -Math.sin(e.yaw) * 0.6, -Math.cos(e.yaw) * 0.6, 0.05); return; }
+  if (e.lying > 0) { e.lying--; walkPhysics(e, 0, 0, 0); return; }
+  if (g === 'aggressive' && e.panic > 0 && plTargetable() && dist < 12) { e.panic = 0; e.angry = 200; } // hits back instead of fleeing
+  if (e.angry > 0) {
+    e.angry--; faceTo(e, PL.x, PL.z); const [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
+    if (dist < 1.8 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, 6, mx, mz); }
+    walkPhysics(e, mx, mz, 0.08); if (!plTargetable()) e.angry = 0; return;
+  }
+  if (g === 'worried' && (W.thunder > 0.5 || ENT.some(o => o.kind === 'mob' && o.def.hostile && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8))) { e.lying = 40; return; } // hides its face
+  if (g === 'lazy' && Math.random() < 1 / 300) { e.lying = 200 + Math.floor(Math.random() * 200); return; }
+  if (g === 'playful' && Math.random() < 1 / 400) { e.roll = 30; play('hmm', { pitch: 0.8, vol: 0.4 }); return; }
+  if ((g === 'weak' || e.baby) && Math.random() < (g === 'weak' ? 1 / 2000 : 0)) { dropItem(e.x, e.y + 0.5, e.z, IID.slime_ball, 1); play('hmm', { pitch: 2 }); } // weak pandas sneeze
+  return pandaBaseAI(e, dist);
+};
+MOBDEF.panda.anim = (e, P) => {
+  if (!P.body) return;
+  P.body.rotation.x = e.roll > 0 ? (e.roll / 30) * Math.PI * 2 : 0;
+  P.body.rotation.z = e.lying > 0 ? 0.9 : 0; // lies on its side
+  if (P.head) P.head.rotation.z = e.lying > 0 ? 0.9 : 0;
+};
+{ const save = MOBDEF.panda.save, init = MOBDEF.panda.init;
+  MOBDEF.panda.save = e => ({ ...(save ? save(e) : {}), gene: e.gene }); MOBDEF.panda.init = (e, o) => { if (init) init(e, o); if (o.gene) e.gene = o.gene; }; }
+
+// ---------- llamas ----------
+function llamaSpit(e, t) {
+  const dx = t.x - e.x, dy = (t.y + (t.h || 1.6) * 0.6) - (e.y + 1.6), dz = t.z - e.z, d = Math.hypot(dx, dy, dz) || 1, v = 1.2;
+  const s = shootArrow(e.x + dx / d * 0.6, e.y + 1.6, e.z + dz / d * 0.6, dx / d * v, dy / d * v + d * 0.015, dz / d * v, e, 0.8);
+  s.noPickup = true; s.age = 1170; s.mesh.scale.setScalar(0.3); s.mesh.material.color.set(0xf0f0e8);
+  play('splash', { vol: 0.3, pitch: 1.6 });
+}
+function llamaExtras(e, dist) {
+  // spits at wolves, and at a player who hurt it
+  if (e.panic > 0 && plTargetable() && dist < 10 && !e.rider) { e.spitAt = PL; e.panic = 0; }
+  if (!e.spitAt && e.age % 40 === 0) e.spitAt = ENT.find(o => o.type === 'wolf' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 10) || null;
+  if (e.spitAt) {
+    const t = e.spitAt, d = Math.hypot(t.x - e.x, t.z - e.z);
+    if (t.dead || d > 14 || (t === PL && !plTargetable())) e.spitAt = null;
+    else { faceTo(e, t.x, t.z); if (e.attackCd <= 0) { e.attackCd = 40; llamaSpit(e, t); } walkPhysics(e, 0, 0, 0); return true; }
+  }
+  // caravans: a llama near a led llama follows it, up to ten in a line
+  if (!e.leash && !e.rider) {
+    if (e.age % 20 === 0) { const lead = ENT.find(o => o !== e && (o.type === 'llama' || o.type === 'trader_llama') && !o.dead && (o.leash || o.caravanOf) && o.caravanBy !== e && Math.hypot(o.x - e.x, o.z - e.z) < 8 && (o.caravanLen || 0) < 9); e.caravanOf = lead || null; if (lead) { lead.caravanBy = e; e.caravanLen = (lead.caravanLen || 0) + 1; } }
+    const l = e.caravanOf;
+    if (l && !l.dead && Math.hypot(l.x - e.x, l.z - e.z) > 2.5) { faceTo(e, l.x, l.z); const [mx, mz] = pathDir(e, l.x, l.y, l.z); walkPhysics(e, mx, mz, 0.09); return true; }
+  }
+  return false;
+}
+for (const k of ['llama', 'trader_llama']) {
+  const d = MOBDEF[k], base = d.ai, inter = d.interact, save = d.save, init = d.init, drops = d.onDeathDrops;
+  d.ai = (e, dist) => { if (llamaExtras(e, dist)) return; if (base) base(e, dist); else genericAnimal(e, dist); };
+  // a carpet on a tamed llama: right-click with any carpet (shears take it off)
+  d.interact = (e, h, dd) => {
+    const key = h && ITEMS[h.id].key;
+    if (key && key.endsWith('_carpet') && e.owner === 'player' && !e.baby) { if (e.carpet != null) dropItem(e.x, e.y + 1, e.z, IID[S.COLORS[e.carpet] + '_carpet'], 1); e.carpet = S.COLORS.indexOf(key.slice(0, -7)); consume(); play('place', { mat: 'wool' }); swing(); return true; }
+    return inter ? inter(e, h, dd) : false;
+  };
+  d.save = e => ({ ...(save ? save(e) : {}), carpet: e.carpet }); d.init = (e, o) => { if (init) init(e, o); if (o.carpet != null) e.carpet = o.carpet; };
+  d.onDeathDrops = e => { if (drops) drops(e); if (e.carpet != null) dropItem(e.x, e.y + .5, e.z, IID[S.COLORS[e.carpet] + '_carpet'], 1); };
+}
+// a box coloured through vertex colours, so the mob lighting (which sets material colours) shades it correctly
+function tintedBox(w, h, d, col) {
+  const g = new THREE.BoxGeometry(w, h, d), n = g.attributes.position.count, c = new Float32Array(n * 3), [r, gg, b] = hex(col).map(v => v / 255);
+  for (let i = 0; i < n; i++) { const f = i < 8 ? 0.85 : i < 16 ? 1 : 0.9; c[i * 3] = r * f; c[i * 3 + 1] = gg * f; c[i * 3 + 2] = b * f; }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true }));
+}
+function llamaCarpetTick() {
+  if (W.tickN % 10) return;
+  for (const e of ENT) {
+    if (e.kind !== 'mob' || (e.type !== 'llama' && e.type !== 'trader_llama') || !e.mesh) continue;
+    const want = e.carpet != null ? e.carpet : -1;
+    if ((e.carpetMesh ? e.carpetMesh.userData.c : -1) === want) continue;
+    if (e.carpetMesh) { e.mesh.remove(e.carpetMesh); e.carpetMesh = null; }
+    if (want >= 0) { const m = tintedBox(0.8, 0.07, 1.15, BANNER_DYE[want]); m.position.set(0, 1.35, 0.05); m.userData.c = want; e.mesh.add(m); e.carpetMesh = m; }
+  }
+}
+
+// ---------- zombie horses (summoned only, as in Java): undead, cannot be tamed ----------
+HORSE_COL.push(0x4a6a3a);
+MOBDEF.zombie_horse = { ...HORSE_DEF('horse', '좀비 말'), drops: [['rotten_flesh', 0, 2]], food: null, variant: () => HORSE_COL.length - 1, interact: () => false, ride: null };
+
+function mobs9Tick() { llamaCarpetTick(); }
 
 </script>
 <script>/* js/inventory.js */
@@ -13072,7 +13216,7 @@ function gameTick() {
   if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
-  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick();
+  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick();
   playerTick();
   entityTick();
   tickScheduled();

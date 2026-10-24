@@ -1151,7 +1151,7 @@ function outpostAt(seed, G, rx, rz) {
 function stampOutposts(seed, G, st, cx, cz, tiles) {
   const rx = Math.floor(cx / OREG), rz = Math.floor(cz / OREG);
   for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) {
-    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) continue;
+    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 13, o.z + 5)) continue;
     const { x: ox, y: y0, z: oz } = o, r = rng(o.seed), LOG = BID.dark_oak_log, PLK = BID.dark_oak_planks, tile = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
     for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
       const x = ox + dx, z = oz + dz, edge = Math.abs(dx) === 3 || Math.abs(dz) === 3, corner = Math.abs(dx) === 3 && Math.abs(dz) === 3;
@@ -1174,6 +1174,16 @@ function stampOutposts(seed, G, st, cx, cz, tiles) {
     }
     st(ox - 2, y0 + 16, oz + 2, 44, 2); if (st.get(ox - 2, y0 + 16, oz + 2) >= 0) tiles.push({ t: 'chest', i: tile(ox - 2, y0 + 16, oz + 2), loot: rollLoot(r, 'outpost', 6) });
     for (const [dx, dy, dz] of [[0, 1, -5], [3, 1, -5], [0, 16, 0], [-2, 16, -2]]) if (st.get(ox + dx, y0 + dy, oz + dz) >= 0) tiles.push({ t: 'mob', i: tile(ox + dx, y0 + dy, oz + dz), mob: 'pillager' });
+    if (hash32(seed, i, j, 81) % 2 === 0) { // a dark oak cage beside the tower with an iron golem shut in it
+      const cx0 = ox + 11, cz0 = oz;
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const x = cx0 + dx, z = cz0 + dz, edge = Math.abs(dx) === 2 || Math.abs(dz) === 2, corner = Math.abs(dx) === 2 && Math.abs(dz) === 2;
+        for (let y = y0 - 3; y <= y0; y++) st(x, y, z, BID.cobblestone);
+        for (let y = y0 + 1; y <= y0 + 3; y++) st(x, y, z, corner ? LOG : edge ? 116 : 0);
+        st(x, y0 + 4, z, PLK); for (let y = y0 + 5; y <= y0 + 6; y++) st(x, y, z, 0);
+      }
+      if (st.get(cx0, y0 + 1, cz0) >= 0) tiles.push({ t: 'mob', i: tile(cx0, y0 + 1, cz0), mob: 'iron_golem' });
+    }
   }
 }
 // ---------- the sea: kelp forests, seagrass meadows, coral reefs, icebergs ----------

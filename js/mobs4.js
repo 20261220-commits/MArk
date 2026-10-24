@@ -27,22 +27,34 @@ const lighter = (c, f) => { const a = hex(c); return (Math.min(255, a[0] * f) <<
 const HORSE_COL = [0xe8e4dc, 0xc8a060, 0x9a5a2a, 0x6a4024, 0x2e2622, 0x7a7470, 0x3e2a1a];
 const HARMOR = { leather_horse_armor: [3, 0x9a5a32], iron_horse_armor: [5, 0xc8c8c8], golden_horse_armor: [7, 0xe8c840], diamond_horse_armor: [11, 0x5ae0d8] };
 const HARMOR_KEYS = Object.keys(HARMOR);
+// horse variants: colour in the low 4 bits, markings above (0 none, 1 white socks and blaze, 2 white field, 3 white dots, 4 black dots)
+function horseMark(mk, c, part) {
+  if (!mk) return null;
+  return (k, x, y, w, h) => {
+    const n = ((x * 73856093) ^ (y * 19349663) ^ (k.length * 83492791)) >>> 0;
+    if (mk === 1) return part === 'leg' && y > 6 ? hex(0xf0ece4) : part === 'head' && k === 'front' && x >= 2 && x <= 3 ? hex(0xf0ece4) : hex(c);
+    if (mk === 2) return (n % 7) < 4 && part !== 'leg' ? hex(0xf0ece4) : hex(c);
+    if (mk === 3) return n % 11 === 0 ? hex(0xf8f6f0) : hex(c);
+    return n % 9 === 0 ? hex(0x1a1614) : hex(c);
+  };
+}
 function horseSpec(kind) {
   return v => {
+    const mk = kind === 'horse' ? (v >> 4) & 7 : 0; v &= 15;
     const c = kind === 'donkey' ? 0x8a7e72 : kind === 'mule' ? 0x5a3a24 : HORSE_COL[v] || HORSE_COL[2];
     const mane = kind === 'horse' ? lighter(c, v === 0 ? 0.8 : 0.6) : lighter(c, 0.7), belly = kind === 'donkey' ? 0xb8b0a4 : c;
     const ear = kind === 'horse' ? [1, 2, 1] : [2, 6, 1];
     const parts = [
-      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], (k) => k === 'bottom' ? hex(belly) : hex(c)],
-      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], c],
-      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
+      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], horseMark(mk, c, 'body') || ((k) => k === 'bottom' ? hex(belly) : hex(c))],
+      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], horseMark(mk, c, 'neck') || c],
+      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], horseMark(mk, c, 'head') || c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
       ['ear1', [0, 0, 0], [-3, 30, -13, ...ear], c], ['ear2', [0, 0, 0], [3 - ear[0], 30, -13, ...ear], c],
       ['mane', [0, 0, 0], [-1, 19, -8, 2, 12, 2], mane],
       ['tail', [0, 20, 11], [-1.5, -10, 0, 3, 10, 3], mane],
-      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
+      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
       ['saddle', [0, 0, 0], [-5, 21, -5, 10, 1, 9], (k, x, y) => hex(x === 0 || y === 0 ? 0x4a2a14 : 0x7a4a24), 0.15],
       ['rchest', [0, 0, 0], [5, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)], ['lchest', [0, 0, 0], [-8, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)],
     ];
@@ -132,7 +144,7 @@ function horseAnim(e, P) {
   for (const n of ['head', 'ah0', 'ah1', 'ah2', 'ah3', 'ear1', 'ear2']) { const p = P[n]; if (p) { p.rotation.x = hd; p.position.y = -hd * 0.3; p.position.z = -hd * 0.3; } }
 }
 const HORSE_DEF = (kind, name) => ({ hp: 20, w: 0.7, h: 1.6, speed: 0.08, xp: 2, snd: 'hmm', name, drops: [['leather', 0, 2]], parts: HORSE_M[kind].parts, tw: HORSE_M[kind].tw, th: HORSE_M[kind].th,
-  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => (Math.random() * 7) | 0 } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
+  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => ((Math.random() * 7) | 0) | (((Math.random() * 5) | 0) << 4) } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
   init: horseInit, save: horseSave, onBred: horseOnBred, anim: horseAnim, interact: horseInteract, onDeathDrops: horseDrops, armorMul: horseArmorMul });
 
 // ---------- cats ----------
@@ -298,7 +310,7 @@ function spawnMoreForChunk(c) {
   const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 204 || g === 205 ? y + 1 : -1; };
   const group = (t, n, opts) => { const v = opts && opts.variant != null ? opts.variant : null; for (let i = 0; i < n; i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = ground(x, z); if (y > 0) spawnMob(t, x + .5, y, z + .5, v != null ? { variant: v } : {}); } };
   const B = S.BIO;
-  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) }); else group('donkey', 1 + R0.int(2)); }
+  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) | (R0.int(5) << 4) }); else group('donkey', 1 + R0.int(2)); }
   if ((b === B.DESERT || b === B.TUNDRA || b === B.SNOWY_TAIGA || b === B.FOREST || b === B.TAIGA) && R0() < 0.025) group('rabbit', 2 + R0.int(2));
   if ((b === B.TAIGA || b === B.SNOWY_TAIGA) && R0() < 0.03) group('fox', 2 + R0.int(2));
   if (b === B.BEACH && R0() < 0.12) group('turtle', 2 + R0.int(4));

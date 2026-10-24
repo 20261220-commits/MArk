@@ -241,12 +241,11 @@ function craftExtra(out, grid) {
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
 // a saddle drawn on saddled pigs and striders (the resource pack has no saddle layer)
-const SADDLE_MAT = new THREE.MeshLambertMaterial({ color: 0x7a4a24 });
 function saddleTick() {
   if (W.tickN % 10) return;
   for (const e of ENT) {
     if (e.kind !== 'mob' || !(e.type === 'pig' || e.type === 'strider') || !e.mesh) continue;
-    if (e.saddle && !e.saddleMesh) { const pig = e.type === 'pig', m = new THREE.Mesh(new THREE.BoxGeometry(pig ? 0.62 : 0.9, 0.06, pig ? 0.5 : 0.7), SADDLE_MAT); m.position.set(0, pig ? 0.82 : 1.06, pig ? 0.05 : 0); e.mesh.add(m); e.saddleMesh = m; }
+    if (e.saddle && !e.saddleMesh) { const pig = e.type === 'pig', m = tintedBox(pig ? 0.64 : 0.95, 0.07, pig ? 0.5 : 0.75, 0x6a3e1e); m.position.set(0, pig ? 0.92 : 1.2, pig ? 0.05 : 0); e.mesh.add(m); e.saddleMesh = m; }
     else if (!e.saddle && e.saddleMesh) { e.mesh.remove(e.saddleMesh); e.saddleMesh = null; }
   }
 }
