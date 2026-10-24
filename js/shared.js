@@ -1305,38 +1305,118 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
     stampMonument(st, m, tiles, tl);
   }
 }
-function stampMonument(st, m, tiles, tl) {
-  const yB = 39, PR = [209, 0], PB = [200, 11], DP = [200, 12], SL = [210, 0], W = [27, 0];
-  const put = (dx, y, dz, [id, mm]) => st(m.x + dx, y, m.z + dz, id, mm);
-  const inBody = (dx, dz) => Math.abs(dx) <= 13 && dz >= -14 && dz <= 20, inWing = (dx, dz) => (dx >= -28 && dx <= -14 || dx >= 13 && dx <= 28) && dz >= 8 && dz <= 28;
-  for (let dx = -29; dx <= 28; dx++) for (let dz = -29; dz <= 28; dz++) {
-    for (let y = 20; y < yB; y++) if (st.get(m.x + dx, y, m.z + dz) === 27 || st.get(m.x + dx, y, m.z + dz) === 0) put(dx, y, dz, PR); // pedestal
-    for (let y = yB + 1; y <= yB + 22; y++) put(dx, y, dz, W);
-    put(dx, yB, dz, (dx % 6 === 0 && dz % 6 === 0) ? SL : PB); // floor with lights
-    const ring = Math.max(Math.abs(dx + 0.5), Math.abs(dz + 0.5)) >= 26.5;
-    if (ring && !(dz < -25 && Math.abs(dx) < 4)) for (let y = yB + 1; y <= yB + 8; y++) put(dx, y, dz, y === yB + 8 ? DP : (y === yB + 4 && (dx + dz) % 5 === 0) ? SL : PR);
-    if (inWing(dx, dz)) {
-      const edge = dx === -28 || dx === -14 || dx === 13 || dx === 28 || dz === 8 || dz === 28;
-      for (let y = yB + 1; y <= yB + 16; y++) if (edge || y === yB + 8 || y === yB + 16) { if (!(edge && y >= yB + 2 && y <= yB + 4 && (dz === 18 || dx === -21 || dx === 20))) put(dx, y, dz, y % 4 === 0 && edge ? SL : y === yB + 16 ? DP : PB); }
-    }
-    if (inBody(dx, dz)) {
-      const edge = Math.abs(dx) === 13 || dz === -14 || dz === 20;
-      for (let y = yB + 1; y <= yB + 12; y++) {
-        const door = edge && dz === -14 && Math.abs(dx) <= 2 && y <= yB + 4;
-        if ((edge && !door) || ((y === yB + 6 || y === yB + 12) && !(Math.abs(dx) <= 1 && (dz === -6 || dz === 12)))) put(dx, y, dz, edge && y % 4 === 2 && Math.abs(dx) % 4 === 1 ? SL : PB);
-      }
-      // stepped roof
-      for (let k = 0; k < 4; k++) { const inset = k * 3, y = yB + 13 + k * 2; if (Math.abs(dx) <= 13 - inset && dz >= -14 + inset && dz <= 20 - inset) { const e2 = Math.abs(dx) === 13 - inset || dz === -14 + inset || dz === 20 - inset; put(dx, y, dz, e2 ? DP : PR); if (e2) put(dx, y + 1, dz, (dx + dz) % 4 === 0 ? SL : DP); } }
-    }
+// Ocean monument, after vanilla's procedural layout: a 58 x 58 prismarine building whose floor sits at y 39 on a
+// foundation filled down to the sea bed. Front: an entrance hall between two wings, each wing an elder guardian's
+// chamber. Behind: a grid of 8 x 5 x 8 rooms (6 x 4 cells on the two lower levels, 4 x 3 on the top level) joined by a
+// random spanning tree of doorways and shafts from the entrance, some cells merged into double rooms (double-height
+// rooms hold the wet sponges), the 2 x 2 x 2 core with its eight gold blocks in the middle, and the penthouse with the
+// third elder guardian on the roof. The layout is built once per monument and copied into each chunk it touches.
+const MON_CACHE = new Map(), MSX = 58, MSY = 24, MYB = 39;
+function monumentLayout(m) {
+  if (MON_CACHE.has(m.seed)) return MON_CACHE.get(m.seed);
+  const r = rng(m.seed), KEEP = 0xffff, BL = new Uint16Array(MSX * MSX * MSY).fill(KEEP), ML = new Uint8Array(MSX * MSX * MSY), mobs = [];
+  const PR = [209, 0], PB = [200, 11], DP = [200, 12], SL = [210, 0], W = [27, 0], GOLD = [61, 0], SP = [212, 0];
+  const put = (x, y, z, [id, mm]) => { if (x < 0 || z < 0 || x >= MSX || z >= MSX || y < 0 || y >= MSY) return; const i = (y * MSX + z) * MSX + x; BL[i] = id; ML[i] = mm; };
+  const box = (x0, y0, z0, x1, y1, z1, b) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) put(x, y, z, b); };
+  const shell = (x0, y0, z0, x1, y1, z1, b) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (x === x0 || x === x1 || z === z0 || z === z1 || y === y0 || y === y1) put(x, y, z, typeof b === 'function' ? b(x, y, z) : b); };
+  // the whole footprint is water above a lantern-studded brick floor
+  box(0, 1, 0, MSX - 1, MSY - 1, MSX - 1, W);
+  for (let z = 0; z < MSX; z++) for (let x = 0; x < MSX; x++) put(x, 0, z, x % 8 === 4 && z % 8 === 4 ? SL : PB);
+  const wallMat = (x, y, z) => y % 5 === 0 ? DP : y % 5 === 3 && (x + z) % 4 === 0 ? SL : PB;
+  // ---- wings and entrance hall (front, z 0..21) ----
+  for (const [x0, x1] of [[0, 21], [36, 57]]) {
+    shell(x0, 0, 0, x1, 10, 21, wallMat);
+    for (let k = 1; k <= 3; k++) shell(x0 + k * 2, 10 + k, k * 2, x1 - k * 2, 10 + k, 21 - k * 2, k === 3 ? DP : PR); // stepped roof
+    box(x0 + 1, 1, 1, x1 - 1, 9, 20, W);
+    const cx = (x0 + x1) >> 1, cz = 10;
+    for (const [dx, dz] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) { box(cx + dx, 1, cz + dz, cx + dx + 1, 7, cz + dz + 1, DP); put(cx + dx, 8, cz + dz, SL); put(cx + dx + 1, 8, cz + dz + 1, SL); }
+    box(cx - 2, 1, cz - 2, cx + 3, 1, cz + 3, DP); put(cx, 1, cz, SL); put(cx + 1, 1, cz + 1, SL);
+    mobs.push([cx, 5, cz, 'elder_guardian']);
+    box(x0 === 0 ? 8 : 45, 1, 21, x0 === 0 ? 11 : 48, 3, 21, W); // door into the room grid
+    box(x0 === 0 ? 21 : 36, 2, 9, x0 === 0 ? 21 : 36, 4, 12, W); // window into the entrance hall
   }
-  // the treasure room: eight gold blocks inside a dark prismarine box
-  for (let dx = -3; dx <= 3; dx++) for (let dz = 0; dz <= 6; dz++) for (let y = yB + 7; y <= yB + 11; y++) { const e = Math.abs(dx) === 3 || dz === 0 || dz === 6 || y === yB + 7 || y === yB + 11; if (e && !(dz === 0 && Math.abs(dx) <= 1 && y <= yB + 9)) put(dx, y, dz, DP); }
-  for (let dx = 0; dx <= 1; dx++) for (let dz = 2; dz <= 3; dz++) for (let y = yB + 8; y <= yB + 9; y++) put(dx - 1 + 1, y, dz + 1, [61, 0]);
-  // a sponge room in the body
-  for (let dx = 6; dx <= 11; dx++) for (let dz = -12; dz <= -7; dz++) if ((dx + dz) % 2 === 0) put(dx, yB + 11, dz, [212, 0]);
-  const mob = (dx, y, dz, t) => { if (st.get(m.x + dx, y, m.z + dz) >= 0) tiles.push({ t: 'mob', i: tl(m.x + dx, y, m.z + dz), mob: t }); };
-  mob(0, yB + 15, 3, 'elder_guardian'); mob(-21, yB + 10, 18, 'elder_guardian'); mob(20, yB + 10, 18, 'elder_guardian');
-  for (const [dx, dz] of [[-20, -20], [20, -20], [-20, 0], [20, 0], [0, -22], [8, 24]]) mob(dx, yB + 3, dz, 'guardian');
+  shell(22, 0, 0, 35, 10, 21, wallMat); box(23, 1, 1, 34, 9, 20, W);
+  for (let k = 1; k <= 2; k++) shell(22 + k * 2, 10 + k, k * 2, 35 - k * 2, 10 + k, 21 - k * 2, k === 2 ? DP : PR);
+  box(27, 1, 0, 30, 6, 0, W); put(26, 7, 0, SL); put(31, 7, 0, SL); box(27, 7, 0, 30, 7, 0, DP); // the arched front door
+  for (let z = 4; z <= 18; z += 4) for (const x of [25, 32]) box(x, 1, z, x, 9, z, PR); // pillars down the hall
+  box(27, 1, 21, 30, 3, 21, W);
+  // ---- the room grid ----
+  const GX = 6, GZ = 4, GY = 3, cellOk = (i, j, k) => i >= 0 && j >= 0 && k >= 0 && i < GX && j < GZ && k < GY && (k < 2 || (i >= 1 && i <= 4 && j <= 2));
+  const isCore = (i, j, k) => i >= 2 && i <= 3 && j >= 1 && j <= 2 && k <= 1, idx = (i, j, k) => (k * GZ + j) * GX + i;
+  const cx0 = i => 4 + i * 8, cz0 = j => 21 + j * 8, cy0 = k => k * 5;
+  const open = new Set(), link = (a, b) => open.add(a < b ? a + ',' + b : b + ',' + a), linked = (a, b) => open.has(a < b ? a + ',' + b : b + ',' + a);
+  const NB6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  // spanning tree from the entrance cells
+  const seen = new Uint8Array(GX * GZ * GY), stack = [[2, 0, 0], [3, 0, 0], [0, 0, 0], [5, 0, 0]]; for (const [i, j, k] of stack) seen[idx(i, j, k)] = 1;
+  while (stack.length) {
+    const top = stack[stack.length - 1], [i, j, k] = top, opts = NB6.map(([a, b, c]) => [i + a, j + b, k + c]).filter(([a, b, c]) => cellOk(a, b, c) && !isCore(a, b, c) && !seen[idx(a, b, c)]);
+    if (!opts.length) { stack.pop(); continue; }
+    const n = opts[r.int(opts.length)]; seen[idx(...n)] = 1; link(idx(i, j, k), idx(...n)); stack.push(n);
+  }
+  // a few extra doorways, and one way into the core
+  for (let k = 0; k < GY; k++) for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) for (const [a, b, c] of [[1, 0, 0], [0, 0, 1], [0, 1, 0]]) {
+    if (!cellOk(i, j, k) || !cellOk(i + a, j + c, k + b) || isCore(i, j, k) || isCore(i + a, j + c, k + b)) continue;
+    if (r() < 0.1) link(idx(i, j, k), idx(i + a, j + c, k + b));
+  }
+  const coreDoors = [[1, 1, 0, 2, 1, 0], [4, 2, 0, 3, 2, 0], [2, 0, 1, 2, 1, 1], [3, 3, 1, 3, 2, 1]], cd = coreDoors[r.int(4)]; link(idx(cd[0], cd[1], cd[2]), idx(cd[3], cd[4], cd[5]));
+  // merged rooms: the wall (or floor) between two cells is left out
+  const merged = new Set(), mergedWith = new Int16Array(GX * GZ * GY).fill(-1), spongeRoom = new Set();
+  for (let k = 0; k < GY; k++) for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) {
+    const a = idx(i, j, k); if (!cellOk(i, j, k) || isCore(i, j, k) || mergedWith[a] >= 0) continue;
+    const roll = r(), cand = roll < 0.22 ? [i + 1, j, k] : roll < 0.4 ? [i, j + 1, k] : roll < 0.55 ? [i, j, k + 1] : null;
+    if (!cand || !cellOk(...cand) || isCore(...cand) || mergedWith[idx(...cand)] >= 0) continue;
+    const b = idx(...cand); mergedWith[a] = b; mergedWith[b] = a; merged.add(a + ',' + b); link(a, b);
+    if (cand[2] > k && r() < 0.6) spongeRoom.add(b);
+  }
+  const isMerged = (a, b) => merged.has(a < b ? a + ',' + b : b + ',' + a);
+  for (let k = 0; k < GY; k++) for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) {
+    if (!cellOk(i, j, k) || isCore(i, j, k)) continue;
+    const x0 = cx0(i), z0 = cz0(j), y0 = cy0(k), me = idx(i, j, k), outer = (x, y, z) => wallMat(x, y, z);
+    // walls on each side: outer walls where the grid ends, doorways or nothing toward linked / merged neighbours
+    for (const [a, b, c] of NB6) {
+      const n = [i + a, j + b, k + c], nOk = cellOk(...n), ni = nOk ? idx(...n) : -1;
+      if (nOk && isMerged(me, ni)) continue;
+      const door = nOk && linked(me, ni), mat = nOk ? PB : null;
+      if (c) { // floor / ceiling
+        const y = c > 0 ? y0 + 5 : y0; if (c < 0 && k === 0) continue;
+        for (let z = z0; z <= z0 + 8; z++) for (let x = x0; x <= x0 + 8; x++) put(x, y, z, door && x >= x0 + 3 && x <= x0 + 5 && z >= z0 + 3 && z <= z0 + 5 ? W : !nOk && c > 0 ? (x === x0 || x === x0 + 8 || z === z0 || z === z0 + 8 ? DP : PR) : PB);
+        continue;
+      }
+      const wx = a > 0 ? x0 + 8 : a < 0 ? x0 : -1, wz = b > 0 ? z0 + 8 : b < 0 ? z0 : -1;
+      for (let y = y0; y <= y0 + 5; y++) for (let t = 0; t <= 8; t++) {
+        const x = wx >= 0 ? wx : x0 + t, z = wz >= 0 ? wz : z0 + t;
+        if (door && t >= 3 && t <= 5 && y >= y0 + 1 && y <= y0 + 3) { put(x, y, z, W); continue; }
+        if (!nOk && j === 0 && b < 0 && k === 0) continue; // the front wall is the wings' and hall's back wall
+        put(x, y, z, mat || outer(x, y, z));
+      }
+    }
+    // furnishings: corner pillars with a lantern, a centre column, or a sponge-lined ceiling in double-height rooms
+    const kind = spongeRoom.has(me) ? 'sponge' : (hash32(m.seed, i, j, k) % 3);
+    if (kind === 'sponge') { for (let z = z0 + 1; z <= z0 + 7; z++) for (let x = x0 + 1; x <= x0 + 7; x++) if (r() < 0.35) put(x, y0 + 4, z, SP); }
+    else if (kind === 0) { for (const [dx, dz] of [[1, 1], [7, 1], [1, 7], [7, 7]]) box(x0 + dx, y0 + 1, z0 + dz, x0 + dx, y0 + 4, z0 + dz, PR); put(x0 + 4, y0 + 4, z0 + 4, SL); }
+    else if (kind === 1) { box(x0 + 4, y0 + 1, z0 + 4, x0 + 4, y0 + 3, z0 + 4, PB); put(x0 + 4, y0 + 4, z0 + 4, SL); }
+    if (hash32(m.seed, i, j, k + 7) % 3 === 0) mobs.push([x0 + 2, y0 + 2, z0 + 2, 'guardian']);
+  }
+  // the core: dark prismarine walls and pillars around the eight gold blocks
+  const X0 = cx0(2), X1 = cx0(4), Z0 = cz0(1), Z1 = cz0(3);
+  shell(X0, 0, Z0, X1, 10, Z1, DP); box(X0 + 1, 1, Z0 + 1, X1 - 1, 9, Z1 - 1, W);
+  for (const [dx, dz] of [[3, 3], [13, 3], [3, 13], [13, 13]]) { box(X0 + dx, 1, Z0 + dz, X0 + dx, 9, Z0 + dz, DP); put(X0 + dx, 5, Z0 + dz, SL); }
+  box(X0 + 7, 4, Z0 + 7, X0 + 8, 5, Z0 + 8, GOLD);
+  { const [i, j, k, i2, j2] = cd, wx = i < i2 ? X0 : i > i2 ? X1 : -1, wz = j < j2 ? Z0 : j > j2 ? Z1 : -1, x = wx >= 0 ? wx : cx0(i) + 3, z = wz >= 0 ? wz : cz0(j) + 3, y = cy0(k) + 1; box(x, y, z, wx >= 0 ? x : x + 2, y + 2, wz >= 0 ? z : z + 2, W); }
+  // the penthouse on the roof over the core, reached through a shaft from the top level
+  shell(X0 + 2, 15, Z0 + 2, X1 - 2, 21, Z1 - 2, (x, y, z) => y === 18 && (x + z) % 3 === 0 ? SL : DP); box(X0 + 3, 16, Z0 + 3, X1 - 3, 20, Z1 - 3, W);
+  box(X0 + 7, 15, Z0 + 7, X0 + 9, 15, Z0 + 9, W); box(X0 + 6, 16, Z0 + 2, X0 + 10, 18, Z0 + 2, W);
+  mobs.push([X0 + 8, 17, Z0 + 8, 'elder_guardian']);
+  const out = { BL, ML, mobs }; MON_CACHE.set(m.seed, out); return out;
+}
+function stampMonument(st, m, tiles, tl) {
+  const L = monumentLayout(m), ox = m.x - 29, oz = m.z - 29;
+  for (let z = 0; z < MSX; z++) for (let x = 0; x < MSX; x++) {
+    const wx = ox + x, wz = oz + z; if (st.get(wx, MYB, wz) < 0) continue;
+    for (let y = MYB - 1; y > 1; y--) { const b = st.get(wx, y, wz); if (b !== 27 && b !== 0 && !REPL[b] && b !== BID.kelp && b !== BID.kelp_plant) break; st(wx, y, wz, 209, 0); } // foundation down to the sea bed
+    for (let y = 0; y < MSY; y++) { const i = (y * MSX + z) * MSX + x; if (L.BL[i] !== 0xffff) st(wx, MYB + y, wz, L.BL[i], L.ML[i]); }
+  }
+  for (const [x, y, z, t] of L.mobs) if (st.get(ox + x, MYB + y, oz + z) >= 0) tiles.push({ t: 'mob', i: tl(ox + x, MYB + y, oz + z), mob: t });
 }
 // ---------- temples: desert pyramids, jungle temples, swamp huts, igloos ----------
 const TP_CACHE = new Map(), TP_KIND = { pyramid: [32, 61, [BIO.DESERT]], jungle: [32, 63, [BIO.JUNGLE]], hut: [24, 65, [BIO.SWAMP]], igloo: [24, 67, [BIO.TUNDRA, BIO.SNOWY_TAIGA]] };
@@ -1434,68 +1514,157 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
     }
   }
 }
-// ---------- woodland mansions: rare three-storey dark oak mansions in dark forests ----------
-// a 6 x 5 grid of 8-block rooms per floor (upper floors smaller), a corridor along the middle row, rooms of several
-// kinds, a stepped roof; vindicators in the rooms and evokers upstairs
-const MREG = 64, MN_CACHE = new Map();
+// ---------- woodland mansions: rare dark oak mansions in dark forests ----------
+// Laid out the way vanilla's mansion grid is: an 11 x 11 grid of 8-block cells per floor. The ground floor's corridors
+// start at the front door and branch out at random; the cells around them are packed into rooms of 2 x 2, 2 x 1 and
+// 1 x 1 cells, each with a door to a corridor, and the leftover cells that touch no corridor become secret rooms with
+// no door at all. The second floor grows its own corridors from the staircase over the ground floor's footprint; the
+// third floor covers only the inner part. Hipped dark oak roof with a cobblestone ridge; vindicators in the rooms and
+// evokers in the big rooms upstairs. Built once per mansion and copied into each chunk it touches.
+const MREG = 64, MN_CACHE = new Map(), MLAY = new Map(), MGN = 11, MFH = 7, MSZ = MGN * 8 + 1, MSH = 6 + 3 * MFH + 6;
 function mansionAt(seed, G, rx, rz) {
   const key = seed + ':' + rx + ',' + rz; if (MN_CACHE.has(key)) return MN_CACHE.get(key);
   const { r, cx, cz } = regionPick(seed, rx, rz, 69, MREG, 6); let out = null;
   if (r() < 0.6) { const x = cx * 16 + 8, z = cz * 16 + 8, [h, b] = G.column(x, z); if (b === BIO.DARK_FOREST && h > SEA) out = { x, z, h, seed: r.int(1 << 30) }; }
   MN_CACHE.set(key, out); return out;
 }
+function mansionLayout(o) {
+  if (MLAY.has(o.seed)) return MLAY.get(o.seed);
+  const r = rng(o.seed), B = BID, KEEP = 0xffff, BL = new Uint16Array(MSZ * MSZ * MSH).fill(KEEP), ML = new Uint8Array(MSZ * MSZ * MSH), extra = [];
+  const put = (x, y, z, id, m = 0) => { if (x < 0 || z < 0 || x >= MSZ || z >= MSZ || y < 0 || y >= MSH) return; const i = (y * MSZ + z) * MSZ + x; BL[i] = id; ML[i] = m; };
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], inB = (i, j) => i >= 1 && j >= 1 && i <= 9 && j <= 9;
+  // unit[f][j*MGN+i]: 0 empty, 1 corridor, 2+ a room id
+  const unit = [new Int16Array(MGN * MGN), new Int16Array(MGN * MGN), new Int16Array(MGN * MGN)], rooms = [], ci = (i, j) => j * MGN + i;
+  const stairs = [];
+  const corridors = (f, si, sj, foot) => {
+    const U = unit[f], ok = (i, j) => inB(i, j) && (!foot || foot[ci(i, j)]) && U[ci(i, j)] === 0;
+    const walk = (i, j, dx, dz, len) => { for (let s = 0; s < len; s++) { i += dx; j += dz; if (!ok(i, j)) return; U[ci(i, j)] = 1; if (len > 2 && r() < 0.35) { const sgn = r() < 0.5 ? 1 : -1; walk(i, j, dz * sgn, dx * sgn, len - 2); } } };
+    U[ci(si, sj)] = 1;
+    if (f === 0) { U[ci(5, 2)] = 1; U[ci(5, 3)] = 1; walk(5, 3, -1, 0, 4); walk(5, 3, 1, 0, 4); walk(5, 3, 0, 1, 3); }
+    else for (const [dx, dz] of N4) if (r() < 0.8) walk(si, sj, dx, dz, 3 + r.int(2));
+  };
+  const packRooms = (f, cand) => {
+    const U = unit[f], free = (i, j) => inB(i, j) && cand[ci(i, j)] && U[ci(i, j)] === 0, touchesCor = cells => cells.some(([i, j]) => N4.some(([a, b]) => inB(i + a, j + b) && U[ci(i + a, j + b)] === 1));
+    const order = []; for (let j = 1; j <= 9; j++) for (let i = 1; i <= 9; i++) if (free(i, j)) order.push([i, j]);
+    for (let k = order.length - 1; k > 0; k--) { const t = r.int(k + 1); [order[k], order[t]] = [order[t], order[k]]; }
+    for (const [i, j] of order) {
+      if (!free(i, j)) continue;
+      const shapes = [[[0, 0], [1, 0], [0, 1], [1, 1]], [[0, 0], [1, 0]], [[0, 0], [0, 1]], [[0, 0]]];
+      let placed = false;
+      for (let s = 0; s < shapes.length && !placed; s++) {
+        if (s < 3 && r() < (s === 0 ? 0.6 : 0.4)) continue;
+        const cells = shapes[s].map(([a, b]) => [i + a, j + b]);
+        if (!cells.every(([a, b]) => free(a, b)) || !touchesCor(cells)) continue;
+        const id = rooms.length + 2; rooms.push({ f, cells, id, secret: false }); for (const [a, b] of cells) U[ci(a, b)] = id; placed = true;
+      }
+    }
+    // cells left over with no corridor beside them: secret rooms
+    for (const [i, j] of order) if (free(i, j)) { const id = rooms.length + 2; rooms.push({ f, cells: [[i, j]], id, secret: true }); U[ci(i, j)] = id; }
+  };
+  // ground floor
+  corridors(0, 5, 1, null); unit[0][ci(5, 1)] = 1;
+  { const near = new Uint8Array(MGN * MGN); for (let j = 1; j <= 9; j++) for (let i = 1; i <= 9; i++) for (let jj = 1; jj <= 9; jj++) for (let ii = 1; ii <= 9; ii++) if (unit[0][ci(ii, jj)] === 1 && Math.abs(ii - i) + Math.abs(jj - j) <= 2) near[ci(i, j)] = 1; near[ci(5, 0)] = 0; packRooms(0, near); }
+  // upper floors: the second over the whole ground floor, the third over its inner part; stairs in a corridor cell
+  for (let f = 1; f < 3; f++) {
+    const below = unit[f - 1], foot = new Uint8Array(MGN * MGN);
+    for (let j = 1; j <= 9; j++) for (let i = 1; i <= 9; i++) if (below[ci(i, j)]) foot[ci(i, j)] = f === 1 || N4.every(([a, b]) => below[ci(i + a, j + b)]);
+    const cors = []; for (let j = 1; j <= 9; j++) for (let i = 1; i <= 9; i++) if (below[ci(i, j)] === 1 && foot[ci(i, j)]) cors.push([i, j]);
+    if (!cors.length) break;
+    const [si, sj] = cors[r.int(cors.length)]; stairs.push([f - 1, si, sj]);
+    corridors(f, si, sj, foot); packRooms(f, foot);
+  }
+  // ---- blocks ----
+  const cx0 = i => i * 8, cz0 = j => j * 8, fy = f => 6 + f * MFH; // y 0..5 is the foundation under the ground floor
+  const has = (f, i, j) => f >= 0 && f < 3 && i >= 0 && j >= 0 && i < MGN && j < MGN && unit[f][ci(i, j)] !== 0;
+  // one door per room (not the secret ones), in a wall shared with a corridor; walls are keyed by their cell boundary
+  const wallKey = (f, i, j, a, b) => a ? f + ':x' + (a > 0 ? i + 1 : i) + ',' + j : f + ':z' + i + ',' + (b > 0 ? j + 1 : j), doors = new Set();
+  for (const rm of rooms) if (!rm.secret) for (const [i, j] of rm.cells) { const d = N4.find(([a, b]) => has(rm.f, i + a, j + b) && unit[rm.f][ci(i + a, j + b)] === 1); if (d) { doors.add(wallKey(rm.f, i, j, d[0], d[1])); break; } }
+  // pass 1: foundation, floors, cleared rooms, ceilings and corridor carpet
+  for (let f = 0; f < 3; f++) for (let j = 0; j < MGN; j++) for (let i = 0; i < MGN; i++) {
+    if (!has(f, i, j)) continue;
+    const u = unit[f][ci(i, j)], x0 = cx0(i), z0 = cz0(j), y0 = fy(f);
+    for (let z = z0; z <= z0 + 8; z++) for (let x = x0; x <= x0 + 8; x++) {
+      if (f === 0) for (let y = 0; y < y0; y++) put(x, y, z, B.cobblestone);
+      put(x, y0, z, f === 0 && u === 1 ? B.cobblestone : B.dark_oak_planks);
+      for (let y = y0 + 1; y < y0 + MFH; y++) put(x, y, z, 0);
+      if (!has(f + 1, i, j)) put(x, y0 + MFH, z, B.dark_oak_planks);
+    }
+    if (u === 1) for (let z = z0 + 1; z < z0 + 8; z++) for (let x = x0 + 1; x < x0 + 8; x++) put(x, y0 + 1, z, 198, 7); // grey corridor carpet
+  }
+  // pass 2: walls toward other units — outer walls with windows and log posts, birch walls inside, doorways
+  for (let f = 0; f < 3; f++) for (let j = 0; j < MGN; j++) for (let i = 0; i < MGN; i++) {
+    if (!has(f, i, j)) continue;
+    const u = unit[f][ci(i, j)], x0 = cx0(i), z0 = cz0(j), y0 = fy(f);
+    for (const [a, b] of N4) {
+      const nu = has(f, i + a, j + b) ? unit[f][ci(i + a, j + b)] : 0;
+      if (nu === u) continue;
+      const outside = nu === 0, door = doors.has(wallKey(f, i, j, a, b)), wx = a > 0 ? x0 + 8 : a < 0 ? x0 : -1, wz = b > 0 ? z0 + 8 : b < 0 ? z0 : -1;
+      for (let y = y0 + 1; y < y0 + MFH; y++) for (let t = 0; t <= 8; t++) {
+        const x = wx >= 0 ? wx : x0 + t, z = wz >= 0 ? wz : z0 + t;
+        if (t === 0 || t === 8) put(x, y, z, B.dark_oak_log);
+        else if (outside) put(x, y, z, (y === y0 + 2 || y === y0 + 3) && (t === 2 || t === 3 || t === 5 || t === 6) ? B.glass_pane : B.dark_oak_planks);
+        else if (door && t >= 3 && t <= 5 && y <= y0 + 3) put(x, y, z, 0);
+        else put(x, y, z, B.birch_planks);
+      }
+    }
+  }
+  for (let x = cx0(5) + 3; x <= cx0(5) + 5; x++) for (let y = fy(0) + 1; y <= fy(0) + 4; y++) put(x, y, cz0(1), 0); // front door
+  // stairs: a log post with a ladder up through the ceiling
+  for (const [f, i, j] of stairs) { const x = cx0(i) + 4, z = cz0(j) + 4, y0 = fy(f); for (let y = y0 + 1; y <= y0 + MFH; y++) { put(x, y, z, B.dark_oak_log); put(x, y, z + 1, B.ladder, 0); } }
+  // rooms: furniture by size, chests, illagers
+  const chest = (x, y, z, f, n) => { put(x, y, z, 44, f); extra.push({ t: 'chest', x, y, z, loot: rollLoot(r, 'mansion', n) }); };
+  const mob = (x, y, z, m) => extra.push({ t: 'mob', x, y, z, mob: m });
+  for (const rm of rooms) {
+    const xs = rm.cells.map(c => cx0(c[0])), zs = rm.cells.map(c => cz0(c[1])), X0 = Math.min(...xs) + 1, Z0 = Math.min(...zs) + 1, X1 = Math.max(...xs) + 7, Z1 = Math.max(...zs) + 7, y = fy(rm.f) + 1;
+    const n = rm.cells.length, k = hash32(o.seed, rm.id, rm.f, 3);
+    if (rm.secret) { // hidden behind solid walls
+      const v = k % 3;
+      if (v === 0) { put(X0 + 3, y, Z0 + 3, B.diamond_block); chest(X0 + 1, y, Z0 + 1, 2, 6); }
+      else if (v === 1) { for (let x = X0; x <= X1; x++) for (let z = Z0; z <= Z1; z++) if ((x + z) % 3 === 0) put(x, y + 3, z, B.cobweb); chest(X0 + 3, y, Z0 + 3, 1, 5); }
+      else { for (let x = X0 + 2; x <= X0 + 4; x++) for (let z = Z0 + 2; z <= Z0 + 4; z++) put(x, y - 1, z, B.obsidian); put(X0 + 3, y, Z0 + 3, 59, 15); }
+      continue;
+    }
+    if (n === 1) {
+      const v = k % 3;
+      if (v === 0) { put(X0 + 1, y, Z0 + 1, B.red_bed, 2); put(X0 + 1, y, Z0 + 2, B.red_bed, 2 | 4); put(X0 + 5, y, Z0 + 1, B.crafting_table); if (k % 2) chest(X0 + 5, y, Z0 + 5, 1, 5); }
+      else if (v === 1) { for (let t = 0; t < 3; t++) { chest(X0 + 1 + t * 2, y, Z0 + 5, 2, 4); put(X0 + 1 + t * 2, y, Z0 + 1, B.barrel); } }
+      else { for (let x = X0; x <= X1; x++) for (let z = Z0; z <= Z1; z++) put(x, y - 1 + 1, z, 198, 13); put(X0 + 3, y, Z0 + 3, B.flower_pot || B.oak_fence); }
+    } else if (n === 2) {
+      const v = k % 3;
+      if (v === 0) for (let x = X0; x <= X1; x++) for (let yy = y; yy <= y + 2; yy++) { put(x, yy, Z0, B.bookshelf); put(x, yy, Z1, B.bookshelf); } // library
+      else if (v === 1) for (let x = X0 + 1; x <= X1 - 1; x++) { put(x, y, (Z0 + Z1) >> 1, B.oak_fence); put(x, y + 1, (Z0 + Z1) >> 1, 198, 0); } // dining table
+      else { for (let x = X0; x <= X1; x++) for (let z = Z0; z <= Z1; z++) put(x, y, z, 198, 14); put((X0 + X1) >> 1, y + 1, (Z0 + Z1) >> 1, 59, 7); put((X0 + X1) >> 1, y + 2, (Z0 + Z1) >> 1, B.carved_pumpkin || B.pumpkin); } // illager statue
+      if (k % 4 === 0) chest(X1, y, Z1, 1, 5);
+    } else { // 2 x 2: a big library, an arena, or a spider room
+      const v = k % 3, cxm = (X0 + X1) >> 1, czm = (Z0 + Z1) >> 1;
+      if (v === 0) { for (let x = X0; x <= X1; x += 3) for (let z = Z0 + 1; z <= Z1 - 1; z++) for (let yy = y; yy <= y + 3; yy++) put(x, yy, z, B.bookshelf); }
+      else if (v === 1) { for (let x = X0; x <= X1; x++) for (let z = Z0; z <= Z1; z++) put(x, y - 1, z, B.cobblestone); mob(cxm - 2, y, czm, 'vindicator'); mob(cxm + 2, y, czm, 'vindicator'); }
+      else { for (let x = X0; x <= X1; x++) for (let z = Z0; z <= Z1; z++) if (hash32(o.seed, x, z, 11) % 4 === 0) put(x, y + 4, z, B.cobweb); chest(cxm, y, czm, 2, 6); }
+      if (rm.f > 0) mob(cxm, y, czm + 2, 'evoker');
+    }
+    if (k % 10 < 3) mob(X0 + 3, y, Z0 + 3, 'vindicator');
+  }
+  // hipped roof over every part of a floor with nothing above it; cobblestone along the ridge
+  const inF = (f, x, z) => { if (f > 2 || x < 0 || z < 0 || x >= MSZ || z >= MSZ) return false; const i = x >> 3, j = z >> 3, ex = x % 8 === 0, ez = z % 8 === 0; return has(f, i, j) || (ex && has(f, i - 1, j)) || (ez && has(f, i, j - 1)) || (ex && ez && has(f, i - 1, j - 1)); };
+  for (let f = 0; f < 3; f++) for (let z = 0; z < MSZ; z++) for (let x = 0; x < MSZ; x++) {
+    if (!inF(f, x, z) || inF(f + 1, x, z)) continue;
+    let d = 0; while (d < 4 && inF(f, x - d - 1, z) && inF(f, x + d + 1, z) && inF(f, x, z - d - 1) && inF(f, x, z + d + 1)) d++;
+    const y0 = fy(f) + MFH; for (let y = y0 + 1; y <= y0 + 1 + d; y++) put(x, y, z, d >= 3 && y === y0 + 1 + d ? B.cobblestone : B.dark_oak_planks);
+  }
+  const out = { BL, ML, extra }; MLAY.set(o.seed, out); return out;
+}
 function stampMansions(seed, G, st, cx, cz, tiles) {
-  const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), B = BID;
+  const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), H = MSZ >> 1;
   for (let rx = Math.floor((cx - 4) / MREG); rx <= Math.floor((cx + 4) / MREG); rx++) for (let rz = Math.floor((cz - 4) / MREG); rz <= Math.floor((cz + 4) / MREG); rz++) {
-    const o = mansionAt(seed, G, rx, rz); if (!o || !st.inside(o.x - 26, o.z - 22, o.x + 26, o.z + 22)) continue;
-    const r = rng(o.seed), X0 = o.x - 24, Z0 = o.z - 20, y0 = o.h + 1, COLS = 6, ROWS = 5, FH = 7;
-    const put = (x, y, z, id, m = 0) => st(X0 + x, y, Z0 + z, id, m);
-    // which cells exist on each floor (the middle row is the corridor)
-    const has = [[], [], []];
-    for (let f = 0; f < 3; f++) for (let c = 0; c < COLS; c++) for (let w = 0; w < ROWS; w++) {
-      const edge = c === 0 || c === COLS - 1 || w === 0 || w === ROWS - 1;
-      has[f][c * ROWS + w] = f === 0 ? true : f === 1 ? !(edge && (c === 0 || c === COLS - 1) && (w === 0 || w === ROWS - 1)) && hash32(o.seed, c, w, 1) % 100 < 92 : !edge && hash32(o.seed, c, w, 2) % 100 < 85;
+    const o = mansionAt(seed, G, rx, rz); if (!o || !st.inside(o.x - H, o.z - H, o.x + H, o.z + H)) continue;
+    const L = mansionLayout(o), ox = o.x - H, oz = o.z - H, oy = o.h + 1 - 6; // ground floor level with the site's surface
+    for (let z = 0; z < MSZ; z++) for (let x = 0; x < MSZ; x++) {
+      const wx = ox + x, wz = oz + z; if (st.get(wx, oy + 6, wz) < 0) continue;
+      let any = false;
+      for (let y = 0; y < MSH; y++) { const i = (y * MSZ + z) * MSZ + x; if (L.BL[i] !== 0xffff) { st(wx, oy + y, wz, L.BL[i], L.ML[i]); any = true; } }
+      if (any && L.BL[(0 * MSZ + z) * MSZ + x] === BID.cobblestone) for (let y = oy - 1; y > oy - 12; y--) { const b = st.get(wx, y, wz); if (OPQ[b] && !LEAF[b]) break; st(wx, y, wz, BID.cobblestone); } // foundation to the ground
     }
-    const cell = (f, c, w) => f >= 0 && f < 3 && c >= 0 && c < COLS && w >= 0 && w < ROWS && has[f][c * ROWS + w];
-    // ground: foundation, then clear the volume
-    for (let x = -1; x <= COLS * 8; x++) for (let z = -1; z <= ROWS * 8; z++) { for (let y = y0 - 6; y < y0; y++) put(x, y, z, B.cobblestone); for (let y = y0; y <= y0 + 3 * FH + 8; y++) put(x, y, z, 0); }
-    for (let f = 0; f < 3; f++) for (let c = 0; c < COLS; c++) for (let w = 0; w < ROWS; w++) {
-      if (!cell(f, c, w)) continue;
-      const bx = c * 8, bz = w * 8, by = y0 + f * FH, kind = w === 2 ? 'hall' : ['bed', 'library', 'store', 'dining', 'bed', 'library', 'secret'][hash32(o.seed, f, c, w) % (hash32(o.seed, c, w, 9) % 20 === 0 ? 7 : 6)];
-      for (let x = 0; x < 8; x++) for (let z = 0; z < 8; z++) {
-        put(bx + x, by, bz + z, f === 0 ? B.cobblestone : B.dark_oak_planks); // floor
-        if (!cell(f + 1, c, w)) put(bx + x, by + FH, bz + z, B.dark_oak_planks); // ceiling where nothing is above
-        if (kind !== 'hall' && (x + z) % 2 === 0 && f > 0) put(bx + x, by + 1, bz + z, 198, kind === 'library' ? 14 : kind === 'bed' ? 11 : 7);
-      }
-      // walls: logs at the corners; outer walls with windows; inner walls with a doorway toward the corridor
-      const walls = [[0, -1, (x, y) => [bx + x, y, bz]], [0, 1, (x, y) => [bx + x, y, bz + 7]], [-1, 0, (x, y) => [bx, y, bz + x]], [1, 0, (x, y) => [bx + 7, y, bz + x]]];
-      for (const [dc, dw, at] of walls) {
-        const outside = !cell(f, c + dc, w + dw), toHall = (w + dw === 2 && w !== 2) || (w === 2 && dw !== 0 && cell(f, c, w + dw));
-        for (let x = 0; x < 8; x++) for (let y = by + 1; y < by + FH; y++) {
-          const [px, py, pz] = at(x, y), corner = x === 0 || x === 7;
-          if (corner) { put(px, py, pz, B.dark_oak_log); continue; }
-          if (outside) { put(px, py, pz, (y === by + 3 || y === by + 4) && (x === 2 || x === 5) ? B.glass_pane : B.dark_oak_planks); continue; }
-          if (w === 2 && dw === 0) continue; // the corridor runs through
-          if (toHall && (x === 3 || x === 4) && y <= by + 3) { put(px, py, pz, 0); continue; } // doorway
-          if (toHall || hash32(o.seed, c * 2 + dc, w * 2 + dw, f) % 3) put(px, py, pz, B.birch_planks);
-        }
-      }
-      if (f === 0 && w === 0 && (c === 2 || c === 3)) for (let x = 2; x <= 5; x++) for (let y = by + 1; y <= by + 3; y++) put(bx + x, y, bz, 0); // the front door
-      // furniture
-      const ix = bx + 1, iz = bz + 1, y1 = by + 1;
-      if (kind === 'hall') { put(bx + 3, by + FH - 1, bz + 3, B.lantern, 1); put(bx + 4, by + FH - 1, bz + 4, B.lantern, 1); }
-      if (kind === 'library') for (let k = 0; k < 6; k++) for (let y = y1; y <= y1 + 2; y++) { put(ix + k, y, iz, B.bookshelf); if (hash32(o.seed, k, y, c) % 2) put(ix + k, y, iz + 5, B.bookshelf); }
-      if (kind === 'bed') { put(ix + 1, y1, iz + 1, B.red_bed, 2); put(ix + 1, y1, iz + 2, B.red_bed, 2 | 4); put(ix + 4, y1, iz + 1, B.crafting_table); if (hash32(o.seed, c, w, f + 5) % 3 === 0) { const tx = X0 + ix + 5, tz = Z0 + iz + 5; st(tx, y1, tz, 44, 1); if (st.get(tx, y1, tz) >= 0) tiles.push({ t: 'chest', i: tl(tx, y1, tz), loot: rollLoot(r, 'mansion', 5) }); } }
-      if (kind === 'store') for (let k = 0; k < 3; k++) { const tx = X0 + ix + 1 + k * 2, tz = Z0 + iz + 4; st(tx, y1, tz, 44, 2); if (st.get(tx, y1, tz) >= 0) tiles.push({ t: 'chest', i: tl(tx, y1, tz), loot: rollLoot(r, 'mansion', 4) }); put(ix + 1 + k * 2, y1, iz + 1, B.barrel); }
-      if (kind === 'dining') for (let k = 0; k < 4; k++) { put(ix + 1 + k, y1, iz + 2, B.oak_fence); put(ix + 1 + k, y1 + 1, iz + 2, B.stone_pressure_plate); }
-      if (kind === 'secret') { put(ix + 2, y1, iz + 2, f === 2 ? B.diamond_block : B.obsidian); put(ix + 3, y1, iz + 3, B.pumpkin); }
-      if (kind !== 'hall' && hash32(o.seed, c, w, f + 7) % 10 < 3 && st.get(X0 + ix + 3, y1, Z0 + iz + 3) >= 0) tiles.push({ t: 'mob', i: tl(X0 + ix + 3, y1, Z0 + iz + 3), mob: 'vindicator' });
-      if (f > 0 && kind === 'hall' && c % 3 === 1 && st.get(X0 + bx + 4, y1, Z0 + bz + 4) >= 0) tiles.push({ t: 'mob', i: tl(X0 + bx + 4, y1, Z0 + bz + 4), mob: 'evoker' });
-      // stairs between floors: a ladder in the corridor at the ends
-      if (w === 2 && (c === 0 || c === COLS - 1) && cell(f + 1, c, w)) for (let y = y1; y <= by + FH; y++) { put(bx + 4, y, bz + 6, B.ladder, 0); if (y === by + FH) put(bx + 4, y, bz + 6, B.ladder, 0); }
-      // a stepped roof over cells with nothing above
-      if (!cell(f + 1, c, w)) for (let k = 0; k < 4; k++) for (let x = k; x < 8 - k; x++) for (let z = k; z < 8 - k; z++) if (x === k || z === k || x === 7 - k || z === 7 - k) put(bx + x, by + FH + 1 + k, bz + z, k === 3 ? B.cobblestone : B.dark_oak_planks);
-    }
+    for (const e of L.extra) { const wx = ox + e.x, wy = oy + e.y, wz = oz + e.z; if (st.get(wx, wy, wz) < 0) continue; tiles.push(e.t === 'chest' ? { t: 'chest', i: tl(wx, wy, wz), loot: e.loot } : { t: 'mob', i: tl(wx, wy, wz), mob: e.mob }); }
   }
 }
 // ---------- ruined portals (overworld and Nether) and bastion remnants ----------
@@ -1529,39 +1698,95 @@ function stampRuinedPortal(st, o, nether, tiles) {
   st(o.x + 2, y0, o.z + 2, BID.gold_block);
   const cx2 = o.x - 2, cz2 = o.z + 2; st(cx2, y0, cz2, 44, 2); if (st.get(cx2, y0, cz2) >= 0) tiles.push({ t: 'chest', i: tl(cx2, y0, cz2), loot: rollLoot(r, 'ruined_portal', 5) });
 }
-// bastion: blackstone walls around a four-storey keep, chests on every floor, the treasure at the top; piglins, brutes, hoglins
-function stampBastion(st, o, tiles) {
-  const r = rng(o.seed), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), y0 = o.y, BS = BID.blackstone, PBB = [200, 14], PB = [200, 13], GB = BID.gilded_blackstone, BA = BID.basalt;
-  const put = (dx, y, dz, id, m = 0) => st(o.x + dx, y, o.z + dz, id, m);
-  const brick = (dx, y, dz) => { const k = hash32(o.seed, dx * 31 + dz, y, 3) % 100; if (k < 4) put(dx, y, dz, GB); else if (k < 30) put(dx, y, dz, BS); else put(dx, y, dz, ...PBB); };
-  for (let dx = -18; dx <= 18; dx++) for (let dz = -18; dz <= 18; dz++) {
-    const d = Math.max(Math.abs(dx), Math.abs(dz));
-    for (let y = y0 - 5; y < y0; y++) put(dx, y, dz, BS); // foundation over the lava sea
-    for (let y = y0; y <= y0 + 26; y++) put(dx, y, dz, 0);
-    put(dx, y0, dz, ...(d % 4 === 0 ? PB : [BS, 0]));
-    if (d >= 17) for (let y = y0 + 1; y <= y0 + 16; y++) { const gate = Math.abs(dx) <= 1 && Math.abs(dz) >= 17 && y <= y0 + 4; if (!gate) brick(dx, y, dz); }
-    if (d === 18 && (dx + dz) % 2 === 0) brick(dx, y0 + 17, dz); // battlements
-    if (d <= 10) {
-      for (const fy of [y0 + 6, y0 + 12, y0 + 18]) if (d > 2) put(dx, fy, dz, ...PB); // floors around a central shaft
-      if (d === 10) for (let y = y0 + 1; y <= y0 + 23; y++) { const door = (dx === 0 || dz === 0) && (y - y0) % 6 >= 1 && (y - y0) % 6 <= 3; if (!door) brick(dx, y, dz); }
-      if (d === 10 && Math.abs(dx) === 10 && Math.abs(dz) === 10) for (let y = y0 + 1; y <= y0 + 24; y++) put(dx, y, dz, BA, 0);
-      if (d <= 10) put(dx, y0 + 24, dz, ...PB);
+// bastion remnants come in vanilla's four kinds (picked from the bastion's seed): a bridge over a lava channel to a
+// gatehouse, hoglin stables with a ramp spiralling up a central tower, a treasure room whose loot sits on a pillar in a
+// lava pit, and housing units stacked around a courtyard. Blackstone-brick walls, gilded blackstone, chains and soul
+// lanterns; piglins and brutes everywhere, hoglins in the stables. Built once per bastion, copied into each chunk.
+const BAS_CACHE = new Map(), BSX = 44, BSY = 30, BASTION_KIND = ['bridge', 'stables', 'treasure', 'housing'];
+function bastionLayout(o) {
+  if (BAS_CACHE.has(o.seed)) return BAS_CACHE.get(o.seed);
+  const r = rng(o.seed), BL = new Uint16Array(BSX * BSX * BSY).fill(0xffff), ML = new Uint8Array(BSX * BSX * BSY), extra = [], kind = BASTION_KIND[o.seed % 4];
+  const BS = [BID.blackstone, 0], PBB = [200, 14], PB = [200, 13], GB = [BID.gilded_blackstone, 0], BA = [BID.basalt, 0], LV = [28, 0], AIR = [0, 0], GOLD = [61, 0], MAG = [BID.magma_block, 0], CHAIN = [BID.chain, 0], LAMP = [BID.soul_lantern, 1], BARS = [BID.iron_bars, 0];
+  const put = (x, y, z, [id, m]) => { if (x < 0 || z < 0 || x >= BSX || z >= BSX || y < 0 || y >= BSY) return; const i = (y * BSX + z) * BSX + x; BL[i] = id; ML[i] = m; };
+  const brick = (x, y, z) => { const k = hash32(o.seed, x * 64 + z, y, 3) % 100; put(x, y, z, k < 4 ? GB : k < 28 ? BS : PBB); };
+  const box = (x0, y0, z0, x1, y1, z1, b) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) b === 'brick' ? brick(x, y, z) : put(x, y, z, b); };
+  const walls = (x0, y0, z0, x1, y1, z1) => { for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (x === x0 || x === x1 || z === z0 || z === z1) brick(x, y, z); };
+  const battlements = (x0, y, z0, x1, z1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if ((x === x0 || x === x1 || z === z0 || z === z1) && (x + z) % 2 === 0) brick(x, y, z); };
+  const chest = (x, y, z, f, table, n) => { put(x, y, z, [44, f]); extra.push({ t: 'chest', x, y, z, loot: rollLoot(r, table, n) }); };
+  const mob = (x, y, z, m) => extra.push({ t: 'mob', x, y, z, mob: m });
+  const C = BSX >> 1;
+  if (kind === 'bridge') {
+    // a lava channel crossed by an arched bridge, ending at a two-storey gatehouse
+    box(C - 5, 0, 0, C + 5, 0, 26, LV); box(C - 5, 1, 0, C + 5, 12, 26, AIR);
+    for (let z = 0; z <= 26; z++) { box(C - 2, 10, z, C + 2, 10, z, z % 6 === 0 ? PB : PBB); brick(C - 3, 11, z); brick(C + 3, 11, z); if (z % 6 === 0) { box(C - 2, 1, z, C - 2, 9, z, BA); box(C + 2, 1, z, C + 2, 9, z, BA); for (let y = 6; y <= 9; y++) { brick(C - 1, y, z); brick(C + 1, y, z); } brick(C, 9, z); put(C - 3, 12, z, LAMP); } }
+    walls(C - 10, 0, 27, C + 10, 18, 43); box(C - 9, 1, 28, C + 9, 17, 42, AIR); box(C - 9, 0, 28, C + 9, 0, 42, PB);
+    for (const y of [9]) box(C - 9, y, 28, C + 9, y, 42, PBB); box(C - 2, 9, 34, C + 2, 9, 36, AIR); // floor with a drop-hole
+    box(C - 2, 10, 27, C + 2, 13, 27, AIR); box(C - 2, 1, 27, C + 2, 4, 27, AIR); battlements(C - 10, 19, 27, C + 10, 43);
+    for (let y = 1; y <= 9; y++) put(C - 8 + Math.min(y - 1, 8), y, 41, PB); // a ramp of blocks up to the upper storey
+    chest(C - 8, 1, 29, 3, 'bastion', 5); chest(C + 8, 10, 41, 2, 'bastion', 5); chest(C + 8, 1, 41, 2, 'bastion', 4);
+    box(C + 6, 10, 30, C + 8, 10, 32, GOLD);
+    mob(C, 11, 8, 'piglin'); mob(C, 11, 20, 'piglin'); mob(C - 5, 1, 34, 'piglin_brute'); mob(C + 4, 10, 38, 'piglin'); mob(C, 1, 40, 'piglin');
+  } else if (kind === 'stables') {
+    // a walled yard with stalls along the walls and a ramp spiralling up a central tower to a lookout
+    walls(2, 0, 2, 41, 12, 41); box(3, 1, 3, 40, 26, 40, AIR); box(3, 0, 3, 40, 0, 40, PB); battlements(2, 13, 2, 41, 41);
+    box(20, 1, 2, 23, 5, 2, AIR); // gate
+    for (let s = 0; s < 6; s++) { const z = 5 + s * 6; for (const x of [3, 36]) { box(x, 1, z, x + 4, 1, z + 4, [BID.soul_soil || BID.soul_sand, 0]); for (let t = 0; t <= 4; t++) { put(x === 3 ? x + 5 : x - 1, 1, z + t, t === 2 ? AIR : BARS); put(x === 3 ? x + 5 : x - 1, 2, z + t, BARS); } if (s % 2 === 0) mob(x + 2, 2, z + 2, 'hoglin'); } }
+    box(18, 1, 18, 25, 20, 25, 'brick'); box(19, 21, 19, 24, 21, 24, PB); battlements(18, 22, 18, 25, 25);
+    // the ramp: a 2-wide stepped path around the tower, one block up every two steps
+    const path = []; for (let x = 16; x <= 27; x++) path.push([x, 16]); for (let z = 17; z <= 27; z++) path.push([27, z]); for (let x = 26; x >= 16; x--) path.push([x, 27]); for (let z = 26; z >= 17; z--) path.push([16, z]);
+    for (let k = 0; k < 42; k++) { const [x, z] = path[k % path.length], y = 1 + (k >> 1); if (y > 20) break; put(x, y, z, PBB); const ox = x === 16 ? -1 : x === 27 ? 1 : 0, oz = z === 16 ? -1 : z === 27 ? 1 : 0; put(x + ox, y, z + oz, PBB); }
+    put(21, 22, 21, CHAIN); chest(22, 22, 22, 0, 'bastion', 6); chest(5, 1, 39, 0, 'bastion', 4); chest(38, 1, 39, 0, 'bastion', 4);
+    mob(12, 1, 12, 'piglin'); mob(30, 1, 30, 'piglin'); mob(21, 22, 23, 'piglin_brute'); mob(12, 1, 30, 'piglin');
+  } else if (kind === 'treasure') {
+    // a square keep: the treasure on a pillar in the middle of a lava pit, reached by four narrow bridges
+    walls(3, 0, 3, 40, 20, 40); box(4, 1, 4, 39, 19, 39, AIR); box(4, 0, 4, 39, 0, 39, PB); battlements(3, 21, 3, 40, 40);
+    for (let y = 10; y <= 10; y++) { box(4, y, 4, 39, y, 8, PBB); box(4, y, 35, 39, y, 39, PBB); box(4, y, 4, 8, y, 39, PBB); box(35, y, 4, 39, y, 39, PBB); } // upper gallery
+    box(14, -0, 14, 29, 0, 29, LV); for (let x = 14; x <= 29; x++) for (let z = 14; z <= 29; z++) if (x === 14 || x === 29 || z === 14 || z === 29) put(x, 0, z, MAG);
+    box(19, 0, 19, 24, 3, 24, 'brick'); box(20, 4, 20, 23, 4, 23, GOLD); put(21, 5, 21, [44, 0]); extra.push({ t: 'chest', x: 21, y: 5, z: 21, loot: rollLoot(r, 'bastion_treasure', 6) });
+    put(22, 5, 22, GOLD); put(20, 5, 23, [BID.ancient_debris, 0]);
+    for (const [ax, az, bx, bz] of [[21, 4, 22, 18], [21, 25, 22, 39], [4, 21, 18, 22], [25, 21, 39, 22]]) box(ax, 3, az, bx, 3, bz, PB);
+    for (let y = 1; y <= 3; y++) put(4 + y, y, 5, PB); // steps up to the bridges
+    for (const [x, z] of [[8, 8], [35, 8], [8, 35], [35, 35]]) { box(x, 1, z, x, 9, z, BA); put(x, 11, z, LAMP); }
+    for (let y = 12; y <= 19; y++) { put(21, y, 21, CHAIN); put(22, y, 22, CHAIN); }
+    chest(6, 11, 6, 1, 'bastion', 5); chest(37, 11, 37, 3, 'bastion', 5);
+    mob(21, 4, 10, 'piglin_brute'); mob(10, 4, 22, 'piglin_brute'); mob(33, 4, 21, 'piglin_brute'); mob(20, 11, 6, 'piglin'); mob(6, 1, 30, 'piglin');
+  } else {
+    // housing units: three storeys of small rooms around a courtyard with a lava pool, joined by block stairs
+    walls(4, 0, 4, 39, 18, 39); box(5, 1, 5, 38, 25, 38, AIR); box(5, 0, 5, 38, 0, 38, PB); battlements(4, 19, 4, 39, 39);
+    box(16, 0, 16, 27, 0, 27, PB); box(19, 0, 19, 24, 0, 24, LV);
+    box(20, 1, 4, 23, 4, 4, AIR); // gate
+    for (let f = 0; f < 3; f++) {
+      const y0 = f * 6;
+      for (let k = 0; k < 4; k++) { // units along each side of the courtyard
+        const ux = [6, 31, 6, 31][k], uz = [6, 6, 31, 31][k];
+        walls(ux, y0, uz, ux + 7, y0 + 5, uz + 7); box(ux + 1, y0 + 1, uz + 1, ux + 6, y0 + 4, uz + 6, AIR); box(ux, y0, uz, ux + 7, y0, uz + 7, f ? PBB : PB); box(ux, y0 + 6, uz, ux + 7, y0 + 6, uz + 7, PBB);
+        const dx = ux < 20 ? ux + 7 : ux, dz = uz + 3; box(dx, y0 + 1, dz, dx, y0 + 3, dz + 1, AIR); // door to the courtyard
+        const h = hash32(o.seed, f, k, 5) % 4;
+        if (h === 0) chest(ux + 3, y0 + 1, uz + 3, 0, 'bastion', 4); else if (h === 1) { put(ux + 2, y0 + 1, uz + 2, GOLD); put(ux + 5, y0 + 1, uz + 5, GB); } else if (h === 2) mob(ux + 3, y0 + 1, uz + 3, 'piglin');
+        put(ux + 3, y0 + 4, uz + 3, LAMP);
+      }
+      // walkways in front of the upper units, and a stair of blocks up the east side
+      if (f > 0) { box(14, y0, 6, 16, y0, 38, PBB); box(27, y0, 6, 29, y0, 38, PBB); }
     }
+    for (let k = 0; k < 12; k++) put(28, 1 + k, 8 + k, PB);
+    for (let k = 0; k < 12; k++) put(15, 1 + k, 37 - k, PB);
+    mob(22, 1, 12, 'piglin'); mob(12, 1, 22, 'piglin_brute'); mob(30, 7, 22, 'piglin'); mob(15, 13, 20, 'piglin');
   }
-  // lava in the courtyard corners, chains hanging in the shaft
-  for (const [dx, dz] of [[-14, -14], [14, 14]]) { put(dx, y0, dz, 28); }
-  for (let y = y0 + 8; y <= y0 + 22; y++) put(0, y, 0, BID.chain);
-  // chests on each floor, the treasure room on top: gold blocks and ancient debris
-  const chest = (dx, y, dz, loot, f = 0) => { put(dx, y, dz, 44, f); if (st.get(o.x + dx, y, o.z + dz) >= 0) tiles.push({ t: 'chest', i: tl(o.x + dx, y, o.z + dz), loot }); };
-  chest(-8, y0 + 1, -8, rollLoot(r, 'bastion', 5)); chest(8, y0 + 7, 8, rollLoot(r, 'bastion', 5), 2); chest(-8, y0 + 13, 8, rollLoot(r, 'bastion', 5), 1);
-  for (let dx = 4; dx <= 6; dx++) for (let dz = 4; dz <= 6; dz++) put(dx, y0 + 19, dz, (dx + dz) % 3 ? BID.gold_block : BID.ancient_debris);
-  chest(-5, y0 + 19, -5, rollLoot(r, 'bastion_treasure', 6), 0);
-  const mob = (dx, y, dz, m) => { if (st.get(o.x + dx, y, o.z + dz) >= 0) tiles.push({ t: 'mob', i: tl(o.x + dx, y, o.z + dz), mob: m }); };
-  [[-12, 1, -12, 'piglin'], [12, 1, -12, 'piglin'], [-12, 1, 12, 'piglin'], [5, 7, -5, 'piglin'], [-5, 13, 5, 'piglin'], [5, 1, 5, 'piglin_brute'], [-4, 7, -6, 'piglin_brute'], [3, 19, -3, 'piglin_brute'], [-14, 1, 0, 'hoglin'], [14, 1, 0, 'hoglin']].forEach(([dx, dy, dz, m]) => mob(dx, y0 + dy, dz, m));
+  const out = { BL, ML, extra }; BAS_CACHE.set(o.seed, out); return out;
+}
+function stampBastion(st, o, tiles) {
+  const L = bastionLayout(o), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), ox = o.x - (BSX >> 1), oz = o.z - (BSX >> 1);
+  for (let z = 0; z < BSX; z++) for (let x = 0; x < BSX; x++) {
+    const wx = ox + x, wz = oz + z; if (st.get(wx, o.y, wz) < 0) continue;
+    let any = false;
+    for (let y = 0; y < BSY; y++) { const i = (y * BSX + z) * BSX + x; if (L.BL[i] !== 0xffff) { st(wx, o.y + y, wz, L.BL[i], L.ML[i]); any = true; } }
+    if (any) for (let y = o.y - 1; y > o.y - 20; y--) { const b = st.get(wx, y, wz); if (b !== 0 && b !== 28) break; st(wx, y, wz, BID.blackstone); } // foundations down into the lava sea
+  }
+  for (const e of L.extra) { const wx = ox + e.x, wy = o.y + e.y, wz = oz + e.z; if (st.get(wx, wy, wz) < 0) continue; tiles.push(e.t === 'chest' ? { t: 'chest', i: tl(wx, wy, wz), loot: e.loot } : { t: 'mob', i: tl(wx, wy, wz), mob: e.mob }); }
 }
 function stampNetherRuins(seed, st, cx, cz, tiles) {
   for (let rx = Math.floor((cx - 1) / RPREG); rx <= Math.floor((cx + 1) / RPREG); rx++) for (let rz = Math.floor((cz - 1) / RPREG); rz <= Math.floor((cz + 1) / RPREG); rz++) { const o = ruinedPortalAt(seed, null, rx, rz, true); if (o && st.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) stampRuinedPortal(st, o, true, tiles); }
-  for (let rx = Math.floor((cx - 2) / BREG); rx <= Math.floor((cx + 2) / BREG); rx++) for (let rz = Math.floor((cz - 2) / BREG); rz <= Math.floor((cz + 2) / BREG); rz++) { const o = bastionAt(seed, rx, rz); if (o && st.inside(o.x - 19, o.z - 19, o.x + 19, o.z + 19)) stampBastion(st, o, tiles); }
+  for (let rx = Math.floor((cx - 2) / BREG); rx <= Math.floor((cx + 2) / BREG); rx++) for (let rz = Math.floor((cz - 2) / BREG); rz <= Math.floor((cz + 2) / BREG); rz++) { const o = bastionAt(seed, rx, rz); if (o && st.inside(o.x - 22, o.z - 22, o.x + 22, o.z + 22)) stampBastion(st, o, tiles); }
 }
 // ---------- the Nether ----------
 const NETHER_BIO = { WASTES: 13, CRIMSON: 14, WARPED: 15, SOUL: 16, BASALT: 17 };
@@ -2679,7 +2904,7 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
