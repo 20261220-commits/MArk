@@ -71,23 +71,27 @@ function signTick() {
 function bookOpen(h) { UI.openScreen('book', { st: h, page: 0, signing: false }); }
 CUSTOM_SCREENS.book = {
   html: () => {
-    const c = GUI.ctx, st = c.st, pages = st.pages || (st.pages = ['']), ro = st.id === IID.written_book;
+    const c = GUI.ctx, st = c.st, pages = st.pages || (st.pages = ['']), ro = st.id === IID.written_book || !!c.lectern;
     if (c.signing) return `<div class="panel"><div class="cap">책 서명</div><input id="btitle" maxlength="16" placeholder="제목" value="${escH(c.title || '')}" autocomplete="off" style="display:block;margin:6px auto;width:14em"><p class="tip">서명하면 더 이상 수정할 수 없어요.</p><button id="bsign" class="btn">서명하고 닫기</button> <button id="bcancel" class="btn">취소</button></div>`;
     const body = ro ? `<div style="white-space:pre-wrap;text-align:left;width:18em;min-height:14em;background:#f4ecd8;color:#222;padding:8px;margin:auto">${escH(pages[c.page] || '')}</div>` : `<textarea id="bpage" maxlength="256" style="width:18em;height:14em;background:#f4ecd8;color:#222">${escH(pages[c.page] || '')}</textarea>`;
-    return `<div class="panel"><div class="cap">${ro ? escH(st.title || '서명된 책') + (st.author ? ' — ' + escH(st.author) : '') : '책과 깃펜'}</div>${body}<div class="row" style="justify-content:center;gap:8px;margin-top:6px"><button id="bprev" class="btn">◀</button><span>${c.page + 1} / ${pages.length}</span><button id="bnext" class="btn">▶</button>${ro ? '' : '<button id="bsignq" class="btn">서명</button>'}<button id="bdone" class="btn">완료</button></div></div>`;
+    return `<div class="panel"><div class="cap">${ro ? escH(st.title || '서명된 책') + (st.author ? ' — ' + escH(st.author) : '') : '책과 깃펜'}</div>${body}<div class="row" style="justify-content:center;gap:8px;margin-top:6px"><button id="bprev" class="btn">◀</button><span>${c.page + 1} / ${pages.length}</span><button id="bnext" class="btn">▶</button>${ro ? '' : '<button id="bsignq" class="btn">서명</button>'}${c.lectern ? '<button id="btake" class="btn">책 꺼내기</button>' : ''}<button id="bdone" class="btn">완료</button></div></div>`;
   },
   bind: () => {
     const c = GUI.ctx, st = c.st, pages = st.pages, stop = el => { if (el) { el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') UI.closeScreen(); }; el.onpointerdown = e => e.stopPropagation(); } };
     const ta = $('bpage'); stop(ta); if (ta) { ta.oninput = () => { pages[c.page] = ta.value; }; setTimeout(() => ta.focus(), 0); }
     const bt = $('btitle'); stop(bt); if (bt) { bt.oninput = () => { c.title = bt.value; }; setTimeout(() => bt.focus(), 0); }
     const on = (id, f) => { const el = $(id); if (el) el.onclick = () => { f(); if (UI.screen === 'book') UI.renderScreen(); }; };
-    on('bprev', () => { c.page = Math.max(0, c.page - 1); });
-    on('bnext', () => { if (c.page === pages.length - 1 && st.id === IID.writable_book && pages.length < 50) pages.push(''); c.page = Math.min(pages.length - 1, c.page + 1); });
+    const lecternPage = () => { if (!c.lectern) return; const t = getTile(...c.lectern); if (t) t.page = c.page; lecternPulse(c.lectern); };
+    on('bprev', () => { c.page = Math.max(0, c.page - 1); lecternPage(); });
+    on('bnext', () => { if (c.page === pages.length - 1 && st.id === IID.writable_book && pages.length < 50) pages.push(''); c.page = Math.min(pages.length - 1, c.page + 1); lecternPage(); });
+    on('btake', () => { const [x, y, z] = c.lectern, t = getTile(x, y, z); if (t && t.items[0]) { INV.giveOrDrop(t.items[0]); t.items[0] = null; } setMeta(x, y, z, getMeta(x, y, z) & ~4); UI.closeScreen(); });
     on('bsignq', () => { c.signing = true; }); on('bcancel', () => { c.signing = false; });
     on('bsign', () => { if (!(c.title || '').trim()) return; st.id = IID.written_book; st.title = c.title.trim(); st.name = st.title; st.author = '플레이어'; UI.hudDirty = true; UI.closeScreen(); play('levelup', { vol: 0.3 }); });
     on('bdone', () => UI.closeScreen());
   },
 };
+
+function lecternPulse([x, y, z]) { if (getBlock(x, y, z) !== BID.lectern) return; setMeta(x, y, z, getMeta(x, y, z) | 8); rsNotify(x, y, z); rsLater(x, y, z, 4); }
 
 // ---------- fireworks ----------
 const ROCKETS = [];
@@ -196,7 +200,17 @@ function craftExtra(out, grid) {
   if (d.key === 'firework_star') { const dye = grid.find(s => s && ITEMS[s.id].key.endsWith('_dye')); if (dye) { const c = S.COLORS.indexOf(ITEMS[dye.id].key.slice(0, -4)); out.colors = [c]; out.name = '폭죽 탄약 (' + S.COLKO[c] + ')'; } }
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
-function items6Tick() { signTick(); rocketTick(); leashTick(); dialTick(); }
+// a saddle drawn on saddled pigs and striders (the resource pack has no saddle layer)
+const SADDLE_MAT = new THREE.MeshLambertMaterial({ color: 0x7a4a24 });
+function saddleTick() {
+  if (W.tickN % 10) return;
+  for (const e of ENT) {
+    if (e.kind !== 'mob' || !(e.type === 'pig' || e.type === 'strider') || !e.mesh) continue;
+    if (e.saddle && !e.saddleMesh) { const pig = e.type === 'pig', m = new THREE.Mesh(new THREE.BoxGeometry(pig ? 0.62 : 0.9, 0.06, pig ? 0.5 : 0.7), SADDLE_MAT); m.position.set(0, pig ? 0.82 : 1.06, pig ? 0.05 : 0); e.mesh.add(m); e.saddleMesh = m; }
+    else if (!e.saddle && e.saddleMesh) { e.mesh.remove(e.saddleMesh); e.saddleMesh = null; }
+  }
+}
+function items6Tick() { signTick(); rocketTick(); leashTick(); dialTick(); saddleTick(); }
 
 // ---------- compasses and clocks: held, a dial shows where the needle points (a compass used on a lodestone points there) ----------
 const DIAL = { el: null, g: null };

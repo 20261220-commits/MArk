@@ -228,7 +228,7 @@ function animalTick() {
 function inBerryBush(e) { return boxBlocks(e, b => b === BID.sweet_berry_bush) ; }
 
 Object.assign(MOBDEF, {
-  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['dried_kelp'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
+  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['seagrass'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
     save: e => ({ home: e.home || null, pregnant: !!e.pregnant }), init: (e, o) => { if (o.home) e.home = o.home; if (o.pregnant) e.pregnant = true; } },
   dolphin: { hp: 10, w: 0.45, h: 0.6, speed: 0.12, xp: 2, snd: 'splash', neutral: 1, drops: [['cod', 0, 1]], parts: DOLPHIN_M.parts, tex: () => DOLPHIN_M.tex(0), ai: dolphinAI, anim: dolphinAnim },
   bee: { hp: 10, w: 0.35, h: 0.6, speed: 0.07, xp: 2, snd: 'hmm', neutral: 1, fly: 1, fallReduce: 99, drops: [], parts: BEE_M.parts, tex: () => BEE_M.tex(0), food: [...FLOWERS].map(id => BLOCKS[id].key).filter(k => IID[k] != null),

@@ -552,6 +552,7 @@ function useItem(first) {
       // candles: stack up to four of the same colour, or light one with flint and steel
       const cdT = S.candleOf(id, t.m);
       if (d.candle != null && cdT && cdT.c === d.candle && cdT.n < 4) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n + 1, cdT.lit)); consume(); play('place', { mat: 'wool' }); swing(); return; }
+      if (d.candle != null && id === BID.cake && t.m === 0 && t.ny === 1) { setBlock(x, y, z, BID.candle_cake, d.candle + 1); consume(); play('place', { mat: 'wool' }); swing(); return; } // a candle on an uneaten cake
       if (d.candle != null) { placeCandle(t, d.candle); return; }
       if (cdT && !cdT.lit && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !FLUID[getBlock(x, y + 1, z)]) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n, 1)); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return; }
       // copper (1.17): honeycomb waxes it (no more oxidation), an axe scrapes the wax off before any oxidation

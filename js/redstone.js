@@ -69,6 +69,7 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.sculk_sensor: return (m & 3) === 1 ? m >> 4 : 0;
     case BID.detector_rail: return m & 8 ? 15 : 0;
     case BID.tripwire_hook_block: return m & 8 ? 15 : 0;
+    case BID.lectern: return m & 8 ? 15 : 0; // a page turn gives a short pulse
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -170,6 +171,7 @@ function rsComponent(x, y, z, b) {
 }
 function rsDelayed(x, y, z) {
   const b = getBlock(x, y, z), m = getMeta(x, y, z);
+  if (b === BID.lectern) { if (m & 8) { setMeta(x, y, z, m & ~8); rsNotify(x, y, z); } return; }
   if (b === RSB.torch || b === RSB.torchOff) {
     const a = torchAttach(x, y, z, m), ab = getBlock(a[0], a[1], a[2]);
     const pw = isConductor(ab) ? Math.max(strongPower(a[0], a[1], a[2]), weakPower(a[0], a[1], a[2])) : 0;

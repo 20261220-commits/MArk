@@ -2,7 +2,7 @@
 // broken), respawn anchors (charged with glowstone, set the spawn in the Nether, explode elsewhere), scaffolding
 // (climbable, falls apart more than 6 blocks from support), nether vines, frosted ice and frost walker.
 const SCAFB = BID.scaffolding, SHULK = BID.shulker_box, ANCHOR = BID.respawn_anchor, FICE = BID.frosted_ice;
-const isShulkerItem = id => ITEMS[id] && ITEMS[id].place === SHULK;
+const isShulker = b => b === SHULK || b === BID.purple_shulker_box, isShulkerItem = id => ITEMS[id] && isShulker(ITEMS[id].place);
 
 // ---------- support (world.js plantOK, cases 21+) ----------
 function scafDist(x, y, z) {
@@ -41,12 +41,12 @@ function blocks6Place(t, x, y, z, id, meta, fd) {
 }
 function blocks6Placed(x, y, z, id, meta, h) {
   if (id === BID.oak_sign) { setTimeout(() => signEdit(x, y, z), 0); return; }
-  if (id === SHULK) setTile(x, y, z, { type: 'chest', shulker: true, items: h && h.items ? h.items.map(s => s && { ...s }) : new Array(27).fill(null) });
+  if (isShulker(id)) setTile(x, y, z, { type: 'chest', shulker: true, items: h && h.items ? h.items.map(s => s && { ...s }) : new Array(27).fill(null) });
   if ((id === BID.weeping_vines || id === BID.twisting_vines)) { const oy = id === BID.weeping_vines ? 1 : -1; if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, 0); } // the old tip is now a stem
 }
 // a broken shulker box drops itself with everything inside (in creative too, unless it is empty)
 function blocks6Break(x, y, z, id, m) {
-  if (id !== SHULK) return;
+  if (!isShulker(id)) return;
   const t = getTile(x, y, z), items = t && t.items; if (t) t.items = null; // nothing spills
   const full = items && items.some(s => s);
   if (creative() && !full) return;
@@ -62,6 +62,19 @@ function blocks6Use(t, h, dry) {
     if (!dry) { let nm = m ^ 4; if (nm & 4) { const away = (m & 1) ? PL.x > x + .5 : PL.z > z + .5; nm = away ? nm | 2 : nm & ~2; } setMeta(x, y, z, nm); play('door', { vol: 0.6, pitch: 1.2 }); }
     return true;
   }
+  if (id === BID.candle_cake) {
+    if (h && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !(m & 32)) { if (!dry) { setMeta(x, y, z, m | 32); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); } return true; }
+    if (!h && (m & 32)) { if (!dry) { setMeta(x, y, z, m & ~32); play('fizz', { vol: 0.4 }); } return true; }
+    if (!(PL.food < 20 || creative())) return false;
+    if (!dry) { const c = m & 31; setBlock(x, y, z, BID.cake, 1); dropItem(x + .5, y + .7, z + .5, c ? IID[S.COLORS[c - 1] + '_candle'] : IID.candle, 1); PL.food = Math.min(20, PL.food + 2); PL.sat = Math.min(PL.food, PL.sat + 0.4); play('eat'); UI.hudDirty = true; }
+    return true;
+  }
+  if (id === BID.lectern) { // a book on a lectern can be read by anyone; it drops when the lectern breaks
+    const tile = getTile(x, y, z);
+    if ((m & 4) && tile && tile.items && tile.items[0]) { if (!dry) UI.openScreen('book', { st: tile.items[0], page: tile.page || 0, lectern: [x, y, z] }); return true; }
+    if (h && (h.id === IID.writable_book || h.id === IID.written_book)) { if (!dry) { setTile(x, y, z, { type: 'lectern', items: [{ ...h, n: 1 }], page: 0 }); setMeta(x, y, z, m | 4); consume(); play('place', { mat: 'wood' }); } return true; }
+    return null;
+  }
   if (id === BID.cake) {
     if (!(PL.food < 20 || creative())) return false;
     if (!dry) { PL.food = Math.min(20, PL.food + 2); PL.sat = Math.min(PL.food, PL.sat + 0.4); if ((m & 7) >= 6) setBlock(x, y, z, 0); else setMeta(x, y, z, m + 1); play('eat'); UI.hudDirty = true; }
@@ -71,7 +84,7 @@ function blocks6Use(t, h, dry) {
     if (!dry) { if (!PL.ender) PL.ender = new Array(27).fill(null); UI.openScreen('chest', { cart: { items: PL.ender }, title: '엔더 상자' }); play('door', { vol: 0.4, pitch: 0.7 }); }
     return true;
   }
-  if (id === SHULK) {
+  if (isShulker(id)) {
     if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', shulker: true, items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z, title: ITEMS[itemOfBlock(id, m)].name }); play('door', { vol: 0.4, pitch: 1.4 }); }
     return true;
   }
