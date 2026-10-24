@@ -9966,11 +9966,12 @@ function raidBar() {
   raidEl.querySelector('.bn').textContent = R0.state === 'won' ? '습격 - 승리' : R0.state === 'lost' ? '습격 - 패배' : R0.state === 'wait' ? `습격 (${R0.wave}/${R0.waves})` : `습격 - 습격자 ${n}명 남음`;
   raidEl.querySelector('i').style.width = (R0.state === 'active' ? n / tot * 100 : R0.state === 'wait' ? Math.min(100, (300 - R0.t) / 3) : 0) + '%';
 }
-function villageCentre() { // the bell or the middle of the villagers near the player
-  const vs = ENT.filter(e => e.type === 'villager' && !e.dead && Math.hypot(e.x - PL.x, e.z - PL.z) < 48);
-  if (vs.length < 2) return null;
-  for (const k of TRACKED.get(BID.bell) || []) { const [x, y, z] = k.split(',').map(Number); if (Math.hypot(x - PL.x, z - PL.z) < 64) return [x + .5, y, z + .5]; }
-  return [vs.reduce((a, e) => a + e.x, 0) / vs.length, PL.y, vs.reduce((a, e) => a + e.z, 0) / vs.length];
+const VBEDS = trackBlocks(BID.red_bed), VBELLS = trackBlocks(BID.bell);
+function villageCentre() { // as in Java, a village is its points of interest: a bell (the meeting point) or beds near the player
+  const near = set => [...set].map(k => k.split(',').map(Number)).filter(([x, , z]) => Math.hypot(x - PL.x, z - PL.z) < 48);
+  const bells = near(VBELLS); if (bells.length) { const [x, y, z] = bells[0]; return [x + .5, y, z + .5]; }
+  const beds = near(VBEDS); if (!beds.length) return null;
+  return [beds.reduce((a, b) => a + b[0], 0) / beds.length + .5, beds.reduce((a, b) => a + b[1], 0) / beds.length, beds.reduce((a, b) => a + b[2], 0) / beds.length + .5];
 }
 function raidTick() {
   if (W.dim !== 0) return;
