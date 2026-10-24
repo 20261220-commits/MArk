@@ -174,6 +174,7 @@ function items6Use(t, h, d) {
     const led = ENT.filter(e => e.leash === 'player'); if (!led.length) return false;
     for (const e of led) e.leash = [t.x, t.y, t.z]; play('place', { mat: 'wool' }); swing(); return true;
   }
+  if (t && t.type === 'block' && lodestoneUse(t, h)) return true;
   if (h.id === IID.writable_book || h.id === IID.written_book) { if (!(t && t.type === 'block' && interactBlock(t, true))) { bookOpen(h); return true; } return false; }
   if (h.id === IID.firework_rocket) {
     if (PL.gliding) { launchRocket(PL.x, PL.y, PL.z, h, true); PL.fwBoost = 10 * ((h.fw && h.fw.flight) || 1) + 10; consume(); swing(); USE.placeCd = 10; return true; }
@@ -195,4 +196,33 @@ function craftExtra(out, grid) {
   if (d.key === 'firework_star') { const dye = grid.find(s => s && ITEMS[s.id].key.endsWith('_dye')); if (dye) { const c = S.COLORS.indexOf(ITEMS[dye.id].key.slice(0, -4)); out.colors = [c]; out.name = '폭죽 탄약 (' + S.COLKO[c] + ')'; } }
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
-function items6Tick() { signTick(); rocketTick(); leashTick(); }
+function items6Tick() { signTick(); rocketTick(); leashTick(); dialTick(); }
+
+// ---------- compasses and clocks: held, a dial shows where the needle points (a compass used on a lodestone points there) ----------
+const DIAL = { el: null, g: null };
+function lodestoneUse(t, h) {
+  if (!h || h.id !== IID.compass || t.id !== BID.lodestone) return false;
+  const st = { id: IID.compass, n: 1, lode: [t.x, t.y, t.z, W.dim], name: '자석석 나침반' };
+  if (h.n === 1 && !h.lode) INV.slots[INV.sel] = st; else { if (!h.lode) consume(); INV.giveOrDrop(st); }
+  play('anvil', { vol: 0.3, pitch: 1.6 }); swing(); UI.hudDirty = true; return true;
+}
+function dialTick() {
+  const h = PL.held(), show = h && (h.id === IID.compass || h.id === IID.clock) && !UI.screen;
+  if (!DIAL.el) { DIAL.el = document.createElement('canvas'); DIAL.el.id = 'dialview'; DIAL.el.width = DIAL.el.height = 32; document.body.appendChild(DIAL.el); DIAL.g = DIAL.el.getContext('2d'); }
+  DIAL.el.hidden = !show; if (!show) return;
+  const g = DIAL.g; g.clearRect(0, 0, 32, 32);
+  g.fillStyle = h.id === IID.clock ? '#d8b040' : '#8a8a8a'; g.beginPath(); g.arc(16, 16, 15, 0, 7); g.fill();
+  if (h.id === IID.clock) { // the sun and moon turn on the face
+    const a = ((W.time % 24000) / 24000) * Math.PI * 2;
+    g.fillStyle = W.dim === 0 ? '#3a6ad8' : '#2a1a3a'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
+    if (W.dim !== 0) return; // spins elsewhere: nothing sensible to show
+    g.fillStyle = '#ffe040'; g.beginPath(); g.arc(16 + Math.sin(a) * 8, 16 - Math.cos(a) * 8, 3, 0, 7); g.fill(); g.fillStyle = '#e8e8f0'; g.beginPath(); g.arc(16 - Math.sin(a) * 8, 16 + Math.cos(a) * 8, 2.5, 0, 7); g.fill();
+    g.fillStyle = '#3a8a2a'; g.fillRect(3, 17, 26, 12); return;
+  }
+  g.fillStyle = '#e8e4d8'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
+  let tgt = null;
+  if (h.lode) { if (h.lode[3] === W.dim && (!isLoaded(h.lode[0], h.lode[2]) || getBlock(h.lode[0], h.lode[1], h.lode[2]) === BID.lodestone)) tgt = h.lode; }
+  else if (W.dim === 0) tgt = W.worldSpawn;
+  const ang = tgt ? Math.atan2(tgt[0] + .5 - PL.x, -(tgt[2] + .5 - PL.z)) + PL.yaw : performance.now() / 120; // the needle spins without a target
+  g.save(); g.translate(16, 16); g.rotate(ang); g.fillStyle = '#c02020'; g.beginPath(); g.moveTo(0, -10); g.lineTo(3, 0); g.lineTo(-3, 0); g.fill(); g.fillStyle = '#303030'; g.beginPath(); g.moveTo(0, 10); g.lineTo(3, 0); g.lineTo(-3, 0); g.fill(); g.restore();
+}
