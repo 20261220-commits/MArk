@@ -135,7 +135,7 @@ crack.visible = false; scene.add(crack);
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
-const PMAX = 600;
+const PMAX = 1500;
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PMAX * 3), pUV = new Float32Array(PMAX * 2), pSize = new Float32Array(PMAX), pCol = new Float32Array(PMAX * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute('puv', new THREE.BufferAttribute(pUV, 2)); pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1)); pGeo.setAttribute('pcol', new THREE.BufferAttribute(pCol, 3));

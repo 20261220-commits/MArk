@@ -101,9 +101,9 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
   play('hurt');
-  if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying (held anywhere in the hotbar: there is no off-hand)
-    const k = INV.slots.findIndex((s, i) => i < 9 && s && s.id === IID.totem_of_undying);
-    if (k >= 0) { INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+  if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
+    offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
+    if (k !== -1) { if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) die(cause);
   UI.hudDirty = true;
@@ -113,7 +113,7 @@ const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게
 function die(cause) {
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
   if (!W.keepInv) {
-    const all = [...INV.slots, ...INV.armor]; INV.slots.fill(null); INV.armor.fill(null);
+    offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
     for (const s of all) if (s && !enchLv(s, 'vanishing_curse')) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
     PL.level = 0; PL.xpP = 0; PL.xpTotal = 0;
@@ -295,6 +295,7 @@ function survivalTick(inWater, inLava, eyeF) {
 let TARGET = null;
 function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
+  offhandTick();
   const held = PL.held();
   TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
   if (MINE.cd > 0) MINE.cd--;
@@ -402,6 +403,7 @@ function finishEat() {
   UI.hudDirty = true;
 }
 function onUsePress() {
+  if (offhandUse(onUsePress)) return; // the off hand takes the click when the main hand has nothing to do
   const h = PL.held(), d = h && ITEMS[h.id];
   if (PL.sleeping) return;
   // eat / drink
@@ -434,7 +436,7 @@ function onUseRelease() {
   if (USE.kind === 'crossbow' && PL.held() && PL.held().id === IID.crossbow) crossbowRelease(PL.held());
   if (USE.kind === 'trident' && PL.held() && PL.held().id === IID.trident) tridentRelease(PL.held());
   if (USE.kind === 'eat') R.hand.eat = 0;
-  USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0;
+  USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0; offUnswap();
 }
 function interactBlock(t, dry) {
   if (PL.sneaking && PL.held()) return false;

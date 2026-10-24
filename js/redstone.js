@@ -205,43 +205,70 @@ function rsDelayed(x, y, z) {
 // ---------- pistons ----------
 const immovable = b => { const d = BLOCKS[b]; return !d || d.hard < 0 || b === BID.obsidian || b === BID.crying_obsidian || b === BID.furnace || b === BID.lit_furnace || b === BID.chest || b === BID.enchanting_table || b === BID.spawner || b === RSB.head || b === BID.anvil || b === BID.end_portal_frame || b === BID.red_bed || b === BID.oak_door; };
 const breaksOnPush = b => REPL[b] || FLUID[b] || RTYPE[b] === RT.CROSS || RTYPE[b] === RT.TORCH || RTYPE[b] === RT.CROP || b === RSB.wire || b === RSB.lever || b === RSB.button || b === RSB.plate || b === RSB.rep || b === BID.ladder || b === BID.lantern || b === BID.cobweb || b === BID.cactus || b === BID.sugar_cane || BLOCKS[b].leaves && false;
+// which blocks move (Java's structure resolver): the line in front of the piston, plus everything slime and honey
+// blocks stick to (they do not stick to each other), at most 12; anything fragile in the way is broken
+const isStickyBlock = b => b === BID.slime_block || b === BID.honey_block;
+const sticksTo = (a, b) => !((a === BID.slime_block && b === BID.honey_block) || (a === BID.honey_block && b === BID.slime_block));
+function resolveMove(sx, sy, sz, dx, dy, dz, skip) {
+  const moving = new Map(), breaks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z;
+  const visit = (x, y, z, pushed) => {
+    const k = K(x, y, z); if (moving.has(k) || skip.has(k)) return true;
+    if (y < 0 || y >= CH || !isLoaded(x, z)) return !pushed;
+    const id = getBlock(x, y, z);
+    if (!id) return true;
+    if (breaksOnPush(id)) { if (pushed) breaks.set(k, [x, y, z]); return true; }
+    if (immovable(id)) return !pushed; // a sticky block simply lets go of what cannot move
+    if (moving.size >= 12) return false;
+    moving.set(k, [x, y, z, id, getMeta(x, y, z), getTile(x, y, z)]);
+    if (!visit(x + dx, y + dy, z + dz, true)) return false;
+    if (isStickyBlock(id)) for (const [ex, ey, ez] of S.DIR6) {
+      if (ex === dx && ey === dy && ez === dz) continue;
+      const nx = x + ex, ny = y + ey, nz = z + ez, nb = getBlock(nx, ny, nz);
+      if (!nb || breaksOnPush(nb) || immovable(nb) || !sticksTo(id, nb)) continue;
+      if (!visit(nx, ny, nz, false)) return false;
+    }
+    return true;
+  };
+  if (!visit(sx, sy, sz, true)) return null;
+  // cells the moved blocks land in that hold something fragile
+  for (const [x, y, z] of moving.values()) { const k = K(x + dx, y + dy, z + dz), t = getBlock(x + dx, y + dy, z + dz); if (!moving.has(k) && !skip.has(k) && t && breaksOnPush(t)) breaks.set(k, [x + dx, y + dy, z + dz]); }
+  return { moving: [...moving.values()], breaks: [...breaks.values()] };
+}
+function applyMove(r, dx, dy, dz) {
+  for (const [x, y, z] of r.breaks) { const id = getBlock(x, y, z); if (!id) continue; if (!FLUID[id] && W.onDrop) W.onDrop(x, y, z, blockDrops(id, getMeta(x, y, z), null).items, 0); setBlock(x, y, z, 0, 0, { noUpdate: true }); }
+  for (const [x, y, z] of r.moving) setBlock(x, y, z, 0, 0, { noUpdate: true, keepTile: false, dry: true });
+  for (const [x, y, z, id, mm, t] of r.moving) { setBlock(x + dx, y + dy, z + dz, id, mm, { noUpdate: true }); if (t) setTile(x + dx, y + dy, z + dz, t); }
+  for (const [x, y, z] of r.moving) { neighborUpdate(x, y, z); neighborUpdate(x + dx, y + dy, z + dz); rsNotify(x, y, z); rsNotify(x + dx, y + dy, z + dz); }
+  pushEntitiesAt(r.moving.map(([x, y, z]) => [x + dx, y + dy, z + dz]), dx, dy, dz);
+}
 function pistonExtend(x, y, z, b, m) {
-  const f = m & 7, [dx, dy, dz] = S.DIR6[f], line = [];
-  let cx = x + dx, cy = y + dy, cz = z + dz;
-  for (;;) {
-    if (cy < 0 || cy >= CH || !isLoaded(cx, cz)) return;
-    const id = getBlock(cx, cy, cz);
-    if (!id || breaksOnPush(id)) break;
-    if (immovable(id) || line.length >= 12) return;
-    line.push([cx, cy, cz, id, getMeta(cx, cy, cz), getTile(cx, cy, cz)]);
-    cx += dx; cy += dy; cz += dz;
-  }
-  const end = getBlock(cx, cy, cz);
-  if (end && end !== 0) { const dr = blockDrops(end, getMeta(cx, cy, cz), null); if (W.onDrop && !FLUID[end]) W.onDrop(cx, cy, cz, dr.items, 0); }
-  for (let i = line.length - 1; i >= 0; i--) { const [px, py, pz, id, mm, t] = line[i]; setBlock(px + dx, py + dy, pz + dz, id, mm, { noUpdate: true }); if (t) setTile(px + dx, py + dy, pz + dz, t); }
+  const f = m & 7, [dx, dy, dz] = S.DIR6[f];
+  const r = resolveMove(x + dx, y + dy, z + dz, dx, dy, dz, new Set([x + ',' + y + ',' + z]));
+  if (!r) return;
+  applyMove(r, dx, dy, dz);
   setMeta(x, y, z, m | 8);
-  setBlock(x + dx, y + dy, z + dz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
+  const hx = x + dx, hy = y + dy, hz = z + dz; if (getBlock(hx, hy, hz) && breaksOnPush(getBlock(hx, hy, hz))) setBlock(hx, hy, hz, 0, 0, { noUpdate: true });
+  setBlock(hx, hy, hz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
   markDirty(x, z);
-  for (const [px, py, pz] of line) { neighborUpdate(px + dx, py + dy, pz + dz); rsNotify(px + dx, py + dy, pz + dz); }
-  rsNotify(cx, cy, cz);
-  pushEntities(x + dx, y + dy, z + dz, line.length + 1, dx, dy, dz);
+  pushEntitiesAt([[hx, hy, hz]], dx, dy, dz);
   play('piston', { vol: 0.6 });
 }
 function pistonRetract(x, y, z, b, m) {
   const f = m & 7, [dx, dy, dz] = S.DIR6[f];
   setMeta(x, y, z, m & ~8);
   if (getBlock(x + dx, y + dy, z + dz) === RSB.head) setBlock(x + dx, y + dy, z + dz, 0, 0);
-  if (b === RSB.sticky) {
+  if (b === RSB.sticky) { // pull what is in front of the head back by one, with everything stuck to it
     const px = x + dx * 2, py = y + dy * 2, pz = z + dz * 2, id = getBlock(px, py, pz);
-    if (id && !immovable(id) && !breaksOnPush(id)) { const mm = getMeta(px, py, pz), t = getTile(px, py, pz); setBlock(px, py, pz, 0, 0, { noUpdate: true }); setBlock(x + dx, y + dy, z + dz, id, mm); if (t) setTile(x + dx, y + dy, z + dz, t); rsNotify(px, py, pz); }
+    if (id && !immovable(id) && !breaksOnPush(id)) { const r = resolveMove(px, py, pz, -dx, -dy, -dz, new Set([x + ',' + y + ',' + z])); if (r) applyMove(r, -dx, -dy, -dz); }
   }
   markDirty(x, z); rsNotify(x + dx, y + dy, z + dz);
   play('piston', { vol: 0.5, pitch: 0.8 });
 }
-function pushEntities(x, y, z, n, dx, dy, dz) {
-  const hit = (e, w, h) => { for (let i = 0; i < n; i++) { const bx = x + dx * i, by = y + dy * i, bz = z + dz * i; if (e.x + w > bx && e.x - w < bx + 1 && e.y + h > by && e.y < by + 1 && e.z + w > bz && e.z - w < bz + 1) return true; } return false; };
-  if (hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
-  for (const e of ENT) if (!e.dead && hit(e, e.w, e.h)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
+// entities standing in or on moved blocks go with them
+function pushEntitiesAt(cells, dx, dy, dz) {
+  const hit = (e, w, h) => cells.some(([bx, by, bz]) => e.x + w > bx && e.x - w < bx + 1 && e.z + w > bz && e.z - w < bz + 1 && e.y + h > by && e.y < by + 1.05);
+  if (!spectator() && hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
+  for (const e of ENT) if (!e.dead && hit(e, e.w || 0.2, e.h || 0.2)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
 }
 // ---------- pressure plates & player interaction ----------
 function plateOccupied(x, y, z) {

@@ -94,30 +94,71 @@ CUSTOM_SCREENS.book = {
 function lecternPulse([x, y, z]) { if (getBlock(x, y, z) !== BID.lectern) return; setMeta(x, y, z, getMeta(x, y, z) | 8); rsNotify(x, y, z); rsLater(x, y, z, 4); }
 
 // ---------- fireworks ----------
-const ROCKETS = [];
-function launchRocket(x, y, z, st, rider) {
-  const fw = st.fw || { flight: 1, colors: [] }, mesh = R.itemMesh(IID.firework_rocket); mesh.scale.setScalar(0.35); scene.add(mesh);
-  ROCKETS.push({ x, y, z, vx: (Math.random() - .5) * 0.02, vy: 0.05, vz: (Math.random() - .5) * 0.02, life: 10 * (fw.flight + 1) + Math.floor(Math.random() * 12), colors: fw.colors || [], mesh, rider });
+const ROCKETS = [], SPARKS = [];
+const FW_SHAPES = ['작은 공', '큰 공', '별 모양', '크리퍼 모양', '폭발형'];
+const dyeRGB = c => { const v = BANNER_DYE[c]; return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; };
+// stars: [{ colors, fade, shape, trail, twinkle }] (old saves kept only colours)
+const rocketStars = fw => fw.stars || (fw.colors && fw.colors.length ? [{ colors: fw.colors, shape: 0 }] : []);
+function launchRocket(x, y, z, st, rider, shot) {
+  const fw = st.fw || { flight: 1 }, mesh = R.itemMesh(IID.firework_rocket); mesh.scale.setScalar(0.35); scene.add(mesh);
+  ROCKETS.push({ x, y, z, vx: shot ? shot[0] : (Math.random() - .5) * 0.02, vy: shot ? shot[1] : 0.05, vz: shot ? shot[2] : (Math.random() - .5) * 0.02, shot: !!shot,
+    life: 10 * ((fw.flight || 1) + 1) + Math.floor(Math.random() * 12), stars: rocketStars(fw), mesh, rider });
   play('bow', { vol: 0.5, pitch: 0.6 });
 }
+// the particle pattern of one star
+function burstStar(x, y, z, st) {
+  const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life }); if (fade || st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: fade ? fade[k % fade.length] : [1, 1, 1], tw: st.twinkle }); };
+  if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
+    const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
+    if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }
+    else { const FACE = ['11011', '11011', '00100', '01110', '01010']; FACE.forEach((row, j) => [...row].forEach((c, i) => { if (c === '1') pts.push([(i - 2) / 2.2, (2 - j) / 2.2]); })); }
+    pts.forEach(([u, v], k) => P(u * ca * 6, v * 6, u * sa * 6, k));
+  } else if (st.shape === 4) { for (let k = 0; k < 70; k++) { const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; P(Math.cos(a) * s, 3 + Math.random() * 5, Math.sin(a) * s, k); } }
+  else { const n = st.shape === 1 ? 140 : 70, sp = st.shape === 1 ? 9 : 5; for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 2 - 1), s = sp * (0.85 + Math.random() * 0.3); P(Math.sin(b) * Math.cos(a) * s, Math.cos(b) * s, Math.sin(b) * Math.sin(a) * s, k); } }
+}
+function rocketExplode(r) {
+  scene.remove(r.mesh);
+  if (!r.stars.length) return;
+  for (const st of r.stars) burstStar(r.x, r.y, r.z, st);
+  const dist = Math.hypot(PL.x - r.x, PL.y - r.y, PL.z - r.z), big = r.stars.some(s => s.shape === 1);
+  play('explode', { vol: Math.max(0.05, (big ? 0.6 : 0.4) * (1 - dist / 96)), pitch: big ? 1.3 : 1.7 });
+  const dmg = 5 + 2 * r.stars.length; // stars hurt what is close
+  if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
+  for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+}
 function rocketTick() {
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
   for (let i = ROCKETS.length - 1; i >= 0; i--) {
     const r = ROCKETS[i];
-    if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; } else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
+    if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; }
+    else if (r.shot) { r.x += r.vx; r.y += r.vy; r.z += r.vz; } // from a crossbow: straight and fast
+    else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
     r.mesh.position.set(r.x, r.y, r.z);
     R.simpleParticle(r.x, r.y - 0.3, r.z, [1, 0.9, 0.6], { size: 0.06, vy: -0.5, grav: 0 });
-    const hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
+    let hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
+    if (r.shot && !hit) hit = ENT.some(e => e.kind === 'mob' && !e.dead && Math.abs(e.x - r.x) < e.w + 0.3 && Math.abs(e.z - r.z) < e.w + 0.3 && r.y > e.y - 0.2 && r.y < e.y + e.h + 0.2);
     if (--r.life > 0 && !hit) continue;
-    scene.remove(r.mesh); ROCKETS.splice(i, 1);
-    if (!r.colors.length) continue;
-    const cols = r.colors.map(c => { const v = BANNER_DYE[c]; return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; });
-    for (let k = 0; k < 90; k++) { const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 2 - 1), s = 5 + Math.random() * 2; R.simpleParticle(r.x, r.y, r.z, cols[k % cols.length], { size: 0.12, vx: Math.sin(b) * Math.cos(a) * s, vy: Math.cos(b) * s, vz: Math.sin(b) * Math.sin(a) * s, grav: 0.3, life: 1.2 }); }
-    const dist = Math.hypot(PL.x - r.x, PL.y - r.y, PL.z - r.z); play('explode', { vol: Math.max(0.05, 0.4 * (1 - dist / 80)), pitch: 1.7 });
-    const dmg = 5 + 2 * r.colors.length; // stars hurt what is close
-    if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
-    for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+    ROCKETS.splice(i, 1); rocketExplode(r);
   }
 }
+// firework stars and their fades follow no fixed recipe: gunpowder, dyes and at most one each of a shape item,
+// glowstone dust (twinkle) and a diamond (trail); a star with more dyes gets fade colours
+const STAR_SHAPE_ITEM = () => ({ [IID.fire_charge]: 1, [IID.gold_nugget]: 2, [IID.feather]: 4, [IID.wither_skeleton_skull]: 3 });
+function craftCustom(grid) {
+  const st = grid.filter(Boolean), dyes = [], it = k => st.filter(s => s.id === IID[k]).length;
+  for (const s of st) { const k = ITEMS[s.id].key; if (k.endsWith('_dye')) dyes.push(S.COLORS.indexOf(k.slice(0, -4))); }
+  const shapeIt = st.filter(s => STAR_SHAPE_ITEM()[s.id] != null || ITEMS[s.id].place === BID.mob_head);
+  const starIn = st.filter(s => s.id === IID.firework_star);
+  if (starIn.length === 1 && dyes.length && st.length === 1 + dyes.length && starIn[0].star) { // fade
+    const star = { ...starIn[0].star, fade: dyes }; return { id: IID.firework_star, n: 1, star, name: starName(star) };
+  }
+  const g = it('gunpowder'), gl = it('glowstone_dust'), di = it('diamond');
+  if (g !== 1 || !dyes.length || shapeIt.length > 1 || gl > 1 || di > 1 || st.length !== 1 + dyes.length + shapeIt.length + gl + di) return null;
+  const star = { colors: dyes, shape: shapeIt.length ? (STAR_SHAPE_ITEM()[shapeIt[0].id] || 3) : 0, trail: di > 0, twinkle: gl > 0 };
+  return { id: IID.firework_star, n: 1, star, name: starName(star) };
+}
+const starName = st => '폭죽 탄약 (' + FW_SHAPES[st.shape] + ', ' + st.colors.map(c => S.COLKO[c]).join('·') + (st.fade ? ' → ' + st.fade.map(c => S.COLKO[c]).join('·') : '') + (st.trail ? ', 꼬리' : '') + (st.twinkle ? ', 반짝임' : '') + ')';
 // gliding with an elytra: a rocket pushes you along the look direction (Java: v += l * 0.1 + (l * 1.5 - v) * 0.5)
 function fireworkBoost() {
   if (!(PL.fwBoost > 0) || !PL.gliding) { PL.fwBoost = 0; return; }
@@ -196,8 +237,7 @@ function items6Use(t, h, d) {
 // crafting results that carry data: rocket flight and star colours, star colours, the stew's effect
 function craftExtra(out, grid) {
   const d = ITEMS[out.id];
-  if (d.key === 'firework_rocket') { const g = grid.filter(s => s && s.id === IID.gunpowder).length, cols = []; for (const s of grid) if (s && s.id === IID.firework_star) cols.push(...(s.colors || [])); out.fw = { flight: g, colors: cols }; if (cols.length) out.name = '폭죽 로켓 (비행 시간 ' + g + ', 탄약)'; else if (g > 1) out.name = '폭죽 로켓 (비행 시간 ' + g + ')'; }
-  if (d.key === 'firework_star') { const dye = grid.find(s => s && ITEMS[s.id].key.endsWith('_dye')); if (dye) { const c = S.COLORS.indexOf(ITEMS[dye.id].key.slice(0, -4)); out.colors = [c]; out.name = '폭죽 탄약 (' + S.COLKO[c] + ')'; } }
+  if (d.key === 'firework_rocket') { const g = grid.filter(s => s && s.id === IID.gunpowder).length, stars = grid.filter(s => s && s.id === IID.firework_star && s.star).map(s => s.star); out.fw = { flight: g, stars }; out.name = '폭죽 로켓 (비행 시간 ' + g + (stars.length ? ', 탄약 ' + stars.length + '개' : '') + ')'; }
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
 // a saddle drawn on saddled pigs and striders (the resource pack has no saddle layer)
@@ -221,7 +261,7 @@ function lodestoneUse(t, h) {
   play('anvil', { vol: 0.3, pitch: 1.6 }); swing(); UI.hudDirty = true; return true;
 }
 function dialTick() {
-  const h = PL.held(), show = h && (h.id === IID.compass || h.id === IID.clock) && !UI.screen;
+  const isDial = s => s && (s.id === IID.compass || s.id === IID.clock), h = isDial(PL.held()) ? PL.held() : offItem(), show = h && (h.id === IID.compass || h.id === IID.clock) && !UI.screen;
   if (!DIAL.el) { DIAL.el = document.createElement('canvas'); DIAL.el.id = 'dialview'; DIAL.el.width = DIAL.el.height = 32; document.body.appendChild(DIAL.el); DIAL.g = DIAL.el.getContext('2d'); }
   DIAL.el.hidden = !show; if (!show) return;
   const g = DIAL.g; g.clearRect(0, 0, 32, 32);

@@ -526,7 +526,6 @@ shaped('scaffolding', 6, ['BSB', 'B B', 'B B'], { B: 'bamboo', S: 'string' }); I
 for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_sign', 3, ['PPP', 'PPP', ' S '], { S: 'stick', P: w + '_planks' }); ITEMS[IID[w + '_sign']].stack = 16; ITEMS[IID[w + '_sign']].sprite = w + '_sign_item'; if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_sign']].fuel = 200; }
 shapeless('writable_book', 1, ['book', 'ink_sac', 'feather']);
 for (let g = 1; g <= 3; g++) for (let s = 0; s + g <= 8 && s <= 3; s++) shapeless('firework_rocket', 3, ['paper', ...Array(g).fill('gunpowder'), ...Array(s).fill('firework_star')]); // flight 1-3, up to three stars (colours: craftExtra)
-for (const c of S.COLORS) shapeless('firework_star', 1, ['gunpowder', c + '_dye']);
 shaped('lead', 2, ['SS ', 'SB ', '  S'], { S: 'string', B: 'slime_ball' });
 shapeless('carrot_on_a_stick', 1, ['fishing_rod', 'carrot']); shapeless('warped_fungus_on_a_stick', 1, ['fishing_rod', 'warped_fungus']);
 // suspicious stew: the flower decides the effect (craftExtra)

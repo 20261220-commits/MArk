@@ -26,6 +26,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #hotbar{position:relative;height:calc(22 * var(--px));background:rgba(0,0,0,.45);border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #8b8b8b,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #3a3a3a;display:flex;padding:var(--px);pointer-events:auto;margin-bottom:var(--px)}
 .hs{width:calc(20 * var(--px));height:calc(20 * var(--px));position:relative;display:grid;place-items:center;border-right:var(--px) solid rgba(80,80,80,.6)}
 .hs:last-of-type{border-right:0}
+#offslot{position:absolute;left:calc(-30 * var(--px));top:calc(-1 * var(--px));background:rgba(0,0,0,.45);border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #8b8b8b;padding:var(--px)}
 #hsel{position:absolute;left:calc(-1 * var(--px));top:calc(-1 * var(--px));width:calc(24 * var(--px));height:calc(24 * var(--px));border:calc(2 * var(--px)) solid #fff;box-shadow:0 0 0 var(--px) #000,inset 0 0 0 var(--px) #000;transition:transform .05s linear;pointer-events:none}
 .ic{display:block;width:calc(16 * var(--px));height:calc(16 * var(--px));image-rendering:pixelated;background-repeat:no-repeat}
 .hs b,.sl b,.toff span b{position:absolute;right:0;bottom:calc(-1 * var(--px));font-size:calc(8 * var(--px));line-height:1;font-weight:700;color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
@@ -3442,7 +3443,6 @@ shaped('scaffolding', 6, ['BSB', 'B B', 'B B'], { B: 'bamboo', S: 'string' }); I
 for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_sign', 3, ['PPP', 'PPP', ' S '], { S: 'stick', P: w + '_planks' }); ITEMS[IID[w + '_sign']].stack = 16; ITEMS[IID[w + '_sign']].sprite = w + '_sign_item'; if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_sign']].fuel = 200; }
 shapeless('writable_book', 1, ['book', 'ink_sac', 'feather']);
 for (let g = 1; g <= 3; g++) for (let s = 0; s + g <= 8 && s <= 3; s++) shapeless('firework_rocket', 3, ['paper', ...Array(g).fill('gunpowder'), ...Array(s).fill('firework_star')]); // flight 1-3, up to three stars (colours: craftExtra)
-for (const c of S.COLORS) shapeless('firework_star', 1, ['gunpowder', c + '_dye']);
 shaped('lead', 2, ['SS ', 'SB ', '  S'], { S: 'string', B: 'slime_ball' });
 shapeless('carrot_on_a_stick', 1, ['fishing_rod', 'carrot']); shapeless('warped_fungus_on_a_stick', 1, ['fishing_rod', 'warped_fungus']);
 // suspicious stew: the flower decides the effect (craftExtra)
@@ -5294,7 +5294,7 @@ crack.visible = false; scene.add(crack);
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
-const PMAX = 600;
+const PMAX = 1500;
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PMAX * 3), pUV = new Float32Array(PMAX * 2), pSize = new Float32Array(PMAX), pCol = new Float32Array(PMAX * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute('puv', new THREE.BufferAttribute(pUV, 2)); pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1)); pGeo.setAttribute('pcol', new THREE.BufferAttribute(pCol, 3));
@@ -6661,43 +6661,70 @@ function rsDelayed(x, y, z) {
 // ---------- pistons ----------
 const immovable = b => { const d = BLOCKS[b]; return !d || d.hard < 0 || b === BID.obsidian || b === BID.crying_obsidian || b === BID.furnace || b === BID.lit_furnace || b === BID.chest || b === BID.enchanting_table || b === BID.spawner || b === RSB.head || b === BID.anvil || b === BID.end_portal_frame || b === BID.red_bed || b === BID.oak_door; };
 const breaksOnPush = b => REPL[b] || FLUID[b] || RTYPE[b] === RT.CROSS || RTYPE[b] === RT.TORCH || RTYPE[b] === RT.CROP || b === RSB.wire || b === RSB.lever || b === RSB.button || b === RSB.plate || b === RSB.rep || b === BID.ladder || b === BID.lantern || b === BID.cobweb || b === BID.cactus || b === BID.sugar_cane || BLOCKS[b].leaves && false;
+// which blocks move (Java's structure resolver): the line in front of the piston, plus everything slime and honey
+// blocks stick to (they do not stick to each other), at most 12; anything fragile in the way is broken
+const isStickyBlock = b => b === BID.slime_block || b === BID.honey_block;
+const sticksTo = (a, b) => !((a === BID.slime_block && b === BID.honey_block) || (a === BID.honey_block && b === BID.slime_block));
+function resolveMove(sx, sy, sz, dx, dy, dz, skip) {
+  const moving = new Map(), breaks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z;
+  const visit = (x, y, z, pushed) => {
+    const k = K(x, y, z); if (moving.has(k) || skip.has(k)) return true;
+    if (y < 0 || y >= CH || !isLoaded(x, z)) return !pushed;
+    const id = getBlock(x, y, z);
+    if (!id) return true;
+    if (breaksOnPush(id)) { if (pushed) breaks.set(k, [x, y, z]); return true; }
+    if (immovable(id)) return !pushed; // a sticky block simply lets go of what cannot move
+    if (moving.size >= 12) return false;
+    moving.set(k, [x, y, z, id, getMeta(x, y, z), getTile(x, y, z)]);
+    if (!visit(x + dx, y + dy, z + dz, true)) return false;
+    if (isStickyBlock(id)) for (const [ex, ey, ez] of S.DIR6) {
+      if (ex === dx && ey === dy && ez === dz) continue;
+      const nx = x + ex, ny = y + ey, nz = z + ez, nb = getBlock(nx, ny, nz);
+      if (!nb || breaksOnPush(nb) || immovable(nb) || !sticksTo(id, nb)) continue;
+      if (!visit(nx, ny, nz, false)) return false;
+    }
+    return true;
+  };
+  if (!visit(sx, sy, sz, true)) return null;
+  // cells the moved blocks land in that hold something fragile
+  for (const [x, y, z] of moving.values()) { const k = K(x + dx, y + dy, z + dz), t = getBlock(x + dx, y + dy, z + dz); if (!moving.has(k) && !skip.has(k) && t && breaksOnPush(t)) breaks.set(k, [x + dx, y + dy, z + dz]); }
+  return { moving: [...moving.values()], breaks: [...breaks.values()] };
+}
+function applyMove(r, dx, dy, dz) {
+  for (const [x, y, z] of r.breaks) { const id = getBlock(x, y, z); if (!id) continue; if (!FLUID[id] && W.onDrop) W.onDrop(x, y, z, blockDrops(id, getMeta(x, y, z), null).items, 0); setBlock(x, y, z, 0, 0, { noUpdate: true }); }
+  for (const [x, y, z] of r.moving) setBlock(x, y, z, 0, 0, { noUpdate: true, keepTile: false, dry: true });
+  for (const [x, y, z, id, mm, t] of r.moving) { setBlock(x + dx, y + dy, z + dz, id, mm, { noUpdate: true }); if (t) setTile(x + dx, y + dy, z + dz, t); }
+  for (const [x, y, z] of r.moving) { neighborUpdate(x, y, z); neighborUpdate(x + dx, y + dy, z + dz); rsNotify(x, y, z); rsNotify(x + dx, y + dy, z + dz); }
+  pushEntitiesAt(r.moving.map(([x, y, z]) => [x + dx, y + dy, z + dz]), dx, dy, dz);
+}
 function pistonExtend(x, y, z, b, m) {
-  const f = m & 7, [dx, dy, dz] = S.DIR6[f], line = [];
-  let cx = x + dx, cy = y + dy, cz = z + dz;
-  for (;;) {
-    if (cy < 0 || cy >= CH || !isLoaded(cx, cz)) return;
-    const id = getBlock(cx, cy, cz);
-    if (!id || breaksOnPush(id)) break;
-    if (immovable(id) || line.length >= 12) return;
-    line.push([cx, cy, cz, id, getMeta(cx, cy, cz), getTile(cx, cy, cz)]);
-    cx += dx; cy += dy; cz += dz;
-  }
-  const end = getBlock(cx, cy, cz);
-  if (end && end !== 0) { const dr = blockDrops(end, getMeta(cx, cy, cz), null); if (W.onDrop && !FLUID[end]) W.onDrop(cx, cy, cz, dr.items, 0); }
-  for (let i = line.length - 1; i >= 0; i--) { const [px, py, pz, id, mm, t] = line[i]; setBlock(px + dx, py + dy, pz + dz, id, mm, { noUpdate: true }); if (t) setTile(px + dx, py + dy, pz + dz, t); }
+  const f = m & 7, [dx, dy, dz] = S.DIR6[f];
+  const r = resolveMove(x + dx, y + dy, z + dz, dx, dy, dz, new Set([x + ',' + y + ',' + z]));
+  if (!r) return;
+  applyMove(r, dx, dy, dz);
   setMeta(x, y, z, m | 8);
-  setBlock(x + dx, y + dy, z + dz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
+  const hx = x + dx, hy = y + dy, hz = z + dz; if (getBlock(hx, hy, hz) && breaksOnPush(getBlock(hx, hy, hz))) setBlock(hx, hy, hz, 0, 0, { noUpdate: true });
+  setBlock(hx, hy, hz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
   markDirty(x, z);
-  for (const [px, py, pz] of line) { neighborUpdate(px + dx, py + dy, pz + dz); rsNotify(px + dx, py + dy, pz + dz); }
-  rsNotify(cx, cy, cz);
-  pushEntities(x + dx, y + dy, z + dz, line.length + 1, dx, dy, dz);
+  pushEntitiesAt([[hx, hy, hz]], dx, dy, dz);
   play('piston', { vol: 0.6 });
 }
 function pistonRetract(x, y, z, b, m) {
   const f = m & 7, [dx, dy, dz] = S.DIR6[f];
   setMeta(x, y, z, m & ~8);
   if (getBlock(x + dx, y + dy, z + dz) === RSB.head) setBlock(x + dx, y + dy, z + dz, 0, 0);
-  if (b === RSB.sticky) {
+  if (b === RSB.sticky) { // pull what is in front of the head back by one, with everything stuck to it
     const px = x + dx * 2, py = y + dy * 2, pz = z + dz * 2, id = getBlock(px, py, pz);
-    if (id && !immovable(id) && !breaksOnPush(id)) { const mm = getMeta(px, py, pz), t = getTile(px, py, pz); setBlock(px, py, pz, 0, 0, { noUpdate: true }); setBlock(x + dx, y + dy, z + dz, id, mm); if (t) setTile(x + dx, y + dy, z + dz, t); rsNotify(px, py, pz); }
+    if (id && !immovable(id) && !breaksOnPush(id)) { const r = resolveMove(px, py, pz, -dx, -dy, -dz, new Set([x + ',' + y + ',' + z])); if (r) applyMove(r, -dx, -dy, -dz); }
   }
   markDirty(x, z); rsNotify(x + dx, y + dy, z + dz);
   play('piston', { vol: 0.5, pitch: 0.8 });
 }
-function pushEntities(x, y, z, n, dx, dy, dz) {
-  const hit = (e, w, h) => { for (let i = 0; i < n; i++) { const bx = x + dx * i, by = y + dy * i, bz = z + dz * i; if (e.x + w > bx && e.x - w < bx + 1 && e.y + h > by && e.y < by + 1 && e.z + w > bz && e.z - w < bz + 1) return true; } return false; };
-  if (hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
-  for (const e of ENT) if (!e.dead && hit(e, e.w, e.h)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
+// entities standing in or on moved blocks go with them
+function pushEntitiesAt(cells, dx, dy, dz) {
+  const hit = (e, w, h) => cells.some(([bx, by, bz]) => e.x + w > bx && e.x - w < bx + 1 && e.z + w > bz && e.z - w < bz + 1 && e.y + h > by && e.y < by + 1.05);
+  if (!spectator() && hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
+  for (const e of ENT) if (!e.dead && hit(e, e.w || 0.2, e.h || 0.2)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
 }
 // ---------- pressure plates & player interaction ----------
 function plateOccupied(x, y, z) {
@@ -8451,6 +8478,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
 const crossbowCharge = st => Math.max(0, 25 - 5 * enchLv(st, 'quick_charge'));
 function crossbowRelease(h) { // let go of the button: load if fully drawn
   if (USE.t < crossbowCharge(h)) return;
+  const fw = offItem(); if (fw && fw.id === IID.firework_rocket) { h.ch = IID.firework_rocket; h.chFw = fw.fw || { flight: 1 }; if (!creative()) { fw.n--; if (!fw.n) INV.off = null; } play('click', { pitch: 0.6 }); UI.hudDirty = true; return; } // a rocket in the off hand loads instead of an arrow
   const ai = arrowSlot(); if (ai < 0 && !creative()) return;
   const ast = ai >= 0 ? INV.slots[ai] : { id: IID.arrow, n: 1 };
   h.ch = ast.id; play('click', { pitch: 0.6 });
@@ -8462,13 +8490,14 @@ function crossbowFire(h) {
   const angles = ms ? [0, -0.17, 0.17] : [0];
   for (const a of angles) {
     const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
+    if (h.ch === IID.firework_rocket) { launchRocket(PL.x + vx * 0.6, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.6, { fw: h.chFw }, false, [vx * 1.6, dy * 1.6, vz * 1.6]); continue; }
     const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2);
     if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
     if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
     e.crossbow = true;
   }
-  h.ch = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
+  h.ch = null; h.chFw = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
 }
 
 // ---------- trident ----------
@@ -10325,7 +10354,7 @@ function mapUpdate(c) {
 }
 // ---------- the map in hand ----------
 function mapViewTick() {
-  const h = PL.held(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
+  const h = PL.held() && PL.held().id === IID.filled_map ? PL.held() : offItem(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
   if (!MAPS.view) { MAPS.view = document.createElement('canvas'); MAPS.view.id = 'mapview'; MAPS.view.width = MAPS.view.height = 128; document.body.appendChild(MAPS.view); MAPS.ctx = MAPS.view.getContext('2d'); }
   MAPS.view.hidden = !show; if (!show) return;
   const c = mapData(h.map); if (!c) return;
@@ -11041,30 +11070,71 @@ CUSTOM_SCREENS.book = {
 function lecternPulse([x, y, z]) { if (getBlock(x, y, z) !== BID.lectern) return; setMeta(x, y, z, getMeta(x, y, z) | 8); rsNotify(x, y, z); rsLater(x, y, z, 4); }
 
 // ---------- fireworks ----------
-const ROCKETS = [];
-function launchRocket(x, y, z, st, rider) {
-  const fw = st.fw || { flight: 1, colors: [] }, mesh = R.itemMesh(IID.firework_rocket); mesh.scale.setScalar(0.35); scene.add(mesh);
-  ROCKETS.push({ x, y, z, vx: (Math.random() - .5) * 0.02, vy: 0.05, vz: (Math.random() - .5) * 0.02, life: 10 * (fw.flight + 1) + Math.floor(Math.random() * 12), colors: fw.colors || [], mesh, rider });
+const ROCKETS = [], SPARKS = [];
+const FW_SHAPES = ['작은 공', '큰 공', '별 모양', '크리퍼 모양', '폭발형'];
+const dyeRGB = c => { const v = BANNER_DYE[c]; return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; };
+// stars: [{ colors, fade, shape, trail, twinkle }] (old saves kept only colours)
+const rocketStars = fw => fw.stars || (fw.colors && fw.colors.length ? [{ colors: fw.colors, shape: 0 }] : []);
+function launchRocket(x, y, z, st, rider, shot) {
+  const fw = st.fw || { flight: 1 }, mesh = R.itemMesh(IID.firework_rocket); mesh.scale.setScalar(0.35); scene.add(mesh);
+  ROCKETS.push({ x, y, z, vx: shot ? shot[0] : (Math.random() - .5) * 0.02, vy: shot ? shot[1] : 0.05, vz: shot ? shot[2] : (Math.random() - .5) * 0.02, shot: !!shot,
+    life: 10 * ((fw.flight || 1) + 1) + Math.floor(Math.random() * 12), stars: rocketStars(fw), mesh, rider });
   play('bow', { vol: 0.5, pitch: 0.6 });
 }
+// the particle pattern of one star
+function burstStar(x, y, z, st) {
+  const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life }); if (fade || st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: fade ? fade[k % fade.length] : [1, 1, 1], tw: st.twinkle }); };
+  if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
+    const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
+    if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }
+    else { const FACE = ['11011', '11011', '00100', '01110', '01010']; FACE.forEach((row, j) => [...row].forEach((c, i) => { if (c === '1') pts.push([(i - 2) / 2.2, (2 - j) / 2.2]); })); }
+    pts.forEach(([u, v], k) => P(u * ca * 6, v * 6, u * sa * 6, k));
+  } else if (st.shape === 4) { for (let k = 0; k < 70; k++) { const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; P(Math.cos(a) * s, 3 + Math.random() * 5, Math.sin(a) * s, k); } }
+  else { const n = st.shape === 1 ? 140 : 70, sp = st.shape === 1 ? 9 : 5; for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 2 - 1), s = sp * (0.85 + Math.random() * 0.3); P(Math.sin(b) * Math.cos(a) * s, Math.cos(b) * s, Math.sin(b) * Math.sin(a) * s, k); } }
+}
+function rocketExplode(r) {
+  scene.remove(r.mesh);
+  if (!r.stars.length) return;
+  for (const st of r.stars) burstStar(r.x, r.y, r.z, st);
+  const dist = Math.hypot(PL.x - r.x, PL.y - r.y, PL.z - r.z), big = r.stars.some(s => s.shape === 1);
+  play('explode', { vol: Math.max(0.05, (big ? 0.6 : 0.4) * (1 - dist / 96)), pitch: big ? 1.3 : 1.7 });
+  const dmg = 5 + 2 * r.stars.length; // stars hurt what is close
+  if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
+  for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+}
 function rocketTick() {
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
   for (let i = ROCKETS.length - 1; i >= 0; i--) {
     const r = ROCKETS[i];
-    if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; } else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
+    if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; }
+    else if (r.shot) { r.x += r.vx; r.y += r.vy; r.z += r.vz; } // from a crossbow: straight and fast
+    else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
     r.mesh.position.set(r.x, r.y, r.z);
     R.simpleParticle(r.x, r.y - 0.3, r.z, [1, 0.9, 0.6], { size: 0.06, vy: -0.5, grav: 0 });
-    const hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
+    let hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
+    if (r.shot && !hit) hit = ENT.some(e => e.kind === 'mob' && !e.dead && Math.abs(e.x - r.x) < e.w + 0.3 && Math.abs(e.z - r.z) < e.w + 0.3 && r.y > e.y - 0.2 && r.y < e.y + e.h + 0.2);
     if (--r.life > 0 && !hit) continue;
-    scene.remove(r.mesh); ROCKETS.splice(i, 1);
-    if (!r.colors.length) continue;
-    const cols = r.colors.map(c => { const v = BANNER_DYE[c]; return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; });
-    for (let k = 0; k < 90; k++) { const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 2 - 1), s = 5 + Math.random() * 2; R.simpleParticle(r.x, r.y, r.z, cols[k % cols.length], { size: 0.12, vx: Math.sin(b) * Math.cos(a) * s, vy: Math.cos(b) * s, vz: Math.sin(b) * Math.sin(a) * s, grav: 0.3, life: 1.2 }); }
-    const dist = Math.hypot(PL.x - r.x, PL.y - r.y, PL.z - r.z); play('explode', { vol: Math.max(0.05, 0.4 * (1 - dist / 80)), pitch: 1.7 });
-    const dmg = 5 + 2 * r.colors.length; // stars hurt what is close
-    if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
-    for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+    ROCKETS.splice(i, 1); rocketExplode(r);
   }
 }
+// firework stars and their fades follow no fixed recipe: gunpowder, dyes and at most one each of a shape item,
+// glowstone dust (twinkle) and a diamond (trail); a star with more dyes gets fade colours
+const STAR_SHAPE_ITEM = () => ({ [IID.fire_charge]: 1, [IID.gold_nugget]: 2, [IID.feather]: 4, [IID.wither_skeleton_skull]: 3 });
+function craftCustom(grid) {
+  const st = grid.filter(Boolean), dyes = [], it = k => st.filter(s => s.id === IID[k]).length;
+  for (const s of st) { const k = ITEMS[s.id].key; if (k.endsWith('_dye')) dyes.push(S.COLORS.indexOf(k.slice(0, -4))); }
+  const shapeIt = st.filter(s => STAR_SHAPE_ITEM()[s.id] != null || ITEMS[s.id].place === BID.mob_head);
+  const starIn = st.filter(s => s.id === IID.firework_star);
+  if (starIn.length === 1 && dyes.length && st.length === 1 + dyes.length && starIn[0].star) { // fade
+    const star = { ...starIn[0].star, fade: dyes }; return { id: IID.firework_star, n: 1, star, name: starName(star) };
+  }
+  const g = it('gunpowder'), gl = it('glowstone_dust'), di = it('diamond');
+  if (g !== 1 || !dyes.length || shapeIt.length > 1 || gl > 1 || di > 1 || st.length !== 1 + dyes.length + shapeIt.length + gl + di) return null;
+  const star = { colors: dyes, shape: shapeIt.length ? (STAR_SHAPE_ITEM()[shapeIt[0].id] || 3) : 0, trail: di > 0, twinkle: gl > 0 };
+  return { id: IID.firework_star, n: 1, star, name: starName(star) };
+}
+const starName = st => '폭죽 탄약 (' + FW_SHAPES[st.shape] + ', ' + st.colors.map(c => S.COLKO[c]).join('·') + (st.fade ? ' → ' + st.fade.map(c => S.COLKO[c]).join('·') : '') + (st.trail ? ', 꼬리' : '') + (st.twinkle ? ', 반짝임' : '') + ')';
 // gliding with an elytra: a rocket pushes you along the look direction (Java: v += l * 0.1 + (l * 1.5 - v) * 0.5)
 function fireworkBoost() {
   if (!(PL.fwBoost > 0) || !PL.gliding) { PL.fwBoost = 0; return; }
@@ -11143,8 +11213,7 @@ function items6Use(t, h, d) {
 // crafting results that carry data: rocket flight and star colours, star colours, the stew's effect
 function craftExtra(out, grid) {
   const d = ITEMS[out.id];
-  if (d.key === 'firework_rocket') { const g = grid.filter(s => s && s.id === IID.gunpowder).length, cols = []; for (const s of grid) if (s && s.id === IID.firework_star) cols.push(...(s.colors || [])); out.fw = { flight: g, colors: cols }; if (cols.length) out.name = '폭죽 로켓 (비행 시간 ' + g + ', 탄약)'; else if (g > 1) out.name = '폭죽 로켓 (비행 시간 ' + g + ')'; }
-  if (d.key === 'firework_star') { const dye = grid.find(s => s && ITEMS[s.id].key.endsWith('_dye')); if (dye) { const c = S.COLORS.indexOf(ITEMS[dye.id].key.slice(0, -4)); out.colors = [c]; out.name = '폭죽 탄약 (' + S.COLKO[c] + ')'; } }
+  if (d.key === 'firework_rocket') { const g = grid.filter(s => s && s.id === IID.gunpowder).length, stars = grid.filter(s => s && s.id === IID.firework_star && s.star).map(s => s.star); out.fw = { flight: g, stars }; out.name = '폭죽 로켓 (비행 시간 ' + g + (stars.length ? ', 탄약 ' + stars.length + '개' : '') + ')'; }
   if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
 }
 // a saddle drawn on saddled pigs and striders (the resource pack has no saddle layer)
@@ -11168,7 +11237,7 @@ function lodestoneUse(t, h) {
   play('anvil', { vol: 0.3, pitch: 1.6 }); swing(); UI.hudDirty = true; return true;
 }
 function dialTick() {
-  const h = PL.held(), show = h && (h.id === IID.compass || h.id === IID.clock) && !UI.screen;
+  const isDial = s => s && (s.id === IID.compass || s.id === IID.clock), h = isDial(PL.held()) ? PL.held() : offItem(), show = h && (h.id === IID.compass || h.id === IID.clock) && !UI.screen;
   if (!DIAL.el) { DIAL.el = document.createElement('canvas'); DIAL.el.id = 'dialview'; DIAL.el.width = DIAL.el.height = 32; document.body.appendChild(DIAL.el); DIAL.g = DIAL.el.getContext('2d'); }
   DIAL.el.hidden = !show; if (!show) return;
   const g = DIAL.g; g.clearRect(0, 0, 32, 32);
@@ -11189,9 +11258,80 @@ function dialTick() {
 }
 
 </script>
+<script>/* js/offhand.js */
+// The off hand (F swaps it with the main hand). Right-click uses the main-hand item first; when that has nothing to
+// do (empty hand, a sword or pickaxe, a plain material) the off-hand item is used instead: a shield is raised, a torch
+// or block placed, food eaten, a map shown. While an off-hand use lasts, the two hands are swapped behind the scenes
+// so every item rule (consuming, durability, shield blocking) keeps working on the right stack.
+const OFF = { swapped: false, slot: 0 };
+const MAIN_USE_IDS = () => OFF.ids || (OFF.ids = new Set(['bow', 'crossbow', 'trident', 'shield', 'spyglass', 'bucket', 'water_bucket', 'lava_bucket', 'powder_snow_bucket', 'axolotl_bucket', 'tropical_fish_bucket',
+  'milk_bucket', 'flint_and_steel', 'fire_charge', 'ender_pearl', 'ender_eye', 'snowball', 'egg', 'experience_bottle', 'fishing_rod', 'oak_boat', 'bone_meal', 'map', 'writable_book', 'written_book', 'firework_rocket',
+  'lead', 'carrot_on_a_stick', 'warped_fungus_on_a_stick', 'saddle', 'name_tag', 'shears', 'item_frame', 'glow_item_frame', 'painting', 'armor_stand', 'glass_bottle', 'honeycomb', 'compass', 'redstone', 'string'].map(k => IID[k])));
+function mainHandIdle(h) {
+  if (!h) return true;
+  const d = ITEMS[h.id];
+  if (d.tool) return d.tool.type === S.TOOL.SWORD || d.tool.type === S.TOOL.PICK;
+  return d.place == null && !d.food && !d.drink && !d.cart && !d.splash && !d.lingering && d.candle == null && !MAIN_USE_IDS().has(h.id) && !ITEMS[h.id].key.endsWith('_dye');
+}
+function offSwap() { const i = INV.sel, a = INV.slots[i]; INV.slots[i] = INV.off; INV.off = a; OFF.swapped = true; OFF.slot = i; UI.hudDirty = true; }
+function offUnswap() { if (!OFF.swapped) return; const i = OFF.slot, a = INV.slots[i]; INV.slots[i] = INV.off; INV.off = a; OFF.swapped = false; UI.hudDirty = true; }
+// player.js onUsePress: true when the off hand took the click
+function offhandUse(press) {
+  if (OFF.swapped || !INV.off || PL.sleeping) return false;
+  if (!mainHandIdle(PL.held())) return false;
+  if (TARGET && TARGET.type === 'block' && interactBlock(TARGET, true)) return false; // doors, chests... open with the main hand
+  if (TARGET && TARGET.type === 'ent' && PL.held() === null && TARGET.e.kind === 'mob' && (TARGET.e.def.villager || TARGET.e.type === 'wandering_trader')) return false;
+  offSwap(); press();
+  if (!USE.kind || USE.kind === 'place') offUnswap(); // instant uses swap straight back; held uses wait for the release
+  return true;
+}
+// keep the hands straight: the use ended, or the game is about to save
+function offhandTick() { if (OFF.swapped && (!IN.use || !USE.kind || USE.kind === 'place' || INV.sel !== OFF.slot)) offUnswap(); }
+function swapHands() {
+  if (OFF.swapped) offUnswap();
+  const i = INV.sel, a = INV.slots[i]; INV.slots[i] = INV.off; INV.off = a; USE.kind = null; UI.hudDirty = true; play('click', { vol: 0.3 });
+}
+// the HUD slot to the left of the hotbar
+function offhandHud() {
+  let el = $('offslot');
+  if (!el) { el = document.createElement('div'); el.id = 'offslot'; el.className = 'hs'; $('hotbar').appendChild(el); }
+  const s = OFF.swapped ? INV.slots[OFF.slot] : INV.off; el.hidden = !s; el.innerHTML = s ? icon(s.id, s.n, s.d, s.e) : '';
+}
+const offItem = () => OFF.swapped ? INV.slots[OFF.slot] : INV.off;
+
+// ---------- armour drawn on the player model (third person) ----------
+// boxes per slot: [bone, x0, y0, z0, w, h, d, grow] in the model's pixel coordinates (as HUM_BODY)
+const PL_ARMOR_BOXES = [
+  [['head', -4, -8, -4, 8, 8, 8, 1]],
+  [['body', -4, 0, -2, 8, 12, 4, 1], ['rarm', -3, -2, -2, 4, 12, 4, 1], ['larm', -1, -2, -2, 4, 12, 4, 1]],
+  [['body', -4, 7, -2, 8, 5, 4, 0.5], ['rleg', -2, 0, -2, 4, 9, 4, 0.5], ['lleg', -2, 0, -2, 4, 9, 4, 0.5]],
+  [['rleg', -2, 8, -2, 4, 4, 4, 1], ['lleg', -2, 8, -2, 4, 4, 4, 1]],
+];
+const PLA = { key: '', meshes: [] };
+function playerArmorTick(model, light) {
+  const key = INV.armor.map(s => s ? s.id : 0).join(',');
+  if (key !== PLA.key) {
+    PLA.key = key; for (const m of PLA.meshes) { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); } PLA.meshes = [];
+    const P = model.userData.parts;
+    INV.armor.forEach((st, slot) => {
+      if (!st) return;
+      const a = ITEMS[st.id].armor, col = ARMOR_COL[a && a.mat] || (st.id === BID.pumpkin || st.id === BID.carved_pumpkin ? 0xe88a1a : st.id === BID.wither_skeleton_skull ? 0x2a2a2a : 0x888888);
+      const boxes = a && a.mat === 'elytra' ? [['body', -5, 0, 2, 10, 14, 1, 0]] : PL_ARMOR_BOXES[slot];
+      for (const [bone, x0, y0, z0, w, h, d, g] of boxes) {
+        if (!P[bone]) continue;
+        const m = new THREE.Mesh(new THREE.BoxGeometry((w + g * 2) / 16, (h + g * 2) / 16, (d + g * 2) / 16), new THREE.MeshBasicMaterial({ color: col }));
+        m.position.set(-(x0 + w / 2) / 16, -(y0 + h / 2) / 16, (z0 + d / 2) / 16); m.userData.col = new THREE.Color(col);
+        P[bone].add(m); PLA.meshes.push(m);
+      }
+    });
+  }
+  for (const m of PLA.meshes) m.material.color.copy(m.userData.col).multiplyScalar(light);
+}
+
+</script>
 <script>/* js/inventory.js */
 // Inventory model + container screens with Java Edition click semantics.
-const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
+const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), off: null, sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
 const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
@@ -11212,7 +11352,7 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
+function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'inv' || type === 'craft') {
@@ -11266,6 +11406,7 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
   return L;
 }
@@ -11586,9 +11727,9 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
   play('hurt');
-  if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying (held anywhere in the hotbar: there is no off-hand)
-    const k = INV.slots.findIndex((s, i) => i < 9 && s && s.id === IID.totem_of_undying);
-    if (k >= 0) { INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+  if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
+    offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
+    if (k !== -1) { if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) die(cause);
   UI.hudDirty = true;
@@ -11598,7 +11739,7 @@ const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게
 function die(cause) {
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
   if (!W.keepInv) {
-    const all = [...INV.slots, ...INV.armor]; INV.slots.fill(null); INV.armor.fill(null);
+    offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
     for (const s of all) if (s && !enchLv(s, 'vanishing_curse')) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
     PL.level = 0; PL.xpP = 0; PL.xpTotal = 0;
@@ -11780,6 +11921,7 @@ function survivalTick(inWater, inLava, eyeF) {
 let TARGET = null;
 function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
+  offhandTick();
   const held = PL.held();
   TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
   if (MINE.cd > 0) MINE.cd--;
@@ -11887,6 +12029,7 @@ function finishEat() {
   UI.hudDirty = true;
 }
 function onUsePress() {
+  if (offhandUse(onUsePress)) return; // the off hand takes the click when the main hand has nothing to do
   const h = PL.held(), d = h && ITEMS[h.id];
   if (PL.sleeping) return;
   // eat / drink
@@ -11919,7 +12062,7 @@ function onUseRelease() {
   if (USE.kind === 'crossbow' && PL.held() && PL.held().id === IID.crossbow) crossbowRelease(PL.held());
   if (USE.kind === 'trident' && PL.held() && PL.held().id === IID.trident) tridentRelease(PL.held());
   if (USE.kind === 'eat') R.hand.eat = 0;
-  USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0;
+  USE.kind = null; USE.t = 0; R.hand.bow = 0; R.hand.spy = false; R.hand.eat = 0; offUnswap();
 }
 function interactBlock(t, dry) {
   if (PL.sneaking && PL.held()) return false;
@@ -12349,7 +12492,8 @@ function renderHud(dt) {
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
+  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
+  offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
     for (let i = 0; i < 10; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
@@ -12414,7 +12558,7 @@ UI.renderScreen = () => {
   const T = UI.screen, el = $('screen');
   let h = '';
   if (T === 'inv') {
-    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
+    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
@@ -12749,6 +12893,7 @@ addEventListener('keydown', e => {
   if (UI.screen) {
     if (e.code === 'Escape' || e.code === 'KeyE') { UI.closeScreen(); e.preventDefault(); return; }
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
+    if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
   }
@@ -12764,6 +12909,7 @@ addEventListener('keydown', e => {
   if (e.code === 'F3' || e.code === 'Backquote') { UI.debug = !UI.debug; return; }
   if (e.code === 'F5' || e.code === 'KeyV') { view = (view + 1) % 3; return; }
   if (e.code === 'KeyQ') { dropHeld(e.ctrlKey); return; }
+  if (e.code === 'KeyF') { swapHands(); return; }
   if (/^Digit[1-9]$/.test(e.code)) { INV.sel = +e.code.slice(5) - 1; if (USE.kind) onUseRelease(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { const t = performance.now(); if ((creative() || spectator()) && t - IN.lastSpace < 300) { if (!spectator()) PL.flying = !PL.flying; PL.vy = 0; IN.lastSpace = 0; } else IN.lastSpace = t; } }
   if (e.code === 'KeyW' && !e.repeat) { const t = performance.now(); if (t - IN.lastW < 280) IN.wTap = true; IN.lastW = t; }
@@ -12844,7 +12990,7 @@ async function startWorld(id, meta) {
   await loadSavedKeys(meta.id);
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
-  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null;
+  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
   Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
@@ -12853,6 +12999,7 @@ async function startWorld(id, meta) {
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
     if (p.ender) PL.ender = p.ender.map(s => s && ITEMS[s.id] ? s : null);
+    INV.off = p.off && ITEMS[p.off.id] ? p.off : null;
     W.time = meta.time || 1000; W.rain = meta.rain || 0; W.rainTarget = W.rain; W.thunderOn = !!meta.thunder; W.thunder = W.thunderOn && W.rain > 0.5 ? 1 : 0;
   } else {
     PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1] + 1; PL.z = W.worldSpawn[2] + .5; PL.yaw = Math.random() * 6; PL.pitch = 0; W.time = 1000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
@@ -12894,8 +13041,9 @@ function finishLoading() {
 }
 function saveWorldMeta() {
   if (!W.active || !W.meta) return;
+  offUnswap();
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender };
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off };
   (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
@@ -12972,6 +13120,7 @@ function updateCamera(alpha, dt) {
     P.rleg.rotation.x = w; P.lleg.rotation.x = -w; P.rarm.rotation.x = -w * 0.8 - (R.hand.swing > 0 ? Math.sin(R.hand.swing * Math.PI) : 0); P.larm.rotation.x = w * 0.8;
     P.head.rotation.x = -PL.pitch; if (PL.sneaking) { P.body.rotation.x = 0.3; } else P.body.rotation.x = 0;
     for (const m of playerModel.userData.mats) m.color.setScalar(lightBright(x, y + 1, z));
+    playerArmorTick(playerModel, lightBright(x, y + 1, z));
   }
   // fov
   let fov = OPT.fov * (PL.sprinting ? 1.15 : 1) * (PL.flying && PL.sprinting ? 1.1 : 1);

@@ -64,7 +64,7 @@ function mapUpdate(c) {
 }
 // ---------- the map in hand ----------
 function mapViewTick() {
-  const h = PL.held(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
+  const h = PL.held() && PL.held().id === IID.filled_map ? PL.held() : offItem(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
   if (!MAPS.view) { MAPS.view = document.createElement('canvas'); MAPS.view.id = 'mapview'; MAPS.view.width = MAPS.view.height = 128; document.body.appendChild(MAPS.view); MAPS.ctx = MAPS.view.getContext('2d'); }
   MAPS.view.hidden = !show; if (!show) return;
   const c = mapData(h.map); if (!c) return;
