@@ -657,6 +657,8 @@ Object.assign(SPR, {
 for (const c of S.COLORS) SPR[c + '_candle_item'] = () => candleSprite(CANDLE_COL[c]);
 // potions: bottle (drinkable), round splash flask, lingering flask with a long neck, tipped arrow with a coloured head
 function potionSprite(col, form) {
+  const base = PACKPX.items[['_potion', '_splash_potion', '_lingering_potion', '_arrow_base'][form]], ov = PACKPX.items[form === 3 ? '_arrow_head' : '_potion_overlay'];
+  if (base && ov) { const c = hex(col); return sprite(p => { for (let i = 0; i < 256; i++) { const x = i & 15, y = i >> 4; if (ov[i * 4 + 3] > 0) p(x, y, [ov[i * 4] * c[0] / 255, ov[i * 4 + 1] * c[1] / 255, ov[i * 4 + 2] * c[2] / 255]); else if (base[i * 4 + 3] > 0) p(x, y, [base[i * 4], base[i * 4 + 1], base[i * 4 + 2]]); } }); } // the pack's bottle with the potion colour in the overlay
   const c = hex(col), glass = hex(0xd8e8f4), dark = shade(c, 0.6), light = mixc(c, [255, 255, 255], 0.4);
   if (form === 3) return sprite(p => { line(p, 3, 12, 11, 4, hex(0x8a6a3b)); for (const [x, y] of [[11, 4], [12, 3], [10, 3], [12, 5], [11, 3], [12, 4], [13, 2]]) p(x, y, c); for (const [x, y] of [[2, 13], [3, 14], [1, 12], [2, 11], [4, 13], [3, 12]]) p(x, y, hex(0xf0f0f0)); });
   return sprite(p => {

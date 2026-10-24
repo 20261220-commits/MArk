@@ -13,7 +13,7 @@ function mooshroomTexture() {
 }
 function mooshroomGear(e) {
   const P = e.mesh.userData.parts, body = P.body; if (!body || e.sheared) return;
-  for (const [x, z] of [[0.1, 0.25], [-0.15, -0.1], [0.05, -0.35]]) { const m = R.itemMesh(BID.red_mushroom); m.scale.setScalar(0.45); m.position.set(x, 0.55, z); body.add(m); }
+  for (const [x, z] of [[0.1, 0.25], [-0.15, -0.1], [0.05, -0.35]]) { const m = R.itemMesh(BID.red_mushroom); m.scale.setScalar(0.45); m.position.set(x, 1.32, z); e.mesh.add(m); } // on top of the back (model root space)
 }
 function mooshroomUse(e, h) {
   if (!h || e.baby) return false;

@@ -65,7 +65,7 @@ function snowGolemAI(e) {
   walkPhysics(e, mx, mz, 0.06);
 }
 // shears take the pumpkin off
-function snowGolemUse(e, h) { if (!h || h.id !== IID.shears || e.noPumpkin) return false; e.noPumpkin = true; hidePart(e, 'head', false); dropItem(e.x, e.y + 1.8, e.z, BID.carved_pumpkin, 1); damageItem(INV.slots, INV.sel, 1); swing(); return true; }
+function snowGolemUse(e, h) { if (!h || h.id !== IID.shears || e.noPumpkin) return false; e.noPumpkin = true; if (!e.mesh.userData.mc) hidePart(e, 'head', false); dropItem(e.x, e.y + 1.8, e.z, BID.carved_pumpkin, 1); damageItem(INV.slots, INV.sel, 1); swing(); return true; }
 
 // ---------- charged creepers and mob heads ----------
 const HEAD_OF = { skeleton: 0, zombie: 1, creeper: 2, wither_skeleton: -1 };

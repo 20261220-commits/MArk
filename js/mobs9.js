@@ -105,7 +105,7 @@ function tintedBox(w, h, d, col) {
 function llamaCarpetTick() {
   if (W.tickN % 10) return;
   for (const e of ENT) {
-    if (e.kind !== 'mob' || (e.type !== 'llama' && e.type !== 'trader_llama') || !e.mesh) continue;
+    if (e.kind !== 'mob' || (e.type !== 'llama' && e.type !== 'trader_llama') || !e.mesh || e.mesh.userData.mc) continue; // Java models paint the carpet on
     const want = e.carpet != null ? e.carpet : -1;
     if ((e.carpetMesh ? e.carpetMesh.userData.c : -1) === want) continue;
     if (e.carpetMesh) { e.mesh.remove(e.carpetMesh); e.carpetMesh = null; }
