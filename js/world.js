@@ -206,7 +206,10 @@ function neighborUpdate(x, y, z) {
     else if (d.plant === 2) ok = below === 9 || below === 3 || below === 2;
     else if (d.plant === 3) { ok = below === b || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27)); }
     else if (d.plant === 4) { ok = (below === b || below === 9) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
-    else if (d.plant === 5) ok = below === BID.farmland;
+    else if (d.plant === 5) {
+      ok = below === BID.farmland;
+      if (ok && b === BID.stem && (m & 16)) { const dd = DIRS[(m >> 5) & 3]; if (getBlock(x + dd[0], y, z + dd[2]) !== (m & 8 ? BID.melon : BID.pumpkin)) setMeta(x, y, z, (m & 8) | 7); } // the fruit was taken
+    }
     else if (d.plant === 6) ok = OPQ[below];
     else if (d.plant === 7) ok = OPQ[below] || below === BID.soul_sand;
     else if (d.plant === 8) ok = below === BID.soul_sand;
@@ -370,6 +373,18 @@ const grow = (x, y, z, b, m) => {
   if (m < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, m + 1);
 };
 RANDOM_TICK[BID.wheat] = grow;
+// pumpkin / melon stems: grow to age 7, then try to put a fruit on a random side (on dirt, grass, farmland...) and bend toward it
+const FRUIT_SOIL = new Set([2, 3, BID.farmland, BID.podzol, BID.coarse_dirt, BID.moss_block, BID.rooted_dirt]);
+RANDOM_TICK[BID.stem] = (x, y, z, b, m) => {
+  if (m & 16 || lightLevelAbove(x, y - 1, z) < 9) return;
+  const wet = (getMeta(x, y - 1, z) & 7) > 0;
+  if (Math.random() > (wet ? 0.33 : 0.14)) return;
+  if ((m & 7) < 7) { setMeta(x, y, z, m + 1); return; }
+  const f = (Math.random() * 4) | 0, d = DIRS[f], fx = x + d[0], fz = z + d[2];
+  if (getBlock(fx, y, fz) !== 0 || !FRUIT_SOIL.has(getBlock(fx, y - 1, fz))) return;
+  setBlock(fx, y, fz, m & 8 ? BID.melon : BID.pumpkin);
+  setMeta(x, y, z, (m & 15) | 16 | (f << 5));
+};
 // carrots / potatoes / beetroots share one block: type in meta bits 3-4, age in bits 0-2
 RANDOM_TICK[BID.crops2] = (x, y, z, b, m) => { if (lightLevelAbove(x, y - 1, z) < 9) return; const age = m & 7, wet = (getMeta(x, y - 1, z) & 7) > 0; if (age < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, (m & ~7) | (age + 1)); };
 for (const [sap, type] of [[BID.oak_sapling, 0], [BID.birch_sapling, 2], [BID.spruce_sapling, 3], [BID.jungle_sapling, 4], [BID.acacia_sapling, 5], [BID.dark_oak_sapling, 6]]) RANDOM_TICK[sap] = (x, y, z, b, m) => {
@@ -421,7 +436,7 @@ RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   for (let dx = -4; dx <= 4 && !wet; dx++) for (let dz = -4; dz <= 4 && !wet; dz++) for (let dy = 0; dy <= 1; dy++) if (getBlock(x + dx, y + dy, z + dz) === 27) { wet = true; break; }
   if (wet || (W.rain > 0.5 && W.dim === 0 && (getLight(x, y + 1, z) >> 4) === 15)) { if (m !== 7) setMeta(x, y, z, 7); } // rain only reaches farmland open to the sky
   else if (m > 0) setMeta(x, y, z, m - 1);
-  else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
+  else if (BLOCKS[getBlock(x, y + 1, z)].plant !== 5) setBlock(x, y, z, 3); // dry farmland under a crop stays tilled
 };
 for (const b of BLOCKS) if (b && b.oxid) RANDOM_TICK[b.id] = (x, y, z, id, m) => { if (!(m & BLOCKS[id].wax) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[id].oxid, m); }; // waxed copper never oxidises; shape bits (slab half, stair facing) stay
 // budding amethyst (1.17): small bud -> medium -> large -> cluster, each pointing away from the budding block
@@ -518,7 +533,7 @@ function addChunk(cx, cz, d, tiles) {
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
   w.busy++; const id = jobId++; W.pending.set(ckey(cx, cz), id);
-  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim });
+  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim, exp: W.exp });
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }

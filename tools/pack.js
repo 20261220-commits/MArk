@@ -70,7 +70,7 @@ const TILE = {
   smooth_stone_slab_side: 'smooth_stone_slab_side', stone_bricks: 'stone_bricks', granite: 'granite', diorite: 'diorite', andesite: 'andesite',
   tnt_side: 'tnt_side', tnt_top: 'tnt_top', tnt_bottom: 'tnt_bottom', oak_door_top: 'oak_door_top', oak_door_bottom: 'oak_door_bottom', ladder: 'ladder',
   lantern: 'lantern', cobweb: 'cobweb', coal_block: 'coal_block', lapis_block: 'lapis_block', emerald_block: 'emerald_block', redstone_block: 'redstone_block',
-  brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom', spawner: 'spawner', hay_side: 'hay_block_side', hay_top: 'hay_block_top', melon_stem: 'melon_stem',
+  brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom', spawner: 'spawner', hay_side: 'hay_block_side', hay_top: 'hay_block_top', melon_stem: 'melon_stem', pumpkin_stem: 'pumpkin_stem', attached_melon_stem: 'attached_melon_stem', attached_pumpkin_stem: 'attached_pumpkin_stem',
   enchanting_table_top: 'enchanting_table_top', enchanting_table_side: 'enchanting_table_side', grass_side_snowed: 'grass_block_snow',
   // redstone, utility, village
   redstone_dust_dot: 'redstone_dust_dot', redstone_dust_line0: 'redstone_dust_line0', redstone_dust_line1: 'redstone_dust_line1',
@@ -109,7 +109,7 @@ for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of [''
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
 const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
-const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1']);
+const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
 const ITEM = {};
 for (const k of ('stick coal charcoal iron_ingot gold_ingot iron_nugget gold_nugget diamond emerald lapis_lazuli redstone flint flint_and_steel string feather gunpowder bone ' +

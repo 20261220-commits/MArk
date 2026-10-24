@@ -496,7 +496,7 @@ function trySleep(x, y, z) {
 const BLAST_OK = id => { const k = ITEMS[id].key; return k.startsWith('raw_') || k.endsWith('_ore') || k.startsWith('iron_') || k.startsWith('golden_') || k === 'ancient_debris'; };
 function newFurnace(kind) { return { type: 'furnace', kind: kind || null, items: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 }; }
 // composter: compostable items raise the level; at 8 it yields bone meal
-const COMPOST = { wheat_seeds: 0.3, beetroot_seeds: 0.3, short_grass: 0.3, oak_leaves: 0.3, spruce_leaves: 0.3, birch_leaves: 0.3, jungle_leaves: 0.3, acacia_leaves: 0.3, dark_oak_leaves: 0.3, oak_sapling: 0.3, spruce_sapling: 0.3, birch_sapling: 0.3,
+const COMPOST = { wheat_seeds: 0.3, beetroot_seeds: 0.3, pumpkin_seeds: 0.3, melon_seeds: 0.3, short_grass: 0.3, oak_leaves: 0.3, spruce_leaves: 0.3, birch_leaves: 0.3, jungle_leaves: 0.3, acacia_leaves: 0.3, dark_oak_leaves: 0.3, oak_sapling: 0.3, spruce_sapling: 0.3, birch_sapling: 0.3,
   vine: 0.5, melon_slice: 0.5, sugar_cane: 0.5, cactus: 0.5, apple: 0.65, carrot: 0.65, potato: 0.65, beetroot: 0.65, wheat: 0.65, fern: 0.65, dandelion: 0.65, poppy: 0.65, pumpkin: 0.65, lily_pad: 0.65, brown_mushroom: 0.65, red_mushroom: 0.65,
   baked_potato: 0.85, bread: 0.85, cookie: 0.85, hay_block: 0.85, pumpkin_pie: 1 };
 function composterUse(x, y, z, m, h) {
@@ -526,8 +526,8 @@ function useItem(first) {
     if (e.kind === 'armor_stand') { const [, ldy] = lookDir(); standUse(e, h, PL.y + PL.eyeH + ldy * t.t); return; }
     if (e.kind === 'boat') { if (!PL.sneaking) mount(e); return; }
     if (e.kind === 'minecart') { cartUse(e, h); return; }
-    if (d && h.id === IID.water_bucket && (e.type === 'axolotl' || e.type === 'tropical_fish') && !e.dead) {
-      removeEnt(e); const it = { id: e.type === 'axolotl' ? IID.axolotl_bucket : IID.tropical_fish_bucket, n: 1, v: e.variant || 0 };
+    if (d && h.id === IID.water_bucket && MOB_BUCKET[e.type] && !e.dead) {
+      removeEnt(e); const it = { id: IID[MOB_BUCKET[e.type]], n: 1, v: e.variant || 0 };
       if (creative()) { if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } else INV.slots[INV.sel] = it;
       play('splash'); swing(); UI.hudDirty = true; return;
     }
@@ -577,12 +577,12 @@ function useItem(first) {
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
       if (h.id === IID.bucket) { if (FLUID[id] && getMeta(x, y, z) === 0) { setBlock(x, y, z, 0); consume(); const it = { id: id === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; if (creative()) {} else if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); play('splash'); swing(); } else if (id === BID.powder_snow) { setBlock(x, y, z, 0); consume(); const it = { id: IID.powder_snow_bucket, n: 1 }; if (!PL.held()) INV.slots[INV.sel] = it; else INV.add(it); swing(); } return; }
-      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket || h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) {
+      if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket || BUCKET_MOB[h.id]) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
         const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
-        if (h.id === IID.axolotl_bucket || h.id === IID.tropical_fish_bucket) spawnMob(h.id === IID.axolotl_bucket ? 'axolotl' : 'tropical_fish', px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true });
+        if (BUCKET_MOB[h.id]) { const m = spawnMob(BUCKET_MOB[h.id], px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true }); if (m) m.persistent = true; } // released fish never despawn
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
         play('splash'); swing(); return;
       }
@@ -604,10 +604,14 @@ function throwItem(id) {
   e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh);
   consume(); swing();
 }
+// mobs a water bucket can scoop up, and back
+const MOB_BUCKET = { axolotl: 'axolotl_bucket', tropical_fish: 'tropical_fish_bucket', pufferfish: 'pufferfish_bucket', cod: 'cod_bucket', salmon: 'salmon_bucket' };
+const BUCKET_MOB = {}; for (const k in MOB_BUCKET) BUCKET_MOB[IID[MOB_BUCKET[k]]] = k;
 function boneMeal(x, y, z, id) {
   for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
   const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
   if (id === BID.wheat) { setMeta(x, y, z, Math.min(7, getMeta(x, y, z) + 2 + Math.floor(Math.random() * 4))); return true; }
+  if (id === BID.stem) { const m = getMeta(x, y, z); if (m & 16 || (m & 7) === 7) return false; setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
   if (id === BID.crops2) { const m = getMeta(x, y, z); setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
   const sap = { 38: 0, 39: 3, 40: 2, [BID.jungle_sapling]: 4, [BID.acacia_sapling]: 5, [BID.dark_oak_sapling]: 6 }[id];
   if (sap != null) { if (Math.random() < 0.45) growTreeAt(x, y, z, sap); return true; }
@@ -711,7 +715,7 @@ function placeBlock(t, d) {
 }
 function pickBlock() {
   const t = TARGET; if (!t || t.type !== 'block') return;
-  let id = itemOfBlock(t.id, t.m); if (t.id === BID.crops2) id = [IID.carrot, IID.potato, IID.beetroot_seeds][(t.m >> 3) & 3] || IID.carrot; if (id === BID.lit_furnace) id = BID.furnace; if (id === BID.redstone_wire) id = IID.redstone; if (id === BID.unlit_redstone_torch) id = BID.redstone_torch; if (id === BID.lit_redstone_lamp) id = BID.redstone_lamp; if (id === BID.nether_wart) id = IID.nether_wart; if (id === BID.wheat) id = IID.wheat_seeds; if (id === BID.farmland) id = BID.dirt;
+  let id = itemOfBlock(t.id, t.m); if (t.id === BID.crops2) id = [IID.carrot, IID.potato, IID.beetroot_seeds][(t.m >> 3) & 3] || IID.carrot; if (id === BID.lit_furnace) id = BID.furnace; if (id === BID.redstone_wire) id = IID.redstone; if (id === BID.unlit_redstone_torch) id = BID.redstone_torch; if (id === BID.lit_redstone_lamp) id = BID.redstone_lamp; if (id === BID.nether_wart) id = IID.nether_wart; if (id === BID.wheat) id = IID.wheat_seeds; if (t.id === BID.stem) id = t.m & 8 ? IID.melon_seeds : IID.pumpkin_seeds; if (id === BID.farmland) id = BID.dirt;
   if (!ITEMS[id]) return;
   const i = INV.slots.findIndex(s => s && s.id === id);
   if (i >= 0 && i < 9) { INV.sel = i; }

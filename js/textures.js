@@ -366,7 +366,8 @@ PAINT.pumpkin_face = r => carved(r, false);
 PAINT.jack_o_lantern = r => carved(r, true);
 PAINT.melon_side = r => fill((x, y) => { const s = (x + Math.floor(y / 5)) % 4; return shade(s === 0 ? hex(0x9cb22f) : hex(0x5c8a1c), 1 + (r() - .5) * .12); });
 PAINT.melon_top = r => fill((x, y) => { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return shade(Math.floor(d) % 3 === 0 ? hex(0x9cb22f) : hex(0x5c8a1c), 1 + (r() - .5) * .1); });
-PAINT.melon_stem = r => stem(7, 4, hex(0x8a9a2a));
+PAINT.melon_stem = r => stem(7, 4, hex(0x8a9a2a)); PAINT.pumpkin_stem = PAINT.melon_stem;
+PAINT.attached_melon_stem = r => { stem(8, 8, hex(0x8a9a2a)); for (let x = 0; x < 8; x++) P(x, 8 - (x >> 2), hex(0x8a9a2a)); }; PAINT.attached_pumpkin_stem = PAINT.attached_melon_stem;
 PAINT.farmland = r => fill((x, y) => { const furrow = y % 4 === 0 || y % 4 === 3; return quant(shade(hex(0x77553a), (furrow ? 0.72 : 1) + (r() - .5) * .14), 3); });
 PAINT.farmland_wet = r => fill((x, y) => { const furrow = y % 4 === 0 || y % 4 === 3; return quant(shade(hex(0x4f331d), (furrow ? 0.72 : 1) + (r() - .5) * .14), 3); });
 for (let s = 0; s < 8; s++) PAINT['wheat' + s] = r => {
