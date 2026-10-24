@@ -32,11 +32,16 @@ MOBDEF.parrot.anim = (e, P, now) => {
 };
 
 // ---------- pandas: each has a main gene that sets its manner ----------
-const PANDA_GENES = ['normal', 'lazy', 'worried', 'playful', 'aggressive', 'weak'];
+const PANDA_GENES = ['normal', 'lazy', 'worried', 'playful', 'aggressive', 'weak', 'brown'];
+// Java's genetics: a main and a hidden gene; brown and weak are recessive and only show when both genes match
+const PANDA_WEIGHT = { normal: 5, lazy: 1, worried: 1, playful: 1, aggressive: 1, weak: 1, brown: 1 };
+const pandaRandomGene = () => { let t = Math.random() * 11; for (const g of PANDA_GENES) { t -= PANDA_WEIGHT[g]; if (t < 0) return g; } return 'normal'; };
+const pandaShown = e => (e.gene === 'brown' || e.gene === 'weak') && e.gene2 !== e.gene ? 'normal' : e.gene;
+function pandaGenes(e) { if (!e.gene) { e.gene = e.variant === 1 ? 'brown' : pandaRandomGene(); e.gene2 = e.variant === 1 ? 'brown' : pandaRandomGene(); } }
 const PANDA_GENE_KO = { normal: '보통', lazy: '게으름', worried: '걱정 많음', playful: '장난기', aggressive: '공격적', weak: '약함', brown: '갈색' };
 const pandaBaseAI = MOBDEF.panda.ai;
 MOBDEF.panda.ai = (e, dist) => {
-  const g = e.gene || (e.gene = e.variant === 1 ? 'brown' : PANDA_GENES[(Math.random() * PANDA_GENES.length) | 0]);
+  pandaGenes(e); const g = pandaShown(e);
   if (e.roll > 0) { e.roll--; walkPhysics(e, -Math.sin(e.yaw) * 0.6, -Math.cos(e.yaw) * 0.6, 0.05); return; }
   if (e.lying > 0) { e.lying--; walkPhysics(e, 0, 0, 0); return; }
   if (g === 'aggressive' && e.panic > 0 && plTargetable() && dist < 12) { e.panic = 0; e.angry = 200; } // hits back instead of fleeing
@@ -58,7 +63,9 @@ MOBDEF.panda.anim = (e, P) => {
   if (P.head) P.head.rotation.z = e.lying > 0 ? 0.9 : 0;
 };
 { const save = MOBDEF.panda.save, init = MOBDEF.panda.init;
-  MOBDEF.panda.save = e => ({ ...(save ? save(e) : {}), gene: e.gene }); MOBDEF.panda.init = (e, o) => { if (init) init(e, o); if (o.gene) e.gene = o.gene; }; }
+  MOBDEF.panda.save = e => ({ ...(save ? save(e) : {}), gene: e.gene, gene2: e.gene2 }); MOBDEF.panda.init = (e, o) => { if (init) init(e, o); if (o.gene) { e.gene = o.gene; e.gene2 = o.gene2 || o.gene; } };
+  // a cub takes one gene from each parent at random, each with a 1/32 chance to mutate
+  MOBDEF.panda.onBred = (kid, a, b) => { pandaGenes(a); pandaGenes(b); const pick = p => Math.random() < 1 / 32 ? pandaRandomGene() : Math.random() < 0.5 ? p.gene : p.gene2; kid.gene = pick(a); kid.gene2 = pick(b); }; }
 
 // ---------- llamas ----------
 function llamaSpit(e, t) {

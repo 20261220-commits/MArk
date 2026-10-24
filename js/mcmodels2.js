@@ -34,7 +34,6 @@ const HORSE_ARMOR_TEX = { leather_horse_armor: 'horse_armor_leather', iron_horse
 function horseSkin(e) {
   const keys = e.type === 'donkey' || e.type === 'mule' ? [e.type] : e.type === 'skeleton_horse' ? ['horse_skeleton'] : e.type === 'zombie_horse' ? ['horse_zombie'] : ['horse_' + HORSE_COLS[(e.variant || 0) & 15]];
   const mk = HORSE_MARKS[((e.variant || 0) >> 4) & 7]; if (mk && e.type === 'horse') keys.push('horse_markings_' + mk);
-  if (e.harmor && HORSE_ARMOR_TEX[e.harmor]) keys.push(HORSE_ARMOR_TEX[e.harmor]); // armour painted on (Java draws it on a slightly larger copy of the model)
   return packLayers(keys);
 }
 // ---------- cats and ocelots (64x32, Java OcelotModel) ----------
@@ -193,15 +192,19 @@ const PUFFER_PARTS = [
   { n: 'spikes', o: [0, 14, -4], b: [[15, 17, -4, -1, 0, 8, 1, 0], [14, 16, -4, -1, 8, 8, 1, 1], [23, 18, -4, 0, 0, 1, 8, 1], [5, 17, -4, 0, 8, 1, 8, 1]] },
 ];
 
+// Java draws horse armour and llama carpets on a slightly larger copy of the model with their own texture
+const layerOf = (parts, names, grow) => parts.filter(p => names.includes(p.n)).map(p => ({ n: 'L_' + p.n, p: p.n, o: [0, 0, 0], t: 1, b: p.b.map(b => [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], (b[8] || 0) + grow, b[9]]) }));
+const HORSE_LAYER = layerOf(HORSE_PARTS(false), ['body', 'neck', 'head', 'ear1', 'ear2', 'rleg', 'lleg', 'rleg2', 'lleg2'], 0.1);
+const LLAMA_LAYER = layerOf(LLAMA_PARTS, ['head', 'body', 'rleg', 'lleg', 'rleg2', 'lleg2'], 0.5);
 Object.assign(MCMODELS, {
-  horse: { tex: 'horse_brown', tw: 64, th: 64, parts: HORSE_PARTS(false) }, skeleton_horse: { tex: 'horse_skeleton', tw: 64, th: 64, parts: HORSE_PARTS(false) }, zombie_horse: { tex: 'horse_zombie', tw: 64, th: 64, parts: HORSE_PARTS(false) },
+  horse: { tex: 'horse_brown', tex2: 'horse_armor_iron', tw: 64, th: 64, parts: [...HORSE_PARTS(false), ...HORSE_LAYER] }, skeleton_horse: { tex: 'horse_skeleton', tw: 64, th: 64, parts: HORSE_PARTS(false) }, zombie_horse: { tex: 'horse_zombie', tw: 64, th: 64, parts: HORSE_PARTS(false) },
   donkey: { tex: 'donkey', tw: 64, th: 64, parts: HORSE_PARTS(true) }, mule: { tex: 'mule', tw: 64, th: 64, parts: HORSE_PARTS(true) },
   cat: { tex: 'cat_tabby', tw: 64, th: 32, parts: CAT_PARTS, scale: 0.8 }, ocelot: { tex: 'cat_ocelot', tw: 64, th: 32, parts: CAT_PARTS },
   rabbit: { tex: 'rabbit_brown', tw: 64, th: 32, parts: RABBIT_PARTS, scale: 0.6 }, fox: { tex: 'fox', tw: 48, th: 32, parts: FOX_PARTS }, bee: { tex: 'bee', tw: 64, th: 64, parts: BEE_PARTS },
   pillager: { tex: 'pillager', tw: 64, th: 64, parts: ILLAGER_PARTS }, vindicator: { tex: 'vindicator', tw: 64, th: 64, parts: ILLAGER_PARTS }, evoker: { tex: 'evoker', tw: 64, th: 64, parts: ILLAGER_PARTS },
   witch: { tex: 'witch', tw: 64, th: 128, parts: WITCH_PARTS }, wandering_trader: { tex: 'wandering_trader', tw: 64, th: 64, parts: MCMODELS.villager.parts },
   snow_golem: { tex: 'snow_golem', tw: 64, th: 64, parts: SNOWG_PARTS }, polar_bear: { tex: 'polar_bear', tw: 128, th: 64, parts: BEAR_PARTS, scale: 1.2 },
-  panda: { tex: 'panda', tw: 64, th: 64, parts: PANDA_PARTS }, llama: { tex: 'llama_creamy', tw: 128, th: 64, parts: LLAMA_PARTS }, trader_llama: { tex: 'llama_creamy', tw: 128, th: 64, parts: LLAMA_PARTS },
+  panda: { tex: 'panda', tw: 64, th: 64, parts: PANDA_PARTS }, llama: { tex: 'llama_creamy', tex2: 'llama_decor_white', tw: 128, th: 64, parts: [...LLAMA_PARTS, ...LLAMA_LAYER] }, trader_llama: { tex: 'llama_creamy', tex2: 'llama_decor_trader_llama', tw: 128, th: 64, parts: [...LLAMA_PARTS, ...LLAMA_LAYER] },
   parrot: { tex: 'parrot_red_blue', tw: 32, th: 32, parts: PARROT_PARTS }, turtle: { tex: 'turtle', tw: 128, th: 64, parts: TURTLE_PARTS }, dolphin: { tex: 'dolphin', tw: 64, th: 64, parts: DOLPHIN_PARTS },
   phantom: { tex: 'phantom', eyes: 'phantom_eyes', tw: 64, th: 64, parts: PHANTOM_PARTS }, cave_spider: { ...MCMODELS.spider, tex: 'cave_spider' },
   mooshroom: { ...MCMODELS.cow, tex: 'red_mooshroom' }, ravager: { tex: 'ravager', tw: 128, th: 128, parts: RAVAGER_PARTS }, vex: { tex: 'vex', tw: 64, th: 64, parts: VEX_PARTS, scale: 0.4 },
@@ -215,14 +218,14 @@ const MCVTEX = {
   cat: e => packTexture('cat_' + (CAT_TEX[e.variant] || 'tabby')), ocelot: () => packTexture('cat_ocelot'),
   rabbit: e => packTexture('rabbit_' + (RABBIT_TEX[e.variant] || 'brown')), fox: e => packTexture(e.variant === 1 ? 'snow_fox' : 'fox'),
   parrot: e => packTexture('parrot_' + (PARROT_TEX[e.variant] || 'red_blue')),
-  llama: e => packLayers(['llama_' + (LLAMA_TEX[e.variant] || 'creamy'), ...(e.carpet != null ? ['llama_decor_' + S.COLORS[e.carpet]] : [])]),
-  trader_llama: e => packLayers(['llama_' + (LLAMA_TEX[e.variant] || 'creamy'), 'llama_decor_trader_llama']),
-  panda: e => packTexture(PANDA_TEX[e.gene] || (e.variant === 1 ? 'brown_panda' : 'panda')),
+  llama: e => packTexture('llama_' + (LLAMA_TEX[e.variant] || 'creamy')), trader_llama: e => packTexture('llama_' + (LLAMA_TEX[e.variant] || 'creamy')),
+  panda: e => packTexture(PANDA_TEX[e.gene ? pandaShown(e) : null] || (e.variant === 1 ? 'brown_panda' : 'panda')),
   bee: e => packTexture(e.target ? (e.nectar ? 'bee_angry_nectar' : 'bee_angry') : e.nectar ? 'bee_nectar' : 'bee'),
   zombie_villager: e => packLayers(['zv_zombie_villager', ...(e.prof ? ['zv_' + e.prof] : [])]),
 };
+const LAYER_TEX = { horse: e => e.harmor && HORSE_ARMOR_TEX[e.harmor], llama: e => e.carpet != null && 'llama_decor_' + S.COLORS[e.carpet], trader_llama: () => 'llama_decor_trader_llama' };
 // skins are refreshed when what decides them changes (armour, carpets, genes, anger)
-const skinKey = e => [e.variant, e.harmor, e.carpet, e.gene, !!e.target, e.nectar, e.prof].join('|');
+const skinKey = e => [e.variant, e.harmor, e.carpet, e.gene, e.gene2, !!e.target, e.nectar, e.prof].join('|');
 function mcSkinTick() {
   if (W.tickN % 10) return;
   for (const e of ENT) {
@@ -230,7 +233,11 @@ function mcSkinTick() {
     const k = skinKey(e); if (e.skinK === k) continue; e.skinK = k;
     const t = MCVTEX[e.type](e); if (!t) continue;
     e.mesh.userData.mat.map = t; e.mesh.userData.mat.needsUpdate = true;
-    if (e.matOwn) for (const m of e.mesh.userData.own) if (m.map && m.skinning) { m.map = t; m.needsUpdate = true; }
+    if (e.matOwn) for (const m of e.mesh.userData.own) if (m.map && m.skinning && !m.userData.layer) { m.map = t; m.needsUpdate = true; }
+    // the armour / carpet layer
+    const lk = LAYER_TEX[e.type] && LAYER_TEX[e.type](e), lt = lk && packTexture(lk);
+    for (const n in e.mesh.userData.parts) if (n.startsWith('L_')) hidePart(e, n, !!lt);
+    if (lt) for (const m of [...e.mesh.userData.mats, ...(e.matOwn ? e.mesh.userData.own : [])]) if (m.userData && m.userData.layer) { m.map = lt; m.needsUpdate = true; }
   }
 }
 // colour variants keep choosing a variant at spawn, but now return the pack skin for it

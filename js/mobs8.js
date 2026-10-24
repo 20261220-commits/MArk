@@ -157,7 +157,7 @@ function genericAnimal(e, dist) {
   const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plTargetable();
   if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; sp *= 2.2; }
   else if (food) e.goal = dist > 2 ? [PL.x, PL.z] : null;
-  else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+  else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; { const kid = spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); if (e.def.onBred) e.def.onBred(kid, e, mate); } spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
   else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
   if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   walkPhysics(e, mx, mz, sp);

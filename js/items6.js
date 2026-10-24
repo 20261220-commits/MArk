@@ -8,7 +8,7 @@ const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;'
 function signPlace(t, x, y, z, meta) {
   if (t.ny === -1) return false;
   if (t.ny === 0) { const f = DIRS.findIndex(v => v[0] === t.nx && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)]) return false; return (meta & ~31) | 16 | f; }
-  return supportedBy(getBlock(x, y - 1, z)) ? (meta & ~31) | ((facingDir() + 2) & 3) : false;
+  return supportedBy(getBlock(x, y - 1, z)) ? (meta & ~31) | ((-Math.round(PL.yaw / (Math.PI / 8))) & 15) : false; // 16 rotations, facing the player
 }
 function signEdit(x, y, z) {
   let t = getTile(x, y, z); if (!t) { t = { type: 'sign', lines: ['', '', '', ''] }; setTile(x, y, z, t); }
@@ -40,15 +40,25 @@ function signTexture(t) {
   t.lines.forEach((l, i) => { if (t.glow) { g.fillStyle = col === '#101010' ? '#f0f0d0' : col; g.shadowColor = g.fillStyle; g.shadowBlur = 8; } else g.fillStyle = col; g.fillText(l, 128, 16 + i * 32); });
   const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
 }
-function signMesh(x, y, z, m, t) {
-  const mat = new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), mat), f = m & 3, d = DIRS[f];
-  if (m & 16) mesh.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135);
-  else mesh.position.set(x + .5 + d[0] * 0.07, y + 0.75, z + .5 + d[2] * 0.07);
-  mesh.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f];
-  scene.add(mesh); return mesh;
+// a box with every face showing (part of) one atlas tile
+function atlasBox(w, h, d, tile) {
+  const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, tu = (tile % TPR) * 16 / ATLAS_W, tv = ((tile / TPR) | 0) * 16 / ATLAS_W, s = 16 / ATLAS_W;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, tu + uv.getX(i) * s, tv + (1 - uv.getY(i)) * s); // the atlas texture is not flipped
+  return g;
 }
-function dropSign(k) { const s = SIGNS.get(k); if (!s) return; scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.map.dispose(); s.mesh.material.dispose(); SIGNS.delete(k); }
+function signMesh(x, y, z, m, t) {
+  const grp = new THREE.Group(), text = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false }));
+  if (m & 16) { // on a wall: the board is drawn by the block mesh
+    const f = m & 3, d = DIRS[f]; text.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135); text.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f]; grp.add(text);
+  } else { // standing: board and post turned to any of 16 directions (0 faces south)
+    const wood = S.tileFor(SIGN, m, 0), mat = new THREE.MeshBasicMaterial({ map: atlasTex });
+    const board = new THREE.Mesh(atlasBox(1, 0.5, 0.083, wood), mat), post = new THREE.Mesh(atlasBox(0.083, 0.583, 0.083, wood), mat);
+    board.position.y = 0.833; post.position.y = 0.292; text.position.set(0, 0.833, 0.045);
+    const pivot = new THREE.Group(); pivot.add(board, post, text); pivot.position.set(x + .5, y, z + .5); pivot.rotation.y = -(m & 15) * Math.PI / 8; grp.add(pivot);
+  }
+  scene.add(grp); return grp;
+}
+function dropSign(k) { const s = SIGNS.get(k); if (!s) return; scene.remove(s.mesh); s.mesh.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && o.material.map !== atlasTex) o.material.map.dispose(); o.material.dispose(); } }); SIGNS.delete(k); }
 function signTick() {
   if (W.tickN % 5) return;
   const seen = new Set();
@@ -59,7 +69,7 @@ function signTick() {
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
       if (getBlock(x, y, z) !== SIGN) continue;
       seen.add(k); const s = SIGNS.get(k), m = getMeta(x, y, z), v = (t.v || 0) * 64 + m;
-      if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.material.color.setScalar(b); } continue; }
+      if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(o.material.map === atlasTex || !t.glow ? Math.max(0.25, lightBright(x + .5, y + .5, z + .5)) : b); }); } continue; }
       if (s) dropSign(k);
       SIGNS.set(k, { mesh: signMesh(x, y, z, m, t), v });
     }
@@ -108,7 +118,7 @@ function launchRocket(x, y, z, st, rider, shot) {
 // the particle pattern of one star
 function burstStar(x, y, z, st) {
   const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
-  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life }); if (fade || st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: fade ? fade[k % fade.length] : [1, 1, 1], tw: st.twinkle }); };
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
   if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
     const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
     if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }

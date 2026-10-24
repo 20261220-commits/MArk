@@ -849,7 +849,7 @@ function shapes(id, meta) {
     case 1093: return [[1 + (meta & 7) * 2, 0, 1, 15, 8, 15]];
     case 1098: { const f = meta & 3, d = DIRS[f];
       if (meta & 16) return [d[2] ? [0, 4, d[2] > 0 ? 0 : 14, 16, 12, d[2] > 0 ? 2 : 16] : [d[0] > 0 ? 0 : 14, 4, 0, d[0] > 0 ? 2 : 16, 12, 16]]; // on a wall, against the block behind
-      return [f & 1 ? [7, 8, 0, 9, 16, 16] : [0, 8, 7, 16, 16, 9], [7, 0, 7, 9, 8, 9]]; }
+      return [[4, 0, 4, 12, 16, 12]]; } // standing (16 rotations in meta & 15): only the selection box, the sign itself is a mesh
     case 1094: return [[1, 0, 1, 15, 14, 15]];
     case 1095: case 1099: return [[0, 0, 0, 16, 16, 16]];
     case 1100: return [[1, 0, 1, 15, 8, 15], [7, 8, 7, 9, 14, 9], [7.5, 14, 7.5, 8.5, meta & 32 ? 16 : 15, 8.5]];
@@ -1296,10 +1296,19 @@ function stampVillage(v, st, blocks, meta, hgt, x0, z0, R, tiles) {
   for (const p of v.pieces) { const t = TPL[p.t]; stampTemplate(st, t, p.x, p.y, p.z, p.r, v.sty, R, tiles, { vt: v.vt }); }
 }
 // ---- strongholds: three per world on a ring, like Java's first ring but closer ----
+// Java's ring placement: 128 strongholds; 3 in the first ring (1280-2816 blocks out), then 6, 10, 15, 21, 28, 36, 9
+const SH_CACHE = new Map();
 function strongholdsOf(seed) {
-  const r = rng(hash32(seed, 77, 3, 9)), a0 = r() * Math.PI * 2, out = [];
-  for (let i = 0; i < 3; i++) { const a = a0 + i * Math.PI * 2 / 3, d = 700 + r() * 500; out.push([Math.round(Math.cos(a) * d / 16) * 16 + 8, 30, Math.round(Math.sin(a) * d / 16) * 16 + 8]); }
-  return out;
+  if (SH_CACHE.has(seed)) return SH_CACHE.get(seed);
+  const r = rng(hash32(seed, 77, 3, 9)), out = [], DIST = 32, COUNT = 128;
+  let angle = r() * Math.PI * 2, ring = 0, inRing = 0, spread = 3;
+  for (let i = 0; i < COUNT; i++) {
+    const d = 4 * DIST + DIST * ring * 6 + (r() - 0.5) * DIST * 2.5; // chunks
+    out.push([Math.round(Math.cos(angle) * d) * 16 + 8, 30, Math.round(Math.sin(angle) * d) * 16 + 8]);
+    angle += Math.PI * 2 / spread;
+    if (++inRing === spread) { ring++; inRing = 0; spread += Math.floor(2 * spread / (ring + 1)); spread = Math.min(spread, COUNT - i - 1); angle += r() * Math.PI * 2; }
+  }
+  SH_CACHE.set(seed, out); return out;
 }
 function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
   const r = rng(hash32(seed, sx, sz, 41));
@@ -2689,6 +2698,7 @@ function meshChunk(B, M, L, bio, opts) {
         else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
       }
     } else if (rt === RT.BOX) {
+      if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
       const boxes = shapes(id, meta);
       boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);
@@ -5338,13 +5348,14 @@ function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
 function simpleParticle(x, y, z, col, opts = {}) {
   const t = S.T.white_wool; // flat white tile, tinted by color
   spawnParticle({ x, y, z, vx: opts.vx || (Math.random() - .5), vy: opts.vy != null ? opts.vy : Math.random() * 1.5, vz: opts.vz || (Math.random() - .5), life: opts.life || 0.8, size: opts.size || 0.15,
-    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3 });
+    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8 });
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
 function updateParticles(dt) {
   let n = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; }
+    if (p.fade) { const k = Math.min(1, Math.max(0, 1 - p.life / p.life0) * 1.6); p.r = p.c0[0] + (p.fade[0] - p.c0[0]) * k; p.g = p.c0[1] + (p.fade[1] - p.c0[1]) * k; p.b = p.c0[2] + (p.fade[2] - p.c0[2]) * k; } // firework fade: the colour shifts over its life
     p.vy -= 18 * p.grav * dt; p.vx *= 0.96; p.vz *= 0.96;
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
     if (p.grav && SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { p.vy = 0; p.vx *= 0.5; p.vz *= 0.5; } else { p.x = nx; p.y = ny; p.z = nz; }
@@ -5928,7 +5939,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   const tk = opts.skin && PACKPX.ent[opts.skin] ? opts.skin : spec.tex;
   const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[tk + '_e'] && packTexture(tk + '_e');
   const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
-  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null; if (mat2) mat2.userData.layer = true; // second-texture layer (sheep wool, horse armour, llama carpets)
   const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
   const root = new THREE.Group(), { inner, parts, list } = buildBones(spec);
   const main = new THREE.SkinnedMesh(geos.m, mat); main.add(inner); root.add(main);
@@ -6399,7 +6410,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
@@ -10834,7 +10845,7 @@ function genericAnimal(e, dist) {
   const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plTargetable();
   if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; sp *= 2.2; }
   else if (food) e.goal = dist > 2 ? [PL.x, PL.z] : null;
-  else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+  else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; { const kid = spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); if (e.def.onBred) e.def.onBred(kid, e, mate); } spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
   else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
   if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   walkPhysics(e, mx, mz, sp);
@@ -11009,7 +11020,7 @@ const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;'
 function signPlace(t, x, y, z, meta) {
   if (t.ny === -1) return false;
   if (t.ny === 0) { const f = DIRS.findIndex(v => v[0] === t.nx && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)]) return false; return (meta & ~31) | 16 | f; }
-  return supportedBy(getBlock(x, y - 1, z)) ? (meta & ~31) | ((facingDir() + 2) & 3) : false;
+  return supportedBy(getBlock(x, y - 1, z)) ? (meta & ~31) | ((-Math.round(PL.yaw / (Math.PI / 8))) & 15) : false; // 16 rotations, facing the player
 }
 function signEdit(x, y, z) {
   let t = getTile(x, y, z); if (!t) { t = { type: 'sign', lines: ['', '', '', ''] }; setTile(x, y, z, t); }
@@ -11041,15 +11052,25 @@ function signTexture(t) {
   t.lines.forEach((l, i) => { if (t.glow) { g.fillStyle = col === '#101010' ? '#f0f0d0' : col; g.shadowColor = g.fillStyle; g.shadowBlur = 8; } else g.fillStyle = col; g.fillText(l, 128, 16 + i * 32); });
   const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
 }
-function signMesh(x, y, z, m, t) {
-  const mat = new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), mat), f = m & 3, d = DIRS[f];
-  if (m & 16) mesh.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135);
-  else mesh.position.set(x + .5 + d[0] * 0.07, y + 0.75, z + .5 + d[2] * 0.07);
-  mesh.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f];
-  scene.add(mesh); return mesh;
+// a box with every face showing (part of) one atlas tile
+function atlasBox(w, h, d, tile) {
+  const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, tu = (tile % TPR) * 16 / ATLAS_W, tv = ((tile / TPR) | 0) * 16 / ATLAS_W, s = 16 / ATLAS_W;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, tu + uv.getX(i) * s, tv + (1 - uv.getY(i)) * s); // the atlas texture is not flipped
+  return g;
 }
-function dropSign(k) { const s = SIGNS.get(k); if (!s) return; scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.map.dispose(); s.mesh.material.dispose(); SIGNS.delete(k); }
+function signMesh(x, y, z, m, t) {
+  const grp = new THREE.Group(), text = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false }));
+  if (m & 16) { // on a wall: the board is drawn by the block mesh
+    const f = m & 3, d = DIRS[f]; text.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135); text.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f]; grp.add(text);
+  } else { // standing: board and post turned to any of 16 directions (0 faces south)
+    const wood = S.tileFor(SIGN, m, 0), mat = new THREE.MeshBasicMaterial({ map: atlasTex });
+    const board = new THREE.Mesh(atlasBox(1, 0.5, 0.083, wood), mat), post = new THREE.Mesh(atlasBox(0.083, 0.583, 0.083, wood), mat);
+    board.position.y = 0.833; post.position.y = 0.292; text.position.set(0, 0.833, 0.045);
+    const pivot = new THREE.Group(); pivot.add(board, post, text); pivot.position.set(x + .5, y, z + .5); pivot.rotation.y = -(m & 15) * Math.PI / 8; grp.add(pivot);
+  }
+  scene.add(grp); return grp;
+}
+function dropSign(k) { const s = SIGNS.get(k); if (!s) return; scene.remove(s.mesh); s.mesh.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && o.material.map !== atlasTex) o.material.map.dispose(); o.material.dispose(); } }); SIGNS.delete(k); }
 function signTick() {
   if (W.tickN % 5) return;
   const seen = new Set();
@@ -11060,7 +11081,7 @@ function signTick() {
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
       if (getBlock(x, y, z) !== SIGN) continue;
       seen.add(k); const s = SIGNS.get(k), m = getMeta(x, y, z), v = (t.v || 0) * 64 + m;
-      if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.material.color.setScalar(b); } continue; }
+      if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(o.material.map === atlasTex || !t.glow ? Math.max(0.25, lightBright(x + .5, y + .5, z + .5)) : b); }); } continue; }
       if (s) dropSign(k);
       SIGNS.set(k, { mesh: signMesh(x, y, z, m, t), v });
     }
@@ -11109,7 +11130,7 @@ function launchRocket(x, y, z, st, rider, shot) {
 // the particle pattern of one star
 function burstStar(x, y, z, st) {
   const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
-  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life }); if (fade || st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: fade ? fade[k % fade.length] : [1, 1, 1], tw: st.twinkle }); };
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
   if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
     const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
     if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }
@@ -11388,11 +11409,16 @@ MOBDEF.parrot.anim = (e, P, now) => {
 };
 
 // ---------- pandas: each has a main gene that sets its manner ----------
-const PANDA_GENES = ['normal', 'lazy', 'worried', 'playful', 'aggressive', 'weak'];
+const PANDA_GENES = ['normal', 'lazy', 'worried', 'playful', 'aggressive', 'weak', 'brown'];
+// Java's genetics: a main and a hidden gene; brown and weak are recessive and only show when both genes match
+const PANDA_WEIGHT = { normal: 5, lazy: 1, worried: 1, playful: 1, aggressive: 1, weak: 1, brown: 1 };
+const pandaRandomGene = () => { let t = Math.random() * 11; for (const g of PANDA_GENES) { t -= PANDA_WEIGHT[g]; if (t < 0) return g; } return 'normal'; };
+const pandaShown = e => (e.gene === 'brown' || e.gene === 'weak') && e.gene2 !== e.gene ? 'normal' : e.gene;
+function pandaGenes(e) { if (!e.gene) { e.gene = e.variant === 1 ? 'brown' : pandaRandomGene(); e.gene2 = e.variant === 1 ? 'brown' : pandaRandomGene(); } }
 const PANDA_GENE_KO = { normal: '보통', lazy: '게으름', worried: '걱정 많음', playful: '장난기', aggressive: '공격적', weak: '약함', brown: '갈색' };
 const pandaBaseAI = MOBDEF.panda.ai;
 MOBDEF.panda.ai = (e, dist) => {
-  const g = e.gene || (e.gene = e.variant === 1 ? 'brown' : PANDA_GENES[(Math.random() * PANDA_GENES.length) | 0]);
+  pandaGenes(e); const g = pandaShown(e);
   if (e.roll > 0) { e.roll--; walkPhysics(e, -Math.sin(e.yaw) * 0.6, -Math.cos(e.yaw) * 0.6, 0.05); return; }
   if (e.lying > 0) { e.lying--; walkPhysics(e, 0, 0, 0); return; }
   if (g === 'aggressive' && e.panic > 0 && plTargetable() && dist < 12) { e.panic = 0; e.angry = 200; } // hits back instead of fleeing
@@ -11414,7 +11440,9 @@ MOBDEF.panda.anim = (e, P) => {
   if (P.head) P.head.rotation.z = e.lying > 0 ? 0.9 : 0;
 };
 { const save = MOBDEF.panda.save, init = MOBDEF.panda.init;
-  MOBDEF.panda.save = e => ({ ...(save ? save(e) : {}), gene: e.gene }); MOBDEF.panda.init = (e, o) => { if (init) init(e, o); if (o.gene) e.gene = o.gene; }; }
+  MOBDEF.panda.save = e => ({ ...(save ? save(e) : {}), gene: e.gene, gene2: e.gene2 }); MOBDEF.panda.init = (e, o) => { if (init) init(e, o); if (o.gene) { e.gene = o.gene; e.gene2 = o.gene2 || o.gene; } };
+  // a cub takes one gene from each parent at random, each with a 1/32 chance to mutate
+  MOBDEF.panda.onBred = (kid, a, b) => { pandaGenes(a); pandaGenes(b); const pick = p => Math.random() < 1 / 32 ? pandaRandomGene() : Math.random() < 0.5 ? p.gene : p.gene2; kid.gene = pick(a); kid.gene2 = pick(b); }; }
 
 // ---------- llamas ----------
 function llamaSpit(e, t) {
@@ -11513,7 +11541,6 @@ const HORSE_ARMOR_TEX = { leather_horse_armor: 'horse_armor_leather', iron_horse
 function horseSkin(e) {
   const keys = e.type === 'donkey' || e.type === 'mule' ? [e.type] : e.type === 'skeleton_horse' ? ['horse_skeleton'] : e.type === 'zombie_horse' ? ['horse_zombie'] : ['horse_' + HORSE_COLS[(e.variant || 0) & 15]];
   const mk = HORSE_MARKS[((e.variant || 0) >> 4) & 7]; if (mk && e.type === 'horse') keys.push('horse_markings_' + mk);
-  if (e.harmor && HORSE_ARMOR_TEX[e.harmor]) keys.push(HORSE_ARMOR_TEX[e.harmor]); // armour painted on (Java draws it on a slightly larger copy of the model)
   return packLayers(keys);
 }
 // ---------- cats and ocelots (64x32, Java OcelotModel) ----------
@@ -11672,15 +11699,19 @@ const PUFFER_PARTS = [
   { n: 'spikes', o: [0, 14, -4], b: [[15, 17, -4, -1, 0, 8, 1, 0], [14, 16, -4, -1, 8, 8, 1, 1], [23, 18, -4, 0, 0, 1, 8, 1], [5, 17, -4, 0, 8, 1, 8, 1]] },
 ];
 
+// Java draws horse armour and llama carpets on a slightly larger copy of the model with their own texture
+const layerOf = (parts, names, grow) => parts.filter(p => names.includes(p.n)).map(p => ({ n: 'L_' + p.n, p: p.n, o: [0, 0, 0], t: 1, b: p.b.map(b => [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], (b[8] || 0) + grow, b[9]]) }));
+const HORSE_LAYER = layerOf(HORSE_PARTS(false), ['body', 'neck', 'head', 'ear1', 'ear2', 'rleg', 'lleg', 'rleg2', 'lleg2'], 0.1);
+const LLAMA_LAYER = layerOf(LLAMA_PARTS, ['head', 'body', 'rleg', 'lleg', 'rleg2', 'lleg2'], 0.5);
 Object.assign(MCMODELS, {
-  horse: { tex: 'horse_brown', tw: 64, th: 64, parts: HORSE_PARTS(false) }, skeleton_horse: { tex: 'horse_skeleton', tw: 64, th: 64, parts: HORSE_PARTS(false) }, zombie_horse: { tex: 'horse_zombie', tw: 64, th: 64, parts: HORSE_PARTS(false) },
+  horse: { tex: 'horse_brown', tex2: 'horse_armor_iron', tw: 64, th: 64, parts: [...HORSE_PARTS(false), ...HORSE_LAYER] }, skeleton_horse: { tex: 'horse_skeleton', tw: 64, th: 64, parts: HORSE_PARTS(false) }, zombie_horse: { tex: 'horse_zombie', tw: 64, th: 64, parts: HORSE_PARTS(false) },
   donkey: { tex: 'donkey', tw: 64, th: 64, parts: HORSE_PARTS(true) }, mule: { tex: 'mule', tw: 64, th: 64, parts: HORSE_PARTS(true) },
   cat: { tex: 'cat_tabby', tw: 64, th: 32, parts: CAT_PARTS, scale: 0.8 }, ocelot: { tex: 'cat_ocelot', tw: 64, th: 32, parts: CAT_PARTS },
   rabbit: { tex: 'rabbit_brown', tw: 64, th: 32, parts: RABBIT_PARTS, scale: 0.6 }, fox: { tex: 'fox', tw: 48, th: 32, parts: FOX_PARTS }, bee: { tex: 'bee', tw: 64, th: 64, parts: BEE_PARTS },
   pillager: { tex: 'pillager', tw: 64, th: 64, parts: ILLAGER_PARTS }, vindicator: { tex: 'vindicator', tw: 64, th: 64, parts: ILLAGER_PARTS }, evoker: { tex: 'evoker', tw: 64, th: 64, parts: ILLAGER_PARTS },
   witch: { tex: 'witch', tw: 64, th: 128, parts: WITCH_PARTS }, wandering_trader: { tex: 'wandering_trader', tw: 64, th: 64, parts: MCMODELS.villager.parts },
   snow_golem: { tex: 'snow_golem', tw: 64, th: 64, parts: SNOWG_PARTS }, polar_bear: { tex: 'polar_bear', tw: 128, th: 64, parts: BEAR_PARTS, scale: 1.2 },
-  panda: { tex: 'panda', tw: 64, th: 64, parts: PANDA_PARTS }, llama: { tex: 'llama_creamy', tw: 128, th: 64, parts: LLAMA_PARTS }, trader_llama: { tex: 'llama_creamy', tw: 128, th: 64, parts: LLAMA_PARTS },
+  panda: { tex: 'panda', tw: 64, th: 64, parts: PANDA_PARTS }, llama: { tex: 'llama_creamy', tex2: 'llama_decor_white', tw: 128, th: 64, parts: [...LLAMA_PARTS, ...LLAMA_LAYER] }, trader_llama: { tex: 'llama_creamy', tex2: 'llama_decor_trader_llama', tw: 128, th: 64, parts: [...LLAMA_PARTS, ...LLAMA_LAYER] },
   parrot: { tex: 'parrot_red_blue', tw: 32, th: 32, parts: PARROT_PARTS }, turtle: { tex: 'turtle', tw: 128, th: 64, parts: TURTLE_PARTS }, dolphin: { tex: 'dolphin', tw: 64, th: 64, parts: DOLPHIN_PARTS },
   phantom: { tex: 'phantom', eyes: 'phantom_eyes', tw: 64, th: 64, parts: PHANTOM_PARTS }, cave_spider: { ...MCMODELS.spider, tex: 'cave_spider' },
   mooshroom: { ...MCMODELS.cow, tex: 'red_mooshroom' }, ravager: { tex: 'ravager', tw: 128, th: 128, parts: RAVAGER_PARTS }, vex: { tex: 'vex', tw: 64, th: 64, parts: VEX_PARTS, scale: 0.4 },
@@ -11694,14 +11725,14 @@ const MCVTEX = {
   cat: e => packTexture('cat_' + (CAT_TEX[e.variant] || 'tabby')), ocelot: () => packTexture('cat_ocelot'),
   rabbit: e => packTexture('rabbit_' + (RABBIT_TEX[e.variant] || 'brown')), fox: e => packTexture(e.variant === 1 ? 'snow_fox' : 'fox'),
   parrot: e => packTexture('parrot_' + (PARROT_TEX[e.variant] || 'red_blue')),
-  llama: e => packLayers(['llama_' + (LLAMA_TEX[e.variant] || 'creamy'), ...(e.carpet != null ? ['llama_decor_' + S.COLORS[e.carpet]] : [])]),
-  trader_llama: e => packLayers(['llama_' + (LLAMA_TEX[e.variant] || 'creamy'), 'llama_decor_trader_llama']),
-  panda: e => packTexture(PANDA_TEX[e.gene] || (e.variant === 1 ? 'brown_panda' : 'panda')),
+  llama: e => packTexture('llama_' + (LLAMA_TEX[e.variant] || 'creamy')), trader_llama: e => packTexture('llama_' + (LLAMA_TEX[e.variant] || 'creamy')),
+  panda: e => packTexture(PANDA_TEX[e.gene ? pandaShown(e) : null] || (e.variant === 1 ? 'brown_panda' : 'panda')),
   bee: e => packTexture(e.target ? (e.nectar ? 'bee_angry_nectar' : 'bee_angry') : e.nectar ? 'bee_nectar' : 'bee'),
   zombie_villager: e => packLayers(['zv_zombie_villager', ...(e.prof ? ['zv_' + e.prof] : [])]),
 };
+const LAYER_TEX = { horse: e => e.harmor && HORSE_ARMOR_TEX[e.harmor], llama: e => e.carpet != null && 'llama_decor_' + S.COLORS[e.carpet], trader_llama: () => 'llama_decor_trader_llama' };
 // skins are refreshed when what decides them changes (armour, carpets, genes, anger)
-const skinKey = e => [e.variant, e.harmor, e.carpet, e.gene, !!e.target, e.nectar, e.prof].join('|');
+const skinKey = e => [e.variant, e.harmor, e.carpet, e.gene, e.gene2, !!e.target, e.nectar, e.prof].join('|');
 function mcSkinTick() {
   if (W.tickN % 10) return;
   for (const e of ENT) {
@@ -11709,7 +11740,11 @@ function mcSkinTick() {
     const k = skinKey(e); if (e.skinK === k) continue; e.skinK = k;
     const t = MCVTEX[e.type](e); if (!t) continue;
     e.mesh.userData.mat.map = t; e.mesh.userData.mat.needsUpdate = true;
-    if (e.matOwn) for (const m of e.mesh.userData.own) if (m.map && m.skinning) { m.map = t; m.needsUpdate = true; }
+    if (e.matOwn) for (const m of e.mesh.userData.own) if (m.map && m.skinning && !m.userData.layer) { m.map = t; m.needsUpdate = true; }
+    // the armour / carpet layer
+    const lk = LAYER_TEX[e.type] && LAYER_TEX[e.type](e), lt = lk && packTexture(lk);
+    for (const n in e.mesh.userData.parts) if (n.startsWith('L_')) hidePart(e, n, !!lt);
+    if (lt) for (const m of [...e.mesh.userData.mats, ...(e.matOwn ? e.mesh.userData.own : [])]) if (m.userData && m.userData.layer) { m.map = lt; m.needsUpdate = true; }
   }
 }
 // colour variants keep choosing a variant at spawn, but now return the pack skin for it
@@ -11765,6 +11800,55 @@ MCMODELS.tropical_fish = { tex: 'tropical_a', tw: 32, th: 32, parts: [
   { n: 'fin', o: [0, 20.5, -3], b: [[10, -5, 0, -3, 0, 0, 3, 6]] }] };
 MCVTEX.tropical_fish = e => { const v = e.variant || 0, [bc, pc] = TFISH_COL[v % TFISH_COL.length]; return tintedLayers([['tropical_a', bc], ['tropical_a_pattern_' + (1 + ((v >> 1) % 6)), pc]]); };
 if (MOBDEF.tropical_fish) MOBDEF.tropical_fish.vtex = v => MCVTEX.tropical_fish({ variant: v });
+
+</script>
+<script>/* js/villagers.js */
+// Villager life as in Java: an unemployed villager claims a free job site block nearby and takes its profession (a
+// nitwit never does); it loses the job if the block is broken before it ever traded. Villagers pick up bread,
+// carrots, potatoes and beetroots, and two villagers with enough food breed when the village has a free bed.
+const JOB_SITES = () => VIL.sites || (VIL.sites = new Map([[BID.composter, 'farmer'], [BID.lectern, 'librarian'], [BID.blast_furnace, 'armorer'], [BID.smithing_table, 'toolsmith'],
+  [BID.grindstone, 'weaponsmith'], [BID.smoker, 'butcher'], [BID.brewing_stand, 'cleric'], [BID.fletching_table, 'fletcher'], [BID.loom, 'shepherd'], [BID.stonecutter, 'mason'],
+  [BID.cauldron, 'leatherworker'], [BID.cartography_table, 'cartographer'], [BID.barrel, 'fisherman']]));
+const VIL = { sites: null, claimed: new Map() }; // "x,y,z" -> villager
+const VFOOD = () => VIL.food || (VIL.food = { [IID.bread]: 4, [IID.carrot]: 1, [IID.potato]: 1, [IID.beetroot]: 1 });
+function villagerRetexture(e) { const t = villagerTexture(e.vtype, e.prof); if (t && e.mesh) { e.mesh.userData.mat.map = t; if (e.matOwn) for (const m of e.mesh.userData.own) if (m.skinning) m.map = t; } }
+function villagerLifeTick() {
+  if (W.tickN % 20) return;
+  const vs = ENT.filter(e => e.type === 'villager' && !e.dead);
+  for (const [k, v] of VIL.claimed) if (v.dead || !ENT.includes(v)) VIL.claimed.delete(k);
+  for (const e of vs) {
+    // a lost job site
+    if (e.job) { const [x, y, z] = e.job; if (isLoaded(x, z) && JOB_SITES().get(getBlock(x, y, z)) !== e.prof) { VIL.claimed.delete(e.job.join(',')); e.job = null; if (!e.traded) { e.prof = 'none'; e.trades = null; villagerRetexture(e); } } }
+    // looking for work
+    if (!e.baby && e.prof === 'none' && W.tickN % 100 === 0) {
+      let best = null, bd = 17;
+      for (let dx = -16; dx <= 16; dx++) for (let dy = -4; dy <= 4; dy++) for (let dz = -16; dz <= 16; dz++) {
+        const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz, p = JOB_SITES().get(getBlock(x, y, z));
+        if (!p || VIL.claimed.has(x + ',' + y + ',' + z)) continue; const d = Math.hypot(dx, dy, dz); if (d < bd) { bd = d; best = [x, y, z, p]; }
+      }
+      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { size: 0.1, vy: 1, grav: 0 }); }
+    }
+    if (e.job) VIL.claimed.set(e.job.join(','), e);
+    // food lying close by is picked up
+    for (const it of ENT) if (it.kind === 'item' && !it.dead && VFOOD()[it.stack.id] && Math.hypot(it.x - e.x, it.z - e.z) < 1.5 && Math.abs(it.y - e.y) < 2) { e.vfood = (e.vfood || 0) + VFOOD()[it.stack.id] * it.stack.n; removeEnt(it); }
+  }
+  // breeding: food for both, and a bed nobody sleeps in
+  if (W.tickN % 200) return;
+  const beds = [...trackBlocks(BID.red_bed)].filter(k => { const [x, y, z] = k.split(',').map(Number); return getMeta(x, y, z) & 4; }).length;
+  const adults = vs.filter(e => !e.baby && (e.vfood || 0) >= 12 && !(e.breedCd > W.tickN));
+  if (vs.length >= beds) return;
+  for (let i = 0; i < adults.length; i++) for (let j = i + 1; j < adults.length; j++) {
+    const a = adults[i], b = adults[j]; if (Math.hypot(a.x - b.x, a.z - b.z) > 8 || a.breedCd > W.tickN || b.breedCd > W.tickN) continue;
+    a.vfood -= 12; b.vfood -= 12; a.breedCd = b.breedCd = W.tickN + 6000;
+    const kid = spawnMob('villager', (a.x + b.x) / 2, a.y, (a.z + b.z) / 2, { baby: true, vtype: a.vtype, prof: 'none' }); kid.persistent = true;
+    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 });
+    return;
+  }
+}
+{ const save = MOBDEF.villager.save, init = MOBDEF.villager.init;
+  MOBDEF.villager.save = e => ({ ...(save ? save(e) : {}), job: e.job || null, traded: !!e.traded, vfood: e.vfood || 0 });
+  MOBDEF.villager.init = (e, o) => { if (init) init(e, o); if (o.job) e.job = o.job; if (o.traded) e.traded = true; if (o.vfood) e.vfood = o.vfood; if (o.baby && !o.prof) e.prof = 'none'; }; }
+PROF_NAME.none = '실업자';
 
 </script>
 <script>/* js/inventory.js */
@@ -11980,7 +12064,7 @@ function tradeResult(c) {
 function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
-  o.uses++; if (o.ench) o.e = null; o.made = null;
+  o.uses++; if (o.ench) o.e = null; o.made = null; c.e.traded = true; // the villager keeps its job from now on
   play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
@@ -12596,6 +12680,7 @@ function useItem(first) {
       play('splash'); swing(); UI.hudDirty = true; return;
     }
     if (e.kind === 'mob' && mobInteract(e, h, d)) return;
+    if (e.type === 'villager' && (e.prof === 'none' || e.prof === 'nitwit') && !e.baby && !(d && h.id === IID.name_tag)) { play('hmm', { pitch: 0.7 }); swing(); return; } // no job, no trades: it shakes its head
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
@@ -13510,7 +13595,7 @@ function gameTick() {
   if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
-  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick(); mcmodels2Tick();
+  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick(); mcmodels2Tick(); villagerLifeTick();
   playerTick();
   entityTick();
   tickScheduled();

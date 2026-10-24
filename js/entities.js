@@ -309,7 +309,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   const tk = opts.skin && PACKPX.ent[opts.skin] ? opts.skin : spec.tex;
   const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[tk + '_e'] && packTexture(tk + '_e');
   const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
-  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null; if (mat2) mat2.userData.layer = true; // second-texture layer (sheep wool, horse armour, llama carpets)
   const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
   const root = new THREE.Group(), { inner, parts, list } = buildBones(spec);
   const main = new THREE.SkinnedMesh(geos.m, mat); main.add(inner); root.add(main);
@@ -780,7 +780,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);

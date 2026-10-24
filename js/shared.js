@@ -599,7 +599,7 @@ function shapes(id, meta) {
     case 1093: return [[1 + (meta & 7) * 2, 0, 1, 15, 8, 15]];
     case 1098: { const f = meta & 3, d = DIRS[f];
       if (meta & 16) return [d[2] ? [0, 4, d[2] > 0 ? 0 : 14, 16, 12, d[2] > 0 ? 2 : 16] : [d[0] > 0 ? 0 : 14, 4, 0, d[0] > 0 ? 2 : 16, 12, 16]]; // on a wall, against the block behind
-      return [f & 1 ? [7, 8, 0, 9, 16, 16] : [0, 8, 7, 16, 16, 9], [7, 0, 7, 9, 8, 9]]; }
+      return [[4, 0, 4, 12, 16, 12]]; } // standing (16 rotations in meta & 15): only the selection box, the sign itself is a mesh
     case 1094: return [[1, 0, 1, 15, 14, 15]];
     case 1095: case 1099: return [[0, 0, 0, 16, 16, 16]];
     case 1100: return [[1, 0, 1, 15, 8, 15], [7, 8, 7, 9, 14, 9], [7.5, 14, 7.5, 8.5, meta & 32 ? 16 : 15, 8.5]];
@@ -1046,10 +1046,19 @@ function stampVillage(v, st, blocks, meta, hgt, x0, z0, R, tiles) {
   for (const p of v.pieces) { const t = TPL[p.t]; stampTemplate(st, t, p.x, p.y, p.z, p.r, v.sty, R, tiles, { vt: v.vt }); }
 }
 // ---- strongholds: three per world on a ring, like Java's first ring but closer ----
+// Java's ring placement: 128 strongholds; 3 in the first ring (1280-2816 blocks out), then 6, 10, 15, 21, 28, 36, 9
+const SH_CACHE = new Map();
 function strongholdsOf(seed) {
-  const r = rng(hash32(seed, 77, 3, 9)), a0 = r() * Math.PI * 2, out = [];
-  for (let i = 0; i < 3; i++) { const a = a0 + i * Math.PI * 2 / 3, d = 700 + r() * 500; out.push([Math.round(Math.cos(a) * d / 16) * 16 + 8, 30, Math.round(Math.sin(a) * d / 16) * 16 + 8]); }
-  return out;
+  if (SH_CACHE.has(seed)) return SH_CACHE.get(seed);
+  const r = rng(hash32(seed, 77, 3, 9)), out = [], DIST = 32, COUNT = 128;
+  let angle = r() * Math.PI * 2, ring = 0, inRing = 0, spread = 3;
+  for (let i = 0; i < COUNT; i++) {
+    const d = 4 * DIST + DIST * ring * 6 + (r() - 0.5) * DIST * 2.5; // chunks
+    out.push([Math.round(Math.cos(angle) * d) * 16 + 8, 30, Math.round(Math.sin(angle) * d) * 16 + 8]);
+    angle += Math.PI * 2 / spread;
+    if (++inRing === spread) { ring++; inRing = 0; spread += Math.floor(2 * spread / (ring + 1)); spread = Math.min(spread, COUNT - i - 1); angle += r() * Math.PI * 2; }
+  }
+  SH_CACHE.set(seed, out); return out;
 }
 function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
   const r = rng(hash32(seed, sx, sz, 41));
@@ -2439,6 +2448,7 @@ function meshChunk(B, M, L, bio, opts) {
         else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
       }
     } else if (rt === RT.BOX) {
+      if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
       const boxes = shapes(id, meta);
       boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);

@@ -532,6 +532,7 @@ function useItem(first) {
       play('splash'); swing(); UI.hudDirty = true; return;
     }
     if (e.kind === 'mob' && mobInteract(e, h, d)) return;
+    if (e.type === 'villager' && (e.prof === 'none' || e.prof === 'nitwit') && !e.baby && !(d && h.id === IID.name_tag)) { play('hmm', { pitch: 0.7 }); swing(); return; } // no job, no trades: it shakes its head
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
