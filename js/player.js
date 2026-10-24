@@ -380,6 +380,7 @@ function finishEat() {
   if (h.id === IID.milk_bucket) { clearEffects(PL); INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
+  if (h.stew) addEffect(PL, h.stew[0], h.stew[1], 0); // suspicious stew
   PL.sat = Math.min(PL.food, PL.sat);
   if (d.cures && PL.eff && PL.eff[d.cures]) { delete PL.eff[d.cures]; UI.hudDirty = true; }
   if (d.eff) for (const [k, dur, lv, ch] of d.eff) if (ch == null || Math.random() < ch) addEffect(PL, k, dur, lv);
@@ -504,6 +505,7 @@ function useItem(first) {
   USE.placeCd = 4;
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
+  if (first && items6Use(t, h, d)) return;
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'frame') { frameUse(e, h); return; }
@@ -781,6 +783,7 @@ function elytraTick() {
   if (pitch < 0 && hor > 0) { const d = spd * -Math.sin(pitch) * 0.04; PL.vy += d * 3.2; PL.vx -= lx * d / hor; PL.vz -= lz * d / hor; }
   if (hor > 0) { PL.vx += (lx / hor * spd - PL.vx) * 0.1; PL.vz += (lz / hor * spd - PL.vz) * 0.1; }
   PL.vx *= 0.99; PL.vy *= 0.98; PL.vz *= 0.99;
+  fireworkBoost();
   physMove(PL, PL.vx, PL.vy, PL.vz, 0);
   if (PL.hitH && spd > 0.5) hurtPlayer(Math.floor((spd - 0.5) * 10), 'fall');
   PL.fallDist = 0;

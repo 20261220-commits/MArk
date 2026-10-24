@@ -607,8 +607,25 @@ function cartSprite(load) {
     for (const cx of [4, 11]) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) p(cx + dx - 1, 12 + dy, hex(0x2a2a2a));
   });
 }
+function signSprite(col) { return sprite(p => { for (let y = 2; y < 10; y++) for (let x = 1; x < 15; x++) p(x, y, shade(hex(col), x === 1 || y === 2 ? 1.15 : x === 14 || y === 9 ? 0.75 : 1)); for (const y of [4, 6]) for (let x = 3; x < 13; x += 1) if (x % 4) p(x, y, hex(0x3a2a18)); for (let y = 10; y < 15; y++) { p(7, y, hex(0x6a4a24)); p(8, y, hex(0x5a3a1a)); } }); }
 Object.assign(SPR, {
   minecart: () => cartSprite(null),
+  oak_sign_item: () => signSprite(0xb8945a),
+  spruce_sign_item: () => signSprite(0x7a5a34),
+  birch_sign_item: () => signSprite(0xd8c88a),
+  jungle_sign_item: () => signSprite(0xb07a50),
+  acacia_sign_item: () => signSprite(0xb8642e),
+  dark_oak_sign_item: () => signSprite(0x4a3018),
+  crimson_sign_item: () => signSprite(0x7a3050),
+  warped_sign_item: () => signSprite(0x2a7a70),
+  writable_book: () => sprite(p => { for (let y = 3; y < 15; y++) for (let x = 2; x < 11; x++) p(x, y, x < 4 ? hex(0x5a3a1a) : y > 12 ? hex(0xf0f0e0) : hex(0x8a5a2a)); line(p, 9, 10, 14, 1, i => i < 2 ? hex(0x202020) : hex(0xe8e8e8)); }),
+  written_book: () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 3; x < 13; x++) p(x, y, x < 5 ? hex(0x3a2a1a) : y > 11 ? hex(0xf0f0e0) : hex(0x6a4a2a)); for (let x = 6; x < 12; x++) p(x, 6, hex(0xd8b040)); }),
+  firework_rocket: () => sprite(p => { for (let y = 4; y < 13; y++) for (let x = 6; x < 10; x++) p(x, y, y < 6 ? hex(0xd03030) : (y % 3 ? hex(0xe8e0c8) : hex(0xc8a070))); p(7, 3, hex(0xd03030)); p(8, 3, hex(0xd03030)); line(p, 8, 13, 8, 15, hex(0x6a4a24)); }),
+  firework_star: () => sprite(p => { for (let y = 4; y < 12; y++) for (let x = 4; x < 12; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 5) p(x, y, d < 2 ? hex(0x8a8a8a) : hex(0x4a4a4a)); } }),
+  carrot_on_a_stick: () => sprite(p => { line(p, 2, 14, 12, 2, hex(0x6a4a24)); line(p, 12, 2, 13, 9, hex(0xc8c8c8)); for (let y = 9; y < 14; y++) p(13 - (y > 11 ? 1 : 0), y, hex(0xf08a20)); p(13, 8, hex(0x3a9a2a)); }),
+  warped_fungus_on_a_stick: () => sprite(p => { line(p, 2, 14, 12, 2, hex(0x6a4a24)); line(p, 12, 2, 13, 9, hex(0xc8c8c8)); for (let y = 9; y < 13; y++) for (let x = 11; x < 15; x++) p(x, y, y < 11 ? hex(0x14968a) : hex(0xd8702a)); }),
+  suspicious_stew: () => sprite(p => { for (let y = 8; y < 14; y++) for (let x = 2; x < 14; x++) if (Math.abs(x - 7.5) < 7 - (y - 8) * 0.6) p(x, y, y === 8 ? hex(0xa06a3a) : hex(0x6a4a2a)); for (let x = 3; x < 13; x++) p(x, 8, x % 3 ? hex(0xc89050) : hex(0xd8c040)); }),
+
   bamboo_item: () => sprite(p => { for (let y = 1; y < 15; y++) { p(7, y, y % 5 === 0 ? hex(0x8aa83a) : hex(0x5a9a2a)); p(8, y, hex(0x4a8a22)); } for (let d = 0; d < 4; d++) { p(9 + d, 3 + (d >> 1), hex(0x5aa832)); p(6 - d, 8 + (d >> 1), hex(0x5aa832)); } }),
   heart_of_the_sea: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 6) p(x, y, d < 2 ? hex(0x9affff) : d < 4 ? hex(0x2ab8d8) : hex(0x1a6a8a)); } p(6, 6, hex(0xffffff)); }),
   nautilus_shell: () => sprite(p => { for (let a = 0; a < 60; a++) { const t = a / 60 * Math.PI * 3.2, rr = 1 + t * 1.2; p(Math.round(8 + Math.cos(t) * rr), Math.round(8 + Math.sin(t) * rr), a % 6 < 3 ? hex(0xe8d8c0) : hex(0xc87a4a)); } for (let y = 6; y < 11; y++) for (let x = 6; x < 11; x++) if (Math.hypot(x - 8, y - 8) < 2.5) p(x, y, hex(0xe8d8c0)); }),

@@ -182,6 +182,10 @@ item('map', '빈 지도'); item('filled_map', '지도', { stack: 1 });
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
 item('furnace_minecart', '화로가 실린 광산 수레', { stack: 1, cart: 'furnace' });
+item('writable_book', '책과 깃펜', { stack: 1 }); item('written_book', '서명된 책', { stack: 16 });
+item('firework_rocket', '폭죽 로켓'); item('firework_star', '폭죽 탄약');
+item('lead', '끈'); item('carrot_on_a_stick', '당근 낚싯대', { stack: 1, dur: 25 }); item('warped_fungus_on_a_stick', '뒤틀린 균 낚싯대', { stack: 1, dur: 100 });
+item('suspicious_stew', '수상한 스튜', { food: [6, 7.2], stack: 1, leaves: 'bowl' });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 S.COLORS.forEach((c, i) => { ITEMS[IID[c + '_banner']].sprite = c + '_banner_item'; ITEMS[IID[c + '_banner']].stack = 16; });
@@ -513,6 +517,16 @@ for (const c of S.COLORS) { const to = c === 'purple' ? 'shulker_box' : c + '_sh
 for (const k in IID) if (ITEMS[IID[k]].place === BID.shulker_box || IID[k] === BID.shulker_box) ITEMS[IID[k]].stack = 1;
 shaped('respawn_anchor', 1, ['CCC', 'GGG', 'CCC'], { C: 'crying_obsidian', G: 'glowstone' });
 shaped('scaffolding', 6, ['BSB', 'B B', 'B B'], { B: 'bamboo', S: 'string' }); ITEMS[BID.scaffolding].fuel = 50;
+for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_sign', 3, ['PPP', 'PPP', ' S '], { S: 'stick', P: w + '_planks' }); ITEMS[IID[w + '_sign']].stack = 16; ITEMS[IID[w + '_sign']].sprite = w + '_sign_item'; if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_sign']].fuel = 200; }
+shapeless('writable_book', 1, ['book', 'ink_sac', 'feather']);
+for (let g = 1; g <= 3; g++) for (let s = 0; s + g <= 8 && s <= 3; s++) shapeless('firework_rocket', 3, ['paper', ...Array(g).fill('gunpowder'), ...Array(s).fill('firework_star')]); // flight 1-3, up to three stars (colours: craftExtra)
+for (const c of S.COLORS) shapeless('firework_star', 1, ['gunpowder', c + '_dye']);
+shaped('lead', 2, ['SS ', 'SB ', '  S'], { S: 'string', B: 'slime_ball' });
+shapeless('carrot_on_a_stick', 1, ['fishing_rod', 'carrot']); shapeless('warped_fungus_on_a_stick', 1, ['fishing_rod', 'warped_fungus']);
+// suspicious stew: the flower decides the effect (craftExtra)
+const STEW_EFF = { dandelion: ['saturation', 7], poppy: ['night_vision', 100], cornflower: ['jump_boost', 120], oxeye_daisy: ['regeneration', 160], allium: ['fire_resistance', 80], azure_bluet: ['blindness', 160],
+  red_tulip: ['weakness', 180], orange_tulip: ['weakness', 180], white_tulip: ['weakness', 180], pink_tulip: ['weakness', 180], lily_of_the_valley: ['poison', 240], blue_orchid: ['saturation', 7], wither_rose: ['wither', 160] };
+for (const f in STEW_EFF) if (IID[f] != null) shapeless('suspicious_stew', 1, ['bowl', 'brown_mushroom', 'red_mushroom', f]);
 
 // ---------- drops ----------
 function toolOf(stack) { const d = stack && ITEMS[stack.id]; return d && d.tool ? d.tool : null; }

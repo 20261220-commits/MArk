@@ -649,6 +649,7 @@ const BLOCK_ROWS = [
   [1095, 'shulker_box', '셜커 상자', RT.BOX, null, 2, P, 0, { vars: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vk: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vn: ['셜커 상자', '하얀색 셜커 상자', '주황색 셜커 상자', '자홍색 셜커 상자', '하늘색 셜커 상자', '노란색 셜커 상자', '연두색 셜커 상자', '분홍색 셜커 상자', '회색 셜커 상자', '회백색 셜커 상자', '청록색 셜커 상자', '파란색 셜커 상자', '갈색 셜커 상자', '초록색 셜커 상자', '빨간색 셜커 상자', '검은색 셜커 상자'] }],
   [1096, 'respawn_anchor', '리스폰 정박기', C, ['respawn_anchor_side', 'respawn_anchor_top_off', 'respawn_anchor_bottom'], 50, P, 4], // meta: charges 0-4
   [1097, 'scaffolding', '비계', RT.BOX, ['scaffolding_side', 'scaffolding_top', 'scaffolding_bottom'], 0, N, 0, { nosolid: 1, climb: 1, plant: 24 }], // meta: distance 0-7
+  [1098, 'oak_sign', '참나무 표지판', RT.BOX, null, 1, A, 0, { nosolid: 1, plant: 25, vshift: 5, vars: ['oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'crimson_planks', 'warped_planks'], vk: ['oak_sign', 'spruce_sign', 'birch_sign', 'jungle_sign', 'acacia_sign', 'dark_oak_sign', 'crimson_sign', 'warped_sign'], vn: ['참나무 표지판', '가문비나무 표지판', '자작나무 표지판', '정글 나무 표지판', '아카시아 나무 표지판', '짙은 참나무 표지판', '진홍빛 표지판', '뒤틀린 표지판'] }], // meta: facing | wall << 4 | wood << 5; the text is a tile ('sign')
   [1069, 'sweet_berry_bush', '달콤한 열매 덤불', X, 'sweet_berry_bush_stage0', 0, N, 0, { plant: 1 }], // meta: age 0-3
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
@@ -839,6 +840,9 @@ function shapes(id, meta) {
       return out;
     }
     case 1093: return [[1 + (meta & 7) * 2, 0, 1, 15, 8, 15]];
+    case 1098: { const f = meta & 3, d = DIRS[f];
+      if (meta & 16) return [d[2] ? [0, 4, d[2] > 0 ? 0 : 14, 16, 12, d[2] > 0 ? 2 : 16] : [d[0] > 0 ? 0 : 14, 4, 0, d[0] > 0 ? 2 : 16, 12, 16]]; // on a wall, against the block behind
+      return [f & 1 ? [7, 8, 0, 9, 16, 16] : [0, 8, 7, 16, 16, 9], [7, 0, 7, 9, 8, 9]]; }
     case 1094: return [[1, 0, 1, 15, 14, 15]];
     case 1095: return [[0, 0, 0, 16, 16, 16]];
     case 1097: return [[0, 14, 0, 16, 16, 16], [0, 0, 0, 2, 14, 2], [14, 0, 0, 16, 14, 2], [0, 0, 14, 2, 14, 16], [14, 0, 14, 16, 14, 16]];
@@ -3085,6 +3089,10 @@ item('map', '빈 지도'); item('filled_map', '지도', { stack: 1 });
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
 item('furnace_minecart', '화로가 실린 광산 수레', { stack: 1, cart: 'furnace' });
+item('writable_book', '책과 깃펜', { stack: 1 }); item('written_book', '서명된 책', { stack: 16 });
+item('firework_rocket', '폭죽 로켓'); item('firework_star', '폭죽 탄약');
+item('lead', '끈'); item('carrot_on_a_stick', '당근 낚싯대', { stack: 1, dur: 25 }); item('warped_fungus_on_a_stick', '뒤틀린 균 낚싯대', { stack: 1, dur: 100 });
+item('suspicious_stew', '수상한 스튜', { food: [6, 7.2], stack: 1, leaves: 'bowl' });
 item('item_frame', '아이템 액자', { sprite: 'item_frame_item' }); item('glow_item_frame', '발광 아이템 액자', { sprite: 'glow_item_frame_item' });
 for (const b of BLOCKS) if (b && b.vars && b.id >= S.NEWB && !NO_ITEM.has(b.key)) for (let k = 1; k < b.vars.length; k++) VARITEM[b.id * 16 + k] = item(b.vk[k], b.vn[k], { place: b.id, vi: k, block: b });
 S.COLORS.forEach((c, i) => { ITEMS[IID[c + '_banner']].sprite = c + '_banner_item'; ITEMS[IID[c + '_banner']].stack = 16; });
@@ -3416,6 +3424,16 @@ for (const c of S.COLORS) { const to = c === 'purple' ? 'shulker_box' : c + '_sh
 for (const k in IID) if (ITEMS[IID[k]].place === BID.shulker_box || IID[k] === BID.shulker_box) ITEMS[IID[k]].stack = 1;
 shaped('respawn_anchor', 1, ['CCC', 'GGG', 'CCC'], { C: 'crying_obsidian', G: 'glowstone' });
 shaped('scaffolding', 6, ['BSB', 'B B', 'B B'], { B: 'bamboo', S: 'string' }); ITEMS[BID.scaffolding].fuel = 50;
+for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_sign', 3, ['PPP', 'PPP', ' S '], { S: 'stick', P: w + '_planks' }); ITEMS[IID[w + '_sign']].stack = 16; ITEMS[IID[w + '_sign']].sprite = w + '_sign_item'; if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_sign']].fuel = 200; }
+shapeless('writable_book', 1, ['book', 'ink_sac', 'feather']);
+for (let g = 1; g <= 3; g++) for (let s = 0; s + g <= 8 && s <= 3; s++) shapeless('firework_rocket', 3, ['paper', ...Array(g).fill('gunpowder'), ...Array(s).fill('firework_star')]); // flight 1-3, up to three stars (colours: craftExtra)
+for (const c of S.COLORS) shapeless('firework_star', 1, ['gunpowder', c + '_dye']);
+shaped('lead', 2, ['SS ', 'SB ', '  S'], { S: 'string', B: 'slime_ball' });
+shapeless('carrot_on_a_stick', 1, ['fishing_rod', 'carrot']); shapeless('warped_fungus_on_a_stick', 1, ['fishing_rod', 'warped_fungus']);
+// suspicious stew: the flower decides the effect (craftExtra)
+const STEW_EFF = { dandelion: ['saturation', 7], poppy: ['night_vision', 100], cornflower: ['jump_boost', 120], oxeye_daisy: ['regeneration', 160], allium: ['fire_resistance', 80], azure_bluet: ['blindness', 160],
+  red_tulip: ['weakness', 180], orange_tulip: ['weakness', 180], white_tulip: ['weakness', 180], pink_tulip: ['weakness', 180], lily_of_the_valley: ['poison', 240], blue_orchid: ['saturation', 7], wither_rose: ['wither', 160] };
+for (const f in STEW_EFF) if (IID[f] != null) shapeless('suspicious_stew', 1, ['bowl', 'brown_mushroom', 'red_mushroom', f]);
 
 // ---------- drops ----------
 function toolOf(stack) { const d = stack && ITEMS[stack.id]; return d && d.tool ? d.tool : null; }
@@ -4207,8 +4225,25 @@ function cartSprite(load) {
     for (const cx of [4, 11]) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) p(cx + dx - 1, 12 + dy, hex(0x2a2a2a));
   });
 }
+function signSprite(col) { return sprite(p => { for (let y = 2; y < 10; y++) for (let x = 1; x < 15; x++) p(x, y, shade(hex(col), x === 1 || y === 2 ? 1.15 : x === 14 || y === 9 ? 0.75 : 1)); for (const y of [4, 6]) for (let x = 3; x < 13; x += 1) if (x % 4) p(x, y, hex(0x3a2a18)); for (let y = 10; y < 15; y++) { p(7, y, hex(0x6a4a24)); p(8, y, hex(0x5a3a1a)); } }); }
 Object.assign(SPR, {
   minecart: () => cartSprite(null),
+  oak_sign_item: () => signSprite(0xb8945a),
+  spruce_sign_item: () => signSprite(0x7a5a34),
+  birch_sign_item: () => signSprite(0xd8c88a),
+  jungle_sign_item: () => signSprite(0xb07a50),
+  acacia_sign_item: () => signSprite(0xb8642e),
+  dark_oak_sign_item: () => signSprite(0x4a3018),
+  crimson_sign_item: () => signSprite(0x7a3050),
+  warped_sign_item: () => signSprite(0x2a7a70),
+  writable_book: () => sprite(p => { for (let y = 3; y < 15; y++) for (let x = 2; x < 11; x++) p(x, y, x < 4 ? hex(0x5a3a1a) : y > 12 ? hex(0xf0f0e0) : hex(0x8a5a2a)); line(p, 9, 10, 14, 1, i => i < 2 ? hex(0x202020) : hex(0xe8e8e8)); }),
+  written_book: () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 3; x < 13; x++) p(x, y, x < 5 ? hex(0x3a2a1a) : y > 11 ? hex(0xf0f0e0) : hex(0x6a4a2a)); for (let x = 6; x < 12; x++) p(x, 6, hex(0xd8b040)); }),
+  firework_rocket: () => sprite(p => { for (let y = 4; y < 13; y++) for (let x = 6; x < 10; x++) p(x, y, y < 6 ? hex(0xd03030) : (y % 3 ? hex(0xe8e0c8) : hex(0xc8a070))); p(7, 3, hex(0xd03030)); p(8, 3, hex(0xd03030)); line(p, 8, 13, 8, 15, hex(0x6a4a24)); }),
+  firework_star: () => sprite(p => { for (let y = 4; y < 12; y++) for (let x = 4; x < 12; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 5) p(x, y, d < 2 ? hex(0x8a8a8a) : hex(0x4a4a4a)); } }),
+  carrot_on_a_stick: () => sprite(p => { line(p, 2, 14, 12, 2, hex(0x6a4a24)); line(p, 12, 2, 13, 9, hex(0xc8c8c8)); for (let y = 9; y < 14; y++) p(13 - (y > 11 ? 1 : 0), y, hex(0xf08a20)); p(13, 8, hex(0x3a9a2a)); }),
+  warped_fungus_on_a_stick: () => sprite(p => { line(p, 2, 14, 12, 2, hex(0x6a4a24)); line(p, 12, 2, 13, 9, hex(0xc8c8c8)); for (let y = 9; y < 13; y++) for (let x = 11; x < 15; x++) p(x, y, y < 11 ? hex(0x14968a) : hex(0xd8702a)); }),
+  suspicious_stew: () => sprite(p => { for (let y = 8; y < 14; y++) for (let x = 2; x < 14; x++) if (Math.abs(x - 7.5) < 7 - (y - 8) * 0.6) p(x, y, y === 8 ? hex(0xa06a3a) : hex(0x6a4a2a)); for (let x = 3; x < 13; x++) p(x, 8, x % 3 ? hex(0xc89050) : hex(0xd8c040)); }),
+
   bamboo_item: () => sprite(p => { for (let y = 1; y < 15; y++) { p(7, y, y % 5 === 0 ? hex(0x8aa83a) : hex(0x5a9a2a)); p(8, y, hex(0x4a8a22)); } for (let d = 0; d < 4; d++) { p(9 + d, 3 + (d >> 1), hex(0x5aa832)); p(6 - d, 8 + (d >> 1), hex(0x5aa832)); } }),
   heart_of_the_sea: () => sprite(p => { for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const d = Math.abs(x - 7.5) + Math.abs(y - 7.5); if (d < 6) p(x, y, d < 2 ? hex(0x9affff) : d < 4 ? hex(0x2ab8d8) : hex(0x1a6a8a)); } p(6, 6, hex(0xffffff)); }),
   nautilus_shell: () => sprite(p => { for (let a = 0; a < 60; a++) { const t = a / 60 * Math.PI * 3.2, rr = 1 + t * 1.2; p(Math.round(8 + Math.cos(t) * rr), Math.round(8 + Math.sin(t) * rr), a % 6 < 3 ? hex(0xe8d8c0) : hex(0xc87a4a)); } for (let y = 6; y < 11; y++) for (let x = 6; x < 11; x++) if (Math.hypot(x - 8, y - 8) < 2.5) p(x, y, hex(0xe8d8c0)); }),
@@ -10768,6 +10803,7 @@ function plant6OK(b, x, y, z, m, below, above) {
     case 21: return OPQ[above] || above === b; // weeping vines hang
     case 22: return OPQ[below] || below === b; // twisting vines stand
     case 23: return supportedBy(below); // cake
+    case 25: { const f = m & 3, d = DIRS[f]; return m & 16 ? OPQ[getBlock(x - d[0], y, z - d[2])] : supportedBy(below); } // signs
     case 24: { // scaffolding: recompute the distance; too far from support and it falls apart
       const d = scafDist(x, y, z); if (d > 6) return false;
       if (d !== (m & 7)) { setMeta(x, y, z, d); for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === SCAFB) neighborUpdate(x + dx, y + dy, z + dz); }
@@ -10781,6 +10817,7 @@ function plant6OK(b, x, y, z, m, below, above) {
 function blocks6Place(t, x, y, z, id, meta, fd) {
   const below = getBlock(x, y - 1, z), above = getBlock(x, y + 1, z);
   if (id === BID.oak_fence_gate) return (meta & ~7) | fd;
+  if (id === BID.oak_sign) return signPlace(t, x, y, z, meta);
   if (id === SCAFB) { const d = scafDist(x, y, z); return d > 6 ? false : d; }
   if (id === BID.cake) return supportedBy(below) ? 0 : false;
   if (id === BID.weeping_vines) return OPQ[above] || above === id ? 1 : false;
@@ -10788,6 +10825,7 @@ function blocks6Place(t, x, y, z, id, meta, fd) {
   return meta;
 }
 function blocks6Placed(x, y, z, id, meta, h) {
+  if (id === BID.oak_sign) { setTimeout(() => signEdit(x, y, z), 0); return; }
   if (id === SHULK) setTile(x, y, z, { type: 'chest', shulker: true, items: h && h.items ? h.items.map(s => s && { ...s }) : new Array(27).fill(null) });
   if ((id === BID.weeping_vines || id === BID.twisting_vines)) { const oy = id === BID.weeping_vines ? 1 : -1; if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, 0); } // the old tip is now a stem
 }
@@ -10804,6 +10842,7 @@ function blocks6Break(x, y, z, id, m) {
 // ---------- using ----------
 function blocks6Use(t, h, dry) {
   const { x, y, z, id, m } = t;
+  if (id === BID.oak_sign) return signUse(t, h, dry) || null;
   if (id === BID.oak_fence_gate) {
     if (!dry) { let nm = m ^ 4; if (nm & 4) { const away = (m & 1) ? PL.x > x + .5 : PL.z > z + .5; nm = away ? nm | 2 : nm & ~2; } setMeta(x, y, z, nm); play('door', { vol: 0.6, pitch: 1.2 }); }
     return true;
@@ -10872,6 +10911,207 @@ function blocks6Tick() {
 ENCH.frost_walker = ['차가운 걸음', 2, ['boots'], 1];
 
 </script>
+<script>/* js/items6.js */
+// Items of S6: signs (text drawn in the world, dye and glow ink), books and quills, fireworks (and elytra boosts),
+// leads, carrots and warped fungi on sticks for riding saddled pigs and striders, suspicious stew.
+const SIGN = BID.oak_sign;
+const CUSTOM_SCREENS = {};
+const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// ---------- signs ----------
+function signPlace(t, x, y, z, meta) {
+  if (t.ny === -1) return false;
+  if (t.ny === 0) { const f = DIRS.findIndex(v => v[0] === t.nx && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)]) return false; return (meta & ~31) | 16 | f; }
+  return supportedBy(getBlock(x, y - 1, z)) ? (meta & ~31) | ((facingDir() + 2) & 3) : false;
+}
+function signEdit(x, y, z) {
+  let t = getTile(x, y, z); if (!t) { t = { type: 'sign', lines: ['', '', '', ''] }; setTile(x, y, z, t); }
+  UI.openScreen('sign', { x, y, z, tile: t });
+}
+CUSTOM_SCREENS.sign = {
+  html: () => `<div class="panel"><div class="cap">표지판 문구 편집</div>${GUI.ctx.tile.lines.map((l, i) => `<input class="signl" data-l="${i}" maxlength="15" value="${escH(l)}" autocomplete="off" style="display:block;width:16em;margin:4px auto;text-align:center">`).join('')}<button id="signok" class="btn" style="display:block;margin:8px auto">완료</button></div>`,
+  bind: () => {
+    const ins = [...document.querySelectorAll('.signl')];
+    ins.forEach(el => { el.oninput = () => { GUI.ctx.tile.lines[+el.dataset.l] = el.value; GUI.ctx.tile.v = (GUI.ctx.tile.v || 0) + 1; markTileChunk(GUI.ctx.x, GUI.ctx.z); }; el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { const n = ins[+el.dataset.l + 1]; if (n) n.focus(); else UI.closeScreen(); } if (e.key === 'Escape') UI.closeScreen(); }; el.onpointerdown = e => e.stopPropagation(); });
+    $('signok').onclick = () => UI.closeScreen(); if (ins[0]) setTimeout(() => ins[0].focus(), 0);
+  },
+};
+const markTileChunk = (x, z) => { const c = chunkAt(x >> 4, z >> 4); if (c) c.modified = true; };
+// dye colours the text, a glow ink sac makes it glow (and an ink sac undoes that)
+function signUse(t, h, dry) {
+  const tile = getTile(t.x, t.y, t.z); if (!tile || !h) return false;
+  const k = ITEMS[h.id].key;
+  if (k.endsWith('_dye')) { const c = S.COLORS.indexOf(k.slice(0, -4)); if (c < 0 || tile.color === c) return false; if (!dry) { tile.color = c; tile.v = (tile.v || 0) + 1; consume(); play('place', { mat: 'wool', vol: 0.5 }); markTileChunk(t.x, t.z); } return true; }
+  if (h.id === IID.glow_ink_sac && !tile.glow || h.id === IID.ink_sac && tile.glow) { if (!dry) { tile.glow = h.id === IID.glow_ink_sac; tile.v = (tile.v || 0) + 1; consume(); play('splash', { vol: 0.3 }); markTileChunk(t.x, t.z); } return true; }
+  return false;
+}
+const SIGN_TEXT_C = ['#f0f0f0', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f', '#f38baa', '#474f52', '#9d9d97', '#169c9c', '#8932b8', '#3c44aa', '#835432', '#5e7c16', '#b02e26', '#101010'];
+const SIGNS = new Map(); // "x,y,z" -> { mesh, v }
+function signTexture(t) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const col = SIGN_TEXT_C[t.color != null ? t.color : 15];
+  t.lines.forEach((l, i) => { if (t.glow) { g.fillStyle = col === '#101010' ? '#f0f0d0' : col; g.shadowColor = g.fillStyle; g.shadowBlur = 8; } else g.fillStyle = col; g.fillText(l, 128, 16 + i * 32); });
+  const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
+}
+function signMesh(x, y, z, m, t) {
+  const mat = new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), mat), f = m & 3, d = DIRS[f];
+  if (m & 16) mesh.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135);
+  else mesh.position.set(x + .5 + d[0] * 0.07, y + 0.75, z + .5 + d[2] * 0.07);
+  mesh.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f];
+  scene.add(mesh); return mesh;
+}
+function dropSign(k) { const s = SIGNS.get(k); if (!s) return; scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.map.dispose(); s.mesh.material.dispose(); SIGNS.delete(k); }
+function signTick() {
+  if (W.tickN % 5) return;
+  const seen = new Set();
+  for (const c of W.chunks.values()) {
+    if (!c.tiles || Math.abs(c.cx * 16 + 8 - PL.x) > 64 || Math.abs(c.cz * 16 + 8 - PL.z) > 64) continue;
+    for (const [i, t] of c.tiles) {
+      if (t.type !== 'sign') continue;
+      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
+      if (getBlock(x, y, z) !== SIGN) continue;
+      seen.add(k); const s = SIGNS.get(k), m = getMeta(x, y, z), v = (t.v || 0) * 64 + m;
+      if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.material.color.setScalar(b); } continue; }
+      if (s) dropSign(k);
+      SIGNS.set(k, { mesh: signMesh(x, y, z, m, t), v });
+    }
+  }
+  for (const k of [...SIGNS.keys()]) if (!seen.has(k)) dropSign(k);
+}
+
+// ---------- books ----------
+function bookOpen(h) { UI.openScreen('book', { st: h, page: 0, signing: false }); }
+CUSTOM_SCREENS.book = {
+  html: () => {
+    const c = GUI.ctx, st = c.st, pages = st.pages || (st.pages = ['']), ro = st.id === IID.written_book;
+    if (c.signing) return `<div class="panel"><div class="cap">책 서명</div><input id="btitle" maxlength="16" placeholder="제목" value="${escH(c.title || '')}" autocomplete="off" style="display:block;margin:6px auto;width:14em"><p class="tip">서명하면 더 이상 수정할 수 없어요.</p><button id="bsign" class="btn">서명하고 닫기</button> <button id="bcancel" class="btn">취소</button></div>`;
+    const body = ro ? `<div style="white-space:pre-wrap;text-align:left;width:18em;min-height:14em;background:#f4ecd8;color:#222;padding:8px;margin:auto">${escH(pages[c.page] || '')}</div>` : `<textarea id="bpage" maxlength="256" style="width:18em;height:14em;background:#f4ecd8;color:#222">${escH(pages[c.page] || '')}</textarea>`;
+    return `<div class="panel"><div class="cap">${ro ? escH(st.title || '서명된 책') + (st.author ? ' — ' + escH(st.author) : '') : '책과 깃펜'}</div>${body}<div class="row" style="justify-content:center;gap:8px;margin-top:6px"><button id="bprev" class="btn">◀</button><span>${c.page + 1} / ${pages.length}</span><button id="bnext" class="btn">▶</button>${ro ? '' : '<button id="bsignq" class="btn">서명</button>'}<button id="bdone" class="btn">완료</button></div></div>`;
+  },
+  bind: () => {
+    const c = GUI.ctx, st = c.st, pages = st.pages, stop = el => { if (el) { el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') UI.closeScreen(); }; el.onpointerdown = e => e.stopPropagation(); } };
+    const ta = $('bpage'); stop(ta); if (ta) { ta.oninput = () => { pages[c.page] = ta.value; }; setTimeout(() => ta.focus(), 0); }
+    const bt = $('btitle'); stop(bt); if (bt) { bt.oninput = () => { c.title = bt.value; }; setTimeout(() => bt.focus(), 0); }
+    const on = (id, f) => { const el = $(id); if (el) el.onclick = () => { f(); if (UI.screen === 'book') UI.renderScreen(); }; };
+    on('bprev', () => { c.page = Math.max(0, c.page - 1); });
+    on('bnext', () => { if (c.page === pages.length - 1 && st.id === IID.writable_book && pages.length < 50) pages.push(''); c.page = Math.min(pages.length - 1, c.page + 1); });
+    on('bsignq', () => { c.signing = true; }); on('bcancel', () => { c.signing = false; });
+    on('bsign', () => { if (!(c.title || '').trim()) return; st.id = IID.written_book; st.title = c.title.trim(); st.name = st.title; st.author = '플레이어'; UI.hudDirty = true; UI.closeScreen(); play('levelup', { vol: 0.3 }); });
+    on('bdone', () => UI.closeScreen());
+  },
+};
+
+// ---------- fireworks ----------
+const ROCKETS = [];
+function launchRocket(x, y, z, st, rider) {
+  const fw = st.fw || { flight: 1, colors: [] }, mesh = R.itemMesh(IID.firework_rocket); mesh.scale.setScalar(0.35); scene.add(mesh);
+  ROCKETS.push({ x, y, z, vx: (Math.random() - .5) * 0.02, vy: 0.05, vz: (Math.random() - .5) * 0.02, life: 10 * (fw.flight + 1) + Math.floor(Math.random() * 12), colors: fw.colors || [], mesh, rider });
+  play('bow', { vol: 0.5, pitch: 0.6 });
+}
+function rocketTick() {
+  for (let i = ROCKETS.length - 1; i >= 0; i--) {
+    const r = ROCKETS[i];
+    if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; } else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
+    r.mesh.position.set(r.x, r.y, r.z);
+    R.simpleParticle(r.x, r.y - 0.3, r.z, [1, 0.9, 0.6], { size: 0.06, vy: -0.5, grav: 0 });
+    const hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
+    if (--r.life > 0 && !hit) continue;
+    scene.remove(r.mesh); ROCKETS.splice(i, 1);
+    if (!r.colors.length) continue;
+    const cols = r.colors.map(c => { const v = BANNER_DYE[c]; return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; });
+    for (let k = 0; k < 90; k++) { const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 2 - 1), s = 5 + Math.random() * 2; R.simpleParticle(r.x, r.y, r.z, cols[k % cols.length], { size: 0.12, vx: Math.sin(b) * Math.cos(a) * s, vy: Math.cos(b) * s, vz: Math.sin(b) * Math.sin(a) * s, grav: 0.3, life: 1.2 }); }
+    const dist = Math.hypot(PL.x - r.x, PL.y - r.y, PL.z - r.z); play('explode', { vol: Math.max(0.05, 0.4 * (1 - dist / 80)), pitch: 1.7 });
+    const dmg = 5 + 2 * r.colors.length; // stars hurt what is close
+    if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
+    for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+  }
+}
+// gliding with an elytra: a rocket pushes you along the look direction (Java: v += l * 0.1 + (l * 1.5 - v) * 0.5)
+function fireworkBoost() {
+  if (!(PL.fwBoost > 0) || !PL.gliding) { PL.fwBoost = 0; return; }
+  PL.fwBoost--; const [lx, ly, lz] = lookDir();
+  PL.vx += lx * 0.1 + (lx * 1.5 - PL.vx) * 0.5; PL.vy += ly * 0.1 + (ly * 1.5 - PL.vy) * 0.5; PL.vz += lz * 0.1 + (lz * 1.5 - PL.vz) * 0.5;
+}
+
+// ---------- leads ----------
+const LEASH_OK = e => e.kind === 'mob' && !e.dead && !e.def.hostile && !e.def.boss && e.type !== 'villager' && e.type !== 'wandering_trader';
+const FENCES = new Set([BID.oak_fence, BID.nether_brick_fence, BID.fence2]);
+function leashTick() {
+  for (const e of ENT) {
+    if (!e.leash) { if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } continue; }
+    const fence = Array.isArray(e.leash) ? e.leash : null;
+    if (e.dead || (fence && !FENCES.has(getBlock(...fence))) || (!fence && PL.dead)) { unleash(e, true); continue; }
+    const ax = fence ? fence[0] + .5 : PL.x, ay = fence ? fence[1] + .6 : PL.y + 1, az = fence ? fence[2] + .5 : PL.z;
+    const dx = ax - e.x, dy = ay - (e.y + e.h * 0.6), dz = az - e.z, d = Math.hypot(dx, dy, dz);
+    if (d > 10) { unleash(e, true); continue; }
+    if (d > 4) { const k = (d - 4) * 0.02; e.vx += dx / d * k; e.vz += dz / d * k; if (dy > 1 && e.onGround) e.vy = 0.3; e.goal = null; }
+    if (!e.leashLine) { e.leashLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x6a4a24 })); scene.add(e.leashLine); }
+    const p = e.leashLine.geometry.attributes.position; p.setXYZ(0, e.x, e.y + e.h * 0.6, e.z); p.setXYZ(1, ax, ay, az); p.needsUpdate = true; e.leashLine.geometry.computeBoundingSphere();
+  }
+}
+function unleash(e, drop) { e.leash = null; if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } if (drop && !creative()) dropItem(e.x, e.y + .5, e.z, IID.lead, 1); }
+
+// ---------- riding pigs and striders ----------
+function stickRide(e, stickId, walk) {
+  if (IN.sneak) { dismount(); return; }
+  const h = PL.held(), steer = h && h.id === stickId;
+  e.yawTarget = steer ? PL.yaw : e.yaw; turn(e, 0.3);
+  if (e.boost > 0) e.boost--;
+  const sp = steer ? (e.type === 'pig' ? 0.1 : 0.11) * (e.boost > 0 ? 2 : 1) : 0;
+  walk(e, steer ? -Math.sin(PL.yaw) : 0, steer ? -Math.cos(PL.yaw) : 0, sp);
+  e.fallY = null; PL.fallDist = 0;
+}
+const pigRide = e => stickRide(e, IID.carrot_on_a_stick, (e, mx, mz, sp) => walkPhysics(e, mx, mz, sp));
+const striderRide = e => stickRide(e, IID.warped_fungus_on_a_stick, (e, mx, mz, sp) => { e.goal = [e.x + mx * 4, e.z + mz * 4]; if (!sp) e.goal = [e.x, e.z]; striderAI(e); if (sp) { e.vx = mx * sp * 2; e.vz = mz * sp * 2; } });
+for (const [k, ride] of [['pig', pigRide], ['strider', striderRide]]) {
+  const d = MOBDEF[k], save = d.save, init = d.init, drops = d.onDeathDrops;
+  Object.assign(d, { ride, rideY: k === 'pig' ? 0.75 : 1.55,
+    save: e => ({ ...(save ? save(e) : {}), saddle: !!e.saddle }), init: (e, o) => { if (init) init(e, o); if (o.saddle) e.saddle = true; },
+    onDeathDrops: e => { if (drops) drops(e); if (e.saddle) dropItem(e.x, e.y + .5, e.z, IID.saddle, 1); } });
+}
+
+// ---------- using items (player.js useItem) ----------
+function items6Use(t, h, d) {
+  const ent = t && t.type === 'ent' ? t.e : null;
+  if (ent && ent.kind === 'mob') {
+    if (ent.leash === 'player' && !(h && h.id === IID.lead)) { unleash(ent, true); swing(); return true; }
+    if (h && h.id === IID.lead && LEASH_OK(ent) && !ent.leash) { ent.leash = 'player'; ent.persistent = true; consume(); swing(); play('place', { mat: 'wool', vol: 0.5 }); return true; }
+    if ((ent.type === 'pig' || ent.type === 'strider') && !ent.baby) {
+      if (h && h.id === IID.saddle && !ent.saddle) { ent.saddle = true; consume(); play('place', { mat: 'wool' }); swing(); return true; }
+      if (ent.saddle && !PL.sneaking && !(h && ent.def.food && isFood(ent.def, h.id))) { mount(ent); swing(); return true; }
+    }
+  }
+  if (!h) return false;
+  if (h.id === IID.lead && t && t.type === 'block' && FENCES.has(t.id)) { // tie up everything you lead
+    const led = ENT.filter(e => e.leash === 'player'); if (!led.length) return false;
+    for (const e of led) e.leash = [t.x, t.y, t.z]; play('place', { mat: 'wool' }); swing(); return true;
+  }
+  if (h.id === IID.writable_book || h.id === IID.written_book) { if (!(t && t.type === 'block' && interactBlock(t, true))) { bookOpen(h); return true; } return false; }
+  if (h.id === IID.firework_rocket) {
+    if (PL.gliding) { launchRocket(PL.x, PL.y, PL.z, h, true); PL.fwBoost = 10 * ((h.fw && h.fw.flight) || 1) + 10; consume(); swing(); USE.placeCd = 10; return true; }
+    if (t && t.type === 'block' && !(interactBlock(t, true))) { launchRocket(t.x + .5 + t.nx * .55, t.y + .5 + t.ny * .55, t.z + .5 + t.nz * .55, h, false); consume(); swing(); USE.placeCd = 6; return true; }
+    return false;
+  }
+  if ((h.id === IID.carrot_on_a_stick || h.id === IID.warped_fungus_on_a_stick) && PL.riding && PL.riding.def.ride === (h.id === IID.carrot_on_a_stick ? pigRide : striderRide)) {
+    const e = PL.riding; if (e.boost > 0) return true;
+    e.boost = 60 + Math.floor(Math.random() * 80); damageItem(INV.slots, INV.sel, 7);
+    if (!INV.slots[INV.sel]) INV.slots[INV.sel] = { id: IID.fishing_rod, n: 1 }; // the bait is eaten, the rod stays
+    swing(); USE.placeCd = 10; return true;
+  }
+  return false;
+}
+// crafting results that carry data: rocket flight and star colours, star colours, the stew's effect
+function craftExtra(out, grid) {
+  const d = ITEMS[out.id];
+  if (d.key === 'firework_rocket') { const g = grid.filter(s => s && s.id === IID.gunpowder).length, cols = []; for (const s of grid) if (s && s.id === IID.firework_star) cols.push(...(s.colors || [])); out.fw = { flight: g, colors: cols }; if (cols.length) out.name = '폭죽 로켓 (비행 시간 ' + g + ', 탄약)'; else if (g > 1) out.name = '폭죽 로켓 (비행 시간 ' + g + ')'; }
+  if (d.key === 'firework_star') { const dye = grid.find(s => s && ITEMS[s.id].key.endsWith('_dye')); if (dye) { const c = S.COLORS.indexOf(ITEMS[dye.id].key.slice(0, -4)); out.colors = [c]; out.name = '폭죽 탄약 (' + S.COLKO[c] + ')'; } }
+  if (d.key === 'suspicious_stew') { const f = grid.find(s => s && STEW_EFF[ITEMS[s.id].key]); if (f) out.stew = STEW_EFF[ITEMS[f.id].key]; }
+}
+function items6Tick() { signTick(); rocketTick(); leashTick(); }
+
+</script>
 <script>/* js/inventory.js */
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
@@ -10895,7 +11135,7 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; return out; } // dyed shulker boxes keep their contents
+function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'inv' || type === 'craft') {
@@ -11548,6 +11788,7 @@ function finishEat() {
   if (h.id === IID.milk_bucket) { clearEffects(PL); INV.slots[INV.sel] = creative() ? h : { id: IID.bucket, n: 1 }; play('burp'); return; }
   if (!d.food) return;
   PL.food = Math.min(20, PL.food + d.food[0]); PL.sat = Math.min(PL.food, PL.sat + d.food[0] * d.food[1] / d.food[0] * 1);
+  if (h.stew) addEffect(PL, h.stew[0], h.stew[1], 0); // suspicious stew
   PL.sat = Math.min(PL.food, PL.sat);
   if (d.cures && PL.eff && PL.eff[d.cures]) { delete PL.eff[d.cures]; UI.hudDirty = true; }
   if (d.eff) for (const [k, dur, lv, ch] of d.eff) if (ch == null || Math.random() < ch) addEffect(PL, k, dur, lv);
@@ -11672,6 +11913,7 @@ function useItem(first) {
   USE.placeCd = 4;
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
+  if (first && items6Use(t, h, d)) return;
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'frame') { frameUse(e, h); return; }
@@ -11949,6 +12191,7 @@ function elytraTick() {
   if (pitch < 0 && hor > 0) { const d = spd * -Math.sin(pitch) * 0.04; PL.vy += d * 3.2; PL.vx -= lx * d / hor; PL.vz -= lz * d / hor; }
   if (hor > 0) { PL.vx += (lx / hor * spd - PL.vx) * 0.1; PL.vz += (lz / hor * spd - PL.vz) * 0.1; }
   PL.vx *= 0.99; PL.vy *= 0.98; PL.vz *= 0.99;
+  fireworkBoost();
   physMove(PL, PL.vx, PL.vy, PL.vz, 0);
   if (PL.hitH && spd > 0.5) hurtPlayer(Math.floor((spd - 0.5) * 10), 'fall');
   PL.fallDist = 0;
@@ -12118,11 +12361,12 @@ UI.renderScreen = () => {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
-  }
+  } else if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T]) h = CUSTOM_SCREENS[T].html();
   const cur = INV.cursor;
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
+  if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();
   moveCursorItem(lastMouse.x, lastMouse.y);
 };
 function dollHtml() { return `<div class="doll-fig"><i class="dh"></i><i class="db"></i><i class="dl"></i><i class="dr"></i></div>`; }
@@ -12590,7 +12834,7 @@ function gameTick() {
   if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
-  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick();
+  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick();
   playerTick();
   entityTick();
   tickScheduled();

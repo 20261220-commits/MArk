@@ -18,6 +18,7 @@ function plant6OK(b, x, y, z, m, below, above) {
     case 21: return OPQ[above] || above === b; // weeping vines hang
     case 22: return OPQ[below] || below === b; // twisting vines stand
     case 23: return supportedBy(below); // cake
+    case 25: { const f = m & 3, d = DIRS[f]; return m & 16 ? OPQ[getBlock(x - d[0], y, z - d[2])] : supportedBy(below); } // signs
     case 24: { // scaffolding: recompute the distance; too far from support and it falls apart
       const d = scafDist(x, y, z); if (d > 6) return false;
       if (d !== (m & 7)) { setMeta(x, y, z, d); for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === SCAFB) neighborUpdate(x + dx, y + dy, z + dz); }
@@ -31,6 +32,7 @@ function plant6OK(b, x, y, z, m, below, above) {
 function blocks6Place(t, x, y, z, id, meta, fd) {
   const below = getBlock(x, y - 1, z), above = getBlock(x, y + 1, z);
   if (id === BID.oak_fence_gate) return (meta & ~7) | fd;
+  if (id === BID.oak_sign) return signPlace(t, x, y, z, meta);
   if (id === SCAFB) { const d = scafDist(x, y, z); return d > 6 ? false : d; }
   if (id === BID.cake) return supportedBy(below) ? 0 : false;
   if (id === BID.weeping_vines) return OPQ[above] || above === id ? 1 : false;
@@ -38,6 +40,7 @@ function blocks6Place(t, x, y, z, id, meta, fd) {
   return meta;
 }
 function blocks6Placed(x, y, z, id, meta, h) {
+  if (id === BID.oak_sign) { setTimeout(() => signEdit(x, y, z), 0); return; }
   if (id === SHULK) setTile(x, y, z, { type: 'chest', shulker: true, items: h && h.items ? h.items.map(s => s && { ...s }) : new Array(27).fill(null) });
   if ((id === BID.weeping_vines || id === BID.twisting_vines)) { const oy = id === BID.weeping_vines ? 1 : -1; if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, 0); } // the old tip is now a stem
 }
@@ -54,6 +57,7 @@ function blocks6Break(x, y, z, id, m) {
 // ---------- using ----------
 function blocks6Use(t, h, dry) {
   const { x, y, z, id, m } = t;
+  if (id === BID.oak_sign) return signUse(t, h, dry) || null;
   if (id === BID.oak_fence_gate) {
     if (!dry) { let nm = m ^ 4; if (nm & 4) { const away = (m & 1) ? PL.x > x + .5 : PL.z > z + .5; nm = away ? nm | 2 : nm & ~2; } setMeta(x, y, z, nm); play('door', { vol: 0.6, pitch: 1.2 }); }
     return true;

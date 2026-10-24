@@ -401,6 +401,7 @@ const BLOCK_ROWS = [
   [1095, 'shulker_box', '셜커 상자', RT.BOX, null, 2, P, 0, { vars: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vk: ['shulker_box', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box'], vn: ['셜커 상자', '하얀색 셜커 상자', '주황색 셜커 상자', '자홍색 셜커 상자', '하늘색 셜커 상자', '노란색 셜커 상자', '연두색 셜커 상자', '분홍색 셜커 상자', '회색 셜커 상자', '회백색 셜커 상자', '청록색 셜커 상자', '파란색 셜커 상자', '갈색 셜커 상자', '초록색 셜커 상자', '빨간색 셜커 상자', '검은색 셜커 상자'] }],
   [1096, 'respawn_anchor', '리스폰 정박기', C, ['respawn_anchor_side', 'respawn_anchor_top_off', 'respawn_anchor_bottom'], 50, P, 4], // meta: charges 0-4
   [1097, 'scaffolding', '비계', RT.BOX, ['scaffolding_side', 'scaffolding_top', 'scaffolding_bottom'], 0, N, 0, { nosolid: 1, climb: 1, plant: 24 }], // meta: distance 0-7
+  [1098, 'oak_sign', '참나무 표지판', RT.BOX, null, 1, A, 0, { nosolid: 1, plant: 25, vshift: 5, vars: ['oak_planks', 'spruce_planks', 'birch_planks', 'jungle_planks', 'acacia_planks', 'dark_oak_planks', 'crimson_planks', 'warped_planks'], vk: ['oak_sign', 'spruce_sign', 'birch_sign', 'jungle_sign', 'acacia_sign', 'dark_oak_sign', 'crimson_sign', 'warped_sign'], vn: ['참나무 표지판', '가문비나무 표지판', '자작나무 표지판', '정글 나무 표지판', '아카시아 나무 표지판', '짙은 참나무 표지판', '진홍빛 표지판', '뒤틀린 표지판'] }], // meta: facing | wall << 4 | wood << 5; the text is a tile ('sign')
   [1069, 'sweet_berry_bush', '달콤한 열매 덤불', X, 'sweet_berry_bush_stage0', 0, N, 0, { plant: 1 }], // meta: age 0-3
   [118, 'glow_lichen', '발광 이끼', RT.BOX, 'glow_lichen', 0.2, TOOL.SHEARS, 99, { light: 7, nosolid: 1, repl: 1, lichen: 1 }],
 ];
@@ -591,6 +592,9 @@ function shapes(id, meta) {
       return out;
     }
     case 1093: return [[1 + (meta & 7) * 2, 0, 1, 15, 8, 15]];
+    case 1098: { const f = meta & 3, d = DIRS[f];
+      if (meta & 16) return [d[2] ? [0, 4, d[2] > 0 ? 0 : 14, 16, 12, d[2] > 0 ? 2 : 16] : [d[0] > 0 ? 0 : 14, 4, 0, d[0] > 0 ? 2 : 16, 12, 16]]; // on a wall, against the block behind
+      return [f & 1 ? [7, 8, 0, 9, 16, 16] : [0, 8, 7, 16, 16, 9], [7, 0, 7, 9, 8, 9]]; }
     case 1094: return [[1, 0, 1, 15, 14, 15]];
     case 1095: return [[0, 0, 0, 16, 16, 16]];
     case 1097: return [[0, 14, 0, 16, 16, 16], [0, 0, 0, 2, 14, 2], [14, 0, 0, 16, 14, 2], [0, 0, 14, 2, 14, 16], [14, 0, 14, 16, 14, 16]];
