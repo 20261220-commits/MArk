@@ -28,6 +28,7 @@ addEventListener('keydown', e => {
   if (UI.screen) {
     if (e.code === 'Escape' || e.code === 'KeyE') { UI.closeScreen(); e.preventDefault(); return; }
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
+    if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
   }
@@ -43,6 +44,7 @@ addEventListener('keydown', e => {
   if (e.code === 'F3' || e.code === 'Backquote') { UI.debug = !UI.debug; return; }
   if (e.code === 'F5' || e.code === 'KeyV') { view = (view + 1) % 3; return; }
   if (e.code === 'KeyQ') { dropHeld(e.ctrlKey); return; }
+  if (e.code === 'KeyF') { swapHands(); return; }
   if (/^Digit[1-9]$/.test(e.code)) { INV.sel = +e.code.slice(5) - 1; if (USE.kind) onUseRelease(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { const t = performance.now(); if ((creative() || spectator()) && t - IN.lastSpace < 300) { if (!spectator()) PL.flying = !PL.flying; PL.vy = 0; IN.lastSpace = 0; } else IN.lastSpace = t; } }
   if (e.code === 'KeyW' && !e.repeat) { const t = performance.now(); if (t - IN.lastW < 280) IN.wTap = true; IN.lastW = t; }
@@ -99,7 +101,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -108,7 +110,7 @@ function findSpawn(seed) {
   for (let r = 0; r < 2048; r += 16) for (let a = 0; a < Math.max(1, r / 4); a++) {
     const ang = a / Math.max(1, r / 4) * Math.PI * 2, x = Math.round(Math.cos(ang) * r), z = Math.round(Math.sin(ang) * r);
     const [h, b] = g.column(x, z);
-    if (h > S.SEA + 1 && h < 95 && b !== S.BIO.OCEAN && b !== S.BIO.RIVER && b !== S.BIO.FROZEN_OCEAN) return [x, h + 1, z];
+    if (h > S.SEA + 1 && h < 95 && !S.isOceanBio(b) && b !== S.BIO.RIVER) return [x, h + 1, z];
   }
   return [0, 100, 0];
 }
@@ -120,17 +122,20 @@ async function startWorld(id, meta) {
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
+  W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
   await loadSavedKeys(meta.id);
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
-  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null;
-  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40 });
+  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
+  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
     Object.assign(PL, p.s);
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
+    if (p.ender) PL.ender = p.ender.map(s => s && ITEMS[s.id] ? s : null);
+    INV.off = p.off && ITEMS[p.off.id] ? p.off : null;
     W.time = meta.time || 1000; W.rain = meta.rain || 0; W.rainTarget = W.rain; W.thunderOn = !!meta.thunder; W.thunder = W.thunderOn && W.rain > 0.5 ? 1 : 0;
   } else {
     PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1] + 1; PL.z = W.worldSpawn[2] + .5; PL.yaw = Math.random() * 6; PL.pitch = 0; W.time = 1000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
@@ -172,8 +177,9 @@ function finishLoading() {
 }
 function saveWorldMeta() {
   if (!W.active || !W.meta) return;
-  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE };
+  offUnswap();
+  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off };
   (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
@@ -202,7 +208,7 @@ function gameTick() {
   if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
-  animalTick();
+  animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick(); mcmodels2Tick(); villagerLifeTick();
   playerTick();
   entityTick();
   tickScheduled();
@@ -250,6 +256,7 @@ function updateCamera(alpha, dt) {
     P.rleg.rotation.x = w; P.lleg.rotation.x = -w; P.rarm.rotation.x = -w * 0.8 - (R.hand.swing > 0 ? Math.sin(R.hand.swing * Math.PI) : 0); P.larm.rotation.x = w * 0.8;
     P.head.rotation.x = -PL.pitch; if (PL.sneaking) { P.body.rotation.x = 0.3; } else P.body.rotation.x = 0;
     for (const m of playerModel.userData.mats) m.color.setScalar(lightBright(x, y + 1, z));
+    playerArmorTick(playerModel, lightBright(x, y + 1, z));
   }
   // fov
   let fov = OPT.fov * (PL.sprinting ? 1.15 : 1) * (PL.flying && PL.sprinting ? 1.1 : 1);

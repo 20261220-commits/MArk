@@ -135,7 +135,7 @@ crack.visible = false; scene.add(crack);
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
-const PMAX = 600;
+const PMAX = 1500;
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PMAX * 3), pUV = new Float32Array(PMAX * 2), pSize = new Float32Array(PMAX), pCol = new Float32Array(PMAX * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute('puv', new THREE.BufferAttribute(pUV, 2)); pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1)); pGeo.setAttribute('pcol', new THREE.BufferAttribute(pCol, 3));
@@ -167,13 +167,14 @@ function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
 function simpleParticle(x, y, z, col, opts = {}) {
   const t = S.T.white_wool; // flat white tile, tinted by color
   spawnParticle({ x, y, z, vx: opts.vx || (Math.random() - .5), vy: opts.vy != null ? opts.vy : Math.random() * 1.5, vz: opts.vz || (Math.random() - .5), life: opts.life || 0.8, size: opts.size || 0.15,
-    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3 });
+    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8 });
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
 function updateParticles(dt) {
   let n = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; }
+    if (p.fade) { const k = Math.min(1, Math.max(0, 1 - p.life / p.life0) * 1.6); p.r = p.c0[0] + (p.fade[0] - p.c0[0]) * k; p.g = p.c0[1] + (p.fade[1] - p.c0[1]) * k; p.b = p.c0[2] + (p.fade[2] - p.c0[2]) * k; } // firework fade: the colour shifts over its life
     p.vy -= 18 * p.grav * dt; p.vx *= 0.96; p.vz *= 0.96;
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
     if (p.grav && SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { p.vy = 0; p.vx *= 0.5; p.vz *= 0.5; } else { p.x = nx; p.y = ny; p.z = nz; }

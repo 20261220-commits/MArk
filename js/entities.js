@@ -15,7 +15,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
     for (let y = ay; y <= by; y++) {
       if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
-      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); else if (id === BID.scaffolding && PHYS.scafTop && PHYS.feetY >= y + 1 - 1e-3) pushBox(x, y + 0.875, z, x + 1, y + 1, z + 1); continue; } // scaffolding: stand on top unless sneaking
       const bs = S.collide(id, getMeta(x, y, z));
       if (!bs) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       for (const b of bs) pushBox(x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16);
@@ -25,7 +25,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
 }
 // move an AABB entity (x,y,z = feet centre, w = half width, h = height); stepUp for players/mobs
 function physMove(e, dx, dy, dz, stepUp = 0) {
-  const w = e.w, h = e.h, eps = 1e-7;
+  const w = e.w, h = e.h, eps = 1e-7; PHYS.feetY = e.y;
   const n = gatherBoxes(e.x - w + Math.min(dx, 0) - eps, e.y + Math.min(dy, 0), e.z - w + Math.min(dz, 0) - eps, e.x + w + Math.max(dx, 0) + eps, e.y + h + Math.max(dy, 0) + stepUp, e.z + w + Math.max(dz, 0) + eps);
   const odx = dx, ody = dy, odz = dz;
   const clipY = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 3] <= x - w + eps || BX[i] >= x + w - eps || BX[i + 5] <= z - w + eps || BX[i + 2] >= z + w - eps) continue; if (d > 0 && BX[i + 1] >= y + h - eps) d = Math.min(d, BX[i + 1] - (y + h)); else if (d < 0 && BX[i + 4] <= y + eps) d = Math.max(d, BX[i + 4] - y); } return d; };
@@ -57,7 +57,7 @@ function boxBlocks(e, fn) { // iterate blocks overlapping the entity box
   for (let x = Math.floor(e.x - e.w); x <= Math.floor(e.x + e.w); x++) for (let y = Math.floor(e.y); y <= Math.floor(e.y + e.h - 0.01); y++) for (let z = Math.floor(e.z - e.w); z <= Math.floor(e.z + e.w); z++) if (fn(getBlock(x, y, z), x, y, z)) return true;
   return false;
 }
-function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
+function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return S.WLOG[b] && S.isWet(b, getMeta(Math.floor(x), Math.floor(y), Math.floor(z))) ? 1 : 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
@@ -258,6 +258,8 @@ const MCMODELS = {
 const entTex = {};
 function packTexture(key) {
   if (entTex[key]) return entTex[key];
+  if (key === 'zombie_villager' && typeof zombieVillagerTexture === 'function') return zombieVillagerTexture();
+  if (key === 'mooshroom' && typeof mooshroomTexture === 'function') return mooshroomTexture();
   const e = PACKPX.ent[key]; if (!e) return null;
   const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
@@ -307,7 +309,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   const tk = opts.skin && PACKPX.ent[opts.skin] ? opts.skin : spec.tex;
   const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[tk + '_e'] && packTexture(tk + '_e');
   const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
-  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null; if (mat2) mat2.userData.layer = true; // second-texture layer (sheep wool, horse armour, llama carpets)
   const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
   const root = new THREE.Group(), { inner, parts, list } = buildBones(spec);
   const main = new THREE.SkinnedMesh(geos.m, mat); main.add(inner); root.add(main);
@@ -433,7 +435,7 @@ function explode(x, y, z, power, fire) {
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
     if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
-    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp); else if (e.kind === 'minecart') cartBlast(e, dmg); else if (e.kind === 'item' || e.kind === 'xp') removeEnt(e); }
+    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
   hit(PL, true);
@@ -490,6 +492,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.def.slime) slimeDeath(e);
     e.killedByPlayer = attacker === PL || src === 'player';
     if (e.def.onDeath) e.def.onDeath(e);
+    headDrop(e);
+    if (e.type === 'villager' && typeof zombifyVillager === 'function') zombifyVillager(e, attacker);
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
@@ -555,7 +559,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); explode(e.x, e.y + 0.8, e.z, 3); return; } }
+      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) chargedExplode(e); else explode(e.x, e.y + 0.8, e.z, 3); return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -697,7 +701,8 @@ function arrowTick(e) {
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
       if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour
       if (e.trident) { tridentHit(e, o); break; }
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      if (e.flame && !o.def.fireproof) o.fire = Math.max(o.fire || 0, 100);
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx * (1 + (e.punch || 0)), e.vz * (1 + (e.punch || 0)), e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
       removeEnt(e); return;
     }
@@ -715,6 +720,7 @@ function trySpawnHostile() {
     const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, R.rd * 16 - 30);
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
+    if (W.dim === 0 && biomeAt(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
     const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
     if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
@@ -735,7 +741,7 @@ function spawnAnimalsForChunk(c) {
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 9));
   if (R0() > 0.1) return;
   let types;
-  if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
+  if (S.isOceanBio(b) || b === S.BIO.RIVER) {
     const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
@@ -774,7 +780,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }]);
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
@@ -790,10 +796,10 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
-    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
 // ---------- render update (interpolated) ----------
@@ -826,8 +832,8 @@ function entityRender(alpha, now) {
       }
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
-      for (const m2 of e.mesh.userData.own) { if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb); }
-      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.def.scale || 1);
+      for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
+      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

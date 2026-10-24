@@ -26,6 +26,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #hotbar{position:relative;height:calc(22 * var(--px));background:rgba(0,0,0,.45);border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #8b8b8b,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #3a3a3a;display:flex;padding:var(--px);pointer-events:auto;margin-bottom:var(--px)}
 .hs{width:calc(20 * var(--px));height:calc(20 * var(--px));position:relative;display:grid;place-items:center;border-right:var(--px) solid rgba(80,80,80,.6)}
 .hs:last-of-type{border-right:0}
+#offslot{position:absolute;left:calc(-30 * var(--px));top:calc(-1 * var(--px));background:rgba(0,0,0,.45);border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #8b8b8b;padding:var(--px)}
 #hsel{position:absolute;left:calc(-1 * var(--px));top:calc(-1 * var(--px));width:calc(24 * var(--px));height:calc(24 * var(--px));border:calc(2 * var(--px)) solid #fff;box-shadow:0 0 0 var(--px) #000,inset 0 0 0 var(--px) #000;transition:transform .05s linear;pointer-events:none}
 .ic{display:block;width:calc(16 * var(--px));height:calc(16 * var(--px));image-rendering:pixelated;background-repeat:no-repeat}
 .hs b,.sl b,.toff span b{position:absolute;right:0;bottom:calc(-1 * var(--px));font-size:calc(8 * var(--px));line-height:1;font-weight:700;color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
@@ -64,6 +65,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #effects .ef{background:rgba(0,0,0,.55);color:#fff;font-size:calc(7*var(--px));padding:calc(2*var(--px)) calc(4*var(--px));display:flex;align-items:center;gap:calc(3*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 #effects .ef i{display:inline-block;width:calc(6*var(--px));height:calc(6*var(--px));border:var(--px) solid #000}
 #effects .ef b{font-weight:normal;color:#ddd}
+#dialview{position:fixed;right:calc(8*var(--px));bottom:calc(30*var(--px));width:calc(48*var(--px));height:calc(48*var(--px));image-rendering:pixelated;pointer-events:none;z-index:4}
+#mapview{position:fixed;right:calc(8*var(--px));bottom:calc(30*var(--px));width:calc(110*var(--px));height:calc(110*var(--px));image-rendering:pixelated;border:calc(3*var(--px)) solid #8a6a3b;background:#dec;pointer-events:none;z-index:4}
 #bossbar{position:fixed;top:calc(4*var(--px));left:50%;transform:translateX(-50%);width:calc(182*var(--px));text-align:center;pointer-events:none;z-index:5}
 #bossbar .bn{color:#fff;font-size:calc(8*var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 #bossbar .bb{height:calc(5*var(--px));background:#3a0a3a;border:var(--px) solid #1a001a;margin-top:var(--px)}
@@ -264,6 +267,18 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/mobs5.js"></script>
 <script src="js/mobs6.js"></script>
 <script src="js/mobs7.js"></script>
+<script src="js/ocean.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/temples.js"></script>
+<script src="js/nether.js"></script>
+<script src="js/biomes.js"></script>
+<script src="js/mobs8.js"></script>
+<script src="js/blocks6.js"></script>
+<script src="js/items6.js"></script>
+<script src="js/offhand.js"></script>
+<script src="js/mobs9.js"></script>
+<script src="js/mcmodels2.js"></script>
+<script src="js/villagers.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/effects.js"></script>
 <script src="js/player.js"></script>

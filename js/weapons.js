@@ -19,6 +19,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
 const crossbowCharge = st => Math.max(0, 25 - 5 * enchLv(st, 'quick_charge'));
 function crossbowRelease(h) { // let go of the button: load if fully drawn
   if (USE.t < crossbowCharge(h)) return;
+  const fw = offItem(); if (fw && fw.id === IID.firework_rocket) { h.ch = IID.firework_rocket; h.chFw = fw.fw || { flight: 1 }; if (!creative()) { fw.n--; if (!fw.n) INV.off = null; } play('click', { pitch: 0.6 }); UI.hudDirty = true; return; } // a rocket in the off hand loads instead of an arrow
   const ai = arrowSlot(); if (ai < 0 && !creative()) return;
   const ast = ai >= 0 ? INV.slots[ai] : { id: IID.arrow, n: 1 };
   h.ch = ast.id; play('click', { pitch: 0.6 });
@@ -30,13 +31,14 @@ function crossbowFire(h) {
   const angles = ms ? [0, -0.17, 0.17] : [0];
   for (const a of angles) {
     const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
+    if (h.ch === IID.firework_rocket) { launchRocket(PL.x + vx * 0.6, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.6, { fw: h.chFw }, false, [vx * 1.6, dy * 1.6, vz * 1.6]); continue; }
     const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2);
     if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
     if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
     e.crossbow = true;
   }
-  h.ch = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
+  h.ch = null; h.chFw = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
 }
 
 // ---------- trident ----------

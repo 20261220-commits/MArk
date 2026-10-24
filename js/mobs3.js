@@ -193,6 +193,7 @@ function overworldReplace(t, x, y, z) {
   if (t === 'skeleton' && (b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FROZEN_OCEAN) && Math.random() < 0.8) return 'stray';
   if (t === 'zombie' && FLUID[getBlock(x, y, z)] === 1) return 'drowned';
   if (t === 'zombie' && Math.random() < 0.05) return 'witch';
+  if (t === 'zombie' && Math.random() < 0.05) return 'zombie_villager';
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
 }
@@ -221,8 +222,8 @@ function spawnExtraForChunk(c) {
   if ((b === S.BIO.TAIGA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FOREST) && R0() < 0.03) {
     for (let i = 0; i < 2 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12); let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 2) spawnMob('wolf', x + .5, y + 1, z + .5); }
   }
-  if ((b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) && R0() < 0.08) {
-    const t = b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN ? 'salmon' : 'cod';
+  if ((S.isOceanBio(b) || b === S.BIO.RIVER) && R0() < 0.08) {
+    const t = b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN || b === S.BIO.COLD_OCEAN ? 'salmon' : 'cod';
     for (let i = 0; i < 3 + R0.int(4); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(10); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
   }
 }

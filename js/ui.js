@@ -56,7 +56,8 @@ function renderHud(dt) {
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
+  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
+  offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
     for (let i = 0; i < 10; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
@@ -121,7 +122,7 @@ UI.renderScreen = () => {
   const T = UI.screen, el = $('screen');
   let h = '';
   if (T === 'inv') {
-    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
+    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
@@ -158,11 +159,12 @@ UI.renderScreen = () => {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
-  }
+  } else if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T]) h = CUSTOM_SCREENS[T].html();
   const cur = INV.cursor;
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
+  if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();
   moveCursorItem(lastMouse.x, lastMouse.y);
 };
 function dollHtml() { return `<div class="doll-fig"><i class="dh"></i><i class="db"></i><i class="dl"></i><i class="dr"></i></div>`; }
@@ -245,9 +247,9 @@ function showMenu(name, data) {
       el.innerHTML = ws.length ? ws.map(w => `<div class="wi ${w.id === UI.selWorld ? 'on' : ''}" data-w="${w.id}"><b>${esc(w.name)}</b><span>${new Date(w.last).toLocaleString()} · ${MODE_NAME[w.mode] || w.mode}${w.hardcore ? ' · 하드코어' : ''}</span></div>`).join('') : '<p class="muted">아직 세계가 없어요. 새로운 세계를 만들어 보세요!</p>';
     });
   } else if (name === 'create') {
-    UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true };
+    UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
-    h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}<label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
+    h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}${btn('실험 기능(동굴과 절벽): ' + (c.exp ? '켜짐' : '꺼짐'), 'cexp')}<p class="muted">켜면 무성한 동굴이 생성됩니다 (1.17 실험용 데이터 팩)</p><label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
@@ -279,6 +281,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'cmode') { const order = ['survival', 'creative', 'hardcore']; UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.mode = order[(order.indexOf(UI.cw.mode) + 1) % 3]; showMenu('create'); }
   else if (a === 'cdiff') { if (UI.cw.mode === 'hardcore') return; UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.diff = (UI.cw.diff + 1) % 4; showMenu('create'); }
   else if (a === 'ccheat') { UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.cheats = !UI.cw.cheats; showMenu('create'); }
+  else if (a === 'cexp') { UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.exp = !UI.cw.exp; showMenu('create'); }
   else if (a === 'doCreate') { const c = UI.cw; c.name = $('wname').value || '새로운 세계'; c.seed = $('wseed').value; await createWorld(c); UI.cw = null; }
   else if (a === 'playSel') { if (UI.selWorld) startWorld(UI.selWorld); }
   else if (a === 'delSel') { if (!UI.selWorld) return; const w = UI.worldList.find(x => x.id === UI.selWorld); if (confirm(`'${w.name}' 세계를 삭제할까요? 되돌릴 수 없습니다.`)) { await deleteWorld(UI.selWorld); showMenu('worlds'); } }

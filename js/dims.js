@@ -23,6 +23,7 @@ function arriveDim() {
     const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
     if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
     PL.y = y + 1;
+  } else if (a === 'anchor') { anchorArrive();
   } else if (a === 'gateway' || a === 'gatehome') {
     const x0 = Math.floor(PL.x), z0 = Math.floor(PL.z); let best = null;
     for (let r = 0; r <= 24 && !best; r += 2) for (let dx = -r; dx <= r && !best; dx += 2) for (let dz = -r; dz <= r && !best; dz += 2) { const t = topY(x0 + dx, z0 + dz); if (t > 30 && getBlock(x0 + dx, t, z0 + dz) === BID.end_stone) best = [x0 + dx, t + 1, z0 + dz]; }

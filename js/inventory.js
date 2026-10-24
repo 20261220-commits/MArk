@@ -1,5 +1,5 @@
 // Inventory model + container screens with Java Edition click semantics.
-const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
+const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), off: null, sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
 const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
@@ -20,17 +20,17 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); return r ? { id: r.out, n: r.n } : null; }
+function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'inv' || type === 'craft') {
     const grid = type === 'inv' ? INV.craft2 : INV.craft3, w = type === 'inv' ? 2 : 3;
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));
     L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
-    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && st.id === BID.pumpkin), max: 1 }));
+    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', canTake: () => creative() || !enchLv(INV.armor[i], 'binding_curse'), accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
-    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes
   } else if (type === 'horse') {
     const e = ctx.horse;
     L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));
@@ -74,6 +74,7 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
   return L;
 }
@@ -202,13 +203,14 @@ function smithResult(c) {
 function tradeResult(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
+  if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
   const out = { id: o.b, n: o.bn }; if (o.ench) { if (!o.e) { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; o.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; } out.e = { ...o.e }; }
   return out;
 }
 function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
-  o.uses++; if (o.ench) o.e = null;
+  o.uses++; if (o.ench) o.e = null; o.made = null; c.e.traded = true; // the villager keeps its job from now on
   play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
