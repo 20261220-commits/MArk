@@ -7,6 +7,7 @@ const BAMBOO_SOIL = new Set([BID.grass_block, BID.dirt, BID.sand, BID.gravel, BI
 function biomePlace(x, y, z, id, meta) {
   const below = getBlock(x, y - 1, z);
   if (id === BID.bamboo) return below === BID.bamboo || BAMBOO_SOIL.has(below) ? 0 : false;
+  if (id === BID.tall_grass || id === BID.large_fern) { if (!(below === BID.grass_block || below === BID.dirt || below === BID.podzol || below === BID.coarse_dirt || below === BID.moss_block) || getBlock(x, y + 1, z)) return false; setBlock(x, y + 1, z, id, 8, { noUpdate: true }); return 0; }
   if (id === BID.tall_flower) { if (!(below === BID.grass_block || below === BID.dirt || below === BID.podzol) || getBlock(x, y + 1, z)) return false; setBlock(x, y + 1, z, BID.tall_flower, meta | 8, { noUpdate: true }); return meta; } // the top half first, so the bottom is supported
   return meta;
 }

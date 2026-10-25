@@ -56,11 +56,16 @@ for (const t of ('cauldron_side cauldron_top cauldron_inner cauldron_bottom brew
   'sweet_berry_bush_stage2 sweet_berry_bush_stage3 kelp kelp_plant seagrass tall_seagrass_bottom tall_seagrass_top sea_pickle conduit dried_kelp_side dried_kelp_top flower_pot tripwire ' +
   'tripwire_hook bamboo_stalk bamboo_small_leaves sunflower_bottom sunflower_top lilac_bottom lilac_top rose_bush_bottom rose_bush_top peony_bottom peony_top weeping_vines weeping_vines_plant ' +
   'twisting_vines twisting_vines_plant cake_top cake_side cake_bottom cake_inner respawn_anchor_top respawn_anchor_top_off respawn_anchor_bottom scaffolding_side scaffolding_top scaffolding_bottom').split(' ')) TILE[t] = t;
+// doors, trapdoors and the other blocks with a texture of the same name
+for (const t of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped'].flatMap(w => [w + '_door_bottom', w + '_door_top', w + '_trapdoor']).concat(['iron_trapdoor', 'chipped_anvil_top', 'damaged_anvil_top',
+  'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top', 'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore',
+  'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top', 'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles',
+  'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])) TILE[t] = t;
 for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of ['', 'dead_']) for (const k of ['_coral', '_coral_fan', '_coral_block']) TILE[d + c + k] = d + c + k;
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
 const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
-const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
+const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
 const ITEM = {};
 for (const k of ('stick coal charcoal iron_ingot gold_ingot iron_nugget gold_nugget diamond emerald lapis_lazuli redstone flint flint_and_steel string feather gunpowder bone ' +
@@ -97,7 +102,7 @@ const ENT = {
   villager: 'entity/villager/villager', iron_golem: 'entity/iron_golem/iron_golem', enderman: 'entity/enderman/enderman', enderman_eyes: 'entity/enderman/enderman_eyes',
   blaze: 'entity/blaze', ghast: 'entity/ghast/ghast', ghast_shooting: 'entity/ghast/ghast_shooting', zombified_piglin: 'entity/piglin/zombified_piglin',
   magma_cube: 'entity/slime/magmacube', slime: 'entity/slime/slime', dragon: 'entity/enderdragon/dragon', dragon_eyes: 'entity/enderdragon/dragon_eyes',
-  end_crystal: 'entity/end_crystal/end_crystal', boat: 'entity/boat/oak', chest: 'entity/chest/normal', bed: 'entity/bed/red', xp_orb: 'entity/experience_orb',
+  end_crystal: 'entity/end_crystal/end_crystal', trapped_chest: 'entity/chest/trapped', boat: 'entity/boat/oak', chest: 'entity/chest/normal', bed: 'entity/bed/red', xp_orb: 'entity/experience_orb',
 };
 Object.assign(ENT, {
   husk: 'entity/zombie/husk', drowned: 'entity/zombie/drowned', drowned_outer: 'entity/zombie/drowned_outer_layer', stray: 'entity/skeleton/stray', stray_overlay: 'entity/skeleton/stray_overlay',
@@ -180,6 +185,14 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       const front = tile(); blit(front, 14, 14, 14, 5, 1, 2); blit(front, 14, 34, 14, 9, 1, 7); blit(front, 1, 1, 2, 4, 7, 4); out.tiles.chest_front = put(front);
       const side = tile(); blit(side, 0, 14, 14, 5, 1, 2); blit(side, 0, 34, 14, 9, 1, 7); out.tiles.chest_side = put(side);
     }
+    const tc = load(ENT.trapped_chest);
+    if (tc) {
+      const P = tc.px, W = tc.w, tile = () => new Uint8Array(16 * 16 * 4);
+      const blit = (dst, sx, sy, w, h, dx, dy) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const s = ((sy + y) * W + sx + x) * 4, d = ((dy + y) * 16 + dx + x) * 4; for (let c = 0; c < 4; c++) dst[d + c] = P[s + c]; } };
+      const top = tile(); blit(top, 14, 0, 14, 14, 1, 1); out.tiles.trapped_chest_top = put(top);
+      const front = tile(); blit(front, 14, 14, 14, 5, 1, 2); blit(front, 14, 34, 14, 9, 1, 7); blit(front, 1, 1, 2, 4, 7, 4); out.tiles.trapped_chest_front = put(front);
+      const side = tile(); blit(side, 0, 14, 14, 5, 1, 2); blit(side, 0, 34, 14, 9, 1, 7); out.tiles.trapped_chest_side = put(side);
+    }
     const ec = load(ENT.ender_chest);
     if (ec) {
       const P = ec.px, W = ec.w, tile = () => new Uint8Array(16 * 16 * 4);
@@ -193,16 +206,17 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = (y * sh.w + 16 + x) * 4, d = (y * 16 + x) * 4; for (let k = 0; k < 4; k++) t[d + k] = sh.px[s + k]; }
       out.tiles[c === 'plain' ? 'shulker_box' : c + '_shulker_box'] = put(t);
     }
-    for (const [tile, f] of [['skeleton_skull', 'skeleton'], ['zombie_head', 'zombie'], ['creeper_head', 'creeper'], ['wither_skull', 'wither_skeleton']]) { // 8x8 head faces doubled to 16x16
+    for (const [tile, f] of [['player_head', 'steve'], ['skeleton_skull', 'skeleton'], ['zombie_head', 'zombie'], ['creeper_head', 'creeper'], ['wither_skull', 'wither_skeleton']]) { // 8x8 head faces doubled to 16x16
       const img = load(ENT[f]); if (!img) continue;
       const face = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + (y >> 1)) * img.w + sx + (x >> 1)) * 4, d = (y * 16 + x) * 4; for (let k = 0; k < 4; k++) t[d + k] = img.px[s + k]; t[d + 3] = 255; } return t; };
       out.tiles[tile + '_front'] = put(face(8, 8)); out.tiles[tile + '_side'] = put(face(0, 8)); if (tile === 'wither_skull') out.tiles.wither_skull_top = put(face(8, 0));
     }
-    const bed = load(ENT.bed);
-    if (bed) {
-      const P = bed.px, W = bed.w;
+    for (const c of ['red', 'white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'black']) {
+      const bed = load('entity/bed/' + c); if (!bed) continue;
+      const P = bed.px, W = bed.w, sfx = c === 'red' ? '' : '_' + c;
       const rot = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + y) * W + sx + x) * 4, d = (y * 16 + x) * 4; for (let c = 0; c < 4; c++) t[d + c] = P[s + c]; } return t; };
-      out.tiles.bed_head = put(rot(6, 6)); out.tiles.bed_foot = put(rot(6, 28));
+      const side = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = ((6 + x) * W + r) * 4, d = ((3 + r) * 16 + x) * 4; for (let k = 0; k < 4; k++) side[d + k] = P[s + k]; side[d + 3] = 255; }
+      out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28)); out.tiles['bed_side' + sfx] = put(side);
     }
   }
   for (const [k, f] of Object.entries(ITEM)) {

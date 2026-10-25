@@ -104,6 +104,13 @@ const BANNER_PATTERNS = {
   triangles_bottom: ['아래 톱니', (x, y) => BH - 1 - y < 4 - Math.abs((x % 5) - 2)], triangles_top: ['위 톱니', (x, y) => y < 4 - Math.abs((x % 5) - 2)],
   circle: ['원', (x, y) => Math.hypot(x - 9.5, y - 19.5) < 5.5], rhombus: ['마름모', (x, y) => Math.abs(x - 9.5) / 7 + Math.abs(y - 19.5) / 12 < 1], border: ['테두리', (x, y) => x < 2 || x >= 18 || y < 2 || y >= 38],
   gradient: ['그라데이션', (x, y) => 1 - y / BH], gradient_up: ['아래 그라데이션', (x, y) => y / BH],
+  // these need their banner pattern item in the loom
+  creeper: ['크리퍼', (x, y) => (y >= 13 && y < 17 && (x >= 5 && x < 8 || x >= 12 && x < 15)) || (y >= 17 && y < 20 && x >= 8 && x < 12) || (y >= 20 && y < 25 && (x >= 7 && x < 13) && !(y >= 23 && x >= 9 && x < 11)), 'creeper'],
+  skull: ['해골', (x, y) => (Math.hypot(x - 9.5, (y - 17) * 1.1) < 4.5 && !(y >= 16 && y < 18 && (Math.abs(x - 7.5) < 1 || Math.abs(x - 11.5) < 1))) || (y >= 22 && y < 30 && (Math.abs((x - 9.5) - (y - 26)) < 1 || Math.abs((x - 9.5) + (y - 26)) < 1)), 'skull'],
+  flower: ['꽃', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5), a = Math.atan2(y - 19.5, x - 9.5); return d < 2 || (d < 6 && Math.cos(a * 4) > 0.3 && d > 2.8); }, 'flower'],
+  mojang: ['모장', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5); return d < 7 && d > 4.5 && !(x > 9.5 && Math.abs(y - 19.5) < 2.5) || (Math.abs(x - 9.5) < 2.5 && Math.abs(y - 19.5) < 2.5); }, 'mojang'],
+  globe: ['지구본', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5); return d < 6.5 && ((Math.sin(x * 0.9) + Math.cos(y * 0.7)) > 0.4 || d > 5.8); }, 'globe'],
+  piglin: ['피글린', (x, y) => (y >= 18 && y < 24 && x >= 6 && x < 14 && !(y >= 20 && y < 22 && (x === 8 || x === 11))) || (y >= 24 && y < 27 && (x === 6 || x === 13)), 'piglin'],
 };
 const DYE_HEX = ['#f9fffe', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f', '#f38baa', '#474f52', '#9d9d97', '#169c9c', '#8932b8', '#3c44aa', '#835432', '#5e7c16', '#b02e26', '#1d1d21'];
 const bannerTex = {};
@@ -158,13 +165,14 @@ function bannerItem(t) { const id = itemOfBlock(BID.banner, t.c || 0), it = { id
 const ominousBanner = () => ({ id: IID.white_banner, n: 1, name: '불길한 현수막', bp: [['rhombus', 9], ['stripe_bottom', 8], ['stripe_center', 7], ['border', 8], ['stripe_middle', 15], ['half_horizontal', 8], ['circle', 8], ['border', 15]] });
 // loom: banner + dye, pick a pattern
 function loomResult(ctx) {
-  const [b, dye] = ctx.items; if (!b || !dye || !ctx.pat) return null;
+  const [b, dye, pi] = ctx.items; if (!b || !dye || !ctx.pat) return null;
+  const need = BANNER_PATTERNS[ctx.pat] && BANNER_PATTERNS[ctx.pat][2]; if (need && !(pi && ITEMS[pi.id].pattern === need)) return null;
   const d = ITEMS[b.id]; if (!d.block || d.place !== BID.banner) return null;
   const ci = S.COLORS.indexOf(ITEMS[dye.id].key.replace('_dye', '')); if (ci < 0 || (b.bp || []).length >= 6) return null;
   return { ...b, n: 1, bp: [...(b.bp || []), [ctx.pat, ci]] };
 }
 function loomHtml() {
-  const c = GUI.ctx, list = Object.entries(BANNER_PATTERNS), base = c.items[0] ? ITEMS[c.items[0].id].vi || 0 : 0, dye = c.items[1] ? Math.max(0, S.COLORS.indexOf(ITEMS[c.items[1].id].key.replace('_dye', ''))) : 15;
+  const c = GUI.ctx, pat = c.items[2] && ITEMS[c.items[2].id].pattern, list = Object.entries(BANNER_PATTERNS).filter(([, p]) => !p[2] || p[2] === pat), base = c.items[0] ? ITEMS[c.items[0].id].vi || 0 : 0, dye = c.items[1] ? Math.max(0, S.COLORS.indexOf(ITEMS[c.items[1].id].key.replace('_dye', ''))) : 15;
   const btns = list.map(([k, [nm]]) => `<button class="lpat ${c.pat === k ? 'on' : ''}" data-loom="${k}" title="${nm}" style="background-image:url(${bannerTexture(base, [[k, dye]]).image.toDataURL()})"></button>`).join('');
-  return `<div class="panel"><div class="cap">베틀</div><div class="row top loom"><div class="col">${slotHtml(0)}${slotHtml(1)}</div><div class="lpats">${btns}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  return `<div class="panel"><div class="cap">베틀</div><div class="row top loom"><div class="col">${slotHtml(0)}${slotHtml(1)}${slotHtml(3)}</div><div class="lpats">${btns}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(4)}</div>`;
 }

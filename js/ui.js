@@ -112,7 +112,7 @@ UI.openScreen = (type, ctx) => {
 };
 UI.closeScreen = () => {
   if (!UI.screen) return;
-  if (UI.screen === 'chest') play('door', { vol: 0.5 });
+  if (UI.screen === 'chest') { play('door', { vol: 0.5 }); const c = GUI.ctx; if (c && c.x != null && getBlock(c.x, c.y, c.z) === BID.trapped_chest) { setMeta(c.x, c.y, c.z, getMeta(c.x, c.y, c.z) & ~32); rsNotify(c.x, c.y, c.z); rsNotify(c.x, c.y - 1, c.z); } }
   closeScreenItems(); UI.screen = null; $('screen').hidden = true; $('tooltip').hidden = true; UI.hudDirty = true; grabLock();
 };
 // creative list: colour/material variants sit right after their base block

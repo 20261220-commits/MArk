@@ -15,7 +15,8 @@ function strongPower(x, y, z) {
   for (let k = 0; k < 6; k++) {
     const [dx, dy, dz] = S.DIR6[k], nx = x + dx, ny = y + dy, nz = z + dz, b = getBlock(nx, ny, nz);
     if (b === RSB.lever || b === RSB.button) { const m = getMeta(nx, ny, nz); if (m & 8) { const a = switchAttach(nx, ny, nz, m); if (a[0] === x && a[1] === y && a[2] === z) return 15; } }
-    else if (b === RSB.plate) { if (dy === 1 && getMeta(nx, ny, nz) & 1) return 15; }
+    else if (b === RSB.plate) { if (dy === 1) { const l = plateLevel(nx, ny, nz, getMeta(nx, ny, nz)); if (l) return l; } }
+    else if (b === BID.trapped_chest) { if (dy === 1 && getMeta(nx, ny, nz) & 32) return 1; }
     else if (b === RSB.torch) { if (dy === -1) return 15; } // a torch strongly powers the block above it
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
@@ -58,7 +59,8 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
   const m = getMeta(x, y, z);
   switch (b) {
     case RSB.lever: case RSB.button: return m & 8 ? 15 : 0;
-    case RSB.plate: return m & 1 ? 15 : 0;
+    case RSB.plate: return plateLevel(x, y, z, m);
+    case BID.trapped_chest: return m & 32 ? 1 : 0;
     case BID.redstone_block: return 15;
     case RSB.torch: { const a = torchAttach(x, y, z, m); return a[0] === x + dx && a[1] === y + dy && a[2] === z + dz ? 0 : 15; }
     case RSB.rep: { if (!(m & 16) || dy) return 0; const d = DIRS[m & 3]; return d[0] === dx && d[2] === dz ? 15 : 0; }
@@ -199,7 +201,7 @@ function rsDelayed(x, y, z) {
   else if (b === BID.tripwire_hook_block && (m & 8)) hookDelayed(x, y, z, m);
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);
-    else { setMeta(x, y, z, 0); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
+    else { setMeta(x, y, z, m & ~1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
   }
 }
 // ---------- pistons ----------
@@ -271,21 +273,29 @@ function pushEntitiesAt(cells, dx, dy, dz) {
   for (const e of ENT) if (!e.dead && hit(e, e.w || 0.2, e.h || 0.2)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
 }
 // ---------- pressure plates & player interaction ----------
-function plateOccupied(x, y, z) {
-  const inside = (e, w) => e.x + w > x && e.x - w < x + 1 && e.z + w > z && e.z - w < z + 1 && e.y >= y - 0.01 && e.y < y + 0.5;
-  if (!spectator() && !PL.dead && inside(PL, PL.w)) return true;
-  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat' || e.kind === 'minecart') && inside(e, e.w)) return true;
-  return false;
+const plateKind = m => (m >> 4) & 15, plateAll = k => k >= 1 && k <= 8 || k >= 10;
+function plateCount(x, y, z, m) {
+  const inside = (e, w) => e.x + w > x && e.x - w < x + 1 && e.z + w > z && e.z - w < z + 1 && e.y >= y - 0.01 && e.y < y + 0.5, all = plateAll(plateKind(m));
+  let n = !spectator() && !PL.dead && inside(PL, PL.w) ? 1 : 0;
+  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat' || e.kind === 'minecart' || (all && (e.kind === 'item' || e.kind === 'arrow'))) && inside(e, e.w || 0.125)) n += e.kind === 'item' ? e.stack.n : 1;
+  return n;
+}
+const plateOccupied = (x, y, z) => plateCount(x, y, z, getMeta(x, y, z)) > 0;
+function plateLevel(x, y, z, m) {
+  if (!(m & 1)) return 0;
+  const k = plateKind(m); if (k < 10) return 15;
+  const n = plateCount(x, y, z, m); return Math.min(15, k === 10 ? n : Math.ceil(n / 10));
 }
 function plateCheck(e, w) {
   const x = Math.floor(e.x), y = Math.floor(e.y + 0.01), z = Math.floor(e.z);
   if (getBlock(x, y, z) !== RSB.plate) return;
   const m = getMeta(x, y, z); if (m & 1) return;
-  setMeta(x, y, z, 1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); rsLater(x, y, z, 20);
+  if (e.kind === 'item' && !plateAll(plateKind(m))) return;
+  setMeta(x, y, z, m | 1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); rsLater(x, y, z, 20);
 }
 function useSwitch(x, y, z, b, m) {
   if (b === RSB.lever) { setMeta(x, y, z, m ^ 8); play('click', { pitch: m & 8 ? 0.5 : 0.6 }); }
-  else if (b === RSB.button) { if (m & 8) return; setMeta(x, y, z, m | 8); play('click'); rsLater(x, y, z, 20); }
+  else if (b === RSB.button) { if (m & 8) return; setMeta(x, y, z, m | 8); play('click'); const k = (m >> 4) & 15; rsLater(x, y, z, k >= 1 && k <= 8 ? 30 : 20); }
   else if (b === RSB.rep) { setMeta(x, y, z, (m & ~12) | ((((m >> 2) & 3) + 1) & 3) << 2); play('click'); return; }
   const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]);
 }

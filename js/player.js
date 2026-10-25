@@ -369,12 +369,13 @@ function breakBlock(x, y, z) {
   if ((id === BID.piston || id === BID.sticky_piston) && (m & 8)) { const d = S.DIR6[m & 7]; if (getBlock(x + d[0], y + d[1], z + d[2]) === BID.piston_head) setBlock(x + d[0], y + d[1], z + d[2], 0, 0, { noUpdate: true }); }
   if (id === BID.piston_head) { const d = S.DIR6[m & 7], bx = x - d[0], by = y - d[1], bz = z - d[2], bb = getBlock(bx, by, bz); if (bb === BID.piston || bb === BID.sticky_piston) { setBlock(bx, by, bz, 0); if (!creative()) dropItem(bx + .5, by + .3, bz + .5, bb, 1); } }
   blocks6Break(x, y, z, id, m);
+  if (id === BID.infested && !creative() && !enchLv(held, 'silk_touch')) spawnMob('silverfish', x + .5, y, z + .5);
   let repl = 0;
   if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
   setBlock(x, y, z, repl);
   if (!creative()) {
     const d = blockDrops(id, m, held);
-    if (S.DOOR[id] && (m & 8)) d.items.length = 0, d.items.push([id, 1]);
+    if (S.DOOR[id] && (m & 8)) d.items.length = 0, d.items.push([itemOfBlock(id, m), 1]);
     for (const [iid, n] of d.items) dropItem(x + .5, y + .3, z + .5, iid, n);
     if (d.xp) spawnXP(x + .5, y + .5, z + .5, d.xp);
     PL.exh += 0.005;
@@ -467,12 +468,13 @@ function interactBlock(t, dry) {
     case BID.hopper: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'hopper', items: new Array(5).fill(null), cd: 0 }); UI.openScreen('hopper', { x, y, z }); } return true;
     case BID.dispenser: case BID.dropper: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'dispenser', items: new Array(9).fill(null) }); UI.openScreen('dispenser', { x, y, z, title: BLOCKS[id].name }); } return true;
     case BID.daylight_detector: if (!dry) { setMeta(x, y, z, m ^ 16); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'daylight' }); play('click'); } return true;
-    case BID.oak_trapdoor: if (!dry) { setMeta(x, y, z, m ^ 4); play('door', { vol: 0.6 }); } return true;
+    case BID.oak_trapdoor: if (((m >> 4) & 15) === 8) return false; if (!dry) { setMeta(x, y, z, m ^ 4); play('door', { vol: 0.6 }); } return true; // iron trapdoors only open with redstone
     case BID.note_block: if (!dry) { const tile = getTile(x, y, z) || { type: 'note', n: 0 }; tile.n = ((tile.n || 0) + 1) % 25; setTile(x, y, z, tile); playNote(x, y, z, tile.n); } return true;
     case BID.comparator: if (!dry) { setMeta(x, y, z, m ^ 4); play('click', { pitch: 0.55 }); rsMark(x, y, z); } return true;
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
     case BID.grindstone: { const h = PL.held(); if (h && h.e && Object.keys(h.e).some(k => !k.endsWith('_curse'))) { if (!dry) { let xp = 0; const curses = {}; for (const [k, lv] of Object.entries(h.e)) if (k.endsWith('_curse')) curses[k] = lv; else xp += lv * 3; if (Object.keys(curses).length) h.e = curses; else delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
+    case BID.trapped_chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); setMeta(x, y, z, m | 32); rsNotify(x, y, z); rsNotify(x, y - 1, z); UI.openScreen('chest', { x, y, z, title: '덫 상자' }); } return true;
     case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
     case BID.iron_door: return false;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
@@ -564,6 +566,9 @@ function useItem(first) {
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
+      if (tool && tool.type === S.TOOL.AXE && STRIP()[id] != null) { // axes strip logs, wood, stems and hyphae (the axis / kind stays)
+        const to = STRIP()[id]; setBlock(x, y, z, to, id === BID.wood ? t.m : t.m & 3); play('place', { mat: 'wood' }); swing(); if (!creative()) damageItem(INV.slots, INV.sel, 1); return;
+      }
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].scrape) { setBlock(x, y, z, BLOCKS[id].scrape, BLOCKS[id].wax ? t.m : 0); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [0.9, 0.9, 0.9], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (h.id === IID.bone_meal) { if (boneMeal(x, y, z, id)) { consume(); swing(); } return; }
       if (h.id === IID.flint_and_steel || h.id === IID.fire_charge) {
@@ -575,6 +580,7 @@ function useItem(first) {
       }
       if (h.id === IID.oak_boat) { const fl = FLUID[id] === 1; const bx = x + (fl ? 0 : t.nx) + .5, by = fl ? y + 0.9 : y + t.ny + (t.ny > 0 ? 0 : 0), bz = z + (fl ? 0 : t.nz) + .5; if (!fl && t.ny !== 1) return; placeBoat(bx, fl ? y + 0.88 : y + 1, bz, PL.yaw); consume(); swing(); return; }
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
+      if (h.id === IID.end_crystal) { if (placeEndCrystal(t)) { consume(); swing(); } return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
       if (h.id === IID.bucket) { if (FLUID[id] && getMeta(x, y, z) === 0) { setBlock(x, y, z, 0); consume(); const it = { id: id === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; if (creative()) {} else if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); play('splash'); swing(); } else if (id === BID.powder_snow) { setBlock(x, y, z, 0); consume(); const it = { id: IID.powder_snow_bucket, n: 1 }; if (!PL.held()) INV.slots[INV.sel] = it; else INV.add(it); swing(); } return; }
       if (h.id === IID.water_bucket || h.id === IID.lava_bucket || h.id === IID.powder_snow_bucket || BUCKET_MOB[h.id]) {
@@ -607,6 +613,20 @@ function throwItem(id) {
 // mobs a water bucket can scoop up, and back
 const MOB_BUCKET = { axolotl: 'axolotl_bucket', tropical_fish: 'tropical_fish_bucket', pufferfish: 'pufferfish_bucket', cod: 'cod_bucket', salmon: 'salmon_bucket' };
 const BUCKET_MOB = {}; for (const k in MOB_BUCKET) BUCKET_MOB[IID[MOB_BUCKET[k]]] = k;
+const STRIP = () => STRIP.m || (STRIP.m = { [BID.oak_log]: BID.stripped_oak_log, [BID.spruce_log]: BID.stripped_spruce_log, [BID.birch_log]: BID.stripped_birch_log, [BID.jungle_log]: BID.stripped_jungle_log,
+  [BID.acacia_log]: BID.stripped_acacia_log, [BID.dark_oak_log]: BID.stripped_dark_oak_log, [BID.crimson_stem]: BID.stripped_crimson_stem, [BID.warped_stem]: BID.stripped_warped_stem, [BID.wood]: BID.stripped_wood });
+// end crystals go on obsidian or bedrock; four on the exit portal's sides summon the dragon again
+function placeEndCrystal(t) {
+  const b = getBlock(t.x, t.y, t.z); if ((b !== BID.obsidian && b !== BID.bedrock) || t.ny !== 1 || getBlock(t.x, t.y + 1, t.z) || getBlock(t.x, t.y + 2, t.z)) return false;
+  if (ENT.some(e => !e.dead && e.type === 'end_crystal' && Math.abs(e.x - t.x - .5) < 1 && Math.abs(e.z - t.z - .5) < 1 && Math.abs(e.y - t.y - 1) < 1)) return false;
+  const c = spawnMob('end_crystal', t.x + .5, t.y + 1, t.z + .5); c.persistent = true; c.placed = true;
+  if (W.dim === 1 && W.meta.dragonKilled && !ENT.some(o => o.type === 'ender_dragon' && !o.dead)) {
+    const near = ENT.filter(e => !e.dead && e.type === 'end_crystal' && e.placed && Math.hypot(e.x, e.z) < 4.5 && Math.abs(e.y - c.y) < 2);
+    const sides = new Set(near.map(e => Math.abs(e.x) > Math.abs(e.z) ? (e.x > 0 ? 'e' : 'w') : (e.z > 0 ? 's' : 'n')));
+    if (sides.size === 4) setTimeout(() => { for (const e of near) if (!e.dead) { removeEnt(e); explode(e.x, e.y + 1, e.z, 0); } W.meta.dragonKilled = false; ensureDragon(); chatMsg('엔더 드래곤이 다시 나타났습니다!', '#ff55ff'); }, 3000);
+  }
+  return true;
+}
 function boneMeal(x, y, z, id) {
   for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
   const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
@@ -615,6 +635,7 @@ function boneMeal(x, y, z, id) {
   if (id === BID.crops2) { const m = getMeta(x, y, z); setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
   const sap = { 38: 0, 39: 3, 40: 2, [BID.jungle_sapling]: 4, [BID.acacia_sapling]: 5, [BID.dark_oak_sapling]: 6 }[id];
   if (sap != null) { if (Math.random() < 0.45) growTreeAt(x, y, z, sap); return true; }
+  if ((id === BID.short_grass || id === BID.fern) && getBlock(x, y + 1, z) === 0) { const tall = id === BID.short_grass ? BID.tall_grass : BID.large_fern; setBlock(x, y, z, tall, 0, { noUpdate: true }); setBlock(x, y + 1, z, tall, 8); return true; } // grass grows into tall grass
   if (id === 2) { for (let k = 0; k < 40; k++) { const tx = x + Math.floor((Math.random() - .5) * 7), tz = z + Math.floor((Math.random() - .5) * 7); for (let ty = y + 2; ty >= y - 2; ty--) if (getBlock(tx, ty, tz) === 2 && getBlock(tx, ty + 1, tz) === 0) { setBlock(tx, ty + 1, tz, Math.random() < 0.85 ? 29 : [31, 32, 33, 34][Math.floor(Math.random() * 4)]); break; } } return true; }
   return false;
 }
@@ -632,13 +653,13 @@ function placeBlock(t, d) {
   if (REPL[tgt] && !FLUID[tgt] && !(tgt === BID.snow && id === BID.snow)) { x = t.x; y = t.y; z = t.z; }
   // slab merging / snow stacking
   // slab merging keeps the wax: a waxed copper slab doubles into waxed cut copper
-  const slabFull = BLOCKS[id].slab || (BLOCKS[id].slabv && BLOCKS[id].full[vi]);
+  const slabF = BLOCKS[id].slab || (BLOCKS[id].slabv && BLOCKS[id].full[vi]), [slabFull, slabFm] = typeof slabF === 'string' ? VKEY[slabF] || [0, 0] : [slabF, 0]; // full block: an id, or a (variant) key
   const sameSlab = m => !BLOCKS[id].slabv || (m >> 1) === vi;
-  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
+  if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, slabFm || (BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0)); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
   if (id === BID.snow && tgt === BID.snow && (t.m & 7) < 7) { setBlock(t.x, t.y, t.z, BID.snow, t.m + 1); consume(); swing(); return; }
   if (y < 0 || y >= CH) return;
   const cur = getBlock(x, y, z); if (cur && !REPL[cur]) return;
-  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0); consume(); swing(); return; }
+  if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, slabFm || (BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0)); consume(); swing(); return; }
   const below = getBlock(x, y - 1, z), fd = facingDir();
   const b = BLOCKS[id];
   // placement rules
@@ -680,14 +701,14 @@ function placeBlock(t, d) {
   if (S.DOOR[id]) {
     if (getBlock(x, y + 1, z) && !REPL[getBlock(x, y + 1, z)] || !supportedBy(below)) return;
     if (entityBlocks(x, y, z) || entityBlocks(x, y + 1, z)) return;
-    meta = (fd + 2) & 3;
+    meta = ((fd + 2) & 3) | (meta & 0xf0);
     setBlock(x, y, z, id, meta, { noUpdate: true }); setBlock(x, y + 1, z, id, meta | 8);
     consume(); play('place', { mat: id === BID.iron_door ? 'stone' : 'wood' }); swing(); return;
   }
   if (id === BID.red_bed) {
     const dir = DIRS[fd], hx = x + dir[0], hz = z + dir[2], hb = getBlock(hx, y, hz);
     if ((hb && !REPL[hb]) || !SOLID[below] || !SOLID[getBlock(hx, y - 1, hz)]) return;
-    setBlock(x, y, z, id, fd, { noUpdate: true }); setBlock(hx, y, hz, id, fd | 4);
+    setBlock(x, y, z, id, fd | (meta & 0xf0), { noUpdate: true }); setBlock(hx, y, hz, id, fd | 4 | (meta & 0xf0));
     consume(); play('place', { mat: 'wool' }); swing(); return;
   }
   if (SOLID[id] && entityBlocks(x, y, z)) return;
@@ -710,7 +731,7 @@ function placeBlock(t, d) {
   if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
   biomePlaced(x, y, z, id, meta); blocks6Placed(x, y, z, id, meta, PL.held());
   if (id === BID.tripwire || id === BID.tripwire_hook_block) tripRefresh(x, y, z);
-  if (id === BID.chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
+  if (id === BID.chest || id === BID.trapped_chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }
 function pickBlock() {

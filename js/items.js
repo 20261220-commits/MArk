@@ -5,7 +5,7 @@ const { CH, BLOCKS, BID, RT, TOOL } = S;
 const ITEMS = [];          // id -> def
 const IID = {};            // key -> id
 // block items: ids 0..255 mirror block ids
-const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'budding_amethyst', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
+const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furnace', 'spawner', 'redstone_wire', 'unlit_redstone_torch', 'lit_redstone_lamp',
   'piston_head', 'nether_portal', 'nether_wart', 'fire', 'end_portal', 'crops2', 'soul_fire', 'cave_vines', 'big_dripleaf_stem', 'wall_banner', 'sweet_berry_bush', 'kelp_plant', 'tall_seagrass', 'tripwire', 'tripwire_hook_block', 'frosted_ice', 'candle_cake', 'stem']);
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
@@ -164,6 +164,11 @@ for (const [k, name, col, eff] of POTION_TYPES) {
   if (eff.length || k === 'water') P.items.arrow = item(k + '_arrow', k === 'water' ? '분무 화살' : name.replace(/ ?물약$/, '').replace(/의$/, '') + '의 화살', { tipped: k, pcol: col, form: 3, lore: eff.length ? effText(eff, 0.125) : [] });
 }
 item('nether_star', '네더의 별', { glint: 1 });
+// spectral arrows make what they hit glow for 10 seconds (a "potion" only arrows carry)
+POTION.spectral = { key: 'spectral', name: '분광', col: 0xf8e060, eff: [['glowing', 1600]], items: {} };
+POTION.spectral.items.arrow = item('spectral_arrow', '분광 화살', { tipped: 'spectral' });
+item('end_crystal', '엔드 수정', { glint: 1 });
+for (const [k, n] of [['creeper', '크리퍼'], ['skull', '해골'], ['flower', '꽃'], ['mojang', '모장'], ['globe', '지구본'], ['piglin', '피글린']]) item(k + '_banner_pattern', '현수막 무늬', { stack: 1, lore: [n + ' 무늬'], pattern: k });
 item('painting', '그림'); item('armor_stand', '갑옷 거치대', { stack: 16 });
 // music discs (C418, Lena Raine); the tunes are synthesised in utility.js
 const DISCS = [['13', 0xf2e8a0], ['cat', 0x5ad83a], ['blocks', 0xd85a2a], ['chirp', 0xc82a2a], ['far', 0x8ae84a], ['mall', 0x8a5ad8], ['mellohi', 0xd8a8f0], ['stal', 0x2a2a2a], ['strad', 0xf0f0f0], ['ward', 0x3a8a3a], ['11', 0x4a4a4a], ['wait', 0x3ab8d8], ['pigstep', 0xc87a3a]];
@@ -308,8 +313,29 @@ shapeless('mushroom_stew', 1, ['brown_mushroom', 'red_mushroom', 'bowl']);
 shaped('golden_apple', 1, ['###', '#A#', '###'], { '#': 'gold_ingot', A: 'apple' });
 shaped('tnt', 1, ['GSG', 'SGS', 'GSG'], { G: 'gunpowder', S: 'sand' });
 shaped('ladder', 3, ['S S', 'SSS', 'S S'], { S: 'stick' });
-shaped('oak_door', 3, ['##', '##', '##'], { '#': 'oak_planks' });
-shaped('red_bed', 1, ['WWW', '###'], { W: 'wool', '#': 'planks' });
+for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) {
+  const pl = w + '_planks'; shaped(w + '_door', 3, ['##', '##', '##'], { '#': pl }); shaped(w + '_trapdoor', 2, ['###', '###'], { '#': pl });
+  shapeless(w + '_button', 1, [pl]); shaped(w + '_pressure_plate', 1, ['##'], { '#': pl });
+}
+for (const [w, log] of [['oak', 'oak_log'], ['spruce', 'spruce_log'], ['birch', 'birch_log'], ['jungle', 'jungle_log'], ['acacia', 'acacia_log'], ['dark_oak', 'dark_oak_log']]) {
+  shaped(w + '_wood', 3, ['##', '##'], { '#': log }); shaped('stripped_' + w + '_wood', 3, ['##', '##'], { '#': 'stripped_' + log });
+  shapeless(w + '_planks', 4, [w + '_wood']); shapeless(w + '_planks', 4, ['stripped_' + w + '_wood']);
+}
+for (const w of ['crimson', 'warped']) { shaped(w + '_hyphae', 3, ['##', '##'], { '#': w + '_stem' }); shaped('stripped_' + w + '_hyphae', 3, ['##', '##'], { '#': 'stripped_' + w + '_stem' });
+  shapeless(w + '_planks', 4, ['stripped_' + w + '_stem']); shapeless(w + '_planks', 4, [w + '_hyphae']); shapeless(w + '_planks', 4, ['stripped_' + w + '_hyphae']); }
+shapeless('polished_blackstone_button', 1, ['polished_blackstone']); shaped('polished_blackstone_pressure_plate', 1, ['##'], { '#': 'polished_blackstone' });
+shaped('light_weighted_pressure_plate', 1, ['##'], { '#': 'gold_ingot' }); shaped('heavy_weighted_pressure_plate', 1, ['##'], { '#': 'iron_ingot' });
+shaped('iron_trapdoor', 1, ['##', '##'], { '#': 'iron_ingot' });
+for (const [tile, k, n, full] of [...S.SLABS3, ...S.SLABS4]) shaped(k + '_slab', 6, ['###'], { '#': full });
+for (const [tile, k, n, full] of S.STAIRS34) shaped(k + '_stairs', 4, ['#  ', '## ', '###'], { '#': full });
+for (const [tile, k] of S.WALLS2) shaped(k + '_wall', 6, ['###', '###'], { '#': tile });
+shaped('polished_deepslate', 4, ['##', '##'], { '#': 'cobbled_deepslate' }); shaped('deepslate_bricks', 4, ['##', '##'], { '#': 'polished_deepslate' }); shaped('deepslate_tiles', 4, ['##', '##'], { '#': 'deepslate_bricks' });
+shaped('chiseled_deepslate', 1, ['#', '#'], { '#': 'cobbled_deepslate_slab' }); shaped('chiseled_polished_blackstone', 1, ['#', '#'], { '#': 'polished_blackstone_slab' }); shaped('chiseled_red_sandstone', 1, ['#', '#'], { '#': 'red_sandstone_slab' });
+shaped('quartz_pillar', 2, ['#', '#'], { '#': 'quartz_block' }); shaped('polished_basalt', 4, ['##', '##'], { '#': 'basalt' });
+shapeless('trapped_chest', 1, ['chest', 'tripwire_hook']);
+shaped('spectral_arrow', 2, [' # ', '#X#', ' # '], { '#': 'glowstone_dust', X: 'arrow' }); shaped('end_crystal', 1, ['GGG', 'GEG', 'GTG'], { G: 'glass', E: 'ender_eye', T: 'ghast_tear' });
+shapeless('creeper_banner_pattern', 1, ['paper', 'creeper_head']); shapeless('skull_banner_pattern', 1, ['paper', 'wither_skeleton_skull']); shapeless('flower_banner_pattern', 1, ['paper', 'oxeye_daisy']); shapeless('mojang_banner_pattern', 1, ['paper', 'enchanted_golden_apple']);
+for (const c of S.COLORS) { shaped(c + '_bed', 1, ['WWW', '###'], { W: c + '_wool', '#': 'planks' }); if (c !== 'white') shapeless(c + '_bed', 1, ['white_bed', c + '_dye']); }
 shaped('oak_slab', 6, ['###'], { '#': 'oak_planks' });
 shaped('cobblestone_slab', 6, ['###'], { '#': 'cobblestone' });
 shaped('smooth_stone_slab', 6, ['###'], { '#': 'smooth_stone' });
@@ -449,7 +475,7 @@ shaped('dropper', 1, ['CCC', 'C C', 'CRC'], { C: 'cobblestone', R: 'redstone' })
 shaped('daylight_detector', 1, ['GGG', 'QQQ', 'WWW'], { G: 'glass', Q: 'quartz', W: 'wooden_slabs' });
 shaped('target', 1, [' R ', 'RHR', ' R '], { R: 'redstone', H: 'hay_block' });
 shaped('note_block', 1, ['###', '#R#', '###'], { '#': 'planks', R: 'redstone' });
-shaped('iron_door', 3, ['##', '##', '##'], { '#': 'iron_ingot' }); shaped('oak_trapdoor', 2, ['###', '###'], { '#': 'planks' });
+shaped('iron_door', 3, ['##', '##', '##'], { '#': 'iron_ingot' });
 // workstations
 shaped('composter', 1, ['# #', '# #', '###'], { '#': 'wooden_slabs' });
 shaped('barrel', 1, ['PSP', 'P P', 'PSP'], { P: 'planks', S: 'wooden_slabs' });
@@ -599,9 +625,10 @@ function blockDrops(b, meta, stack) {
   if (cd) { add(itemOfBlock(b, meta), cd.n); return res; }
   if (S.isRod(b, meta) && !(t && t.type === TOOL.PICK)) return res;
   // silk touch keeps the block itself; fortune multiplies ore drops (applied after the switch)
-  if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(itemOfBlock(b, meta)); return res; }
+  if (enchLv(stack, 'silk_touch') && d.key === 'infested') { add(['stone', 'cobblestone', 'stone_bricks', 'mossy_stone_bricks', 'cracked_stone_bricks', 'chiseled_stone_bricks', 'deepslate'][meta & 7] || 'stone'); return res; }
+  if (enchLv(stack, 'silk_touch') && canHarvest(b, stack) && ITEMS[b] && !['short_grass', 'fern', 'dead_bush', 'wheat', 'oak_door', 'red_bed', 'tall_grass', 'large_fern'].includes(d.key) && d.hard >= 0 && b !== BID.spawner) { add(itemOfBlock(b, meta)); return res; }
   const fortune = enchLv(stack, 'fortune');
-  const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore', 'nether_quartz_ore', 'nether_gold_ore', 'glowstone'].includes(d.key);
+  const fortuneOre = ['coal_ore', 'deepslate_coal_ore', 'diamond_ore', 'deepslate_diamond_ore', 'emerald_ore', 'deepslate_emerald_ore', 'lapis_ore', 'deepslate_lapis_ore', 'redstone_ore', 'deepslate_redstone_ore', 'iron_ore', 'deepslate_iron_ore', 'gold_ore', 'deepslate_gold_ore', 'copper_ore', 'deepslate_copper_ore', 'nether_quartz_ore', 'nether_gold_ore', 'glowstone'].includes(d.key);
   // fortune: redstone gets +0..level (uniform bonus), the other ores multiply
   if (fortune && fortuneOre && canHarvest(b, stack)) { const r0 = blockDrops(b, meta, { id: stack.id, n: 1 }); const mul = Math.max(0, Math.floor(Math.random() * (fortune + 2)) - 1) + 1, flat = d.key.endsWith('redstone_ore'); for (const it of r0.items) res.items.push([it[0], flat ? it[1] + Math.floor(Math.random() * (fortune + 1)) : it[1] * mul]); res.xp = r0.xp; return res; }
   if (!canHarvest(b, stack)) {
@@ -619,7 +646,9 @@ function blockDrops(b, meta, stack) {
     case 'gold_ore': case 'deepslate_gold_ore': add('raw_gold'); break;
     case 'copper_ore': case 'deepslate_copper_ore': add('raw_copper', ri(2, 3)); break;
     case 'diamond_ore': case 'deepslate_diamond_ore': add('diamond'); res.xp = ri(3, 7); break;
-    case 'emerald_ore': add('emerald'); res.xp = ri(3, 7); break;
+    case 'emerald_ore': case 'deepslate_emerald_ore': add('emerald'); res.xp = ri(3, 7); break;
+    case 'infested': break; // a silverfish comes out instead (silk touch gives the plain block, below)
+    case 'tall_grass': case 'large_fern': if (!(meta & 8)) { if (shears) add(d.key === 'tall_grass' ? 'short_grass' : 'fern', 2); else if (Math.random() < 0.125) add('wheat_seeds'); } break;
     case 'redstone_ore': case 'deepslate_redstone_ore': add('redstone', ri(4, 5)); res.xp = ri(1, 5); break;
     case 'lapis_ore': case 'deepslate_lapis_ore': add('lapis_lazuli', ri(4, 9)); res.xp = ri(2, 5); break;
     case 'oak_leaves': case 'spruce_leaves': case 'birch_leaves':
@@ -700,6 +729,8 @@ function blockDrops(b, meta, stack) {
 // Item ids are positions in ITEMS. Saved data is tagged with a hash of the key list it was written with
 // (world meta keeps each list), so ids can change between versions: loading remaps them by key.
 // Untagged data comes from before this table existed and uses today's order.
+// block key (including variant keys) -> [block id, meta]
+const VKEY = {}; for (const b of BLOCKS) if (b) { VKEY[b.key] = [b.id, 0]; if (b.vk) b.vk.forEach((k, i) => { VKEY[k] = [b.id, i << (b.vshift || 0)]; }); }
 const ITEM_KEYS = Array.from(ITEMS, d => d ? d.key : null);
 const ITEM_TABLE = (() => { let h = 5381; for (const k of ITEM_KEYS) for (const ch of (k || '-') + ',') h = (h * 33 + ch.charCodeAt(0)) >>> 0; return h.toString(36); })();
 const remapCache = {};

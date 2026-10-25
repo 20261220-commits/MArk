@@ -56,7 +56,7 @@ const { packBuild, TILE, ANIM, ITEM, ENT } = require('../js/packmap.js');
 
 // ---------- optional: copy the needed files out of a full pack ----------
 const fromIdx = process.argv.indexOf('--from');
-const allFiles = () => [...Object.values(TILE).map(f => 'block/' + f), ...Object.values(ANIM).map(f => 'block/' + f), 'block/grass_block_side', 'block/grass_block_side_overlay',
+const allFiles = () => [...['red', 'white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'black'].map(c => 'entity/bed/' + c), ...Object.values(TILE).map(f => 'block/' + f), ...Object.values(ANIM).map(f => 'block/' + f), 'block/grass_block_side', 'block/grass_block_side_overlay',
   ...Object.values(ITEM), 'item/leather_helmet_overlay', ...Object.values(ENT)];
 if (fromIdx > 0) {
   const src = path.join(process.argv[fromIdx + 1], 'assets', 'minecraft', 'textures');

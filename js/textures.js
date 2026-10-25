@@ -423,10 +423,17 @@ PAINT.scaffolding_side = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13
 PAINT.scaffolding_top = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || (x + y) % 5 === 0) ? quant(shade(SCAF_C, 0.9 + r() * 0.15), 3) : null);
 PAINT.scaffolding_bottom = PAINT.scaffolding_top;
 PAINT.lectern_book = r => fill((x, y) => x < 1 || x > 14 ? hex(0x6a3a1a) : x === 7 || x === 8 ? hex(0xb8a888) : y % 3 === 1 && y > 1 && y < 14 && x > 1 && x < 14 ? hex(0x5a5a5a) : quant(shade(hex(0xf0e8d0), 0.95 + r() * 0.06), 3));
+// tiles with no painter borrow a similar one until a resource pack supplies the real texture (nothing new is drawn)
+const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate', polished_deepslate: 'deepslate', chiseled_deepslate: 'deepslate', cracked_deepslate_bricks: 'deepslate', cracked_deepslate_tiles: 'deepslate',
+  chiseled_polished_blackstone: 'polished_blackstone', cracked_polished_blackstone_bricks: 'polished_blackstone_bricks', chiseled_red_sandstone: 'red_sandstone', quartz_block_bottom: 'quartz_block_top',
+  quartz_pillar: 'quartz_block_side', quartz_pillar_top: 'quartz_block_top', polished_basalt_side: 'basalt_side', polished_basalt_top: 'basalt_top', stripped_crimson_stem: 'crimson_stem', stripped_crimson_stem_top: 'crimson_stem_top',
+  stripped_warped_stem: 'warped_stem', stripped_warped_stem_top: 'warped_stem_top', tall_grass_bottom: 'short_grass', tall_grass_top: 'short_grass', large_fern_bottom: 'fern', large_fern_top: 'fern',
+  chipped_anvil_top: 'anvil_top', damaged_anvil_top: 'anvil_top', trapped_chest_side: 'chest_side', trapped_chest_top: 'chest_top', trapped_chest_front: 'chest_front', iron_trapdoor: 'oak_trapdoor', player_head_side: 'zombie_head_side', player_head_front: 'zombie_head_front' };
+for (const w of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) Object.assign(TILE_ALIAS, { [w + '_door_bottom']: 'oak_door_bottom', [w + '_door_top']: 'oak_door_top', [w + '_trapdoor']: 'oak_trapdoor' });
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
     curTile = i;
-    const f = PAINT[name];
+    const f = PAINT[name] || PAINT[TILE_ALIAS[name]] || PAINT[name.replace(/_(white|orange|magenta|light_blue|yellow|lime|pink|gray|light_gray|cyan|purple|blue|brown|green|black)$/, '')];
     if (f) f(trng(i * 7919 + 13)); else fill(() => hex(0xff00ff));
   });
   atlasCtx.putImageData(atlasImg, 0, 0);

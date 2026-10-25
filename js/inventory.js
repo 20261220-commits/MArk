@@ -55,10 +55,11 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
   } else if (type === 'loom') {
-    ctx.items = ctx.items || [null, null];
+    ctx.items = ctx.items || [null, null, null];
     L.push(slotRef(ctx.items, 0, { group: 'lban', accepts: st => !st || (ITEMS[st.id].block && ITEMS[st.id].place === BID.banner), max: 1 }));
     L.push(slotRef(ctx.items, 1, { group: 'ldye', accepts: st => !st || ITEMS[st.id].key.endsWith('_dye') }));
     L.push({ group: 'result', output: true, get: () => loomResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const d = ctx.items[1]; d.n--; if (!d.n) ctx.items[1] = null; play('click'); } });
+    L.push(slotRef(ctx.items, 2, { group: 'lpat', accepts: st => !st || ITEMS[st.id].pattern != null, max: 1 })); // banner pattern item (kept, as in vanilla)
   } else if (type === 'beacon') {
     ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
     L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
