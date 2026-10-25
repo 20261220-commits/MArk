@@ -128,7 +128,7 @@ const QUAD = (legH, bodyY, bodyBox, headP, headBox, legX, legZ0, legZ1) => [
   ['rleg2', [legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]], ['lleg2', [-legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]],
 ];
 const MOBDEF = {
-  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], parts: HUMAN(4), armsOut: 1,
+  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], extraDrop: [['iron_ingot', 0.0083], ['carrot', 0.0083], ['potato', 0.0083]], parts: HUMAN(4), armsOut: 1,
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, (k, x, y) => k === 'top' ? hex(0x3a5a2a) : hex(0x5d8f4c), r, .15, { front: (g, x, y) => { px(g, x + 1, y + 3, '#1a2a12', 2, 1); px(g, x + 5, y + 3, '#1a2a12', 2, 1); px(g, x + 3, y + 5, '#3a5a2a', 2, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => y > 9 ? hex(0x3b3fa0) : hex(0x1fa0a8), r); paintBox(g, 40, 16, 4, 12, 4, (k, x, y) => y < 4 ? hex(0x1fa0a8) : hex(0x5d8f4c), r); paintBox(g, 0, 16, 4, 12, 4, (k, x, y) => y > 9 ? hex(0x4a4a4a) : hex(0x3b3fa0), r); }) },
   skeleton: { hp: 20, w: 0.3, h: 1.99, speed: 0.12, hostile: 1, ranged: 1, burn: 1, xp: 5, snd: 'rattle', drops: [['bone', 0, 2], ['arrow', 0, 2]], parts: HUMAN(2),

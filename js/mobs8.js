@@ -170,7 +170,7 @@ Object.assign(MOBDEF, {
   panda: { hp: 20, w: 0.65, h: 1.25, speed: 0.04, xp: 2, snd: 'hmm', drops: [['bamboo', 0, 2]], parts: PANDA_M.parts, tw: 128, th: 64, tex: () => PANDA_M.tex(0), vtex: v => PANDA_M.tex(v), variant: () => Math.random() < 0.02 ? 1 : 0, food: ['bamboo'], ai: withDefault(pandaAI) },
   polar_bear: { hp: 30, w: 0.7, h: 1.4, speed: 0.06, xp: 2, snd: 'growl', neutral: 1, drops: [['cod', 0, 2], ['salmon', 0, 2]], parts: BEAR_M.parts, tw: 128, th: 64, tex: () => BEAR_M.tex(0), ai: withDefault(polarBearAI) },
   parrot: { hp: 6, w: 0.25, h: 0.9, speed: 0.1, xp: 2, snd: 'hmm', fly: 1, fallReduce: 99, drops: [['feather', 1, 2]], parts: PARROT_M.parts, tex: () => PARROT_M.tex(0), vtex: v => PARROT_M.tex(v), variant: () => (Math.random() * 5) | 0, ai: parrotAI, anim: parrotAnim, interact: (e, h) => parrotUse(e, h) },
-  ocelot: { ...MOBDEF.cat, variant: () => OCELOT_V, ai: withDefault(ocelotAI), interact: (e, h) => ocelotUse(e, h), save: e => ({ trusting: !!e.trusting }), init: (e, o) => { if (o.trusting) e.trusting = true; } },
+  ocelot: { ...MOBDEF.cat, drops: [], variant: () => OCELOT_V, ai: withDefault(ocelotAI), interact: (e, h) => ocelotUse(e, h), save: e => ({ trusting: !!e.trusting }), init: (e, o) => { if (o.trusting) e.trusting = true; } },
   llama: LLAMA_DEF(LLAMA_M, '라마'),
   trader_llama: { ...LLAMA_DEF(TLLAMA_M, '상인 라마'), ai: withDefault(traderLlamaAI) },
   wandering_trader: { hp: 20, w: 0.3, h: 1.95, speed: 0.07, xp: 0, snd: 'hmm', drops: [], parts: TRADER_M.parts, tw: 128, th: 64, tex: () => TRADER_M.tex(0), ai: withDefault(traderAI), interact: e => traderUse(e), init: (e, o) => { e.life = o.life || 48000; }, save: e => ({ life: e.life }) },

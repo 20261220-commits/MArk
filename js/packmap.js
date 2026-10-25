@@ -143,6 +143,7 @@ for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', '
 
 // tiles not in TILE are looked up under their own name (or these vanilla 1.17 names); files renamed in 1.17
 const TILE_117 = { pointed_dripstone: 'pointed_dripstone_down_tip', small_dripleaf: 'small_dripleaf_stem_bottom', sculk_sensor_tendril: 'sculk_sensor_tendril_inactive' };
+const ENT_ALT = { 'entity/squid': 'entity/squid/squid' };
 const FILE_ALT = { grass_path_top: 'dirt_path_top', grass_path_side: 'dirt_path_side' };
 // load(path) -> { w, h, px } | null, for paths like 'block/stone'; extraTiles / extraItems: more names to try as block/<name>, item/<name>
 function packBuild(load, extraTiles = [], extraItems = []) {
@@ -213,7 +214,7 @@ function packBuild(load, extraTiles = [], extraItems = []) {
     }
     out.items[k] = put(px);
   }
-  for (const [k, f] of Object.entries(ENT)) { if (k === 'chest' || k === 'bed') continue; const img = load(f); if (img) out.ent[k] = [put(new Uint8Array(img.px)), img.w, img.h]; }
+  for (const [k, f] of Object.entries(ENT)) { if (k === 'chest' || k === 'bed') continue; const img = load(f) || (ENT_ALT[f] ? load(ENT_ALT[f]) : null); if (img) out.ent[k] = [put(new Uint8Array(img.px)), img.w, img.h]; }
   { // OptiFine custom night sky (optifine/sky/world0/nightbox.png), box-filtered to 128px faces
     const sk = load('../optifine/sky/world0/nightbox');
     if (sk) { const f = 4, w = sk.w / f, h = sk.h / f, px = new Uint8Array(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let a = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) a += sk.px[((y * f + j) * sk.w + x * f + i) * 4 + c]; px[(y * w + x) * 4 + c] = a / (f * f); } out.sky = [put(px), w, h]; }

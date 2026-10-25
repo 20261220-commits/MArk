@@ -282,11 +282,11 @@ function survivalTick(inWater, inLava, eyeF) {
   if (PL.frozen >= 140 && W.tickN % 40 === 0) hurtPlayer(1, 'freeze');
   if (creative()) return;
   // hunger
-  if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
+  if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < plMaxHp()) PL.health = Math.min(plMaxHp(), PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
   if (PL.exh >= 4) { PL.exh -= 4; if (PL.sat > 0) PL.sat = Math.max(0, PL.sat - 1); else if (PL.difficulty > 0) PL.food = Math.max(0, PL.food - 1); UI.hudDirty = true; }
   PL.foodTimer++;
-  if (PL.food >= 20 && PL.sat > 0 && PL.health < 20) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(20, PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
-  else if (PL.food >= 18 && PL.health < 20) { if (PL.foodTimer >= 80) { PL.health = Math.min(20, PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
+  if (PL.food >= 20 && PL.sat > 0 && PL.health < plMaxHp()) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(plMaxHp(), PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
+  else if (PL.food >= 18 && PL.health < plMaxHp()) { if (PL.foodTimer >= 80) { PL.health = Math.min(plMaxHp(), PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food <= 0) { if (PL.foodTimer >= 80) { if (PL.health > 10 || PL.difficulty === 3 || (PL.health > 1 && PL.difficulty === 2)) hurtPlayer(1, 'starve'); PL.foodTimer = 0; } }
   else PL.foodTimer = 0;
 }

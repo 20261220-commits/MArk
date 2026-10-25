@@ -3327,6 +3327,7 @@ for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', '
 
 // tiles not in TILE are looked up under their own name (or these vanilla 1.17 names); files renamed in 1.17
 const TILE_117 = { pointed_dripstone: 'pointed_dripstone_down_tip', small_dripleaf: 'small_dripleaf_stem_bottom', sculk_sensor_tendril: 'sculk_sensor_tendril_inactive' };
+const ENT_ALT = { 'entity/squid': 'entity/squid/squid' };
 const FILE_ALT = { grass_path_top: 'dirt_path_top', grass_path_side: 'dirt_path_side' };
 // load(path) -> { w, h, px } | null, for paths like 'block/stone'; extraTiles / extraItems: more names to try as block/<name>, item/<name>
 function packBuild(load, extraTiles = [], extraItems = []) {
@@ -3397,7 +3398,7 @@ function packBuild(load, extraTiles = [], extraItems = []) {
     }
     out.items[k] = put(px);
   }
-  for (const [k, f] of Object.entries(ENT)) { if (k === 'chest' || k === 'bed') continue; const img = load(f); if (img) out.ent[k] = [put(new Uint8Array(img.px)), img.w, img.h]; }
+  for (const [k, f] of Object.entries(ENT)) { if (k === 'chest' || k === 'bed') continue; const img = load(f) || (ENT_ALT[f] ? load(ENT_ALT[f]) : null); if (img) out.ent[k] = [put(new Uint8Array(img.px)), img.w, img.h]; }
   { // OptiFine custom night sky (optifine/sky/world0/nightbox.png), box-filtered to 128px faces
     const sk = load('../optifine/sky/world0/nightbox');
     if (sk) { const f = 4, w = sk.w / f, h = sk.h / f, px = new Uint8Array(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 4; c++) { let a = 0; for (let j = 0; j < f; j++) for (let i = 0; i < f; i++) a += sk.px[((y * f + j) * sk.w + x * f + i) * 4 + c]; px[(y * w + x) * 4 + c] = a / (f * f); } out.sky = [put(px), w, h]; }
@@ -3986,8 +3987,11 @@ for (const [k, f] of Object.entries(FULL)) {
 }
 // decorative and natural blocks
 for (const [o, i] of [['polished_granite', 'granite'], ['polished_diorite', 'diorite'], ['polished_andesite', 'andesite'], ['cut_sandstone', 'sandstone'], ['quartz_bricks', 'quartz_block'],
-  ['polished_blackstone', 'blackstone'], ['polished_blackstone_bricks', 'polished_blackstone'], ['cut_red_sandstone', 'red_sandstone'], ['red_sandstone', 'red_sand'], ['prismarine', 'prismarine_shard'],
-  ['purpur_block', 'popped_chorus_fruit'], ['packed_ice', 'ice'], ['coarse_dirt', 'dirt']]) shaped(o, 4, ['##', '##'], { '#': i });
+  ['polished_blackstone', 'blackstone'], ['polished_blackstone_bricks', 'polished_blackstone'], ['cut_red_sandstone', 'red_sandstone'],
+  ['purpur_block', 'popped_chorus_fruit']]) shaped(o, 4, ['##', '##'], { '#': i });
+shaped('red_sandstone', 1, ['##', '##'], { '#': 'red_sand' }); shaped('prismarine', 1, ['##', '##'], { '#': 'prismarine_shard' });
+shaped('packed_ice', 1, ['###', '###', '###'], { '#': 'ice' }); shaped('coarse_dirt', 4, ['DG', 'GD'], { D: 'dirt', G: 'gravel' });
+shapeless('andesite', 2, ['diorite', 'cobblestone']); shaped('diorite', 2, ['CQ', 'QC'], { C: 'cobblestone', Q: 'quartz' }); shapeless('granite', 1, ['diorite', 'quartz']); shaped('snow', 6, ['###'], { '#': 'snow_block' });
 shaped('chiseled_stone_bricks', 1, ['#', '#'], { '#': 'stone_brick_slab' }); shaped('chiseled_sandstone', 1, ['#', '#'], { '#': 'sandstone_slab' });
 shaped('chiseled_quartz_block', 1, ['#', '#'], { '#': 'quartz_slab' }); shaped('chiseled_nether_bricks', 1, ['#', '#'], { '#': 'nether_brick_slab' }); shaped('purpur_pillar', 1, ['#', '#'], { '#': 'purpur_slab' });
 shaped('red_nether_bricks', 1, ['NW', 'WN'], { N: 'nether_brick', W: 'nether_wart' });
@@ -4072,7 +4076,12 @@ const SMELT = {};
  ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35], ['rabbit', 'cooked_rabbit', 0.35], ['kelp', 'dried_kelp', 0.1],
  ['wet_sponge', 'sponge', 0], ['clay', 'terracotta', 0.35], ['cactus', 'green_dye', 1], ['potato', 'baked_potato', 0.35], ['cod', 'cooked_cod', 0.35], ['salmon', 'cooked_salmon', 0.35],
  ['chorus_fruit', 'popped_chorus_fruit', 0.1], ['nether_bricks', 'cracked_nether_bricks', 0.1], ['red_sand', 'glass', 0.1], ['jungle_log', 'charcoal', 0.15], ['acacia_log', 'charcoal', 0.15], ['dark_oak_log', 'charcoal', 0.15], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
- ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
+ ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['basalt', 'smooth_basalt', 0.1], ['sea_pickle', 'lime_dye', 0.1], ['quartz_block', 'smooth_quartz', 0.1],
+ ['sandstone', 'smooth_sandstone', 0.1], ['red_sandstone', 'smooth_red_sandstone', 0.1], ['polished_blackstone_bricks', 'cracked_polished_blackstone_bricks', 0.1], ['deepslate_bricks', 'cracked_deepslate_bricks', 0.1], ['deepslate_tiles', 'cracked_deepslate_tiles', 0.1],
+ ...['coal', 'diamond', 'emerald', 'lapis', 'redstone'].flatMap(o => [[o + '_ore', o === 'lapis' ? 'lapis_lazuli' : o, o === 'diamond' || o === 'emerald' ? 1 : o === 'coal' ? 0.1 : 0.2], ['deepslate_' + o + '_ore', o === 'lapis' ? 'lapis_lazuli' : o, o === 'diamond' || o === 'emerald' ? 1 : o === 'coal' ? 0.1 : 0.2]]),
+ ['deepslate_iron_ore', 'iron_ingot', 0.7], ['deepslate_gold_ore', 'gold_ingot', 1], ['deepslate_copper_ore', 'copper_ingot', 0.7],
+ ...['axe', 'shovel', 'hoe', 'helmet', 'chestplate', 'leggings', 'boots', 'horse_armor'].flatMap(t => [['iron_' + t, 'iron_nugget', 0.1], ['golden_' + t, 'gold_nugget', 0.1]]),
+ ...['helmet', 'chestplate', 'leggings', 'boots'].map(t => ['chainmail_' + t, 'iron_nugget', 0.1]), ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
   .forEach(([a, b, xp]) => { if (IID[a] != null && IID[b] != null) SMELT[IID[a]] = [IID[b], xp]; });
 // S6 blocks
 for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_fence_gate', 1, ['SPS', 'SPS'], { S: 'stick', P: w + '_planks' }); if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_fence_gate']].fuel = 300; }
@@ -4164,7 +4173,7 @@ function blockDrops(b, meta, stack) {
   switch (d.key) {
     case 'stone': add('cobblestone'); break;
     case 'deepslate': add('cobbled_deepslate'); break;
-    case 'grass_block': case 'farmland': add('dirt'); break;
+    case 'grass_block': case 'farmland': case 'dirt_path': add('dirt'); break;
     case 'coal_ore': case 'deepslate_coal_ore': add('coal'); res.xp = ri(0, 2); break;
     case 'iron_ore': case 'deepslate_iron_ore': add('raw_iron'); break;
     case 'gold_ore': case 'deepslate_gold_ore': add('raw_gold'); break;
@@ -6407,7 +6416,7 @@ const QUAD = (legH, bodyY, bodyBox, headP, headBox, legX, legZ0, legZ1) => [
   ['rleg2', [legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]], ['lleg2', [-legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]],
 ];
 const MOBDEF = {
-  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], parts: HUMAN(4), armsOut: 1,
+  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], extraDrop: [['iron_ingot', 0.0083], ['carrot', 0.0083], ['potato', 0.0083]], parts: HUMAN(4), armsOut: 1,
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, (k, x, y) => k === 'top' ? hex(0x3a5a2a) : hex(0x5d8f4c), r, .15, { front: (g, x, y) => { px(g, x + 1, y + 3, '#1a2a12', 2, 1); px(g, x + 5, y + 3, '#1a2a12', 2, 1); px(g, x + 3, y + 5, '#3a5a2a', 2, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => y > 9 ? hex(0x3b3fa0) : hex(0x1fa0a8), r); paintBox(g, 40, 16, 4, 12, 4, (k, x, y) => y < 4 ? hex(0x1fa0a8) : hex(0x5d8f4c), r); paintBox(g, 0, 16, 4, 12, 4, (k, x, y) => y > 9 ? hex(0x4a4a4a) : hex(0x3b3fa0), r); }) },
   skeleton: { hp: 20, w: 0.3, h: 1.99, speed: 0.12, hostile: 1, ranged: 1, burn: 1, xp: 5, snd: 'rattle', drops: [['bone', 0, 2], ['arrow', 0, 2]], parts: HUMAN(2),
@@ -7508,8 +7517,8 @@ function targetHit(x, y, z, hx, hy, hz) {
 const solidBox = (c) => mobCanvas(g => { g.fillStyle = c; g.fillRect(0, 0, 64, 64); });
 const BOXPARTS = (w, h, d) => [['body', [0, 0, 0], [-w / 2, 0, -d / 2, w, h, d], [0, 0]]];
 Object.assign(MOBDEF, {
-  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
-    drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], parts: HUMAN(4), tex: () => solidBox('#d89a8a') },
+  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, neutral: 1, dmg: 8, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
+    drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], extraDrop: [['gold_ingot', 0.025]], parts: HUMAN(4), tex: () => solidBox('#d89a8a') },
   ghast: { hp: 10, w: 2, h: 4, speed: 0.03, hostile: 1, fly: 1, xp: 5, snd: 'ghast', fireproof: 1, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#f0f0f0'), ai: ghastAI },
   blaze: { hp: 20, w: 0.3, h: 1.8, speed: 0.07, hostile: 1, xp: 10, snd: 'blaze', fireproof: 1, waterHurt: 1, drops: [['blaze_rod', 0, 1]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#f0c030'), ai: blazeAI, anim: blazeAnim },
   magma_cube: { hp: 16, w: 1, h: 2, speed: 0.1, hostile: 1, xp: 4, snd: 'slime', fireproof: 1, slime: 1, drops: [['magma_cream', 0, 1]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#602010'), ai: slimeAI, anim: slimeAnim },
@@ -8114,10 +8123,10 @@ function pickSkin(type, e) {
 const ZDEF = MOBDEF.zombie, SKDEF = MOBDEF.skeleton;
 Object.assign(MOBDEF, {
   husk: { ...ZDEF, burn: 0, drops: [['rotten_flesh', 0, 2]] },
-  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2], ['copper_ingot', 0, 0]] },
-  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
+  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
+  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]], extraDrop: [['slowness_arrow', 0.5]] },
   wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
-  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [['gold_ingot', 0, 0]], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
+  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
   hoglin: { hp: 40, w: 0.7, h: 1.4, speed: 0.1, hostile: 1, dmg: 6, xp: 5, snd: 'growl', drops: [['porkchop', 2, 4], ['leather', 0, 1]], parts: BOXPARTS(16, 14, 26), tex: () => solidBox('#c08060'), food: 'crimson_fungus' },
   strider: { hp: 20, w: 0.45, h: 1.7, speed: 0.06, xp: 2, snd: 'hmm', fireproof: 1, drops: [['string', 2, 5]], parts: BOXPARTS(16, 14, 16), tex: () => solidBox('#a04040'), ai: striderAI, food: 'warped_fungus' },
   shulker: { hp: 30, w: 0.5, h: 1, speed: 0, hostile: 1, xp: 5, snd: 'click', drops: [['shulker_shell', 0, 1]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#9a6aa0'), ai: shulkerAI, anim: shulkerAnim, noPush: 1, kbRes: 1 },
@@ -8125,8 +8134,8 @@ Object.assign(MOBDEF, {
   silverfish: { hp: 8, w: 0.2, h: 0.3, speed: 0.12, hostile: 1, dmg: 1, xp: 5, snd: 'spider', drops: [], parts: BOXPARTS(6, 4, 10), tex: () => solidBox('#8a8a8a') },
   wolf: { hp: 8, w: 0.3, h: 0.85, speed: 0.12, xp: 2, snd: 'bleat', drops: [], parts: BOXPARTS(6, 6, 10), tex: () => solidBox('#d0d0d0'), ai: wolfAI, anim: wolfAnim, food: 'bone' },
   bat: { hp: 6, w: 0.25, h: 0.9, speed: 0.05, xp: 0, snd: 'click', drops: [], parts: BOXPARTS(6, 6, 6), tex: () => solidBox('#4a3a2a'), ai: batAI, anim: batAnim },
-  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1], ['bone_meal', 0, 0]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
-  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
+  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
+  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
 });
 MOBDEF.drowned.drops = [['rotten_flesh', 0, 2]];
 // ---------- AI ----------
@@ -8353,7 +8362,7 @@ const AXO_PREY = new Set(['cod', 'salmon', 'tropical_fish', 'squid', 'glow_squid
 Object.assign(MOBDEF, {
   axolotl: { hp: 14, w: 0.375, h: 0.42, speed: 0.1, xp: 2, snd: 'splash', drops: [], parts: AXO_PARTS, tex: () => axolotlTex(0), vtex: axolotlTex,
     variant: () => (Math.random() * 4) | 0, food: 'tropical_fish_bucket', ai: axolotlAI, anim: axolotlAnim },
-  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
+  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
     variant: () => (Math.random() * TFISH_COL.length) | 0 },
 });
 
@@ -9881,7 +9890,7 @@ function horseInit(e, o) {
   e.temper = o.temper || 0; e.saddle = !!o.saddle; e.harmor = o.harmor || null; e.chest = !!o.chest;
   if (e.chest || k !== 'horse') e.items = o.items || (k !== 'horse' ? new Array(15).fill(null) : null);
   // stats: health 15-30, speed and jump vary per horse (donkeys and mules are slower, jump less)
-  e.hpMax = o.hpMax || (k === 'horse' ? 15 + Math.floor(Math.random() * 16) : 15 + Math.floor(Math.random() * 16));
+  e.hpMax = o.hpMax || (k === 'skeleton_horse' || k === 'zombie_horse' ? 15 : 15 + Math.floor(Math.random() * 16));
   // Java attribute ranges: speed 0.1125-0.3375 (about 42 m/s per unit), jump strength 0.4-1.0
   e.spd = o.spd || (k === 'horse' ? 0.1125 + Math.random() * 0.225 : 0.175);
   e.jumpS = o.jumpS || (k === 'horse' ? 0.4 + Math.random() * 0.6 : 0.5);
@@ -10371,7 +10380,7 @@ function animalTick() {
 function inBerryBush(e) { return boxBlocks(e, b => b === BID.sweet_berry_bush) ; }
 
 Object.assign(MOBDEF, {
-  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['seagrass'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
+  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [['seagrass', 0, 2]], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['seagrass'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
     save: e => ({ home: e.home || null, pregnant: !!e.pregnant }), init: (e, o) => { if (o.home) e.home = o.home; if (o.pregnant) e.pregnant = true; } },
   dolphin: { hp: 10, w: 0.45, h: 0.6, speed: 0.12, xp: 2, snd: 'splash', neutral: 1, drops: [['cod', 0, 1]], parts: DOLPHIN_M.parts, tex: () => DOLPHIN_M.tex(0), ai: dolphinAI, anim: dolphinAnim },
   bee: { hp: 10, w: 0.35, h: 0.6, speed: 0.07, xp: 2, snd: 'hmm', neutral: 1, fly: 1, fallReduce: 99, drops: [], parts: BEE_M.parts, tex: () => BEE_M.tex(0), food: [...FLOWERS].map(id => BLOCKS[id].key).filter(k => IID[k] != null),
@@ -10694,7 +10703,7 @@ Object.assign(MOBDEF, {
   cave_spider: { ...MOBDEF.spider, hp: 12, w: 0.35, h: 0.5, scale: 0.7, tex: CAVE_SPIDER_TEX, onHitPlayer: () => { if (PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 300 : 140, 0); } },
   witch: { tw: 128, th: 64, hp: 26, w: 0.3, h: 1.95, speed: 0.07, hostile: 1, xp: 5, snd: 'hmm', raider: 1, parts: WITCH_M.parts, tex: () => WITCH_M.tex(0), ai: witchAI, anim: illagerAnim, onDeath: illagerDeath,
     drops: [['glass_bottle', 0, 1], ['glowstone_dust', 0, 1], ['gunpowder', 0, 1], ['redstone', 0, 1], ['spider_eye', 0, 1], ['sugar', 0, 1], ['stick', 0, 1]] },
-  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [['arrow', 0, 2]], extraDrop: [['crossbow', 0.085]] }),
+  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [], extraDrop: [['crossbow', 0.085]] }),
   vindicator: ILL(VINDICATOR_M, { dmg: 13, speed: 0.1, axe: 1, drops: [['emerald', 0, 1]], extraDrop: [['iron_axe', 0.085]] }),
   evoker: ILL(EVOKER_M, { evoker: 1, xp: 10, drops: [['totem_of_undying', 1, 1], ['emerald', 0, 1]] }),
   ravager: { hp: 100, w: 0.98, h: 2.2, speed: 0.1, hostile: 1, xp: 20, snd: 'growl', raider: 1, ravager: 1, dmg: 12, kbRes: 1, drops: [['saddle', 1, 1]], parts: RAVAGER_M.parts, tw: 128, th: 128, tex: () => RAVAGER_M.tex(0), ai: illagerAI, onDeath: illagerDeath },
@@ -10963,10 +10972,10 @@ function monumentSpawn() {
 function oceanTick() { conduitTick(); monumentSpawn(); }
 
 Object.assign(MOBDEF, {
-  pufferfish: { hp: 3, w: 0.35, h: 0.35, speed: 0.04, xp: 1, snd: 'splash', fish: 1, drops: [['pufferfish', 1, 1]], parts: PUFF_M.parts, tex: () => PUFF_M.tex(0), ai: pufferAI },
+  pufferfish: { hp: 3, w: 0.35, h: 0.35, speed: 0.04, xp: 1, snd: 'splash', fish: 1, drops: [['pufferfish', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: PUFF_M.parts, tex: () => PUFF_M.tex(0), ai: pufferAI },
   guardian: { hp: 30, w: 0.425, h: 0.85, speed: 0.1, hostile: 1, xp: 10, snd: 'splash', fallReduce: 99, drops: [['prismarine_shard', 0, 2], ['cod', 0, 1], ['prismarine_crystals', 0, 1]], parts: GUARDIAN_M.parts, tw: 128, th: 64,
     tex: () => GUARDIAN_M.tex(0), ai: guardianAI, anim: guardianAnim, thorns: e => e.spikes, onDeath: e => guardianBeam(e, null) },
-  elder_guardian: { hp: 80, w: 1, h: 2, speed: 0.05, hostile: 1, elder: 1, xp: 10, snd: 'splash', scale: 2.35, kbRes: 1, fallReduce: 99, drops: [['wet_sponge', 1, 1], ['prismarine_shard', 0, 2], ['cod', 0, 1]], parts: ELDER_M.parts, tw: 128, th: 64,
+  elder_guardian: { hp: 80, w: 1, h: 2, speed: 0.05, hostile: 1, elder: 1, xp: 10, snd: 'splash', scale: 2.35, kbRes: 1, fallReduce: 99, drops: [['wet_sponge', 1, 1], ['prismarine_shard', 0, 2], ['cod', 0, 1], ['prismarine_crystals', 0, 1]], parts: ELDER_M.parts, tw: 128, th: 64,
     tex: () => ELDER_M.tex(0), ai: guardianAI, anim: guardianAnim, thorns: e => e.spikes, onDeath: e => guardianBeam(e, null) },
 });
 // drowned sometimes come holding a nautilus shell (3%), which they always drop
@@ -11509,7 +11518,7 @@ Object.assign(MOBDEF, {
   panda: { hp: 20, w: 0.65, h: 1.25, speed: 0.04, xp: 2, snd: 'hmm', drops: [['bamboo', 0, 2]], parts: PANDA_M.parts, tw: 128, th: 64, tex: () => PANDA_M.tex(0), vtex: v => PANDA_M.tex(v), variant: () => Math.random() < 0.02 ? 1 : 0, food: ['bamboo'], ai: withDefault(pandaAI) },
   polar_bear: { hp: 30, w: 0.7, h: 1.4, speed: 0.06, xp: 2, snd: 'growl', neutral: 1, drops: [['cod', 0, 2], ['salmon', 0, 2]], parts: BEAR_M.parts, tw: 128, th: 64, tex: () => BEAR_M.tex(0), ai: withDefault(polarBearAI) },
   parrot: { hp: 6, w: 0.25, h: 0.9, speed: 0.1, xp: 2, snd: 'hmm', fly: 1, fallReduce: 99, drops: [['feather', 1, 2]], parts: PARROT_M.parts, tex: () => PARROT_M.tex(0), vtex: v => PARROT_M.tex(v), variant: () => (Math.random() * 5) | 0, ai: parrotAI, anim: parrotAnim, interact: (e, h) => parrotUse(e, h) },
-  ocelot: { ...MOBDEF.cat, variant: () => OCELOT_V, ai: withDefault(ocelotAI), interact: (e, h) => ocelotUse(e, h), save: e => ({ trusting: !!e.trusting }), init: (e, o) => { if (o.trusting) e.trusting = true; } },
+  ocelot: { ...MOBDEF.cat, drops: [], variant: () => OCELOT_V, ai: withDefault(ocelotAI), interact: (e, h) => ocelotUse(e, h), save: e => ({ trusting: !!e.trusting }), init: (e, o) => { if (o.trusting) e.trusting = true; } },
   llama: LLAMA_DEF(LLAMA_M, '라마'),
   trader_llama: { ...LLAMA_DEF(TLLAMA_M, '상인 라마'), ai: withDefault(traderLlamaAI) },
   wandering_trader: { hp: 20, w: 0.3, h: 1.95, speed: 0.07, xp: 0, snd: 'hmm', drops: [], parts: TRADER_M.parts, tw: 128, th: 64, tex: () => TRADER_M.tex(0), ai: withDefault(traderAI), interact: e => traderUse(e), init: (e, o) => { e.life = o.life || 48000; }, save: e => ({ life: e.life }) },
@@ -12370,7 +12379,8 @@ Object.assign(MCMODELS, {
   mooshroom: { ...MCMODELS.cow, tex: 'red_mooshroom' }, ravager: { tex: 'ravager', tw: 128, th: 128, parts: RAVAGER_PARTS }, vex: { tex: 'vex', tw: 64, th: 64, parts: VEX_PARTS, scale: 0.4 },
   guardian: { tex: 'guardian', tw: 64, th: 64, parts: GUARDIAN_PARTS }, elder_guardian: { tex: 'guardian_elder', tw: 64, th: 64, parts: GUARDIAN_PARTS },
   wither: { tex: 'wither', tw: 64, th: 64, parts: WITHER_PARTS, scale: 2 }, pufferfish: { tex: 'pufferfish', tw: 32, th: 32, parts: PUFFER_PARTS, scale: 0.6 },
-  zombie_villager: { ...MCMODELS.villager, tex: 'zombie_villager' },
+  zombie_villager: { tex: 'zombie_villager', tw: 64, th: 64, parts: [...MCMODELS.villager.parts.filter(p => p.n !== 'arms'),
+    { n: 'rarm', o: [-5, 2, 0], b: [[44, 22, -3, -2, -2, 4, 12, 4]] }, { n: 'larm', o: [5, 2, 0], b: [[44, 22, -1, -2, -2, 4, 12, 4, 0, 1]] }] },
 });
 // variants pick their own pack texture
 const MCVTEX = {
@@ -12832,14 +12842,17 @@ const EFF = {
   hunger: ['허기', '#587653'], weakness: ['나약함', '#484d48'], poison: ['독', '#4e9331'], wither: ['시듦', '#352a27'], absorption: ['흡수', '#2552a5'],
   saturation: ['포화', '#f82423'], levitation: ['공중 부양', '#ceffff'], slow_falling: ['느린 낙하', '#f7f8e0'], conduit_power: ['전달체의 힘', '#1dc2d1'],
   dolphins_grace: ['돌고래의 우아함', '#88a3be'], bad_omen: ['흉조', '#0b6138'], hero_of_the_village: ['마을의 영웅', '#44ff44'], glowing: ['발광', '#94a061'],
+  health_boost: ['생명력 강화', '#f87d23'], luck: ['행운', '#339900'], unluck: ['불운', '#c0a44d'],
 };
+// maximum health: 20, plus 4 for each level of health boost
+const plMaxHp = () => 20 + 4 * effLv(PL, 'health_boost');
 const UNDEAD = new Set(['zombie', 'skeleton', 'husk', 'drowned', 'stray', 'wither_skeleton', 'zombified_piglin', 'zoglin', 'phantom', 'skeleton_horse', 'zombie_horse']);
 const effLv = (t, k) => { const e = t && t.eff && t.eff[k]; return e ? e.lv + 1 : 0; }; // 0: none, 1: level I
 function addEffect(t, k, dur, lv = 0) {
   if (t === PL && (PL.dead || creative() && (k === 'poison' || k === 'wither' || k === 'instant_damage'))) return;
   if (k === 'instant_health' || k === 'instant_damage') { // undead are hurt by healing and healed by harm
     const heal = (k === 'instant_health') !== (t !== PL && UNDEAD.has(t.type));
-    if (heal) { if (t === PL) PL.health = Math.min(20, PL.health + (4 << lv)); else t.hp = Math.min(t.def.hp, t.hp + (4 << lv)); }
+    if (heal) { if (t === PL) PL.health = Math.min(plMaxHp(), PL.health + (4 << lv)); else t.hp = Math.min(t.def.hp, t.hp + (4 << lv)); }
     else if (t === PL) hurtPlayer(6 << lv, 'magic'); else { t.inv = 0; hurtMob(t, 6 << lv, null); }
     UI.hudDirty = true; return;
   }
@@ -12858,11 +12871,11 @@ function effectTick(t) {
   const me = t === PL;
   for (const k in t.eff) {
     const e = t.eff[k], lv = e.lv;
-    if (k === 'regeneration' && e.t % Math.max(1, 50 >> lv) === 0) { if (me) { if (PL.health < 20) { PL.health = Math.min(20, PL.health + 1); UI.hudDirty = true; } } else if (t.hp < t.def.hp) t.hp++; }
+    if (k === 'regeneration' && e.t % Math.max(1, 50 >> lv) === 0) { if (me) { if (PL.health < plMaxHp()) { PL.health = Math.min(plMaxHp(), PL.health + 1); UI.hudDirty = true; } } else if (t.hp < t.def.hp) t.hp++; }
     else if (k === 'poison' && e.t % Math.max(1, 25 >> lv) === 0) { if (me) { if (PL.health > 1) hurtPlayer(1, 'poison'); } else if (t.hp > 1) { t.inv = 0; hurtMob(t, 1, null); } }
     else if (k === 'wither' && e.t % Math.max(1, 40 >> lv) === 0) { if (me) hurtPlayer(1, 'wither'); else { t.inv = 0; hurtMob(t, 1, null); } }
     else if (k === 'hunger' && me) PL.exh += 0.005 * (lv + 1);
-    if (--e.t <= 0) { delete t.eff[k]; if (k === 'absorption' && me) PL.absorb = 0; if (me) UI.hudDirty = true; }
+    if (--e.t <= 0) { delete t.eff[k]; if (k === 'absorption' && me) PL.absorb = 0; if (k === 'health_boost' && me) PL.health = Math.min(PL.health, plMaxHp()); if (me) UI.hudDirty = true; }
   }
 }
 // player modifiers used by movement, combat and mining
@@ -13172,11 +13185,11 @@ function survivalTick(inWater, inLava, eyeF) {
   if (PL.frozen >= 140 && W.tickN % 40 === 0) hurtPlayer(1, 'freeze');
   if (creative()) return;
   // hunger
-  if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < 20) PL.health = Math.min(20, PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
+  if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < plMaxHp()) PL.health = Math.min(plMaxHp(), PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
   if (PL.exh >= 4) { PL.exh -= 4; if (PL.sat > 0) PL.sat = Math.max(0, PL.sat - 1); else if (PL.difficulty > 0) PL.food = Math.max(0, PL.food - 1); UI.hudDirty = true; }
   PL.foodTimer++;
-  if (PL.food >= 20 && PL.sat > 0 && PL.health < 20) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(20, PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
-  else if (PL.food >= 18 && PL.health < 20) { if (PL.foodTimer >= 80) { PL.health = Math.min(20, PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
+  if (PL.food >= 20 && PL.sat > 0 && PL.health < plMaxHp()) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(plMaxHp(), PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
+  else if (PL.food >= 18 && PL.health < plMaxHp()) { if (PL.foodTimer >= 80) { PL.health = Math.min(plMaxHp(), PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food <= 0) { if (PL.foodTimer >= 80) { if (PL.health > 10 || PL.difficulty === 3 || (PL.health > 1 && PL.difficulty === 2)) hurtPlayer(1, 'starve'); PL.foodTimer = 0; } }
   else PL.foodTimer = 0;
 }
@@ -13765,7 +13778,7 @@ function renderHud(dt) {
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
-    for (let i = 0; i < 10; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
+    for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
     if (PL.absorb > 0) for (let i = 0; i < Math.ceil(PL.absorb / 2); i++) hearts.push(`<img src="${SPR_HUD.gold}">`);
     $('hearts').innerHTML = hearts.join('');
     const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD.food : v === 1 ? SPR_HUD.foodHalf : SPR_HUD.foodEmpty}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }

@@ -45,7 +45,7 @@ const AXO_PREY = new Set(['cod', 'salmon', 'tropical_fish', 'squid', 'glow_squid
 Object.assign(MOBDEF, {
   axolotl: { hp: 14, w: 0.375, h: 0.42, speed: 0.1, xp: 2, snd: 'splash', drops: [], parts: AXO_PARTS, tex: () => axolotlTex(0), vtex: axolotlTex,
     variant: () => (Math.random() * 4) | 0, food: 'tropical_fish_bucket', ai: axolotlAI, anim: axolotlAnim },
-  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
+  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
     variant: () => (Math.random() * TFISH_COL.length) | 0 },
 });
 

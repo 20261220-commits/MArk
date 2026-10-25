@@ -3,8 +3,8 @@
 const solidBox = (c) => mobCanvas(g => { g.fillStyle = c; g.fillRect(0, 0, 64, 64); });
 const BOXPARTS = (w, h, d) => [['body', [0, 0, 0], [-w / 2, 0, -d / 2, w, h, d], [0, 0]]];
 Object.assign(MOBDEF, {
-  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
-    drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], parts: HUMAN(4), tex: () => solidBox('#d89a8a') },
+  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, neutral: 1, dmg: 8, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
+    drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], extraDrop: [['gold_ingot', 0.025]], parts: HUMAN(4), tex: () => solidBox('#d89a8a') },
   ghast: { hp: 10, w: 2, h: 4, speed: 0.03, hostile: 1, fly: 1, xp: 5, snd: 'ghast', fireproof: 1, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#f0f0f0'), ai: ghastAI },
   blaze: { hp: 20, w: 0.3, h: 1.8, speed: 0.07, hostile: 1, xp: 10, snd: 'blaze', fireproof: 1, waterHurt: 1, drops: [['blaze_rod', 0, 1]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#f0c030'), ai: blazeAI, anim: blazeAnim },
   magma_cube: { hp: 16, w: 1, h: 2, speed: 0.1, hostile: 1, xp: 4, snd: 'slime', fireproof: 1, slime: 1, drops: [['magma_cream', 0, 1]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#602010'), ai: slimeAI, anim: slimeAnim },

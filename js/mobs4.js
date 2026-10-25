@@ -68,7 +68,7 @@ function horseInit(e, o) {
   e.temper = o.temper || 0; e.saddle = !!o.saddle; e.harmor = o.harmor || null; e.chest = !!o.chest;
   if (e.chest || k !== 'horse') e.items = o.items || (k !== 'horse' ? new Array(15).fill(null) : null);
   // stats: health 15-30, speed and jump vary per horse (donkeys and mules are slower, jump less)
-  e.hpMax = o.hpMax || (k === 'horse' ? 15 + Math.floor(Math.random() * 16) : 15 + Math.floor(Math.random() * 16));
+  e.hpMax = o.hpMax || (k === 'skeleton_horse' || k === 'zombie_horse' ? 15 : 15 + Math.floor(Math.random() * 16));
   // Java attribute ranges: speed 0.1125-0.3375 (about 42 m/s per unit), jump strength 0.4-1.0
   e.spd = o.spd || (k === 'horse' ? 0.1125 + Math.random() * 0.225 : 0.175);
   e.jumpS = o.jumpS || (k === 'horse' ? 0.4 + Math.random() * 0.6 : 0.5);

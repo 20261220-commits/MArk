@@ -427,8 +427,11 @@ for (const [k, f] of Object.entries(FULL)) {
 }
 // decorative and natural blocks
 for (const [o, i] of [['polished_granite', 'granite'], ['polished_diorite', 'diorite'], ['polished_andesite', 'andesite'], ['cut_sandstone', 'sandstone'], ['quartz_bricks', 'quartz_block'],
-  ['polished_blackstone', 'blackstone'], ['polished_blackstone_bricks', 'polished_blackstone'], ['cut_red_sandstone', 'red_sandstone'], ['red_sandstone', 'red_sand'], ['prismarine', 'prismarine_shard'],
-  ['purpur_block', 'popped_chorus_fruit'], ['packed_ice', 'ice'], ['coarse_dirt', 'dirt']]) shaped(o, 4, ['##', '##'], { '#': i });
+  ['polished_blackstone', 'blackstone'], ['polished_blackstone_bricks', 'polished_blackstone'], ['cut_red_sandstone', 'red_sandstone'],
+  ['purpur_block', 'popped_chorus_fruit']]) shaped(o, 4, ['##', '##'], { '#': i });
+shaped('red_sandstone', 1, ['##', '##'], { '#': 'red_sand' }); shaped('prismarine', 1, ['##', '##'], { '#': 'prismarine_shard' });
+shaped('packed_ice', 1, ['###', '###', '###'], { '#': 'ice' }); shaped('coarse_dirt', 4, ['DG', 'GD'], { D: 'dirt', G: 'gravel' });
+shapeless('andesite', 2, ['diorite', 'cobblestone']); shaped('diorite', 2, ['CQ', 'QC'], { C: 'cobblestone', Q: 'quartz' }); shapeless('granite', 1, ['diorite', 'quartz']); shaped('snow', 6, ['###'], { '#': 'snow_block' });
 shaped('chiseled_stone_bricks', 1, ['#', '#'], { '#': 'stone_brick_slab' }); shaped('chiseled_sandstone', 1, ['#', '#'], { '#': 'sandstone_slab' });
 shaped('chiseled_quartz_block', 1, ['#', '#'], { '#': 'quartz_slab' }); shaped('chiseled_nether_bricks', 1, ['#', '#'], { '#': 'nether_brick_slab' }); shaped('purpur_pillar', 1, ['#', '#'], { '#': 'purpur_slab' });
 shaped('red_nether_bricks', 1, ['NW', 'WN'], { N: 'nether_brick', W: 'nether_wart' });
@@ -513,7 +516,12 @@ const SMELT = {};
  ['porkchop', 'cooked_porkchop', 0.35], ['beef', 'cooked_beef', 0.35], ['chicken', 'cooked_chicken', 0.35], ['mutton', 'cooked_mutton', 0.35], ['rabbit', 'cooked_rabbit', 0.35], ['kelp', 'dried_kelp', 0.1],
  ['wet_sponge', 'sponge', 0], ['clay', 'terracotta', 0.35], ['cactus', 'green_dye', 1], ['potato', 'baked_potato', 0.35], ['cod', 'cooked_cod', 0.35], ['salmon', 'cooked_salmon', 0.35],
  ['chorus_fruit', 'popped_chorus_fruit', 0.1], ['nether_bricks', 'cracked_nether_bricks', 0.1], ['red_sand', 'glass', 0.1], ['jungle_log', 'charcoal', 0.15], ['acacia_log', 'charcoal', 0.15], ['dark_oak_log', 'charcoal', 0.15], ['nether_gold_ore', 'gold_ingot', 1], ['nether_quartz_ore', 'quartz', 0.2], ['ancient_debris', 'netherite_scrap', 2],
- ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
+ ['netherrack', 'nether_brick', 0.1], ['stone_bricks', 'cracked_stone_bricks', 0.1], ['basalt', 'smooth_basalt', 0.1], ['sea_pickle', 'lime_dye', 0.1], ['quartz_block', 'smooth_quartz', 0.1],
+ ['sandstone', 'smooth_sandstone', 0.1], ['red_sandstone', 'smooth_red_sandstone', 0.1], ['polished_blackstone_bricks', 'cracked_polished_blackstone_bricks', 0.1], ['deepslate_bricks', 'cracked_deepslate_bricks', 0.1], ['deepslate_tiles', 'cracked_deepslate_tiles', 0.1],
+ ...['coal', 'diamond', 'emerald', 'lapis', 'redstone'].flatMap(o => [[o + '_ore', o === 'lapis' ? 'lapis_lazuli' : o, o === 'diamond' || o === 'emerald' ? 1 : o === 'coal' ? 0.1 : 0.2], ['deepslate_' + o + '_ore', o === 'lapis' ? 'lapis_lazuli' : o, o === 'diamond' || o === 'emerald' ? 1 : o === 'coal' ? 0.1 : 0.2]]),
+ ['deepslate_iron_ore', 'iron_ingot', 0.7], ['deepslate_gold_ore', 'gold_ingot', 1], ['deepslate_copper_ore', 'copper_ingot', 0.7],
+ ...['axe', 'shovel', 'hoe', 'helmet', 'chestplate', 'leggings', 'boots', 'horse_armor'].flatMap(t => [['iron_' + t, 'iron_nugget', 0.1], ['golden_' + t, 'gold_nugget', 0.1]]),
+ ...['helmet', 'chestplate', 'leggings', 'boots'].map(t => ['chainmail_' + t, 'iron_nugget', 0.1]), ['iron_sword', 'iron_nugget', 0.1], ['iron_pickaxe', 'iron_nugget', 0.1], ['golden_sword', 'gold_nugget', 0.1], ['golden_pickaxe', 'gold_nugget', 0.1]]
   .forEach(([a, b, xp]) => { if (IID[a] != null && IID[b] != null) SMELT[IID[a]] = [IID[b], xp]; });
 // S6 blocks
 for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) { shaped(w + '_fence_gate', 1, ['SPS', 'SPS'], { S: 'stick', P: w + '_planks' }); if (w !== 'crimson' && w !== 'warped') ITEMS[IID[w + '_fence_gate']].fuel = 300; }
@@ -605,7 +613,7 @@ function blockDrops(b, meta, stack) {
   switch (d.key) {
     case 'stone': add('cobblestone'); break;
     case 'deepslate': add('cobbled_deepslate'); break;
-    case 'grass_block': case 'farmland': add('dirt'); break;
+    case 'grass_block': case 'farmland': case 'dirt_path': add('dirt'); break;
     case 'coal_ore': case 'deepslate_coal_ore': add('coal'); res.xp = ri(0, 2); break;
     case 'iron_ore': case 'deepslate_iron_ore': add('raw_iron'); break;
     case 'gold_ore': case 'deepslate_gold_ore': add('raw_gold'); break;

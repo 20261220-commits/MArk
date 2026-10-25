@@ -312,7 +312,7 @@ Object.assign(MOBDEF, {
   cave_spider: { ...MOBDEF.spider, hp: 12, w: 0.35, h: 0.5, scale: 0.7, tex: CAVE_SPIDER_TEX, onHitPlayer: () => { if (PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 300 : 140, 0); } },
   witch: { tw: 128, th: 64, hp: 26, w: 0.3, h: 1.95, speed: 0.07, hostile: 1, xp: 5, snd: 'hmm', raider: 1, parts: WITCH_M.parts, tex: () => WITCH_M.tex(0), ai: witchAI, anim: illagerAnim, onDeath: illagerDeath,
     drops: [['glass_bottle', 0, 1], ['glowstone_dust', 0, 1], ['gunpowder', 0, 1], ['redstone', 0, 1], ['spider_eye', 0, 1], ['sugar', 0, 1], ['stick', 0, 1]] },
-  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [['arrow', 0, 2]], extraDrop: [['crossbow', 0.085]] }),
+  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [], extraDrop: [['crossbow', 0.085]] }),
   vindicator: ILL(VINDICATOR_M, { dmg: 13, speed: 0.1, axe: 1, drops: [['emerald', 0, 1]], extraDrop: [['iron_axe', 0.085]] }),
   evoker: ILL(EVOKER_M, { evoker: 1, xp: 10, drops: [['totem_of_undying', 1, 1], ['emerald', 0, 1]] }),
   ravager: { hp: 100, w: 0.98, h: 2.2, speed: 0.1, hostile: 1, xp: 20, snd: 'growl', raider: 1, ravager: 1, dmg: 12, kbRes: 1, drops: [['saddle', 1, 1]], parts: RAVAGER_M.parts, tw: 128, th: 128, tex: () => RAVAGER_M.tex(0), ai: illagerAI, onDeath: illagerDeath },

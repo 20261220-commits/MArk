@@ -134,10 +134,10 @@ function monumentSpawn() {
 function oceanTick() { conduitTick(); monumentSpawn(); }
 
 Object.assign(MOBDEF, {
-  pufferfish: { hp: 3, w: 0.35, h: 0.35, speed: 0.04, xp: 1, snd: 'splash', fish: 1, drops: [['pufferfish', 1, 1]], parts: PUFF_M.parts, tex: () => PUFF_M.tex(0), ai: pufferAI },
+  pufferfish: { hp: 3, w: 0.35, h: 0.35, speed: 0.04, xp: 1, snd: 'splash', fish: 1, drops: [['pufferfish', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: PUFF_M.parts, tex: () => PUFF_M.tex(0), ai: pufferAI },
   guardian: { hp: 30, w: 0.425, h: 0.85, speed: 0.1, hostile: 1, xp: 10, snd: 'splash', fallReduce: 99, drops: [['prismarine_shard', 0, 2], ['cod', 0, 1], ['prismarine_crystals', 0, 1]], parts: GUARDIAN_M.parts, tw: 128, th: 64,
     tex: () => GUARDIAN_M.tex(0), ai: guardianAI, anim: guardianAnim, thorns: e => e.spikes, onDeath: e => guardianBeam(e, null) },
-  elder_guardian: { hp: 80, w: 1, h: 2, speed: 0.05, hostile: 1, elder: 1, xp: 10, snd: 'splash', scale: 2.35, kbRes: 1, fallReduce: 99, drops: [['wet_sponge', 1, 1], ['prismarine_shard', 0, 2], ['cod', 0, 1]], parts: ELDER_M.parts, tw: 128, th: 64,
+  elder_guardian: { hp: 80, w: 1, h: 2, speed: 0.05, hostile: 1, elder: 1, xp: 10, snd: 'splash', scale: 2.35, kbRes: 1, fallReduce: 99, drops: [['wet_sponge', 1, 1], ['prismarine_shard', 0, 2], ['cod', 0, 1], ['prismarine_crystals', 0, 1]], parts: ELDER_M.parts, tw: 128, th: 64,
     tex: () => ELDER_M.tex(0), ai: guardianAI, anim: guardianAnim, thorns: e => e.spikes, onDeath: e => guardianBeam(e, null) },
 });
 // drowned sometimes come holding a nautilus shell (3%), which they always drop

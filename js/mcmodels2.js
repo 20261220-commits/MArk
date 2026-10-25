@@ -210,7 +210,8 @@ Object.assign(MCMODELS, {
   mooshroom: { ...MCMODELS.cow, tex: 'red_mooshroom' }, ravager: { tex: 'ravager', tw: 128, th: 128, parts: RAVAGER_PARTS }, vex: { tex: 'vex', tw: 64, th: 64, parts: VEX_PARTS, scale: 0.4 },
   guardian: { tex: 'guardian', tw: 64, th: 64, parts: GUARDIAN_PARTS }, elder_guardian: { tex: 'guardian_elder', tw: 64, th: 64, parts: GUARDIAN_PARTS },
   wither: { tex: 'wither', tw: 64, th: 64, parts: WITHER_PARTS, scale: 2 }, pufferfish: { tex: 'pufferfish', tw: 32, th: 32, parts: PUFFER_PARTS, scale: 0.6 },
-  zombie_villager: { ...MCMODELS.villager, tex: 'zombie_villager' },
+  zombie_villager: { tex: 'zombie_villager', tw: 64, th: 64, parts: [...MCMODELS.villager.parts.filter(p => p.n !== 'arms'),
+    { n: 'rarm', o: [-5, 2, 0], b: [[44, 22, -3, -2, -2, 4, 12, 4]] }, { n: 'larm', o: [5, 2, 0], b: [[44, 22, -1, -2, -2, 4, 12, 4, 0, 1]] }] },
 });
 // variants pick their own pack texture
 const MCVTEX = {

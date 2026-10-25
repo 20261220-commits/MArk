@@ -67,10 +67,10 @@ function pickSkin(type, e) {
 const ZDEF = MOBDEF.zombie, SKDEF = MOBDEF.skeleton;
 Object.assign(MOBDEF, {
   husk: { ...ZDEF, burn: 0, drops: [['rotten_flesh', 0, 2]] },
-  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2], ['copper_ingot', 0, 0]] },
-  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
+  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
+  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]], extraDrop: [['slowness_arrow', 0.5]] },
   wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
-  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [['gold_ingot', 0, 0]], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
+  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
   hoglin: { hp: 40, w: 0.7, h: 1.4, speed: 0.1, hostile: 1, dmg: 6, xp: 5, snd: 'growl', drops: [['porkchop', 2, 4], ['leather', 0, 1]], parts: BOXPARTS(16, 14, 26), tex: () => solidBox('#c08060'), food: 'crimson_fungus' },
   strider: { hp: 20, w: 0.45, h: 1.7, speed: 0.06, xp: 2, snd: 'hmm', fireproof: 1, drops: [['string', 2, 5]], parts: BOXPARTS(16, 14, 16), tex: () => solidBox('#a04040'), ai: striderAI, food: 'warped_fungus' },
   shulker: { hp: 30, w: 0.5, h: 1, speed: 0, hostile: 1, xp: 5, snd: 'click', drops: [['shulker_shell', 0, 1]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#9a6aa0'), ai: shulkerAI, anim: shulkerAnim, noPush: 1, kbRes: 1 },
@@ -78,8 +78,8 @@ Object.assign(MOBDEF, {
   silverfish: { hp: 8, w: 0.2, h: 0.3, speed: 0.12, hostile: 1, dmg: 1, xp: 5, snd: 'spider', drops: [], parts: BOXPARTS(6, 4, 10), tex: () => solidBox('#8a8a8a') },
   wolf: { hp: 8, w: 0.3, h: 0.85, speed: 0.12, xp: 2, snd: 'bleat', drops: [], parts: BOXPARTS(6, 6, 10), tex: () => solidBox('#d0d0d0'), ai: wolfAI, anim: wolfAnim, food: 'bone' },
   bat: { hp: 6, w: 0.25, h: 0.9, speed: 0.05, xp: 0, snd: 'click', drops: [], parts: BOXPARTS(6, 6, 6), tex: () => solidBox('#4a3a2a'), ai: batAI, anim: batAnim },
-  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1], ['bone_meal', 0, 0]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
-  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
+  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
+  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
 });
 MOBDEF.drowned.drops = [['rotten_flesh', 0, 2]];
 // ---------- AI ----------
