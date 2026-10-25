@@ -96,7 +96,7 @@ function piglinAI(e, dist) {
     walkPhysics(e, 0, 0, 0); return;
   }
   // pick up gold ingots lying nearby
-  if (!e.target) for (const it of ENT) if (it.kind === 'item' && !it.dead && it.stack.id === IID.gold_ingot && Math.hypot(it.x - e.x, it.z - e.z) < 1.2 && Math.abs(it.y - e.y) < 1.5) { it.stack.n--; if (!it.stack.n) removeEnt(it); e.barter = 120; return; }
+  if (!e.target) for (const it of ENT) if (it.kind === 'item' && !it.dead && it.stack.id === IID.gold_ingot && Math.hypot(it.x - e.x, it.z - e.z) < 1.2 && Math.abs(it.y - e.y) < 1.5) { it.stack.n--; if (!it.stack.n) removeEnt(it); e.barter = 120; if (it.byPlayer) advGrant('nether/distract_piglin', 'distract_piglin'); return; }
   let mx = 0, mz = 0;
   if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.def.dmg, mx, mz); } }
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
@@ -179,10 +179,10 @@ function swimAssist(e) { if (e.def.swim && e.inWater && e.target) { e.vy += Math
 // ---------- player interaction with the new mobs ----------
 function mobInteract(e, h, d) {
   if (e.def.interact && e.def.interact(e, h, d)) return true;
-  if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { e.barter = 120; consume(); swing(); play('hmm'); return true; }
+  if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); UI.advance('wolf'); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); return true; }
+    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); return true; }
   }
   return false;
 }

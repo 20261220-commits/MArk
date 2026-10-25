@@ -10,7 +10,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
-  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 });
+  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
   if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // axes knock the shield away for 5 s
   return true;
 }
@@ -38,7 +38,7 @@ function crossbowFire(h) {
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
     e.crossbow = true;
   }
-  h.ch = null; h.chFw = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
+  h.ch = null; h.chFw = null; play('bow'); if (typeof advGrant === 'function') advGrant('adventure/ol_betsy'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
 }
 
 // ---------- trident ----------
@@ -64,7 +64,8 @@ function tridentHit(e, o) {
   const st = e.trident;
   let dmg = 8; if (st && AQUATIC.has(o.type)) dmg += 2.5 * enchLv(st, 'impaling');
   if (o === PL) { if (!creative()) hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e); }
-  else hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null);
+  else { HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e); hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); HURTPROJ = null; }
+  if (st && enchLv(st, 'channeling') && o.type === 'villager' && W.thunder > 0.5 && W.dim === 0 && e.owner === PL && typeof advGrant === 'function') advGrant('adventure/very_very_frightening');
   if (st && enchLv(st, 'channeling') && W.thunder > 0.5 && W.dim === 0 && (getLight(Math.floor(o.x), Math.floor(o.y + 1), Math.floor(o.z)) >> 4) === 15) strikeLightning(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z), false);
   e.vx *= -0.1; e.vy = 0.1; e.vz *= -0.1; e.hitDone = true;
 }

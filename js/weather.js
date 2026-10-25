@@ -33,7 +33,7 @@ function weatherTick() {
   const cs = [...W.chunks.values()], c = cs[(Math.random() * cs.length) | 0];
   const x = c.cx * 16 + ((Math.random() * 16) | 0), z = c.cz * 16 + ((Math.random() * 16) | 0);
   const rod = rodNear(x, z);
-  if (rod) { strikeLightning(rod[0], rod[1] + 1, rod[2], true); return; }
+  if (rod) { strikeLightning(rod[0], rod[1] + 1, rod[2], true); if (ENT.some(e => e.type === 'villager' && !e.dead && Math.hypot(e.x - rod[0], e.y - rod[1], e.z - rod[2]) < 30)) advGrant('adventure/lightning_rod_with_villager_no_fire'); return; }
   if (!rainsAt(x, z)) return;
   strikeLightning(x, topY(x, z) + 1, z, false);
 }

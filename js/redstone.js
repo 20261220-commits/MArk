@@ -380,4 +380,5 @@ function targetHit(x, y, z, hx, hy, hz) {
   const dx = hx - x - .5, dy = hy - y - .5, dz = hz - z - .5, d = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 2 > 0.999 ? Math.hypot(dx, dy, dz) : Math.hypot(dx, dy, dz));
   const v = Math.max(1, Math.round(15 - d * 15 * 1.2));
   setMeta(x, y, z, (getMeta(x, y, z) & ~15) | v); rsNotify(x, y, z); rsLater(x, y, z, 20);
+  return v;
 }

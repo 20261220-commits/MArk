@@ -77,7 +77,7 @@ function parrotAI(e, dist) {
 function parrotUse(e, h) {
   if (h && h.id === IID.cookie) { consume(); addEffect(e, 'poison', 400, 0); hurtMob(e, 999, PL); return true; }
   if (e.owner === 'player') { e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-  if (h && (h.id === IID.wheat_seeds || h.id === IID.melon_seeds || h.id === IID.pumpkin_seeds || h.id === IID.beetroot_seeds)) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.1, vy: 1, grav: 0 }); } return true; }
+  if (h && (h.id === IID.wheat_seeds || h.id === IID.melon_seeds || h.id === IID.pumpkin_seeds || h.id === IID.beetroot_seeds)) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.1, vy: 1, grav: 0 }); } return true; }
   return false;
 }
 function parrotAnim(e, P, now) { const f = e.flying ? Math.sin(now / 50) * 0.9 : 0; if (P.rwing) { P.rwing.rotation.z = -f; P.lwing.rotation.z = f; } }

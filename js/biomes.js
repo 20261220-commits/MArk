@@ -31,7 +31,7 @@ function golemCheck(x, y, z) {
   if (getBlock(x, y - 1, z) === BID.iron_block && getBlock(x, y - 2, z) === BID.iron_block) for (const [ax, az] of [[1, 0], [0, 1]]) {
     if (getBlock(x + ax, y - 1, z + az) !== BID.iron_block || getBlock(x - ax, y - 1, z - az) !== BID.iron_block) continue;
     for (const c of [[0, 0, 0], [0, -1, 0], [0, -2, 0], [ax, -1, az], [-ax, -1, -az]]) setBlock(x + c[0], y + c[1], z + c[2], 0);
-    const g = spawnMob('iron_golem', x + .5, y - 2, z + .5); g.persistent = true; g.playerMade = true; play('golem'); return;
+    const g = spawnMob('iron_golem', x + .5, y - 2, z + .5); g.persistent = true; g.playerMade = true; advGrant('adventure/summon_iron_golem'); play('golem'); return;
   }
 }
 // ---------- bamboo ----------

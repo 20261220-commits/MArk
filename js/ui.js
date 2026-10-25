@@ -150,6 +150,7 @@ UI.renderScreen = () => {
   } else if (T === 'anvil') {
     const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
     h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'adv') { h = advScreenHtml();
   } else if (T === 'stonecutter') { h = stonecutHtml();
   } else if (T === 'cartography') { h = cartoHtml();
   } else if (T === 'grindstone') { h = grindHtml();
@@ -241,7 +242,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('발전 과제', 'advs')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -292,6 +293,7 @@ $('menu').addEventListener('click', async e => {
   const a = b.dataset.act;
   if (a === 'worlds' || a === 'title' || a === 'options' || a === 'create' || a === 'controls' || a === 'pause') { if (a === 'options') UI.optBack = UI.menu === 'pause' || UI.paused ? 'pause' : 'title'; showMenu(a); }
   else if (a === 'packs') showMenu('packs');
+  else if (a === 'advs') { resumeGame(); UI.openScreen('adv'); }
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
   else if (a === 'packLoad') pickPackFile();
@@ -353,61 +355,6 @@ function runCommand(cmd) {
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
     default: err('알 수 없는 명령어입니다. /help 를 입력하세요');
   }
-}
-
-// ---------- advancements (subset of 1.17) ----------
-const ADV = [
-  ['root', 'Minecraft', '제작대를 얻으세요', 'crafting_table', { item: 'crafting_table' }],
-  ['stone', '석기 시대', '새 곡괭이로 돌을 캐세요', 'wooden_pickaxe', { item: 'cobblestone' }],
-  ['upgrade', '더 좋은 도구', '더 좋은 곡괭이를 만드세요', 'stone_pickaxe', { item: 'stone_pickaxe' }],
-  ['iron', '철 획득', '철 주괴를 제련하세요', 'iron_ingot', { item: 'iron_ingot' }],
-  ['armor', '갑옷을 입어라', '철 갑옷으로 몸을 보호하세요', 'iron_chestplate', { armor: 'iron' }],
-  ['lava', '화끈한 것', '양동이에 용암을 담으세요', 'lava_bucket', { item: 'lava_bucket' }],
-  ['ironpick', '철 곡괭이가 최고야', '곡괭이를 업그레이드하세요', 'iron_pickaxe', { item: 'iron_pickaxe' }],
-  ['diamond', '다이아몬드!', '다이아몬드를 얻으세요', 'diamond', { item: 'diamond' }],
-  ['obsidian', '아이스 버킷 챌린지', '흑요석을 얻으세요', 'obsidian', { item: 'obsidian' }],
-  ['copper', '구리 시대', '구리 주괴를 제련하세요', 'copper_ingot', { item: 'copper_ingot' }],
-  ['amethyst', '반짝이는 수정', '자수정 조각을 얻으세요', 'amethyst_shard', { item: 'amethyst_shard' }],
-  ['spyglass', '저게 새인가?', '망원경으로 멀리 보세요', 'spyglass', {}],
-  ['snow', '토끼처럼 가볍게', '가죽 부츠를 신고 가루눈 위를 걸으세요', 'leather_boots', {}],
-  ['seed', '씨앗을 심는 곳', '씨앗을 심어 보세요', 'wheat_seeds', {}],
-  ['breed', '둘이 함께', '두 동물을 번식시키세요', 'wheat', {}],
-  ['hunter', '몬스터 사냥꾼', '적대적 몬스터를 처치하세요', 'iron_sword', {}],
-  ['sleep', '달콤한 꿈', '침대에서 자세요', 'red_bed', {}],
-  ['glow', '빛나는 먹물', '발광 먹물 주머니를 얻으세요', 'glow_ink_sac', { item: 'glow_ink_sac' }],
-  ['enchant', '마법 부여사', '마법 부여대로 아이템에 마법을 부여하세요', 'enchanting_table', {}],
-  ['portal', '더 깊은 곳으로', '네더 차원문을 만들고 불을 붙이세요', 'flint_and_steel', {}],
-  ['nether', '네더', '네더에 들어가세요', 'netherrack', {}],
-  ['blaze', '불 속으로', '블레이즈 막대를 얻으세요', 'blaze_rod', { item: 'blaze_rod' }],
-  ['debris', '잔해 속에 숨겨진 것', '고대 잔해를 얻으세요', 'ancient_debris', { item: 'ancient_debris' }],
-  ['netherite', '파편으로 덮어주세요', '네더라이트 갑옷을 입으세요', 'netherite_chestplate', { armor: 'netherite' }],
-  ['eye', '눈길을 따라서', '엔더의 눈을 던지세요', 'ender_eye', {}],
-  ['end', '끝?', '엔드에 들어가세요', 'end_stone', {}],
-  ['dragon', '엔드 해방', '엔더 드래곤을 물리치세요', 'dragon_egg', {}],
-  ['trade', '좋은 거래!', '주민과 거래하세요', 'emerald', {}],
-  ['wolf', '최고의 친구', '늑대를 길들이세요', 'bone', {}],
-  ['elytra', '하늘은 무한대', '겉날개를 얻으세요', 'elytra', { item: 'elytra' }],
-];
-const advQueue = [];
-UI.advance = key => {
-  if (!W.meta || PL.mode === 'creative' || PL.mode === 'spectator') return;
-  W.meta.adv = W.meta.adv || {};
-  if (W.meta.adv[key]) return;
-  const a = ADV.find(x => x[0] === key); if (!a) return;
-  W.meta.adv[key] = Date.now();
-  chatMsg(`플레이어가 도전 과제 [${a[1]}]을(를) 달성했습니다`, '#55ff55');
-  advQueue.push(a); if (advQueue.length === 1) showAdv();
-};
-function showAdv() {
-  const a = advQueue[0]; if (!a) return;
-  const el = $('adv'); el.innerHTML = `<i class="ic" style="${iconStyle(IID[a[3]], 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2))}"></i><div><b>도전 과제 달성!</b><span>${a[1]}</span></div>`;
-  el.classList.add('show'); play('levelup', { vol: 0.6 });
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => { advQueue.shift(); showAdv(); }, 400); }, 4000);
-}
-function advScan() {
-  if (!W.meta) return;
-  const have = new Set(); for (const s of INV.slots) if (s) have.add(s.id); if (INV.cursor) have.add(INV.cursor.id);
-  for (const a of ADV) { const t = a[4]; if (t.item && have.has(IID[t.item])) UI.advance(a[0]); if (t.armor && INV.armor.some(s => s && ITEMS[s.id].armor.mat === t.armor)) UI.advance(a[0]); }
 }
 
 // ---------- enchanting table ----------

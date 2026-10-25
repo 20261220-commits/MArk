@@ -23,6 +23,7 @@ function invSlots(list) {
 function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
+  if (type === 'adv') return L; // the advancements screen has no slots
   if (type === 'inv' || type === 'craft') {
     const grid = type === 'inv' ? INV.craft2 : INV.craft3, w = type === 'inv' ? 2 : 3;
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));

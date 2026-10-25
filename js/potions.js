@@ -33,7 +33,7 @@ function brewTick(c, i, t) {
   else {
     if (!t.time) t.time = 400;
     if (--t.time <= 0) {
-      for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1 }; }
+      for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1, brewed: 1 }; } // brewed: picked up -> advancement
       ing.n--; if (!ing.n) t.items[3] = null; t.fuel--; c.modified = c.edited = true;
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.5 });

@@ -80,7 +80,7 @@ function axolotlAI(e, dist) {
     const mate = ENT.find(o => o !== e && o.type === 'axolotl' && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8);
     if (mate) {
       e.goal = [mate.x, mate.y, mate.z];
-      if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.2) { e.love = mate.love = 0; spawnMob('axolotl', e.x, e.y, e.z, { baby: true, variant: Math.random() < 1 / 1200 ? 4 : (Math.random() < 0.5 ? e : mate).variant }); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); }
+      if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.2) { e.love = mate.love = 0; spawnMob('axolotl', e.x, e.y, e.z, { baby: true, variant: Math.random() < 1 / 1200 ? 4 : (Math.random() < 0.5 ? e : mate).variant }); ADVT.bred('axolotl'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); }
     }
   }
   const lure = PL.held() && PL.held().id === IID.tropical_fish_bucket && dist < 8 && !e.love && PL.mode !== 'spectator';

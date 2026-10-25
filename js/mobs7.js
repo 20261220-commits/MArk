@@ -21,7 +21,7 @@ function witherCheck(x, y, z) {
     if (!isSoul(getBlock(mx, y - 2, mz))) continue;
     if (SOLID[getBlock(mx - ax, y - 2, mz - az)] || SOLID[getBlock(mx + ax, y - 2, mz + az)]) continue; // the corners under the arms must be clear
     for (const [a, c] of row) { setBlock(a, y, c, 0); setBlock(a, y - 1, c, 0); } setBlock(mx, y - 2, mz, 0);
-    const w = spawnMob('wither', mx + .5, y - 2, mz + .5); w.charge = 220; w.hp = 1; w.persistent = true; play('ghast', { pitch: 0.3, vol: 1 });
+    const w = spawnMob('wither', mx + .5, y - 2, mz + .5); w.charge = 220; w.hp = 1; w.persistent = true; advGrant('nether/summon_wither'); play('ghast', { pitch: 0.3, vol: 1 });
     return true;
   }
   return false;
@@ -75,7 +75,7 @@ function witherHurt(e, dmg, attacker, src) {
   if (e.hp <= 0) {
     e.deathT = 20; bossBar(null);
     explode(e.x, e.y + 1.5, e.z, 4); // the blast first, so it does not destroy the star
-    dropItem(e.x, e.y + 1, e.z, IID.nether_star, 1); spawnXP(e.x, e.y + 1, e.z, 50); UI.advance && UI.advance('wither');
+    dropItem(e.x, e.y + 1, e.z, IID.nether_star, 1); spawnXP(e.x, e.y + 1, e.z, 50);
   }
   return true;
 }

@@ -28,7 +28,7 @@ function signUse(t, h, dry) {
   const tile = getTile(t.x, t.y, t.z); if (!tile || !h) return false;
   const k = ITEMS[h.id].key;
   if (k.endsWith('_dye')) { const c = S.COLORS.indexOf(k.slice(0, -4)); if (c < 0 || tile.color === c) return false; if (!dry) { tile.color = c; tile.v = (tile.v || 0) + 1; consume(); play('place', { mat: 'wool', vol: 0.5 }); markTileChunk(t.x, t.z); } return true; }
-  if (h.id === IID.glow_ink_sac && !tile.glow || h.id === IID.ink_sac && tile.glow) { if (!dry) { tile.glow = h.id === IID.glow_ink_sac; tile.v = (tile.v || 0) + 1; consume(); play('splash', { vol: 0.3 }); markTileChunk(t.x, t.z); } return true; }
+  if (h.id === IID.glow_ink_sac && !tile.glow || h.id === IID.ink_sac && tile.glow) { if (!dry) { if (h.id === IID.glow_ink_sac) advGrant('husbandry/make_a_sign_glow'); tile.glow = h.id === IID.glow_ink_sac; tile.v = (tile.v || 0) + 1; consume(); play('splash', { vol: 0.3 }); markTileChunk(t.x, t.z); } return true; }
   return false;
 }
 const SIGN_TEXT_C = ['#f0f0f0', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f', '#f38baa', '#474f52', '#9d9d97', '#169c9c', '#8932b8', '#3c44aa', '#835432', '#5e7c16', '#b02e26', '#101010'];
@@ -237,6 +237,7 @@ function items6Use(t, h, d) {
     return false;
   }
   if ((h.id === IID.carrot_on_a_stick || h.id === IID.warped_fungus_on_a_stick) && PL.riding && PL.riding.def.ride === (h.id === IID.carrot_on_a_stick ? pigRide : striderRide)) {
+    if (h.id === IID.warped_fungus_on_a_stick) advGrant('nether/ride_strider');
     const e = PL.riding; if (e.boost > 0) return true;
     e.boost = 60 + Math.floor(Math.random() * 80); damageItem(INV.slots, INV.sel, 7);
     if (!INV.slots[INV.sel]) INV.slots[INV.sel] = { id: IID.fishing_rod, n: 1 }; // the bait is eaten, the rod stays
@@ -265,6 +266,7 @@ function items6Tick() { signTick(); rocketTick(); leashTick(); dialTick(); saddl
 const DIAL = { el: null, g: null };
 function lodestoneUse(t, h) {
   if (!h || h.id !== IID.compass || t.id !== BID.lodestone) return false;
+  advGrant('nether/use_lodestone');
   const st = { id: IID.compass, n: 1, lode: [t.x, t.y, t.z, W.dim], name: '자석석 나침반' };
   if (h.n === 1 && !h.lode) INV.slots[INV.sel] = st; else { if (!h.lode) consume(); INV.giveOrDrop(st); }
   play('anvil', { vol: 0.3, pitch: 1.6 }); swing(); UI.hudDirty = true; return true;

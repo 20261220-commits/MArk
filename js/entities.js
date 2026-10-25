@@ -397,8 +397,9 @@ function primeTNT(x, y, z, fuse = 80) {
 // ---------- arrows ----------
 const arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
 const arrowMat = new THREE.MeshBasicMaterial({ color: 0x8a6a3b });
+let HURTPROJ = null; // the projectile behind the hurtMob call in progress (advancements)
 function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
-  const e = Ent('arrow', x, y, z); e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;
+  const e = Ent('arrow', x, y, z); e.from = [x, z]; e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;
   e.mesh = new THREE.Mesh(arrowGeo, arrowMat.clone()); addEnt(e); play('bow', { vol: 0.6 });
   return e;
 }
@@ -444,7 +445,7 @@ function explode(x, y, z, power, fire) {
 function dropTileContents(x, y, z, t) {
   if (t.items) for (const st of t.items) if (st) dropStack(x + .5, y + .5, z + .5, st);
 }
-W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
+W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive' && (t.bees || []).length >= 3 && enchLv(PL.held(), 'silk_touch') && Math.hypot(PL.x - x, PL.z - z) < 8) advGrant('husbandry/silk_touch_nest'); if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
 W.onTntCheck = () => {};
 
 // ---------- mobs ----------
@@ -508,7 +509,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
-      if (e.def.hostile) UI.advance('hunter');
+      if (typeof ADVT !== 'undefined') ADVT.kill(e, HURTPROJ);
     }
   }
   return true;
@@ -520,6 +521,7 @@ function canSee(ax, ay, az, bx, by, bz) {
 }
 function mobTick(e) {
   const d = e.def;
+  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y + 0.2; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
@@ -571,7 +573,7 @@ function mobTick(e) {
     const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
     if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
-    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -690,7 +692,7 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) { const v = targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (v === 15 && e.owner === PL && e.from && Math.hypot(nx - e.from[0], nz - e.from[1]) >= 30 && typeof advGrant === 'function') advGrant('adventure/bullseye'); } if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
@@ -704,7 +706,9 @@ function arrowTick(e) {
       if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour
       if (e.trident) { tridentHit(e, o); break; }
       if (e.flame && !o.def.fireproof) o.fire = Math.max(o.fire || 0, 100);
+      HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e);
       if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx * (1 + (e.punch || 0)), e.vz * (1 + (e.punch || 0)), e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      HURTPROJ = null;
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
       removeEnt(e); return;
     }

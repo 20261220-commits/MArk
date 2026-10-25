@@ -114,7 +114,7 @@ function fireballTick(e) {
         else if (typeof hit === 'object') { hurtMob(hit, 5, e.owner === PL ? PL : null); if (!hit.def.fireproof) hit.fire = 100; }
         else { const bx = Math.floor(e.x), by = Math.floor(e.y), bz = Math.floor(e.z); if (!getBlock(bx, by, bz) && SOLID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
       } else {
-        if (typeof hit === 'object') hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null);
+        if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
         if (hit === 'pl') hurtPlayer(6 * DIFF_MUL(), 'explosion', e.owner);
         explode(nx, cy, nz, 1, true);
       }
@@ -147,7 +147,7 @@ function throwEye() {
   if (!best || W.dim !== 0) return false;
   const e = Ent('eye', PL.x, PL.y + PL.eyeH - 0.2, PL.z); e.kind = 'eye'; e.w = 0.1; e.h = 0.1; e.tx = best[0] + .5; e.tz = best[2] + .5; e.ty = PL.y + 8;
   e.mesh = R.itemMesh(IID.ender_eye); e.mesh.scale.setScalar(0.4); e.tick = eyeTick; e.render = spinRender;
-  play('portal', { vol: 0.3 }); addEnt(e); UI.advance && UI.advance('eye'); return true;
+  play('portal', { vol: 0.3 }); addEnt(e); return true;
 }
 function eyeTick(e) {
   const dx = e.tx - e.x, dz = e.tz - e.z, d = Math.hypot(dx, dz), sp = Math.min(0.5, d);
@@ -517,7 +517,7 @@ function tryLightPortal(x, y, z) {
     for (let j = 0; j < h && ok; j++) if (getBlock(x0 - dx, by + j, z0 - dz) !== BID.obsidian || getBlock(x0 + dx * w, by + j, z0 + dz * w) !== BID.obsidian) ok = false;
     if (!ok) continue;
     for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) setBlock(x0 + dx * i, by + j, z0 + dz * i, BID.nether_portal, axis, { noUpdate: true });
-    play('portal', { vol: 0.6 }); UI.advance && UI.advance('portal');
+    play('portal', { vol: 0.6 });
     return true;
   }
   return false;

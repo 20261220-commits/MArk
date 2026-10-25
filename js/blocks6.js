@@ -90,7 +90,7 @@ function blocks6Use(t, h, dry) {
   }
   if (id === ANCHOR) {
     const ch = m & 7;
-    if (h && h.id === BID.glowstone && ch < 4) { if (!dry) { setMeta(x, y, z, ch + 1); consume(); play('portal', { vol: 0.3, pitch: 1.6 }); } return true; }
+    if (h && h.id === BID.glowstone && ch < 4) { if (!dry) { setMeta(x, y, z, ch + 1); if (ch + 1 === 4) advGrant('nether/charge_respawn_anchor'); consume(); play('portal', { vol: 0.3, pitch: 1.6 }); } return true; }
     if (!ch) return false;
     if (dry) return true;
     if (W.dim === -1) { PL.spawn = [x, y, z]; PL.spawnDim = -1; UI.flash('리스폰 지점이 설정되었습니다'); play('portal', { vol: 0.4 }); }

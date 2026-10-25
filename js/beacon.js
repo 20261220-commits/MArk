@@ -27,6 +27,7 @@ function beaconTick() {
     const [x, y, z] = k.split(',').map(Number), t = getTile(x, y, z) || {};
     const lv = beaconLevels(x, y, z), col = lv ? beaconBeam(x, y, z) : null;
     t.levels = col ? lv : 0;
+    if (col && Math.hypot(PL.x - x, PL.z - z) < 12 && Math.abs(PL.y - y) < 12) { advGrant('nether/create_beacon'); if (lv >= 4) advGrant('nether/create_full_beacon'); }
     let m = beamMeshes.get(k);
     if (col && !m) { m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(...col), transparent: true, opacity: 0.55, depthWrite: false, fog: false })); m.position.set(x + .5, y + 1, z + .5); scene.add(m); beamMeshes.set(k, m); }
     else if (!col && m) { scene.remove(m); m.material.dispose(); beamMeshes.delete(k); }

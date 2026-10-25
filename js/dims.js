@@ -7,11 +7,11 @@ function switchDim(to, x, y, z, arrive) {
   resetWorld(true);
   for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   if (typeof bossBar === 'function') bossBar(null);
-  W.dim = to; W.arrive = arrive || null;
+  const from = W.dim; W.dim = to; W.arrive = arrive || null;
   PL.x = x; PL.y = y; PL.z = z; PL.px = x; PL.py = y; PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.portalT = 0; PL.portalLock = true;
   if (W.meta) W.meta.dim = to;
+  if (typeof ADVT !== 'undefined') { ADVT.dim(to); advNetherTravel(from, to); }
   clearInput(); UI.paused = true; showMenu('loading', DIM_NAME[to] + '(으)로 이동하는 중'); loadingFrom = performance.now();
-  UI.advance && UI.advance(to === -1 ? 'nether' : to === 1 ? 'end' : 'home');
 }
 // after the destination chunks are loaded: find or build a portal, or the End platform
 function arriveDim() {

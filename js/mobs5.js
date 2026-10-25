@@ -204,6 +204,7 @@ function hiveUse(t, h) {
   if (h.id === IID.shears) { dropItem(x + .5, y + 1, z + .5, IID.honeycomb, 3); damageItem(INV.slots, INV.sel, 1); play('click'); }
   else { consume(); INV.giveOrDrop({ id: IID.honey_bottle, n: 1 }); play('splash', { vol: 0.4 }); }
   setMeta(x, y, z, m & 3);
+  if (hiveCalm(x, y, z)) advGrant('husbandry/safely_harvest_honey');
   if (!hiveCalm(x, y, z)) { const tile = getTile(x, y, z); releaseBees(x, y, z, tile, true); for (const e of ENT) if (e.type === 'bee' && !e.dead && Math.hypot(e.x - x, e.z - z) < 16) e.target = PL; }
   swing(); return true;
 }

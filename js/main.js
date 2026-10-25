@@ -86,7 +86,7 @@ addEventListener('keydown', e => {
   if (/^F([1-9]|1[0-2])$/.test(code) || code === 'Tab') e.preventDefault(); // also stops the top-row keys navigating away
   if (code === 'F11') { toggleFullscreen(); return; }
   if (UI.screen) {
-    if (e.code === 'Escape' || e.code === 'KeyE') { UI.closeScreen(); e.preventDefault(); return; }
+    if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; }
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
@@ -99,6 +99,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyT') { e.preventDefault(); openChat(''); return; }
   if (e.code === 'Slash') { e.preventDefault(); openChat('/'); return; }
   if (e.code === 'KeyE') { UI.openScreen('inv'); return; }
+  if (e.code === 'KeyL') { UI.openScreen('adv'); return; }
   if (code === 'F3') { if (!F3K.down) { F3K.down = true; F3K.used = false; } return; }
   if (F3K.down && debugCombo(code)) { F3K.used = true; return; }
   // F1 / F2 / F5 (Chromebook: back / forward / overview keys); H and V stay as extra keys
