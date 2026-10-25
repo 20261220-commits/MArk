@@ -371,13 +371,15 @@ function breakBlock(x, y, z) {
   if (id === BID.piston_head) { const d = S.DIR6[m & 7], bx = x - d[0], by = y - d[1], bz = z - d[2], bb = getBlock(bx, by, bz); if (bb === BID.piston || bb === BID.sticky_piston) { setBlock(bx, by, bz, 0); if (!creative()) dropItem(bx + .5, by + .3, bz + .5, bb, 1); } }
   blocks6Break(x, y, z, id, m);
   if (id === BID.infested && !creative() && !enchLv(held, 'silk_touch')) spawnMob('silverfish', x + .5, y, z + .5);
+  if ((id === BID.bee_nest || id === BID.beehive) && !creative() && enchLv(held, 'silk_touch')) HIVE_KEEP.on = { honey: m >> 2 }; // the bees stay inside (W.onTileRemoved)
   let repl = 0;
   if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
   setBlock(x, y, z, repl);
   if (!creative()) {
     const d = blockDrops(id, m, held);
     if (S.DOOR[id] && (m & 8)) d.items.length = 0, d.items.push([itemOfBlock(id, m), 1]);
-    for (const [iid, n] of d.items) dropItem(x + .5, y + .3, z + .5, iid, n);
+    for (const [iid, n] of d.items) { const keep = HIVE_KEEP.on && (iid === BID.bee_nest || iid === BID.beehive) ? HIVE_KEEP.on : null; dropItem(x + .5, y + .3, z + .5, iid, n, null, 10, undefined, keep && keep.bees && keep.bees.length ? { bees: keep.bees, honey: keep.honey } : undefined); }
+    HIVE_KEEP.on = null;
     if (d.xp) spawnXP(x + .5, y + .5, z + .5, d.xp);
     PL.exh += 0.005;
     const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
@@ -725,6 +727,7 @@ function placeBlock(t, d) {
   if (SOLID[id] && entityBlocks(x, y, z)) return;
   setBlock(x, y, z, id, meta);
   ADVT.planted(id);
+  { const hs = PL.held(); if ((id === BID.bee_nest || id === BID.beehive) && hs && hs.bees) { setTile(x, y, z, { type: 'hive', bees: hs.bees.map(b => ({ ...b })) }); setMeta(x, y, z, (meta & 3) | (Math.min(5, hs.honey || 0) << 2)); } } // a silk-touched nest keeps its bees and honey
   if (b.fall) schedule(x, y, z, 2);
   if (FLUID[getBlock(x, y + 1, z)] || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => FLUID[getBlock(x + dx, y, z + dz)])) for (const [dx, dy, dz] of N6) if (FLUID[getBlock(x + dx, y + dy, z + dz)]) schedule(x + dx, y + dy, z + dz, 5);
   if (id === BID.furnace) setTile(x, y, z, newFurnace());

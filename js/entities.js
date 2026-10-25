@@ -445,7 +445,8 @@ function explode(x, y, z, power, fire) {
 function dropTileContents(x, y, z, t) {
   if (t.items) for (const st of t.items) if (st) dropStack(x + .5, y + .5, z + .5, st);
 }
-W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive' && (t.bees || []).length >= 3 && enchLv(PL.held(), 'silk_touch') && Math.hypot(PL.x - x, PL.z - z) < 8) advGrant('husbandry/silk_touch_nest'); if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
+const HIVE_KEEP = { on: null }; // set while the player silk-touches a hive: its bees go into the dropped item
+W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive' && HIVE_KEEP.on) { HIVE_KEEP.on.bees = t.bees || []; for (const e of ENT) if (e.type === 'bee' && e.hive && e.hive[0] === x && e.hive[1] === y && e.hive[2] === z) e.hive = null; if (HIVE_KEEP.on.bees.length >= 3) advGrant('husbandry/silk_touch_nest'); } else if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
 W.onTntCheck = () => {};
 
 // ---------- mobs ----------

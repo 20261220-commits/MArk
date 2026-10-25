@@ -7,17 +7,22 @@ function parrotPerch(e) {
   const side = e === SHOULDER.l ? -1 : 1, s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
   e.x = PL.x + c * 0.38 * side; e.z = PL.z - s * 0.38 * side; e.y = PL.y + (PL.sneaking ? 1.15 : 1.42); e.yaw = PL.yaw; e.vx = e.vy = e.vz = 0; e.flying = false;
 }
-function parrotOff(e) { if (SHOULDER.l === e) SHOULDER.l = null; if (SHOULDER.r === e) SHOULDER.r = null; e.perched = false; e.perchCd = 60; }
+function parrotOff(e) { if (SHOULDER.l === e) SHOULDER.l = null; if (SHOULDER.r === e) SHOULDER.r = null; e.perched = false; e.perchCd = 100; } // ShoulderEntity: 100 ticks before it may land again
 const nearJukebox = e => { for (let dx = -3; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -3; dz <= 3; dz++) { const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz; if (getBlock(x, y, z) === BID.jukebox) { const t = getTile(x, y, z); if (t && t.playing) return true; } } return false; };
 const parrotBaseAI = MOBDEF.parrot.ai;
 MOBDEF.parrot.ai = (e, dist) => {
   if (e.perched) {
-    // shoulder parrots hop off when the player jumps into water, flies, sleeps, rides, or is hurt
-    if (PL.dead || PL.inWater || PL.flying || PL.sleeping || PL.riding || PL.hurtT > 0 || e.owner !== 'player' || PL.gliding) parrotOff(e); else { parrotPerch(e); return; }
+    // PlayerEntity.dropShoulderEntities: falling more than half a block (a jump), water, flying, sleeping, powder snow or being hurt
+    if (PL.dead || PL.inWater || PL.flying || PL.sleeping || PL.hurtT > 0 || e.owner !== 'player' || PL.gliding || (PL.fallDist || 0) > 0.5 || PL.inSnowBody) parrotOff(e); else { parrotPerch(e); return; }
   }
   if (e.perchCd > 0) e.perchCd--;
-  if (e.owner === 'player' && !e.sitting && !e.perchCd && dist < 1.4 && PL.onGround === false && PL.vy < 0 && (!SHOULDER.l || !SHOULDER.r)) { // lands on you as you come down from a jump
-    if (!SHOULDER.l) SHOULDER.l = e; else SHOULDER.r = e; e.perched = true; play('hmm', { pitch: 1.9, vol: 0.4 }); parrotPerch(e); return;
+  // LandOnOwnersShoulderGoal: a tamed parrot that is not sitting flies to its owner and lands on a free shoulder on touching
+  if (e.owner === 'player' && !e.sitting && !e.perchCd && !e.leashed && (!SHOULDER.l || !SHOULDER.r) && PL.mode !== 'spectator' && !PL.flying && !PL.inWater && !PL.inSnowBody && dist < 16) {
+    if (Math.hypot(e.x - PL.x, e.z - PL.z) < 0.6 && e.y > PL.y && e.y < PL.y + 2.2) { /* bounding boxes touch */ if (!SHOULDER.l) SHOULDER.l = e; else SHOULDER.r = e; e.perched = true; play('hmm', { pitch: 1.9, vol: 0.4 }); parrotPerch(e); return; }
+    const dx = PL.x - e.x, dy = PL.y + 1.4 - e.y, dz = PL.z - e.z, l = Math.hypot(dx, dy, dz) || 1, sp = Math.min(0.25, 0.08 + l * 0.02);
+    e.vx += (dx / l * sp - e.vx) * 0.25; e.vy += (dy / l * sp - e.vy) * 0.25; e.vz += (dz / l * sp - e.vz) * 0.25; e.flying = true;
+    if (e.climbT > 0) { e.climbT--; e.vy = 0.15; }
+    e.yawTarget = Math.atan2(-dx, -dz); turn(e, 0.3); const ox = e.x, oz = e.z; physMove(e, e.vx, e.vy, e.vz); if (Math.hypot(e.x - ox, e.z - oz) < sp * 0.3) e.climbT = 12; return; // blocked: fly up over it
   }
   if (e.age % 20 === 0) e.dancing = nearJukebox(e);
   if (e.dancing && !e.sitting) { walkPhysics(e, 0, 0, 0); return; }

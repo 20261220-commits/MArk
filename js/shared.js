@@ -1806,7 +1806,10 @@ const RPREG = 25, BREG = 27, RP_CACHE = new Map();
 function ruinedPortalAt(seed, G, rx, rz, nether) {
   const key = seed + (nether ? 'n' : 'o') + rx + ',' + rz; if (RP_CACHE.has(key)) return RP_CACHE.get(key);
   const { r, cx, cz } = regionPick(seed, rx, rz, nether ? 73 : 71, RPREG, 2); let out = null;
-  if (r() < 0.7) { const x = cx * 16 + 8, z = cz * 16 + 8; if (nether) out = { x, z, y: 32, seed: r.int(1 << 30), flat: r() < 0.3, f: r.int(2) }; else { const [h, b] = G.column(x, z); if (h > SEA - 1) out = { x, z, y: h + 1 - (r() < 0.3 ? 3 : 0), seed: r.int(1 << 30), flat: r() < 0.25, f: r.int(2), cold: BIOMES[b][4] < 0.3 }; } }
+  if (r() < 0.7) { const x = cx * 16 + 8, z = cz * 16 + 8; if (nether) { // vanilla IN_NETHER placement: half on the lava sea, half on a cave floor found from a random height down
+      out = { x, z, y: 32, seed: r.int(1 << 30), flat: r() < 0.3, f: r.int(2) };
+      if (r() < 0.5) { const top = 34 + r.int(66); for (let y = top; y > 32; y--) if (netherDensityAt(seed, x, y - 1, z) > 0 && netherDensityAt(seed, x, y, z) <= 0) { out.y = y; out.land = true; break; } }
+    } else { const [h, b] = G.column(x, z); if (h > SEA - 1) out = { x, z, y: h + 1 - (r() < 0.3 ? 3 : 0), seed: r.int(1 << 30), flat: r() < 0.25, f: r.int(2), cold: BIOMES[b][4] < 0.3 }; } }
   RP_CACHE.set(key, out); return out;
 }
 function bastionAt(seed, rx, rz) {
@@ -1965,6 +1968,13 @@ function stampFortress(f, st, R, tiles) {
     st(x, y, z, y === f.y || y === f.y + 7 ? NB : edge && !door ? NB : 0);
   }
   st(f.x, f.y + 1, f.z, 108); if (st.get(f.x, f.y + 1, f.z) >= 0) tiles.push({ t: 'spawner', i: ((f.y + 1) << 8) | ((f.z & 15) << 4) | (f.x & 15), mob: 'blaze' });
+}
+// the Nether's terrain density at one spot, the way genNether interpolates it (exact on its 4-block columns)
+const ND_CACHE = new Map();
+function netherDensityAt(seed, x, y, z) {
+  let n = ND_CACHE.get(seed); if (!n) { n = [makeNoise(seed + 101), makeNoise(seed + 102)]; ND_CACHE.set(seed, n); }
+  const g = gy => { const yy = gy * 8; return n[0].n3(x / 60, yy / 34, z / 60) * 0.68 + n[1].n3(x / 20, yy / 15, z / 20) * 0.32 - 0.12 + Math.max(0, (34 - yy) / 14) + Math.max(0, (yy - 100) / 12); };
+  const gy = y >> 3, fy = (y & 7) / 8; return g(gy) * (1 - fy) + g(gy + 1) * fy;
 }
 function genNether(seed, cx, cz) {
   const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256), tiles = [];
@@ -3084,7 +3094,7 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
