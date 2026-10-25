@@ -96,6 +96,6 @@ function portalTick() {
   const ov = $('ovPortal'); if (ov) ov.style.opacity = Math.min(1, (PL.portalT || 0) / 80) * 0.8;
 }
 // fire burns out unless it sits on netherrack or magma
-RANDOM_TICK[BID.fire] = (x, y, z) => { const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
+RANDOM_TICK[BID.fire] = (x, y, z) => { if (!gr('doFireTick')) return; const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
 function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }

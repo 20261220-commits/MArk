@@ -27,7 +27,7 @@ function buildSlots(type, ctx) {
   if (type === 'inv' || type === 'craft') {
     const grid = type === 'inv' ? INV.craft2 : INV.craft3, w = type === 'inv' ? 2 : 3;
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));
-    L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
+    L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { { const r = craftResult(grid, w); if (r) { statOf('crafted', r.id, r.n); stat('craft_item', r.n); } } for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
     if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', canTake: () => creative() || !enchLv(INV.armor[i], 'binding_curse'), accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
@@ -231,7 +231,7 @@ function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
   o.uses++; if (o.ench) o.e = null; o.made = null; c.e.traded = true; // the villager keeps its job from now on
-  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
+  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade'); stat('traded_with_villager');
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
 }

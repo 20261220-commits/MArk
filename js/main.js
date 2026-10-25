@@ -271,24 +271,26 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
-  W.time++;
-  if (--W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
+  if (gr('doDaylightCycle')) W.time++;
+  if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
   animalTick(); oceanTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick(); mcmodels2Tick(); villagerLifeTick();
   playerTick();
+  statsTick();
   entityTick();
   tickScheduled();
   rsTick();
   tileTick();
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
-  if (W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
+  const spawnOK = gr('doMobSpawning');
+  if (spawnOK && W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
   if (W.tickN % 40 === 0) ensureDragon();
-  if (W.tickN % 100 === 0) trySpawnStrider();
-  if (W.tickN % 200 === 50) trySpawnAmbient();
-  if (W.tickN % 200 === 150) trySpawnAxolotl();
-  if (W.tickN % 200 === 100) trySpawnGlowSquid();
+  if (spawnOK && W.tickN % 100 === 0) trySpawnStrider();
+  if (spawnOK && W.tickN % 200 === 50) trySpawnAmbient();
+  if (spawnOK && W.tickN % 200 === 150) trySpawnAxolotl();
+  if (spawnOK && W.tickN % 200 === 100) trySpawnGlowSquid();
   displayTick();
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); beaconTick(); jukeboxVolume(); }

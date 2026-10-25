@@ -242,7 +242,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('발전 과제', 'advs')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -272,6 +272,7 @@ function showMenu(name, data) {
       <li>F3 조합: F3(크롬북 ↻)을 누른 채로 A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말</li>
       <li>크롬북에서 <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫습니다. Ctrl로 달리려면 설정에서 <b>전체 화면 + 키 잠금</b>을 켜세요 (켜지 않으면 <kbd>R</kbd>이나 <kbd>W</kbd> 두 번으로 달리기). 실수로 탭을 닫으려 하면 나가기 전에 확인 창이 뜹니다</li>
       <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
+  } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
@@ -293,6 +294,8 @@ $('menu').addEventListener('click', async e => {
   const a = b.dataset.act;
   if (a === 'worlds' || a === 'title' || a === 'options' || a === 'create' || a === 'controls' || a === 'pause') { if (a === 'options') UI.optBack = UI.menu === 'pause' || UI.paused ? 'pause' : 'title'; showMenu(a); }
   else if (a === 'packs') showMenu('packs');
+  else if (a === 'stats') showMenu('stats');
+  else if (a.startsWith('stat_')) { STATUI.tab = a.slice(5); showMenu('stats'); }
   else if (a === 'advs') { resumeGame(); UI.openScreen('adv'); }
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
@@ -313,7 +316,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'respawn') { respawn(); showMenu(null); resumeGame(); }
   else if (a === 'spectate') { PL.mode = 'spectator'; respawn(); showMenu(null); resumeGame(); }
 });
-UI.showDeath = msg => { UI.paused = true; showMenu('death', msg); chatMsg(msg, '#ffffff'); if (PL.hardcore) saveWorldMeta(); };
+UI.showDeath = msg => { if (gr('showDeathMessages')) chatMsg(msg, '#ffffff'); if (gr('doImmediateRespawn') && !PL.hardcore) { respawn(); return; } UI.paused = true; showMenu('death', msg); if (PL.hardcore) saveWorldMeta(); };
 
 // ---------- chat & commands ----------
 function openChat(prefix = '') { UI.chatOpen = true; releaseLock(); clearInput(); const c = $('chat'); c.hidden = false; const i = $('chatIn'); i.value = prefix; setTimeout(() => i.focus(), 0); renderChat(); }
@@ -329,28 +332,72 @@ function runCommand(cmd) {
   if (!W.cheats && c !== 'help' && c !== 'seed') return err('이 세계에서는 명령어가 허용되지 않습니다');
   const num = (v, base) => v && v[0] === '~' ? base + (+(v.slice(1)) || 0) : +v;
   switch (c) {
-    case 'help': ok('/gamemode <survival|creative|spectator> · /time set <day|noon|night|midnight|숫자> · /weather <clear|rain|thunder> · /give <아이템> [개수] · /tp <x> <y> <z> · /summon <몹> · /kill · /seed · /difficulty <0-3> · /xp <양> · /spawnpoint · /clear · /keepinventory · /locate <village|stronghold|fortress|end_city>'); break;
+    case 'help': ok('/gamemode · /time set|add|query · /weather · /give · /tp · /summon · /kill [@e[type=..]] · /seed · /difficulty · /xp <양>[L] · /spawnpoint · /setworldspawn · /clear · /gamerule <규칙> <값> · /effect give|clear · /enchant · /setblock · /fill · /locate <구조물> · /say · /me · /title · /list'); break;
     case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
-    case 'time': { const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
+    case 'time': { if (a[0] === 'query') { const q = a[1] === 'daytime' ? ((W.time % 24000) + 24000) % 24000 : a[1] === 'day' ? Math.floor(W.time / 24000) : W.tickN; ok('시간: ' + q); break; } const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
     case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.thunderOn = a[0] === 'thunder'; W.rainTimer = W.thunderTimer = 6000 + Math.random() * 12000; ok(a[0] === 'thunder' ? '날씨를 뇌우로 변경했습니다' : '날씨를 변경했습니다'); break;
     case 'give': { const k = (a[0] || '').replace('minecraft:', ''); const id = IID[k] != null ? IID[k] : ITEMS.findIndex(d => d && d.name === a[0]); if (id == null || id < 0 || !ITEMS[id]) return err('알 수 없는 아이템: ' + a[0]); const n = Math.max(1, Math.min(6400, +a[1] || 1)); let left = n; while (left > 0) { const m = Math.min(left, maxStack(id)); INV.giveOrDrop({ id, n: m }); left -= m; } ok(`[${itemName(id)}] ${n}개를 주었습니다`); break; }
-    case 'tp': { const x = num(a[0], PL.x), y = num(a[1], PL.y), z = num(a[2], PL.z); if ([x, y, z].some(isNaN)) return err('좌표가 잘못되었습니다'); PL.x = PL.px = x; PL.y = PL.py = y; PL.z = PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; ok(`${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}(으)로 순간이동했습니다`); break; }
+    case 'teleport': case 'tp': { if (a[0] && a[0].startsWith('@')) a.shift(); const x = num(a[0], PL.x), y = num(a[1], PL.y), z = num(a[2], PL.z); if ([x, y, z].some(isNaN)) return err('좌표가 잘못되었습니다'); PL.x = PL.px = x; PL.y = PL.py = y; PL.z = PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; ok(`${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}(으)로 순간이동했습니다`); break; }
     case 'summon': { const t = (a[0] || '').replace('minecraft:', ''); if (!MOBDEF[t] || t === 'player') return err('알 수 없는 몹: ' + a[0]); const [dx, , dz] = lookDir(); spawnMob(t, PL.x + dx * 3, PL.y, PL.z + dz * 3); ok(t + ' 소환'); break; }
     case 'locate': { // nearest structure, like Java's /locate
       const k = (a[0] || '').replace('minecraft:', ''); let best = null;
-      const near = (x, z) => { const d = Math.hypot(x - PL.x, z - PL.z); if (!best || d < best[2]) best = [x, z, d]; };
-      if (k === 'village' && W.dim === 0) { const G = S.makeGen(W.seed), rx = Math.floor((PL.x >> 4) / S.VREG), rz = Math.floor((PL.z >> 4) / S.VREG); for (let i = rx - 6; i <= rx + 6; i++) for (let j = rz - 6; j <= rz + 6; j++) { const v = S.villageAt(W.seed, G, i, j); if (v) near(v.x, v.z); } }
-      else if (k === 'stronghold' && W.dim === 0) for (const p of S.strongholdsOf(W.seed)) near(p[0], p[2]);
-      else if ((k === 'fortress' || k === 'nether_fortress') && W.dim === -1) { const rx = Math.floor((PL.x >> 4) / S.FREG), rz = Math.floor((PL.z >> 4) / S.FREG); for (let i = rx - 4; i <= rx + 4; i++) for (let j = rz - 4; j <= rz + 4; j++) { const f = S.fortressAt(W.seed, i, j); if (f) near(f.x, f.z); } }
-      else if (k === 'end_city' && W.dim === 1) { const nA = S.makeNoise(W.seed + 201), nB = S.makeNoise(W.seed + 202), rx = Math.floor((PL.x >> 4) / 20), rz = Math.floor((PL.z >> 4) / 20); for (let i = rx - 5; i <= rx + 5; i++) for (let j = rz - 5; j <= rz + 5; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c) near(c.x, c.z); } }
-      else return err('village, stronghold (오버월드), fortress (네더), end_city (엔드) 중 하나를 입력하세요');
+      const near = o => { if (!o) return; const d = Math.hypot(o.x - PL.x, o.z - PL.z); if (!best || d < best[2]) best = [o.x, o.z, d]; };
+      const G = S.makeGen(W.seed), scan = (reg, f, n = 6) => { const rx = Math.floor((PL.x >> 4) / reg), rz = Math.floor((PL.z >> 4) / reg); for (let i = rx - n; i <= rx + n; i++) for (let j = rz - n; j <= rz + n; j++) near(f(i, j)); };
+      const T = (kind) => { const [reg] = S.TP_KIND[kind]; scan(reg, (i, j) => S.templeAt(W.seed, G, kind, i, j)); };
+      const L = { // structure: [dimension, search]
+        village: [0, () => scan(S.VREG, (i, j) => S.villageAt(W.seed, G, i, j))], stronghold: [0, () => S.strongholdsOf(W.seed).forEach(p => near({ x: p[0], z: p[2] }))],
+        desert_pyramid: [0, () => T('pyramid')], jungle_pyramid: [0, () => T('jungle')], swamp_hut: [0, () => T('hut')], igloo: [0, () => T('igloo')],
+        mansion: [0, () => scan(S.MREG, (i, j) => S.mansionAt(W.seed, G, i, j), 4)], monument: [0, () => scan(32, (i, j) => S.monumentAt(W.seed, G, i, j), 4)],
+        shipwreck: [0, () => scan(S.OCREG, (i, j) => S.oceanSite(W.seed, G, 's', i, j))], ocean_ruin: [0, () => scan(20, (i, j) => S.oceanSite(W.seed, G, 'r', i, j))],
+        pillager_outpost: [0, () => scan(S.OREG, (i, j) => S.outpostAt(W.seed, G, i, j))], ruined_portal: [W.dim === -1 ? -1 : 0, () => scan(S.RPREG, (i, j) => S.ruinedPortalAt(W.seed, G, i, j, W.dim === -1))],
+        buried_treasure: [0, () => { const cx = PL.x >> 4, cz = PL.z >> 4; for (let i = cx - 40; i <= cx + 40; i++) for (let j = cz - 40; j <= cz + 40; j++) { const t = S.treasureAt(W.seed, G, i, j); if (t) near({ x: t[0], z: t[2] }); } }],
+        fortress: [-1, () => scan(S.FREG, (i, j) => S.fortressAt(W.seed, i, j), 4)], bastion_remnant: [-1, () => scan(S.BREG, (i, j) => S.bastionAt(W.seed, i, j), 4)],
+        end_city: [1, () => { const nA = S.makeNoise(W.seed + 201), nB = S.makeNoise(W.seed + 202); scan(20, (i, j) => S.endCityAt(W.seed, i, j, nA, nB), 5); }],
+      };
+      L.nether_fortress = L.fortress; L.woodland_mansion = L.mansion; L.ocean_monument = L.monument; L.temple = L.desert_pyramid;
+      const e = L[k]; if (!e) return err('구조물: ' + Object.keys(L).join(', '));
+      if (e[0] !== W.dim) return err('이 차원에는 ' + k + '이(가) 없습니다');
+      e[1]();
       if (!best) return err('가까운 구조물을 찾지 못했습니다');
       ok(`가장 가까운 ${k}: ${best[0]}, ~, ${best[1]} (${Math.round(best[2])}블록 거리)`); break;
     }
-    case 'kill': hurtPlayer(1000, 'kill'); break;
+    case 'gamerule': {
+      if (!a[0]) return ok(Object.keys(GAMERULES).map(k => k + '=' + gr(k)).join(' · '));
+      if (a[1] == null) return ok(a[0] + ' = ' + gr(a[0]));
+      if (!setGamerule(a[0], a[1])) return err('알 수 없는 규칙이나 값: ' + a.join(' '));
+      ok(`게임 규칙 ${a[0]}이(가) ${gr(a[0])}(으)로 설정되었습니다`); break;
+    }
+    case 'effect': { // /effect give <대상> <효과> [초] [증폭] [hideParticles] · /effect clear [대상] [효과]
+      const sub = a[0]; let rest = a.slice(1); if (rest[0] && rest[0].startsWith('@')) rest = rest.slice(1);
+      if (sub === 'clear') { if (rest[0]) { const k = rest[0].replace('minecraft:', ''); if (PL.eff) delete PL.eff[k]; } else clearEffects(PL); renderEffects(); ok('효과를 없앴습니다'); break; }
+      if (sub !== 'give') return err('/effect give <대상> <효과> [초] [증폭] · /effect clear');
+      const k = (rest[0] || '').replace('minecraft:', ''); if (!EFF[k]) return err('알 수 없는 효과: ' + rest[0]);
+      const sec = rest[1] != null ? Math.max(0, +rest[1]) : 30, amp = Math.max(0, Math.min(255, +rest[2] || 0));
+      if (sec === 0) { if (PL.eff) delete PL.eff[k]; } else addEffect(PL, k, Math.round(sec * 20), amp);
+      renderEffects(); ok(`${EFF[k][0]} ${amp + 1} 효과를 ${sec}초 동안 주었습니다`); break;
+    }
+    case 'enchant': { // /enchant <대상> <마법> [레벨]
+      const r = a[0] && a[0].startsWith('@') ? a.slice(1) : a, k = (r[0] || '').replace('minecraft:', ''), h = PL.held();
+      if (!ENCH[k]) return err('알 수 없는 마법: ' + r[0]); if (!h) return err('손에 아이템을 드세요');
+      const lv = Math.max(1, Math.min(ENCH[k][1], +r[1] || 1)); h.e = { ...(h.e || {}), [k]: lv }; UI.hudDirty = true; ok(`${itemName(h.id)}에 ${ENCH[k][0]} ${lv} 마법을 부여했습니다`); break;
+    }
+    case 'setblock': case 'fill': {
+      const n = c === 'fill' ? 6 : 3, p = a.slice(0, n).map((v, i) => Math.floor(num(v, [PL.x, PL.y, PL.z][i % 3]))); if (p.some(isNaN)) return err('좌표가 잘못되었습니다');
+      const key = (a[n] || '').replace('minecraft:', ''), vk = typeof VKEY !== 'undefined' && VKEY[key]; const id = vk ? vk[0] : BID[key] != null ? BID[key] : key === 'air' ? 0 : null, m = vk ? vk[1] : 0;
+      if (id == null) return err('알 수 없는 블록: ' + a[n]);
+      const [x0, y0, z0, x1 = x0, y1 = y0, z1 = z0] = p; const vol = (Math.abs(x1 - x0) + 1) * (Math.abs(y1 - y0) + 1) * (Math.abs(z1 - z0) + 1); if (vol > 32768) return err('영역이 너무 큽니다 (최대 32768 블록)');
+      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(255, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
+      ok(c === 'fill' ? cnt + '개 블록을 채웠습니다' : '블록을 바꿨습니다'); break;
+    }
+    case 'say': case 'me': chatMsg((c === 'me' ? '* 플레이어 ' : '[플레이어] ') + a.join(' '), '#ffffff'); break;
+    case 'title': { const t = a[0] && a[0].startsWith('@') ? a.slice(1) : a; if (t[0] === 'title' || t[0] === 'subtitle' || t[0] === 'actionbar') UI.flash(t.slice(1).join(' ').replace(/^"|"$/g, '')); break; }
+    case 'setworldspawn': W.meta.worldSpawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; ok('세계 스폰 지점을 설정했습니다'); break;
+    case 'defaultgamemode': W.meta.mode = { survival: 'survival', creative: 'creative', adventure: 'survival', spectator: 'spectator' }[a[0]] || W.meta.mode; ok('기본 게임 모드: ' + W.meta.mode); break;
+    case 'list': ok('접속한 플레이어 1명: 플레이어'); break;
+    case 'kill': { const t = a[0] || '@s'; if (t.startsWith('@e')) { const m = t.match(/type=(?:minecraft:)?([a-z_]+)/); let n = 0; for (const e of [...ENT]) if (e.kind === 'mob' && !e.dead && (!m || e.type === m[1])) { removeEnt(e); n++; } ok(n + '마리를 없앴습니다'); } else hurtPlayer(1000, 'kill'); break; }
     case 'seed': ok('시드: ' + W.seed); break;
     case 'difficulty': { const d = { peaceful: 0, easy: 1, normal: 2, hard: 3 }[a[0]] ?? +a[0]; if (!(d >= 0 && d <= 3)) return err('0-3 사이로 입력하세요'); PL.difficulty = d; if (d === 0) for (const e of ENT) if (e.kind === 'mob' && e.def.hostile) removeEnt(e); ok('난이도: ' + DIFF_NAME[d]); break; }
-    case 'xp': addXP(Math.max(0, +a[0] || 0)); break;
+    case 'xp': case 'experience': { const r = a[0] === 'add' || a[0] === 'give' ? a.slice(1).filter(v => !v.startsWith('@')) : a; const v = Math.max(0, parseInt(r[0]) || 0); if (/l$/i.test(r[0] || '') || r[1] === 'levels') { PL.level += v; UI.hudDirty = true; ok('레벨 ' + v + ' 추가'); } else { addXP(v); ok('경험치 ' + v + ' 추가'); } break; }
     case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; ok('스폰 지점을 설정했습니다'); break;
     case 'clear': INV.slots.fill(null); INV.armor.fill(null); UI.hudDirty = true; ok('인벤토리를 비웠습니다'); break;
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
@@ -392,5 +439,5 @@ $('screen').addEventListener('click', e => {
   st.e = o.e;
   if (!creative()) { PL.level = Math.max(0, PL.level - (i + 1)); c.items[1].n -= i + 1; if (c.items[1].n <= 0) c.items[1] = null; }
   PL.enchSeed = (Math.random() * 2 ** 31) | 0;
-  play('levelup', { vol: 0.5 }); UI.advance('enchant'); UI.hudDirty = true; UI.renderScreen();
+  play('levelup', { vol: 0.5 }); UI.advance('enchant'); stat('enchant_item'); UI.hudDirty = true; UI.renderScreen();
 });

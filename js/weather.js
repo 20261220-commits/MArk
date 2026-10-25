@@ -22,7 +22,7 @@ function rodNear(x, z) {
 const rainsAt = (x, z) => { const b = biomeBase(x, z), t = S.BIOMES[biomeAt(x, z)][4]; return t > 0.15 && t < 1 && b !== S.BIO.DESERT && b !== S.BIO.BADLANDS && b !== S.BIO.SAVANNA; };
 
 function weatherTick() {
-  if (--W.thunderTimer <= 0) { W.thunderOn = !W.thunderOn; W.thunderTimer = W.thunderOn ? 3600 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+  if (gr('doWeatherCycle') && --W.thunderTimer <= 0) { W.thunderOn = !W.thunderOn; W.thunderTimer = W.thunderOn ? 3600 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
   const tgt = W.thunderOn && W.rainTarget > 0 ? 1 : 0;
   W.thunder += Math.sign(tgt - W.thunder) * Math.min(Math.abs(tgt - W.thunder), 0.01);
   if (W.flash > 0) W.flash = Math.max(0, W.flash - 0.12);

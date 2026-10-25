@@ -83,6 +83,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
@@ -97,6 +98,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
     const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * 2 : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
+  stat('damage_taken', Math.round(Math.min(dmg, PL.health) * 10));
   PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
@@ -105,14 +107,15 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
     offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
     if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
-  if (PL.health <= 0) { if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
+  if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
   UI.hudDirty = true;
   return true;
 }
 const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
+  stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
-  if (!W.keepInv) {
+  if (!W.keepInv && !gr('keepInventory')) {
     offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
     for (const s of all) if (s && !enchLv(s, 'vanishing_curse')) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
@@ -143,8 +146,8 @@ function damageItem(arr, i, n = 1) {
   if (creative()) return;
   const s = arr[i]; if (!s) return; const d = ITEMS[s.id]; if (!d.dur) return;
   const ub = enchLv(s, 'unbreaking'); if (ub && Math.random() > (d.armor ? 0.6 + 0.4 / (ub + 1) : 1 / (ub + 1))) return; // unbreaking
-  s.d = (s.d || 0) + n;
-  if (s.d >= d.dur) { arr[i] = null; play('break', { mat: 'metal' }); UI.flash(d.name + ' 부서짐'); }
+  s.d = (s.d || 0) + n; statOf('used', s.id);
+  if (s.d >= d.dur) { statOf('broken', s.id); arr[i] = null; play('break', { mat: 'metal' }); UI.flash(d.name + ' 부서짐'); }
   UI.hudDirty = true;
 }
 
@@ -207,7 +210,7 @@ function playerTick() {
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (scaf) { if (IN.jump) PL.vy = 0.2; else if (PL.sneaking) PL.vy = -0.15; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
-      PL.vy = (0.42 + 0.1 * effLv(PL, 'jump_boost')) * (blockUnder() === BID.honey_block ? 0.5 : 1); USE.jumpCd = 10;
+      stat('jump'); PL.vy = (0.42 + 0.1 * effLv(PL, 'jump_boost')) * (blockUnder() === BID.honey_block ? 0.5 : 1); USE.jumpCd = 10;
       if (PL.sprinting) { PL.vx += -sin * 0.2; PL.vz += -cos * 0.2; PL.exh += 0.2; } else PL.exh += 0.05;
     }
     let mx = PL.vx, my = PL.vy, mz = PL.vz;
@@ -286,7 +289,8 @@ function survivalTick(inWater, inLava, eyeF) {
   if (PL.difficulty === 0) { if (W.tickN % 20 === 0 && PL.health < plMaxHp()) PL.health = Math.min(plMaxHp(), PL.health + 1); if (W.tickN % 20 === 0 && PL.food < 20) PL.food++; }
   if (PL.exh >= 4) { PL.exh -= 4; if (PL.sat > 0) PL.sat = Math.max(0, PL.sat - 1); else if (PL.difficulty > 0) PL.food = Math.max(0, PL.food - 1); UI.hudDirty = true; }
   PL.foodTimer++;
-  if (PL.food >= 20 && PL.sat > 0 && PL.health < plMaxHp()) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(plMaxHp(), PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
+  if (!gr('naturalRegeneration') && PL.food > 0) PL.foodTimer = 0;
+  else if (PL.food >= 20 && PL.sat > 0 && PL.health < plMaxHp()) { if (PL.foodTimer >= 10) { const a = Math.min(PL.sat, 6); PL.health = Math.min(plMaxHp(), PL.health + a / 6); PL.exh += a; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food >= 18 && PL.health < plMaxHp()) { if (PL.foodTimer >= 80) { PL.health = Math.min(plMaxHp(), PL.health + 1); PL.exh += 6; PL.foodTimer = 0; UI.hudDirty = true; } }
   else if (PL.food <= 0) { if (PL.foodTimer >= 80) { if (PL.health > 10 || PL.difficulty === 3 || (PL.health > 1 && PL.difficulty === 2)) hurtPlayer(1, 'starve'); PL.foodTimer = 0; } }
   else PL.foodTimer = 0;
@@ -375,7 +379,8 @@ function breakBlock(x, y, z) {
   let repl = 0;
   if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
   setBlock(x, y, z, repl);
-  if (!creative()) {
+  statOf('mined', itemOfBlock(id, m) || id);
+  if (!creative() && gr('doTileDrops')) {
     const d = blockDrops(id, m, held);
     if (S.DOOR[id] && (m & 8)) d.items.length = 0, d.items.push([itemOfBlock(id, m), 1]);
     for (const [iid, n] of d.items) { const keep = HIVE_KEEP.on && (iid === BID.bee_nest || iid === BID.beehive) ? HIVE_KEEP.on : null; dropItem(x + .5, y + .3, z + .5, iid, n, null, 10, undefined, keep && keep.bees && keep.bees.length ? { bees: keep.bees, honey: keep.honey } : undefined); }
@@ -499,7 +504,7 @@ function trySleep(x, y, z) {
   PL.spawn = [x, y + 1, z]; PL.spawnDim = 0; UI.flash('리스폰 지점이 설정되었습니다');
   if (t < 12542 || t > 23460) { if (W.thunder < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } } // plain rain is not enough (Java)
   if (ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - x) < 8 && Math.abs(e.y - y) < 5 && Math.abs(e.z - z) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
-  PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0; advGrant('adventure/sleep_in_bed');
+  PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0; advGrant('adventure/sleep_in_bed'); stat('sleep_in_bed'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_rest = 0;
 }
 const BLAST_OK = id => { const k = ITEMS[id].key; return k.startsWith('raw_') || k.endsWith('_ore') || k.startsWith('iron_') || k.startsWith('golden_') || k === 'ancient_debris'; };
 function newFurnace(kind) { return { type: 'furnace', kind: kind || null, items: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 }; }
@@ -522,7 +527,7 @@ function entityBlocks(x, y, z) {
   for (const e of ENT) if (e.kind === 'mob' && !e.dead && x + 1 > e.x - e.w && x < e.x + e.w && z + 1 > e.z - e.w && z < e.z + e.w && y + 1 > e.y && y < e.y + e.h) return true;
   return false;
 }
-function consume(n = 1) { if (creative()) return; const h = PL.held(); if (!h) return; h.n -= n; if (h.n <= 0) INV.slots[INV.sel] = null; UI.hudDirty = true; }
+function consume(n = 1) { const h0 = PL.held(); if (h0) statOf('used', h0.id); if (creative()) return; const h = PL.held(); if (!h) return; h.n -= n; if (h.n <= 0) INV.slots[INV.sel] = null; UI.hudDirty = true; }
 function useItem(first) {
   USE.placeCd = 4;
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
@@ -761,7 +766,7 @@ function pickBlock() {
 function dropHeld(all) {
   const h = PL.held(); if (!h) return;
   const n = all ? h.n : 1; const [dx, dy, dz] = lookDir();
-  const thrownIt = dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d, h); if (thrownIt) thrownIt.byPlayer = true;
+  const thrownIt = dropItem(PL.x, PL.y + PL.eyeH - 0.3, PL.z, h.id, n, [dx * 0.3, dy * 0.3 + 0.1, dz * 0.3], 40, h.d, h); if (thrownIt) thrownIt.byPlayer = true; statOf('dropped', h.id, n); stat('drop');
   h.n -= n; if (h.n <= 0) INV.slots[INV.sel] = null; swing(); UI.hudDirty = true;
 }
 // ---------- furnaces ----------

@@ -405,8 +405,10 @@ function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
 }
 // ---------- explosions ----------
 function resistance(b) { const d = BLOCKS[b]; if (!d || d.hard < 0) return 3600000; if (FLUID[b]) return 100; if (b === BID.obsidian) return 1200; if (d.tool === S.TOOL.PICK) return Math.max(3, d.hard * 4); return d.hard * 1.5 + 0.1; }
+let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing
 function explode(x, y, z, power, fire) {
   vibrate(x, y, z);
+  const noGrief = MOB_BLAST && !gr('mobGriefing');
   play('explode');
   const broken = new Map();
   for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) for (let k = 0; k < 16; k++) {
@@ -416,7 +418,7 @@ function explode(x, y, z, power, fire) {
     while (f > 0) {
       const bx = Math.floor(px2), by = Math.floor(py2), bz = Math.floor(pz2), b = getBlock(bx, by, bz);
       if (b) f -= (resistance(b) + 0.3) * 0.3;
-      if (f > 0 && b && by > 0) broken.set(bx + ',' + by + ',' + bz, b);
+      if (f > 0 && b && by > 0 && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
       px2 += dx * 0.3; py2 += dy * 0.3; pz2 += dz * 0.3; f -= 0.225;
     }
   }
@@ -476,6 +478,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.inv > 0) return false;
   if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
   if (e.def.armorMul) dmg *= e.def.armorMul(e);
+  if (attacker === PL) stat('damage_dealt', Math.round(Math.min(dmg, Math.max(0, e.hp)) * 10));
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
   const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
@@ -500,7 +503,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
-    if (attacker === PL || src === 'player') {
+    if ((attacker === PL || src === 'player') && gr('doMobLoot')) {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
       const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
       if (!noDrop) for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { rabbit: 'cooked_rabbit', porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
@@ -511,6 +514,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
       if (typeof ADVT !== 'undefined') ADVT.kill(e, HURTPROJ);
+      stat('mob_kills'); statOf('killed', e.type);
     }
   }
   return true;
@@ -563,7 +567,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) chargedExplode(e); else explode(e.x, e.y + 0.8, e.z, 3); return; } }
+      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = true; chargedExplode(e); } else { MOB_BLAST = true; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -657,7 +661,7 @@ function entityTick() {
         if ((e.age & 3) === 0 && e.onGround !== false) plateCheck(e);
         if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && same(o.stack, e.stack) && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
         if (e.pickup <= 0 && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.3 && e.y > PL.y - 0.8 && e.y < PL.y + 2.3 && Math.abs(PL.z - e.z) < 1.3) {
-          const left = INV.add(e.stack); if (left < e.stack.n) { play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
+          const left = INV.add(e.stack); if (left < e.stack.n) { statOf('picked', e.stack.id, e.stack.n - left); play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
         }
       }
       if (e.y < -40) removeEnt(e);

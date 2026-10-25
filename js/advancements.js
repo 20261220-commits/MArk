@@ -129,7 +129,7 @@ function advGrant(id, crit) {
 function advComplete(a, st) {
   st.done = Date.now();
   const verb = a.frame === 'c' ? ['도전 과제', '을(를) 완료했습니다', '#aa00aa'] : a.frame === 'g' ? ['목표', '에 도달했습니다', '#55ff55'] : ['발전 과제', '을(를) 달성했습니다', '#55ff55'];
-  chatMsg(`플레이어가 ${verb[0]} [${a.name}]${verb[1]}`, verb[2]);
+  if (gr('announceAdvancements')) chatMsg(`플레이어가 ${verb[0]} [${a.name}]${verb[1]}`, verb[2]);
   if (a.xp) addXP(a.xp);
   advQueue.push(a); if (advQueue.length === 1) showAdv();
 }
@@ -170,12 +170,12 @@ const ADVT = {
     if (e.plHitT != null && ENT.some(o => o.type === 'axolotl' && !o.dead && o.target === e)) { addEffect(PL, 'regeneration', 100, 0); advGrant('husbandry/kill_axolotl_target'); }
   },
   killedBy() { advGrant('adventure/root', 'killed_by_something'); },
-  bred(type) { advGrant('husbandry/breed_an_animal'); advGrant('husbandry/bred_all_animals', type); },
+  bred(type) { stat('animals_bred'); advGrant('husbandry/breed_an_animal'); advGrant('husbandry/bred_all_animals', type); },
   tamed(e) { advGrant('husbandry/tame_an_animal'); if (e && e.type === 'cat') advGrant('husbandry/complete_catalogue', ALL_CATS[e.variant] || ''); },
   ate(id) { advGrant('husbandry/root'); advGrant('husbandry/balanced_diet', ITEMS[id].key); },
   dim(d) { if (d === -1) { advGrant('story/enter_the_nether'); advGrant('nether/root'); } if (d === 1) { advGrant('story/enter_the_end'); advGrant('end/root'); } },
   planted(id) { const k = id === BID.wheat ? 'wheat' : id === BID.pumpkin_stem ? 'pumpkin_stem' : id === BID.melon_stem ? 'melon_stem' : id === BID.beetroots ? 'beetroots' : id === BID.nether_wart ? 'nether_wart' : null; if (k) advGrant('husbandry/plant_seed', k); },
-  fished(id) { const k = ITEMS[id] && ITEMS[id].key; if (['cod', 'tropical_fish', 'pufferfish', 'salmon'].includes(k)) advGrant('husbandry/fishy_business', k); },
+  fished(id) { stat('fish_caught'); const k = ITEMS[id] && ITEMS[id].key; if (['cod', 'tropical_fish', 'pufferfish', 'salmon'].includes(k)) advGrant('husbandry/fishy_business', k); },
   bucketed(key) { if (key === 'axolotl_bucket') advGrant('husbandry/axolotl_in_a_bucket'); else advGrant('husbandry/tactical_fishing', key); },
   spyglass(e) { if (!e) return; if (e.type === 'parrot') advGrant('adventure/spyglass_at_parrot'); if (e.type === 'ghast' && advDone('adventure/spyglass_at_parrot')) advGrant('adventure/spyglass_at_ghast'); if (e.type === 'ender_dragon' && advDone('adventure/spyglass_at_ghast')) advGrant('adventure/spyglass_at_dragon'); },
 };
@@ -289,7 +289,7 @@ advScan = function () {
 {
   const open0 = UI.openScreen;
   UI.openScreen = (type, ctx) => {
-    open0(type, ctx);
+    open0(type, ctx); if (type === 'chest') stat('open_chest'); if (type === 'trade') stat('talked_to_villager');
     if (type === 'chest' && W.dim === -1 && ctx && ctx.x != null) { const bx = Math.floor((ctx.x >> 4) / S.BREG), bz = Math.floor((ctx.z >> 4) / S.BREG); for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(ctx.x - o.x) < 40 && Math.abs(ctx.z - o.z) < 40) advGrant('nether/loot_bastion', 'loot_bastion_other'); } }
   };
 }

@@ -29,7 +29,7 @@ function phantomAI(e, dist) {
 function phantomAnim(e, P, now) { const f = Math.sin(now / 120 + e.id) * 0.5; if (P.rwing) { P.rwing.rotation.z = f; P.lwing.rotation.z = -f; } e.mesh.rotation.x = Math.max(-0.7, Math.min(0.7, e.vy * 2)); }
 // insomnia: three days without sleep and phantoms come at night, more the longer you stay up
 function trySpawnPhantoms() {
-  if (W.dim !== 0 || PL.difficulty === 0 || PL.dead || spectator() || dayFactor() > 0.3 || (PL.rest || 0) < 72000 || PL.y < S.SEA) return;
+  if (!gr('doInsomnia') || W.dim !== 0 || PL.difficulty === 0 || PL.dead || spectator() || dayFactor() > 0.3 || (PL.rest || 0) < 72000 || PL.y < S.SEA) return;
   if ((getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) < 15) return; // only under the open sky
   if (Math.random() > Math.min(0.9, ((PL.rest || 0) - 72000) / 72000 + 0.15)) return;
   const n = 1 + Math.floor(Math.random() * (PL.difficulty + 1));

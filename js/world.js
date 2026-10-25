@@ -351,7 +351,7 @@ function randomTicks(px, pz) {
   const pcx = px >> 4, pcz = pz >> 4, R = 6;
   for (let cx = pcx - R; cx <= pcx + R; cx++) for (let cz = pcz - R; cz <= pcz + R; cz++) {
     const c = chunkAt(cx, cz); if (!c || !meshable(c)) continue; // neighbours must be loaded (leaf decay, spreading)
-    for (let s = 0, ns = (c.maxY >> 4) + 1; s < ns; s++) for (let k = 0; k < 3; k++) { // only sections that contain blocks
+    for (let s = 0, ns = (c.maxY >> 4) + 1, rts = gr('randomTickSpeed'); s < ns; s++) for (let k = 0; k < rts; k++) { // only sections that contain blocks
       const r = (Math.random() * 4096) | 0, i = (s << 12) | r, b = c.blocks[i];
       if (!b || !RANDOM_TICK[b]) continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
