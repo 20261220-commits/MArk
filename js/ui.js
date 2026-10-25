@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -178,7 +178,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur && UI.advTips ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}${UI.advTips ? `<small class="lore">minecraft:${d.key}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();
@@ -253,11 +253,21 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐</p><div class="btncol">${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2><p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
-    h = `<h2>조작법</h2><ul class="keys"><li><kbd>W A S D</kbd> 이동 · <kbd>W</kbd> 두 번 / <kbd>R</kbd> / <kbd>Ctrl</kbd> 달리기</li><li><kbd>Space</kbd> 점프 · 수영 · (크리에이티브) 두 번 눌러 비행</li><li><kbd>Shift</kbd> 웅크리기 (모서리에서 안 떨어짐) · 비행 중 하강</li><li><kbd>좌클릭</kbd> 블록 캐기 · 공격 (공격 쿨다운 1.9 전투)</li><li><kbd>우클릭</kbd> 블록 놓기 · 사용 · 먹기 · 활 당기기 · 망원경</li><li><kbd>휠 클릭</kbd> 블록 고르기 · <kbd>휠</kbd> / <kbd>1-9</kbd> 단축바</li><li><kbd>E</kbd> 인벤토리 · <kbd>Q</kbd> 버리기 (<kbd>Ctrl+Q</kbd> 묶음)</li><li><kbd>T</kbd> 채팅 · <kbd>/</kbd> 명령어 (/help)</li><li><kbd>F1</kbd>/<kbd>H</kbd> HUD 숨기기 · <kbd>F3</kbd>/<kbd>&#96;</kbd> 디버그 · <kbd>F5</kbd>/<kbd>V</kbd> 시점 전환</li><li>크롬북: <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫으니 <kbd>W</kbd> 두 번이나 <kbd>R</kbd>로 달리세요 (설정에서 전체 화면 + 키 잠금을 켜면 안전)</li><li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
+    const K = t => t.split('+').map(k => `<kbd>${k}</kbd>`).join('+');
+    const rows = [['이동', 'W A S D', 'W A S D'], ['달리기', 'Ctrl · W 두 번', 'Ctrl · W 두 번 · R'], ['점프 · 수영 · (크리에이티브) 두 번 눌러 비행', 'Space', 'Space'], ['웅크리기 · 비행 중 하강', 'Shift', 'Shift'],
+      ['캐기 · 공격', '좌클릭', '터치패드 누르기'], ['놓기 · 사용', '우클릭', '두 손가락 탭 · Alt+누르기'], ['블록 고르기', '휠 클릭', 'G'], ['단축바', '1-9 · 휠', '1-9 · 두 손가락 스크롤'],
+      ['인벤토리', 'E', 'E'], ['버리기 (묶음)', 'Q (Ctrl+Q)', 'Q (Ctrl+Q)'], ['보조 손과 바꾸기', 'F', 'F'], ['채팅 · 명령어', 'T · /', 'T · /'],
+      ['HUD 숨기기', 'F1', '← (뒤로) · H'], ['스크린샷', 'F2', '→ (앞으로) · 화면 캡처 키'], ['디버그 화면 · F3 조합', 'F3', '↻ (새로고침) · `'], ['시점 전환', 'F5', '창 보기 키 · V'], ['전체 화면', 'F11', '전체 화면 키'],
+      ['일시 정지', 'Esc', 'Esc']];
+    h = `<h2>조작법</h2><table class="keytab"><tr><th>동작</th><th>PC 키보드</th><th>크롬북 키보드</th></tr>${rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b.split(' · ').map(K).join(' · ')}</td><td>${c.split(' · ').map(K).join(' · ')}</td></tr>`).join('')}</table>
+      <ul class="keys"><li>크롬북 윗줄 키는 같은 자리의 PC F키로 동작합니다 (검색 키 + 윗줄 키, 또는 크롬북 설정의 "윗줄 키를 기능 키로 사용"으로 보내는 진짜 F키도 그대로 됩니다)</li>
+      <li>F3 조합: F3(크롬북 ↻)을 누른 채로 A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말</li>
+      <li>크롬북에서 <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫습니다. Ctrl로 달리려면 설정에서 <b>전체 화면 + 키 잠금</b>을 켜세요 (켜지 않으면 <kbd>R</kbd>이나 <kbd>W</kbd> 두 번으로 달리기). 실수로 탭을 닫으려 하면 나가기 전에 확인 창이 뜹니다</li>
+      <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {

@@ -15,16 +15,77 @@ canvas.addEventListener('click', () => { if (W.active && !locked && !UI.menu && 
 function clearInput() { IN.f = IN.s = 0; IN.jump = IN.sneak = IN.attack = IN.use = IN.sprintKey = false; keys.clear(); if (USE.kind) onUseRelease(); }
 
 // ---------- keyboard ----------
-const keys = new Set();
+// Chromebook keyboards have browser and system keys where a PC has F1-F10. Each is read as the F-key in the same place,
+// so the layout matches Java Edition: back = F1 (hide HUD), forward = F2 (screenshot), refresh = F3 (debug and F3 combos),
+// full screen = F11, overview = F5 (camera), screenshot key = F2. Search + top row (or the "top-row keys as function keys"
+// setting) sends real F-keys, which work as they are.
+const TOP_ROW = { BrowserBack: 'F1', BrowserForward: 'F2', BrowserRefresh: 'F3', ZoomToggle: 'F11', Zoom: 'F11', LaunchApplication1: 'F5', LaunchApp1: 'F5', LaunchMyComputer: 'F5', PrintScreen: 'F2' };
+const keyCode = e => TOP_ROW[e.code] || TOP_ROW[e.key] || (e.code === 'Backquote' ? 'F3' : e.code);
+const keys = new Set(), F3K = { down: false, used: false }, TOGGLE = { sprint: false, sneak: false };
 function updateMoveKeys() {
   IN.f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   IN.s = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  IN.jump = keys.has('Space'); IN.sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'); IN.sprintKey = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyR');
+  const sneak = keys.has('ShiftLeft') || keys.has('ShiftRight'), sprint = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyR');
+  IN.jump = keys.has('Space'); IN.sneak = OPT.toggleSneak ? TOGGLE.sneak : sneak; IN.sprintKey = OPT.toggleSprint ? TOGGLE.sprint : sprint;
 }
+// F3 + key, as in Java Edition (the debug screen only toggles when F3 is released without a combo)
+function debugCombo(code) {
+  const say = t => chatMsg('[디버그]: ' + t, '#ffe060');
+  switch (code) {
+    case 'KeyH': UI.advTips = !UI.advTips; say('고급 툴팁: ' + (UI.advTips ? '보임' : '숨김')); return true;
+    case 'KeyB': UI.hitboxes = !UI.hitboxes; say('히트박스: ' + (UI.hitboxes ? '보임' : '숨김')); return true;
+    case 'KeyG': UI.chunkBorders = !UI.chunkBorders; say('청크 경계: ' + (UI.chunkBorders ? '보임' : '숨김')); return true;
+    case 'KeyC': { const t = `/tp ${PL.x.toFixed(2)} ${PL.y.toFixed(2)} ${PL.z.toFixed(2)}`; if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {}); say('위치를 클립보드에 복사했습니다: ' + t); return true; }
+    case 'KeyN': if (!W.cheats) { say('명령어가 허용되지 않은 세계입니다'); return true; } runCommand(PL.mode === 'spectator' ? '/gamemode creative' : '/gamemode spectator'); return true;
+    case 'KeyD': UI.msgs.length = 0; renderChat(); return true;
+    case 'KeyA': for (const c of W.chunks.values()) c.dirty = true; say('청크를 다시 불러옵니다'); return true;
+    case 'KeyP': OPT.pauseOnBlur = !OPT.pauseOnBlur; saveOpt(); say('포커스를 잃으면 일시 정지: ' + (OPT.pauseOnBlur ? '켜짐' : '꺼짐')); return true;
+    case 'KeyQ': say('F3 + A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말 (크롬북: 새로고침 키나 ` 키가 F3)'); return true;
+  }
+  return false;
+}
+// F3 + B entity hitboxes (white boxes, the eye line in red) and F3 + G the current chunk's borders
+const DBG = { boxes: new Map(), chunk: null };
+function debugOverlays(px, py, pz) {
+  for (const [e, m] of DBG.boxes) if (!UI.hitboxes || e.dead || !ENT.includes(e)) { scene.remove(m); m.geometry.dispose(); DBG.boxes.delete(e); }
+  if (UI.hitboxes) for (const e of ENT) {
+    if (!e.mesh || e.dead || !e.mesh.visible || !e.w) continue;
+    let m = DBG.boxes.get(e);
+    if (!m) {
+      const w = e.w * 2, h = e.h, g = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, w)); g.translate(0, h / 2, 0);
+      m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff }));
+      const eye = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-w / 2, h * 0.85, -w / 2), new THREE.Vector3(w / 2, h * 0.85, -w / 2), new THREE.Vector3(w / 2, h * 0.85, w / 2), new THREE.Vector3(-w / 2, h * 0.85, w / 2), new THREE.Vector3(-w / 2, h * 0.85, -w / 2)]), new THREE.LineBasicMaterial({ color: 0xff0000 }));
+      m.add(eye); scene.add(m); DBG.boxes.set(e, m);
+    }
+    m.position.copy(e.mesh.position);
+  }
+  if (UI.chunkBorders && !DBG.chunk) {
+    const pts = [];
+    for (let i = 0; i <= 16; i += 2) for (const [x, z] of [[i, 0], [i, 16], [0, i], [16, i]]) pts.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, S.CH, z));
+    for (let y = 0; y <= S.CH; y += 2) for (const [a, b] of [[[0, 0], [16, 0]], [[16, 0], [16, 16]], [[16, 16], [0, 16]], [[0, 16], [0, 0]]]) pts.push(new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1]));
+    DBG.chunk = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.6 }));
+    scene.add(DBG.chunk);
+  }
+  if (DBG.chunk) { DBG.chunk.visible = !!UI.chunkBorders; DBG.chunk.position.set(Math.floor(px / 16) * 16, 0, Math.floor(pz / 16) * 16); }
+}
+// F2: save the frame as a PNG named like Java's screenshots
+function takeScreenshot() { UI.shotPending = true; }
+function screenshotAfterRender() {
+  if (!UI.shotPending) return; UI.shotPending = false;
+  const d = new Date(), p = n => String(n).padStart(2, '0'), name = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}.png`;
+  canvas.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); chatMsg('스크린샷을 ' + name + '(으)로 저장했습니다'); });
+}
+function toggleFullscreen() {
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {}); grabLock(); }).catch(() => {});
+}
+addEventListener('keyup', e => { if (keyCode(e) === 'F3' && F3K.down) { F3K.down = false; if (!F3K.used && W.active && !UI.menu && !UI.screen && !UI.chatOpen) UI.debug = !UI.debug; } });
 addEventListener('keydown', e => {
   audioInit();
   if (UI.chatOpen) return;
-  if (e.code === 'F3' || e.code === 'F1' || e.code === 'F5' || e.code === 'Tab') e.preventDefault();
+  const code = keyCode(e);
+  if (/^F([1-9]|1[0-2])$/.test(code) || code === 'Tab') e.preventDefault(); // also stops the top-row keys navigating away
+  if (code === 'F11') { toggleFullscreen(); return; }
   if (UI.screen) {
     if (e.code === 'Escape' || e.code === 'KeyE') { UI.closeScreen(); e.preventDefault(); return; }
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
@@ -39,10 +100,15 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyT') { e.preventDefault(); openChat(''); return; }
   if (e.code === 'Slash') { e.preventDefault(); openChat('/'); return; }
   if (e.code === 'KeyE') { UI.openScreen('inv'); return; }
-  // Chromebooks have no F-keys by default: H, ` and V are alternatives
-  if (e.code === 'F1' || e.code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
-  if (e.code === 'F3' || e.code === 'Backquote') { UI.debug = !UI.debug; return; }
-  if (e.code === 'F5' || e.code === 'KeyV') { view = (view + 1) % 3; return; }
+  if (code === 'F3') { if (!F3K.down) { F3K.down = true; F3K.used = false; } return; }
+  if (F3K.down && debugCombo(code)) { F3K.used = true; return; }
+  // F1 / F2 / F5 (Chromebook: back / forward / overview keys); H and V stay as extra keys
+  if (code === 'F1' || code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
+  if (code === 'F2') { takeScreenshot(); return; }
+  if (code === 'F5' || code === 'KeyV') { view = (view + 1) % 3; return; }
+  if (code === 'KeyG') { pickBlock(); return; } // touchpads have no middle button (ChromeOS turns Alt + click into a right click)
+  if (!e.repeat && OPT.toggleSprint && (code === 'ControlLeft' || code === 'ControlRight' || code === 'KeyR')) TOGGLE.sprint = !TOGGLE.sprint;
+  if (!e.repeat && OPT.toggleSneak && (code === 'ShiftLeft' || code === 'ShiftRight')) TOGGLE.sneak = !TOGGLE.sneak;
   if (e.code === 'KeyQ') { dropHeld(e.ctrlKey); return; }
   if (e.code === 'KeyF') { swapHands(); return; }
   if (/^Digit[1-9]$/.test(e.code)) { INV.sel = +e.code.slice(5) - 1; if (USE.kind) onUseRelease(); return; }
@@ -51,6 +117,7 @@ addEventListener('keydown', e => {
   keys.add(e.code); updateMoveKeys();
 });
 addEventListener('keyup', e => { keys.delete(e.code); updateMoveKeys(); });
+addEventListener('blur', () => { F3K.down = false; });
 addEventListener('blur', () => { clearInput(); });
 
 // ---------- mouse ----------
@@ -200,7 +267,7 @@ function quitToTitle() {
 addEventListener('pagehide', () => saveAll(true));
 // Ctrl+W (sprint + forward in Java) closes a Chrome tab: ask before leaving a running world
 addEventListener('beforeunload', e => { if (W.active) { saveAll(true); e.preventDefault(); e.returnValue = ''; } });
-document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(true); if (W.active && !UI.paused && !PL.dead) pauseGame(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(true); if (W.active && !UI.paused && !PL.dead && OPT.pauseOnBlur !== false) pauseGame(); } });
 
 // ---------- game tick ----------
 function gameTick() {
@@ -308,7 +375,8 @@ function frame(now) {
   R.updateRain(dt, px, py, pz, W.dim ? 0 : W.rain);
   ambientParticles(dt, px, py, pz);
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;
-  t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); t0 = performance.now();
+  debugOverlays(px, py, pz);
+  t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); screenshotAfterRender(); t0 = performance.now();
   // overlays & HUD
   $('ovWater').hidden = eyeB !== 'water'; $('ovSnow').hidden = !PL.inSnow;
   $('ovHurt').style.opacity = PL.hurtT > 0 ? PL.hurtT / 10 * 0.5 : (PL.health <= 4 && PL.mode !== 'creative' ? 0.25 + 0.1 * Math.sin(now / 200) : 0);
