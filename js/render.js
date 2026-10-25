@@ -197,7 +197,7 @@ function updateRain(dt, px, py, pz, amt) {
   rainMat.opacity = 0.55 * amt;
   colTopT -= dt; if (colTopT < 0) { colTop.clear(); colTopT = 1; }
   const top = (x, z) => { const k = x * 4096 + z; let v = colTop.get(k); if (v === undefined) { v = topY(x, z); colTop.set(k, v); } return v; };
-  const cold = S.BIOMES[biomeAt(Math.floor(px), Math.floor(pz))][4] <= 0.15, dry = biomeAt(Math.floor(px), Math.floor(pz)) === S.BIO.DESERT;
+  const cold = S.BIOMES[biomeAt(Math.floor(px), Math.floor(pz))][4] <= 0.15, dry = biomeBase(Math.floor(px), Math.floor(pz)) === S.BIO.DESERT;
   rainMat.color.setHex(cold ? 0xffffff : 0x9ab4e8);
   const active = Math.floor(RAIN_N * amt * (dry ? 0 : 1));
   for (let i = 0; i < RAIN_N; i++) {

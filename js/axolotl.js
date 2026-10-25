@@ -140,7 +140,7 @@ function trySpawnAxolotl() {
 }
 // tropical fish school in warm and lukewarm oceans; pufferfish too
 function spawnWarmFish(c) {
-  const b = c.biome[8 * 16 + 8]; if (b !== S.BIO.WARM_OCEAN && b !== S.BIO.LUKEWARM_OCEAN) return;
+  const b = S.BB[c.biome[8 * 16 + 8]]; if (b !== S.BIO.WARM_OCEAN && b !== S.BIO.LUKEWARM_OCEAN) return;
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.25) return;
   if (R0() < 0.3) { for (let i = 0; i < 1 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(9); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('pufferfish', x + .5, y, z + .5); } return; }
   const v = R0.int(TFISH_COL.length);

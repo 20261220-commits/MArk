@@ -232,7 +232,7 @@ function trySpawnDimension() {
 }
 // overworld extras: endermen at night and slimes in swamps and slime chunks
 function overworldExtra(x, y, z) {
-  const b = biomeAt(x, z);
+  const b = biomeBase(x, z);
   if (Math.random() < 0.08) return 'enderman';
   const slimeChunk = S.hash32(W.seed, x >> 4, z >> 4, 99) % 10 === 0;
   if ((b === S.BIO.SWAMP && y > 50 && y < 70 && Math.random() < 0.3) || (slimeChunk && y < 40 && Math.random() < 0.3)) return 'slime';

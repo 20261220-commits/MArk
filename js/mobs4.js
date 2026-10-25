@@ -222,7 +222,7 @@ const RABBIT_M = autoModel(v => {
     ['rleg2', [1.5, 2, 2.5], [-1, -2, -1.5, 2, 2, 3], c], ['lleg2', [-1.5, 2, 2.5], [-1, -2, -1.5, 2, 2, 3], c],
   ];
 });
-function rabbitVariant(e) { const b = biomeAt(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.DESERT ? 3 : b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA ? (Math.random() < 0.8 ? 1 : 5) : [0, 0, 2, 4][(Math.random() * 4) | 0]; }
+function rabbitVariant(e) { const b = biomeBase(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.DESERT ? 3 : b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA ? (Math.random() < 0.8 ? 1 : 5) : [0, 0, 2, 4][(Math.random() * 4) | 0]; }
 function rabbitAI(e, dist) {
   let mx = 0, mz = 0, sp = 0.09;
   const held = PL.held(), tempt = held && isFood(e.def, held.id) && dist < 8 && !PL.dead;
@@ -299,14 +299,14 @@ Object.assign(MOBDEF, {
   rabbit: { hp: 3, w: 0.2, h: 0.5, speed: 0.09, xp: 2, snd: 'hmm', drops: [['rabbit', 0, 1], ['rabbit_hide', 0, 1]], extraDrop: [['rabbit_foot', 0.1]], parts: RABBIT_M.parts, tex: () => RABBIT_M.tex(0), vtex: v => RABBIT_M.tex(v),
     variant: () => 0, initVariant: rabbitVariant, food: ['carrot', 'golden_carrot', 'dandelion'], ai: rabbitAI },
   fox: { hp: 10, w: 0.35, h: 0.7, speed: 0.08, xp: 2, snd: 'hmm', drops: [], parts: FOX_M.parts, tex: () => FOX_M.tex(0), vtex: v => FOX_M.tex(v), variant: () => 0,
-    initVariant: e => { const b = biomeAt(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA ? 1 : 0; }, food: ['sweet_berries'], ai: foxAI, anim: foxAnim,
+    initVariant: e => { const b = biomeBase(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA ? 1 : 0; }, food: ['sweet_berries'], ai: foxAI, anim: foxAnim,
     save: e => ({ mouth: e.mouth || null }), init: (e, o) => { if (o.mouth) { e.mouth = o.mouth; foxMouth(e); } }, onDeathDrops: e => { if (e.mouth) dropStack(e.x, e.y + .5, e.z, e.mouth); } },
 });
 MOBDEF.mule.drops = MOBDEF.horse.drops;
 
 // ---------- spawning ----------
 function spawnMoreForChunk(c) {
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 27)), b = c.biome[8 * 16 + 8];
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 27)), b = S.BB[c.biome[8 * 16 + 8]];
   const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 204 || g === 205 ? y + 1 : -1; };
   const group = (t, n, opts) => { const v = opts && opts.variant != null ? opts.variant : null; for (let i = 0; i < n; i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = ground(x, z); if (y > 0) spawnMob(t, x + .5, y, z + .5, v != null ? { variant: v } : {}); } };
   const B = S.BIO;

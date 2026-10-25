@@ -217,7 +217,7 @@ function advScan() {
   if (eff.levitation) { if (PL.levStart == null) PL.levStart = PL.y; else if (PL.y - PL.levStart >= 50) advGrant('end/levitate'); } else PL.levStart = null;
 }
 // the advancement key of a biome (adventuring time)
-function biomeKey(b) { const r = S.BIOMES[b]; return r && r[8] ? r[8] : ['ocean', 'plains', 'forest', 'birch_forest', 'taiga', 'snowy_tundra', 'desert', 'mountains', 'beach', 'river', 'swamp', 'snowy_taiga', 'frozen_ocean', '', '', '', '', '', '', 'jungle', 'savanna', 'dark_forest', 'badlands', 'warm_ocean', 'lukewarm_ocean', 'cold_ocean', 'mushroom_fields', 'ice_spikes', 'bamboo_jungle', 'flower_forest'][b] || ''; }
+function biomeKey(b) { const r = S.BIOMES[b]; return r && r[8] ? r[8] : '' || ['ocean', 'plains', 'forest', 'birch_forest', 'taiga', 'snowy_tundra', 'desert', 'mountains', 'beach', 'river', 'swamp', 'snowy_taiga', 'frozen_ocean', '', '', '', '', '', '', 'jungle', 'savanna', 'dark_forest', 'badlands', 'warm_ocean', 'lukewarm_ocean', 'cold_ocean', 'mushroom_fields', 'ice_spikes', 'bamboo_jungle', 'flower_forest'][b] || ''; }
 
 // ---------- the screen ----------
 const ADVUI = { tab: 'story', px: 0, py: 0 };

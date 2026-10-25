@@ -36,6 +36,7 @@ function getMeta(x, y, z) { if (y < 0 || y >= CH) return 0; const c = chunkAt(x 
 function getLight(x, y, z) { if (y >= CH) return 0xf0; if (y < 0) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.light[(y << 8) | ((z & 15) << 4) | (x & 15)] : 0xf0; }
 function isLoaded(x, z) { return !!chunkAt(x >> 4, z >> 4); }
 function biomeAt(x, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.biome[((z & 15) << 4) | (x & 15)] : 1; }
+const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 variant (taiga hills -> taiga), for spawning rules
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;

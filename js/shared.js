@@ -550,7 +550,41 @@ const BIOMES = [
   ['꽃 숲', 0x79c05a, 0x59ae30, 0x3f76e4, 0.7, 5, 1],
 ];
 const BIO = { OCEAN: 0, PLAINS: 1, FOREST: 2, BIRCH: 3, TAIGA: 4, TUNDRA: 5, DESERT: 6, MOUNTAINS: 7, BEACH: 8, RIVER: 9, SWAMP: 10, SNOWY_TAIGA: 11, FROZEN_OCEAN: 12, JUNGLE: 19, SAVANNA: 20, DARK_FOREST: 21, BADLANDS: 22, WARM_OCEAN: 23, LUKEWARM_OCEAN: 24, COLD_OCEAN: 25, MUSHROOM: 26, ICE_SPIKES: 27, BAMBOO_JUNGLE: 28, FLOWER_FOREST: 29 };
-const isOceanBio = b => b === 0 || b === 12 || (b >= 23 && b <= 25);
+// the 1.17 variants (hills, mutated "M" biomes, deep oceans, edges, plateaus, shores, cave and End biomes):
+// [key, name, base biome, grass, foliage, water, temperature, trees per chunk, tree type]
+// tree types: 0 oak, 1 oak+birch, 2 birch, 3 spruce, 4 jungle, 5 acacia, 6 dark oak, 7/8 huge mushrooms, 9 mega pine, 10 mega spruce, 11 tall birch, 12 jungle bush
+const BIO_KEYS = 'ocean plains forest birch_forest taiga snowy_tundra desert mountains beach river swamp snowy_taiga frozen_ocean nether_wastes crimson_forest warped_forest soul_sand_valley basalt_deltas the_end jungle savanna dark_forest badlands warm_ocean lukewarm_ocean cold_ocean mushroom_fields ice_spikes bamboo_jungle flower_forest'.split(' ');
+BIOMES.forEach((r, i) => { r[7] = i; r[8] = BIO_KEYS[i]; });
+for (const [key, name, base, g, f, w, t, n, ty] of [
+  ['deep_ocean', '깊은 바다', 0, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0], ['deep_frozen_ocean', '깊고 얼어붙은 바다', 12, 0x80b497, 0x60a17b, 0x3938c9, 0.0, 0, 0],
+  ['deep_cold_ocean', '깊고 차가운 바다', 25, 0x8eb971, 0x71a74d, 0x3d57d6, 0.5, 0, 0], ['deep_lukewarm_ocean', '깊고 미지근한 바다', 24, 0x8eb971, 0x71a74d, 0x45adf2, 0.5, 0, 0],
+  ['deep_warm_ocean', '깊고 따뜻한 바다', 23, 0x8eb971, 0x71a74d, 0x43d5ee, 0.5, 0, 0], ['frozen_river', '얼어붙은 강', 9, 0x80b497, 0x60a17b, 0x3938c9, 0.0, 0, 0],
+  ['snowy_beach', '눈 덮인 해변', 8, 0x83b593, 0x64a278, 0x3d57d6, 0.05, 0, 0], ['stone_shore', '돌 해안', 8, 0x8ab689, 0x6da36b, 0x3f76e4, 0.2, 0, 0],
+  ['sunflower_plains', '해바라기 평원', 1, 0x91bd59, 0x77ab2f, 0x3f76e4, 0.8, 0.15, 0], ['desert_hills', '사막 언덕', 6, 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0],
+  ['desert_lakes', '사막 호수', 6, 0xbfb755, 0xaea42a, 0x3f76e4, 2.0, 0, 0], ['wooded_mountains', '나무가 우거진 산', 7, 0x8ab689, 0x6da36b, 0x3f76e4, 0.2, 3, 3],
+  ['gravelly_mountains', '자갈이 많은 산', 7, 0x8ab689, 0x6da36b, 0x3f76e4, 0.2, 0.5, 3], ['modified_gravelly_mountains', '자갈이 많은 산+', 7, 0x8ab689, 0x6da36b, 0x3f76e4, 0.2, 0.5, 3],
+  ['mountain_edge', '산 가장자리', 7, 0x8ab689, 0x6da36b, 0x3f76e4, 0.2, 1, 3], ['snowy_mountains', '눈 덮인 산', 5, 0x80b497, 0x60a17b, 0x3d57d6, 0.0, 0.1, 3],
+  ['snowy_taiga_hills', '눈 덮인 타이가 언덕', 11, 0x80b497, 0x60a17b, 0x3d57d6, -0.5, 6, 3], ['snowy_taiga_mountains', '눈 덮인 타이가 산', 11, 0x80b497, 0x60a17b, 0x3d57d6, -0.5, 6, 3],
+  ['taiga_hills', '타이가 언덕', 4, 0x86b783, 0x68a464, 0x3f76e4, 0.25, 8, 3], ['taiga_mountains', '타이가 산', 4, 0x86b783, 0x68a464, 0x3f76e4, 0.25, 8, 3],
+  ['giant_tree_taiga', '거대 나무 타이가', 4, 0x86b87f, 0x68a55f, 0x3f76e4, 0.3, 10, 9], ['giant_tree_taiga_hills', '거대 나무 타이가 언덕', 4, 0x86b87f, 0x68a55f, 0x3f76e4, 0.3, 10, 9],
+  ['giant_spruce_taiga', '거대 가문비나무 타이가', 4, 0x86b783, 0x68a464, 0x3f76e4, 0.25, 10, 10], ['giant_spruce_taiga_hills', '거대 가문비나무 타이가 언덕', 4, 0x86b783, 0x68a464, 0x3f76e4, 0.25, 10, 10],
+  ['wooded_hills', '나무가 우거진 언덕', 2, 0x79c05a, 0x59ae30, 0x3f76e4, 0.7, 8, 1], ['birch_forest_hills', '자작나무 숲 언덕', 3, 0x88bb67, 0x6ba941, 0x3f76e4, 0.6, 8, 2],
+  ['tall_birch_forest', '키 큰 자작나무 숲', 3, 0x88bb67, 0x6ba941, 0x3f76e4, 0.6, 10, 11], ['tall_birch_hills', '키 큰 자작나무 언덕', 3, 0x88bb67, 0x6ba941, 0x3f76e4, 0.6, 10, 11],
+  ['dark_forest_hills', '어두운 숲 언덕', 21, 0x507a32, 0x59ae30, 0x3f76e4, 0.7, 12, 6], ['swamp_hills', '늪 언덕', 10, 0x6a7039, 0x6a7039, 0x617b64, 0.8, 2, 0],
+  ['jungle_hills', '정글 언덕', 19, 0x59c93c, 0x30bb0b, 0x3f76e4, 0.95, 10, 4], ['modified_jungle', '변형된 정글', 19, 0x59c93c, 0x30bb0b, 0x3f76e4, 0.95, 10, 4],
+  ['jungle_edge', '정글 가장자리', 19, 0x64c73f, 0x3eb80f, 0x3f76e4, 0.95, 2, 12], ['modified_jungle_edge', '변형된 정글 가장자리', 19, 0x64c73f, 0x3eb80f, 0x3f76e4, 0.95, 2, 12],
+  ['bamboo_jungle_hills', '대나무 정글 언덕', 28, 0x59c93c, 0x30bb0b, 0x3f76e4, 0.95, 3, 4], ['savanna_plateau', '사바나 고원', 20, 0xbfb755, 0xaea42a, 0x3f76e4, 1.0, 0.8, 5],
+  ['shattered_savanna', '산산조각 난 사바나', 20, 0xbfb755, 0xaea42a, 0x3f76e4, 1.1, 0.5, 5], ['shattered_savanna_plateau', '산산조각 난 사바나 고원', 20, 0xbfb755, 0xaea42a, 0x3f76e4, 1.0, 0.5, 5],
+  ['badlands_plateau', '악지 고원', 22, 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 0, 0], ['wooded_badlands_plateau', '나무가 우거진 악지 고원', 22, 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 5, 0],
+  ['eroded_badlands', '침식된 악지', 22, 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 0, 0], ['modified_badlands_plateau', '변형된 악지 고원', 22, 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 0, 0],
+  ['modified_wooded_badlands_plateau', '변형된 나무가 우거진 악지 고원', 22, 0x90814d, 0x9e814d, 0x3f76e4, 2.0, 5, 0], ['mushroom_field_shore', '버섯 들판 해안', 26, 0x55c93f, 0x2bbb0f, 0x3f76e4, 0.9, 0, 7],
+  ['dripstone_caves', '점적석 동굴', 1, 0x91bd59, 0x77ab2f, 0x3f76e4, 0.8, 0, 0], ['lush_caves', '무성한 동굴', 1, 0x91bd59, 0x77ab2f, 0x3f76e4, 0.5, 0, 0],
+  ['small_end_islands', '작은 엔드 섬', 18, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0], ['end_midlands', '엔드 중지대', 18, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0],
+  ['end_highlands', '엔드 고지대', 18, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0], ['end_barrens', '엔드 불모지', 18, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0],
+  ['the_void', '공허', 18, 0x8eb971, 0x71a74d, 0x3f76e4, 0.5, 0, 0]]) BIOMES.push([name, g, f, w, t, n, ty, base, key]);
+const BIOK = {}; BIOMES.forEach((r, i) => { BIOK[r[8]] = i; });
+const BB = new Uint8Array(256); BIOMES.forEach((r, i) => { BB[i] = r[7]; }); // variant -> the base biome the older code knows
+const isOceanBio = b => { b = BB[b]; return b === 0 || b === 12 || (b >= 23 && b <= 25); };
 
 // ---------- shapes (pixel boxes) ----------
 const DIRS = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0]]; // facing 0 north,1 east,2 south,3 west
@@ -768,6 +802,13 @@ function makeNoise(seed) {
   return { n2, n3, fbm };
 }
 
+// ---------- cave biomes (1.17): regions of the underground ----------
+const CAVE_N = new Map();
+const caveNoise = (seed, k) => { const key = seed * 4 + k; let n = CAVE_N.get(key); if (!n) { n = makeNoise(seed + 311 + k); CAVE_N.set(key, n); } return n; };
+const isDripstoneCaves = (seed, x, z) => caveNoise(seed, 0).n2(x / 420, z / 420) > 0.5;
+const isLushCaves = (seed, x, z) => caveNoise(seed, 1).n2(x / 380, z / 380) > 0.55;
+// the cave biome at a spot well below the surface, or -1 (lush caves only with the experimental option, as in 1.17)
+function caveBiomeAt(seed, x, y, z, surface, exp) { if (y > Math.min(56, surface - 10)) return -1; if (exp && isLushCaves(seed, x, z)) return BIOK.lush_caves; return isDripstoneCaves(seed, x, z) ? BIOK.dripstone_caves : -1; }
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
@@ -810,7 +851,56 @@ function makeGen(seed) {
     else if (b === BIO.TUNDRA && nX.n2(wx / 420 + 31, wz / 420) > 0.35) b = BIO.ICE_SPIKES;
     else if (b === BIO.JUNGLE && nX.n2(wx / 380 + 91, wz / 380) > 0.3) b = BIO.BAMBOO_JUNGLE;
     else if (b === BIO.FOREST && nX.n2(wx / 320, wz / 320 + 57) > 0.4) b = BIO.FLOWER_FOREST;
-    return [h, b];
+    // ---- 1.17 variants: hills, mutated ("M") biomes, deep oceans, edges, plateaus and shores; v is what the world
+    // records (F3, colours, adventuring time), b the base biome the rest of the generator works with ----
+    const K = BIOK, hillN = nX.fbm(wx / 230 + 41.3, wz / 230 - 17.9, 2), mutN = nX.n2(wx / 260 + 77.1, wz / 260 - 33.7);
+    const hill = hillN > 0.3, mut = mutN > 0.45, hillAdd = smooth(0.2, 0.45, hillN) * 16;
+    const fade = smooth(SEA + 1, SEA + 7, h) * smooth(0.04, 0.12, rv); // no cliffs at shores and river banks
+    let v = b, add = 0;
+    switch (b) {
+      case BIO.OCEAN: if (h < 42) v = K.deep_ocean; break;
+      case BIO.FROZEN_OCEAN: if (h < 42) v = K.deep_frozen_ocean; break;
+      case BIO.COLD_OCEAN: if (h < 42) v = K.deep_cold_ocean; break;
+      case BIO.LUKEWARM_OCEAN: if (h < 42) v = K.deep_lukewarm_ocean; break; // (deep warm ocean exists but never generates in 1.17)
+      case BIO.RIVER: if (temp < -0.45) v = K.frozen_river; break;
+      case BIO.BEACH: if (temp < -0.45) v = K.snowy_beach; else if (mount > 0.05 || nX.n2(wx / 150 + 7.7, wz / 150) > 0.45) v = K.stone_shore; break;
+      case BIO.PLAINS: if (mut) v = K.sunflower_plains; break;
+      case BIO.DESERT: if (hill) { v = K.desert_hills; add = hillAdd; } else if (mut) v = K.desert_lakes; break;
+      case BIO.MOUNTAINS: if (h <= SEA + 3) v = K.stone_shore; else if (mount < 0.5) v = K.mountain_edge; else if (mut) v = hill ? K.modified_gravelly_mountains : K.gravelly_mountains; else if (hum > 0.2) v = K.wooded_mountains; break;
+      case BIO.TUNDRA: if (hill) { v = K.snowy_mountains; add = hillAdd * 1.6; } break;
+      case BIO.SNOWY_TAIGA: if (mut) { v = K.snowy_taiga_mountains; add = hillAdd * 1.3; } else if (hill) { v = K.snowy_taiga_hills; add = hillAdd; } break;
+      case BIO.TAIGA: {
+        const giant = hum > 0.25 && nX.n2(wx / 340 - 61, wz / 340 + 23) > 0.05;
+        if (giant) { v = mut ? (hill ? K.giant_spruce_taiga_hills : K.giant_spruce_taiga) : hill ? K.giant_tree_taiga_hills : K.giant_tree_taiga; if (hill) add = hillAdd; }
+        else if (mut) { v = K.taiga_mountains; add = hillAdd * 1.3; } else if (hill) { v = K.taiga_hills; add = hillAdd; }
+        break;
+      }
+      case BIO.FOREST: if (hill) { v = K.wooded_hills; add = hillAdd; } break;
+      case BIO.BIRCH: if (mut) v = hill ? K.tall_birch_hills : K.tall_birch_forest; else if (hill) v = K.birch_forest_hills; if (hill) add = hillAdd; break;
+      case BIO.DARK_FOREST: if (hill || mut) { v = K.dark_forest_hills; add = hillAdd * 0.8 + (mut ? 6 : 0); } break;
+      case BIO.SWAMP: if (hill || mut) { v = K.swamp_hills; add = Math.min(hillAdd, 6) + (mut ? 3 : 0); } break;
+      case BIO.JUNGLE: if (hum < 0.36) v = mut ? K.modified_jungle_edge : K.jungle_edge; else if (hill) { v = K.jungle_hills; add = hillAdd; } else if (mut) { v = K.modified_jungle; add = Math.abs(nD.n2(wx / 40, wz / 40)) * 10; } break;
+      case BIO.BAMBOO_JUNGLE: if (hill) { v = K.bamboo_jungle_hills; add = hillAdd; } break;
+      case BIO.SAVANNA: {
+        const pk = smooth(0.15, 0.35, nX.n2(wx / 320 - 9.3, wz / 320 + 5.1));
+        if (pk > 0.5) v = mut ? K.shattered_savanna_plateau : K.savanna_plateau; else if (mut) v = K.shattered_savanna;
+        add = pk * Math.max(0, 94 + hills * 3 - h);
+        if (mut) add += Math.pow(Math.abs(nD.n2(wx / 30, wz / 30)), 1.5) * 45 + Math.max(0, nD.n2(wx / 9, wz / 9)) * 6; // shattered: jagged peaks
+        break;
+      }
+      case BIO.BADLANDS: {
+        const pk = smooth(0.1, 0.3, nX.n2(wx / 300 + 19.7, wz / 300 - 3.3));
+        if (pk > 0.5) v = hum > -0.45 ? (mut ? K.modified_wooded_badlands_plateau : K.wooded_badlands_plateau) : (mut ? K.modified_badlands_plateau : K.badlands_plateau);
+        else if (mut) v = K.eroded_badlands;
+        add = pk * Math.max(0, 96 - h); if (pk > 0 && pk < 1) add = Math.floor(add / 4) * 4; // terraced slopes up to the plateau
+        if (v === K.eroded_badlands) { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) add += Math.min(40, (sp - 0.55) * 120); } // hoodoos
+        if (v === K.modified_badlands_plateau || v === K.modified_wooded_badlands_plateau) add -= Math.max(0, nD.n2(wx / 25, wz / 25)) * 14;
+        break;
+      }
+      case BIO.MUSHROOM: if (h <= SEA + 1) v = K.mushroom_field_shore; break;
+    }
+    if (add > 0) h = Math.min(CH - 6, h + Math.floor(add * fade));
+    return [h, b, v];
   }
   return { column, nD, nX };
 }
@@ -2037,7 +2127,7 @@ function genEnd(seed, cx, cz) {
     let top = -1, bot = 0;
     const r = 82 + nA.n2(wx / 50, wz / 50) * 10;
     if (d < r) { const t = 1 - d / r; top = 56 + Math.floor(t * 9 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(Math.sqrt(t) * 44 + 3 + nB.n2(wx / 13, wz / 13) * 3); }
-    else if (d > 700) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
+    else if (d > 700) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; biome[z * 16 + x] = v > 0.75 ? BIOK.end_highlands : v > 0.6 ? BIOK.end_midlands : v > 0.5 ? BIOK.end_barrens : BIOK.small_end_islands; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
     for (let y = Math.max(1, bot); y <= top; y++) blocks[I(x, y, z)] = 166;
   }
   const st = makeStamp(blocks, meta, x0, z0), R = rng(hash32(seed, cx, cz, 61));
@@ -2095,16 +2185,17 @@ function genChunk(seed, cx, cz, dim, exp) {
   if (dim === 1) return genEnd(seed, cx, cz);
   const G = makeGen(seed);
   const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
-  const biome = new Uint8Array(256), hgt = new Int16Array(18 * 18), bpad = new Uint8Array(18 * 18);
+  const biome = new Uint8Array(256), hgt = new Int16Array(18 * 18), bpad = new Uint8Array(18 * 18), vpad = new Uint8Array(18 * 18), vbio = new Uint8Array(256), K = BIOK;
   const x0 = cx * CW, z0 = cz * CW;
-  for (let z = -1; z <= 16; z++) for (let x = -1; x <= 16; x++) { const c = G.column(x0 + x, z0 + z); hgt[(z + 1) * 18 + x + 1] = c[0]; bpad[(z + 1) * 18 + x + 1] = c[1]; }
+  for (let z = -1; z <= 16; z++) for (let x = -1; x <= 16; x++) { const c = G.column(x0 + x, z0 + z); hgt[(z + 1) * 18 + x + 1] = c[0]; bpad[(z + 1) * 18 + x + 1] = c[1]; vpad[(z + 1) * 18 + x + 1] = c[2]; }
   const I = (x, y, z) => (y << 8) | (z << 4) | x;
   const R = rng(hash32(seed, cx, cz, 1));
   const STONE = 1, WATER = 27, LAVA = 28;
   // 1. base terrain + surface
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
-    const h = hgt[(z + 1) * 18 + x + 1], b = bpad[(z + 1) * 18 + x + 1];
-    biome[z * 16 + x] = b;
+    const h = hgt[(z + 1) * 18 + x + 1], b = bpad[(z + 1) * 18 + x + 1], v = vpad[(z + 1) * 18 + x + 1];
+    biome[z * 16 + x] = b; vbio[z * 16 + x] = v;
+    const gN = G.nX.n2((x0 + x) / 11, (z0 + z) / 11), steep = v === K.shattered_savanna || v === K.shattered_savanna_plateau;
     const wx = x0 + x, wz = z0 + z;
     const dsl = 7 + Math.floor(G.nX.n2(wx / 9, wz / 9) * 3);
     const depth = 3 + Math.floor((G.nD.n2(wx / 7, wz / 7) + 1) * 1.2);
@@ -2112,23 +2203,28 @@ function genChunk(seed, cx, cz, dim, exp) {
     for (let y = 0; y <= h; y++) {
       let id = y < dsl ? 76 : STONE;
       const d = h - y;
-      if (b === BIO.DESERT) { if (d < 4) id = 9; else if (d < 7) id = 26; }
+      if (v === K.stone_shore) { if (h < SEA && d < 2 && gN > 0.2) id = 10; } // bare stone (gravel under water)
+      else if (b === BIO.DESERT) { if (d < 4) id = 9; else if (d < 7) id = 26; }
       else if (b === BIO.BADLANDS) { // red sand over horizontal bands of coloured terracotta
         if (d < 1 && h < 80) id = 201;
         else if (d < 18 + (h - SEA) * 0.6) { const band = (y + Math.floor(G.nX.n2(wx / 60, wz / 60) * 3) + 64) % 12; id = band === 0 || band === 7 ? 196 : 195; meta[I(x, y, z)] = band === 0 ? 1 : band === 7 ? 14 : 0; if (band === 3 || band === 4) { id = 196; meta[I(x, y, z)] = [4, 12][band - 3]; } if (band === 9) { id = 196; meta[I(x, y, z)] = 8; } }
       }
       else if (b === BIO.BEACH) { if (d < 4) id = 9; else if (d < 6) id = 26; }
+      else if ((v === K.wooded_badlands_plateau || v === K.modified_wooded_badlands_plateau) && h > 84 && d < 2) id = d === 0 ? (gN > 0.1 ? 205 : 2) : 3; // coarse dirt and grass on the wooded plateau
       else if (isOceanBio(b) || b === BIO.RIVER) { if (d < 3) id = b === BIO.WARM_OCEAN ? 9 : b === BIO.COLD_OCEAN || b === BIO.FROZEN_OCEAN ? (G.nX.n2(wx / 12, wz / 12) > 0.3 ? 9 : 10) : h < SEA - 12 ? 10 : (G.nX.n2(wx / 12, wz / 12) > 0.55 ? 53 : 9); }
       else if (b === BIO.MOUNTAINS) {
-        if (h > 92 || slope > 2) { if (d === 0 && h > 98 && slope <= 2) id = 50; }
+        if ((v === K.gravelly_mountains || v === K.modified_gravelly_mountains) && d < 4 && gN > -0.15) id = 10; // gravel slopes
+        else if (h > 92 || slope > 2) { if (d === 0 && h > 98 && slope <= 2) id = 50; }
         else if (d === 0) id = 2; else if (d < depth) id = 3;
       }
       else if (b === BIO.MUSHROOM) { if (d === 0) id = 204; else if (d < depth) id = 3; }
+      else if (steep && slope > 3 && d < depth) id = STONE; // shattered savanna: bare stone cliffs
+      else if (v >= K.giant_tree_taiga && v <= K.giant_spruce_taiga_hills && d === 0 && h >= SEA) id = gN > 0.25 ? 205 : gN > -0.35 ? 203 : 2; // podzol and coarse dirt
       else { if (d === 0) id = h < SEA ? 3 : 2; else if (d < depth) id = 3; }
       blocks[I(x, y, z)] = id;
     }
     for (let y = h + 1; y <= SEA; y++) blocks[I(x, y, z)] = WATER;
-    if ((b === BIO.FROZEN_OCEAN || ((b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || b === BIO.RIVER) && BIOMES[b][4] <= 0.15)) && h < SEA) blocks[I(x, SEA, z)] = 52;
+    if ((isOceanBio(b) || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || b === BIO.RIVER) && BIOMES[v][4] <= 0.15 && h < SEA) blocks[I(x, SEA, z)] = 52; // frozen oceans and rivers
     blocks[I(x, 0, z)] = 8;
     for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5) blocks[I(x, y, z)] = 8;
   }
@@ -2289,8 +2385,10 @@ function genChunk(seed, cx, cz, dim, exp) {
       }
     }
   }
-  // 6. dripstone (sparse, 1.17)
-  for (let a = 0; a < 6; a++) {
+  // 6. dripstone (sparse, 1.17); dripstone caves regions get many more clusters and extra copper ore
+  const dripRegion = isDripstoneCaves(seed, x0 + 8, z0 + 8);
+  if (dripRegion) for (let i = 0; i < 10; i++) vein(14, 17, uni(0, 95));
+  for (let a = 0, na = dripRegion ? 60 : 6; a < na; a++) {
     const x = R.int(16), z = R.int(16), y0 = 12 + R.int(40);
     for (let y = y0; y < y0 + 20 && y < CH - 2; y++) {
       if (blocks[I(x, y, z)] === 0 && blocks[I(x, y + 1, z)] === 1) {
@@ -2309,7 +2407,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   // 7. lush cave patches: in 1.17 these generate only with the experimental "caves & cliffs" option (a world setting
   // here, off by default); otherwise the blocks come from wandering traders and bone meal, as in vanilla.
   // moss floors with azaleas and dripleaves, clay pools, cave vines and spore blossoms on the ceiling
-  if (exp && R.int(10) === 0) {
+  if (exp && (R.int(10) === 0 || isLushCaves(seed, x0 + 8, z0 + 8))) {
     const lx = R.int(16), lz = R.int(16), ly = 22 + R.int(26), rad = 6 + R.int(5);
     const rocky = v => v === 1 || v === 3 || v === 2 || v === 91 || v === 92 || v === 93 || v === 75 || v === 76;
     for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) {
@@ -2358,18 +2456,21 @@ function genChunk(seed, cx, cz, dim, exp) {
   for (let ox = cx - 1; ox <= cx + 1; ox++) for (let oz = cz - 1; oz <= cz + 1; oz++) {
     const r = rng(hash32(seed, ox, oz, 5));
     const own = ox === cx && oz === cz;
-    const cc = own ? [hgt[9 * 18 + 9], bpad[9 * 18 + 9]] : G.column(ox * 16 + 8, oz * 16 + 8);
-    const bd = BIOMES[cc[1]];
+    const cc = own ? [hgt[9 * 18 + 9], bpad[9 * 18 + 9], vpad[9 * 18 + 9]] : G.column(ox * 16 + 8, oz * 16 + 8);
+    const bd = BIOMES[cc[2]];
     let cnt = bd[5] < 1 ? (r() < bd[5] ? 1 : 0) : Math.floor(bd[5] + r() * 3 - 1);
     for (let k = 0; k < cnt; k++) {
       const tx = ox * 16 + r.int(16), tz = oz * 16 + r.int(16), kind = r(), hh = r();
-      let h, b;
+      let h, b, v;
       const lx = tx - x0, lz = tz - z0;
-      if (lx >= -1 && lz >= -1 && lx <= 16 && lz <= 16) { h = hgt[(lz + 1) * 18 + lx + 1]; b = bpad[(lz + 1) * 18 + lx + 1]; } else { const c = G.column(tx, tz); h = c[0]; b = c[1]; }
-      if (h <= SEA || b === BIO.DESERT || b === BIO.BADLANDS || b === BIO.BEACH || b === BIO.RIVER || isOceanBio(b) || (b === BIO.MOUNTAINS && h > 92)) continue;
+      if (lx >= -1 && lz >= -1 && lx <= 16 && lz <= 16) { h = hgt[(lz + 1) * 18 + lx + 1]; b = bpad[(lz + 1) * 18 + lx + 1]; v = vpad[(lz + 1) * 18 + lx + 1]; } else { const c = G.column(tx, tz); h = c[0]; b = c[1]; v = c[2]; }
+      const woodedBad = (v === K.wooded_badlands_plateau || v === K.modified_wooded_badlands_plateau) && h > 84;
+      if (h <= SEA || b === BIO.DESERT || (b === BIO.BADLANDS && !woodedBad) || b === BIO.BEACH || b === BIO.RIVER || isOceanBio(b) || (b === BIO.MOUNTAINS && h > 92)) continue;
       if (vills.length && inVillage(tx, tz)) continue;
-      if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) { const top = blocks[I(lx, h, lz)]; if (top !== 2 && top !== 3 && top !== 204) continue; }
-      let type = BIOMES[b][6];
+      if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) { const top = blocks[I(lx, h, lz)]; if (top !== 2 && top !== 3 && top !== 204 && top !== 203 && top !== 205) continue; }
+      let type = BIOMES[v][6];
+      if ((type === 9 || type === 10) && kind < 0.33) type = 3; // giant taigas: some ordinary spruces among the giants
+      if (type === 12 && kind < 0.25) type = 4; // jungle edge: mostly bushes
       if (type === 1) type = kind < 0.2 ? 2 : 0;
       if (b === BIO.MOUNTAINS) type = kind < 0.6 ? 3 : 0;
       if (b === BIO.JUNGLE && kind < 0.25) type = 0;
@@ -2386,8 +2487,15 @@ function genChunk(seed, cx, cz, dim, exp) {
       if (lx >= 0 && lz >= 0 && lx < 16 && lz < 16) blocks[I(lx, h, lz)] = 3;
     }
   }
+  if (vbio[8 * 16 + 8] >= K.giant_tree_taiga && vbio[8 * 16 + 8] <= K.giant_spruce_taiga_hills) for (let k = hash32(seed, cx, cz, 413) % 3; k > 0; k--) { // mossy cobblestone boulders
+    const bx = 3 + hash32(seed, cx, cz, 414 + k) % 10, bz = 3 + hash32(seed, cx, cz, 420 + k) % 10, by = hgt[(bz + 1) * 18 + bx + 1];
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) if (dx * dx + dy * dy * 1.5 + dz * dz <= 4.5 && by + dy < CH) blocks[I(bx + dx, by + dy, bz + dz)] = 48;
+  }
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
-    const h = hgt[(z + 1) * 18 + x + 1], b = biome[z * 16 + x], top = blocks[I(x, h, z)], above = I(x, h + 1, z);
+    const h = hgt[(z + 1) * 18 + x + 1], b = biome[z * 16 + x], vb = vbio[z * 16 + x], top = blocks[I(x, h, z)], above = I(x, h + 1, z);
+    if (vb === K.desert_lakes && top === 9 && x > 0 && z > 0 && x < 15 && z < 15 && G.nX.n2((x0 + x) / 13 + 3.1, (z0 + z) / 13) > 0.42 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([ax, az]) => hgt[(z + 1 + az) * 18 + x + 1 + ax] >= h)) { blocks[I(x, h, z)] = WATER; if (G.nX.n2((x0 + x) / 13 + 3.1, (z0 + z) / 13) > 0.55) blocks[I(x, h - 1, z)] = WATER; continue; } // desert lakes
+    if (vb === K.sunflower_plains && top === 2 && h + 2 < CH && !blocks[above] && !blocks[I(x, h + 2, z)] && hash32(seed, x0 + x, z0 + z, 409) % 100 < 6) { blocks[above] = 1087; meta[above] = 0; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = 8; continue; } // sunflowers
+    if ((top === 203 || top === 205) && h + 2 < CH && !blocks[above]) { const p = hash32(seed, x0 + x, z0 + z, 411) % 100; if (p < 6 && !blocks[I(x, h + 2, z)]) { blocks[above] = 1111; blocks[I(x, h + 2, z)] = 1111; meta[I(x, h + 2, z)] = 8; } else if (p < 14) blocks[above] = 30; else if (p < 15) blocks[above] = 106; continue; } // giant taiga floor: ferns, large ferns, brown mushrooms
     if (b === BIO.SWAMP && h < SEA && blocks[I(x, SEA, z)] === WATER && blocks[I(x, SEA + 1, z)] === 0 && R() < 0.05) blocks[I(x, SEA + 1, z)] = 221; // lily pads
     if (h + 1 >= CH || blocks[above] !== 0) continue;
     const v = R();
@@ -2441,7 +2549,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   if (vills.length) fixConnections(blocks, meta);
   // snow cover for cold biomes
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
-    const b = biome[z * 16 + x], cold = BIOMES[b][4] <= 0.15 || (b === BIO.MOUNTAINS && hgt[(z + 1) * 18 + x + 1] > 95);
+    const b = biome[z * 16 + x], cold = BIOMES[vbio[z * 16 + x]][4] <= 0.15 || (b === BIO.MOUNTAINS && hgt[(z + 1) * 18 + x + 1] > 95);
     if (!cold) continue;
     for (let y = CH - 2; y > 0; y--) {
       const id = blocks[I(x, y, z)]; if (id === 0) continue;
@@ -2452,7 +2560,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   }
   const light = new Uint8Array(CVOL);
   lightChunk(blocks, light, meta);
-  return { blocks, meta, light, biome, tiles };
+  return { blocks, meta, light, biome: vbio, tiles };
 }
 // tree shapes; types 0 oak, 2 birch, 3 spruce
 function growTree(set, x, y, z, type, r, snowy) {
@@ -2498,7 +2606,22 @@ function growTree(set, x, y, z, type, r, snowy) {
     for (let i = 0; i < th; i++) set(x, y + i, z, 20, 0, true);
     return;
   }
-  const th = (type === 2 ? 5 : 4) + Math.floor(r * 3), top = y + th, leaf = type === 2 ? 24 : 22, log = type === 2 ? 21 : 19;
+  if (type === 9 || type === 10) { // giant taiga trees: a 2x2 spruce trunk; pines (9) keep a short crown, spruces (10) a long cone
+    const th = 13 + Math.floor(r * 15), top = y + th, cone = type === 9 ? 4 + Math.floor(r * 3) : Math.floor(th * 0.55);
+    for (let i = 0; i <= cone; i++) {
+      const yy = top + 1 - i, rad = Math.min(type === 9 ? 3 : 4, Math.floor(i / (type === 9 ? 1.5 : 2.5)) + (i & 1));
+      for (let dx = -rad; dx <= rad + 1; dx++) for (let dz = -rad; dz <= rad + 1; dz++) if ((dx - 0.5) ** 2 + (dz - 0.5) ** 2 <= rad * rad + 1) { set(x + dx, yy, z + dz, 23, 0); if (snowy) set(x + dx, yy + 1, z + dz, 51, 0); }
+    }
+    for (let i = 0; i < th; i++) for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + dx, y + i, z + dz, 20, 0, true);
+    return;
+  }
+  if (type === 12) { // jungle bush: one jungle log under a mound of oak leaves
+    set(x, y, z, 175, 0, true);
+    for (let yy = y; yy <= y + 2; yy++) { const rad = 2 - (yy - y); for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) if (Math.abs(dx) + Math.abs(dz) <= rad + 1 && (dx || dz || yy > y)) set(x + dx, yy, z + dz, 22, 0); }
+    return;
+  }
+  const tall = type === 11; if (tall) type = 2; // tall birch: five blocks more trunk
+  const th = (type === 2 ? 5 : 4) + Math.floor(r * 3) + (tall ? 5 : 0), top = y + th, leaf = type === 2 ? 24 : 22, log = type === 2 ? 21 : 19;
   h = Math.floor(r * 9973);
   for (let yy = top - 3; yy <= top; yy++) {
     const d = yy - top, rad = d >= -1 ? 1 : 2;
@@ -2961,7 +3084,7 @@ function meshChunk(B, M, L, bio, opts) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

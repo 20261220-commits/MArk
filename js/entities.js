@@ -726,7 +726,7 @@ function trySpawnHostile() {
     const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, R.rd * 16 - 30);
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
-    if (W.dim === 0 && biomeAt(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
+    if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
     const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
     if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
@@ -743,7 +743,7 @@ function trySpawnHostile() {
   }
 }
 function spawnAnimalsForChunk(c) {
-  const b = c.biome[8 * 16 + 8];
+  const b = S.BB[c.biome[8 * 16 + 8]];
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 9));
   if (R0() > 0.1) return;
   let types;

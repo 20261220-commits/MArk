@@ -188,7 +188,7 @@ function mobInteract(e, h, d) {
 }
 // ---------- spawning ----------
 function overworldReplace(t, x, y, z) {
-  const b = biomeAt(x, z);
+  const b = biomeBase(x, z);
   if (t === 'zombie' && (b === S.BIO.DESERT || b === S.BIO.BADLANDS) && Math.random() < 0.8 && (getLight(x, y, z) >> 4) > 8) return 'husk';
   if (t === 'skeleton' && (b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FROZEN_OCEAN) && Math.random() < 0.8) return 'stray';
   if (t === 'zombie' && FLUID[getBlock(x, y, z)] === 1) return 'drowned';
@@ -218,7 +218,7 @@ function trySpawnAmbient() {
 }
 // chunk-load spawns: wolf packs in forests/taigas, fish in water
 function spawnExtraForChunk(c) {
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 19)), b = c.biome[8 * 16 + 8];
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 19)), b = S.BB[c.biome[8 * 16 + 8]];
   if ((b === S.BIO.TAIGA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FOREST) && R0() < 0.03) {
     for (let i = 0; i < 2 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12); let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 2) spawnMob('wolf', x + .5, y + 1, z + .5); }
   }

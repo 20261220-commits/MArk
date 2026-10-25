@@ -19,7 +19,7 @@ function rodNear(x, z) {
   }
   return best;
 }
-const rainsAt = (x, z) => { const b = biomeAt(x, z), t = S.BIOMES[b][4]; return t > 0.15 && t < 1 && b !== S.BIO.DESERT && b !== S.BIO.BADLANDS && b !== S.BIO.SAVANNA; };
+const rainsAt = (x, z) => { const b = biomeBase(x, z), t = S.BIOMES[biomeAt(x, z)][4]; return t > 0.15 && t < 1 && b !== S.BIO.DESERT && b !== S.BIO.BADLANDS && b !== S.BIO.SAVANNA; };
 
 function weatherTick() {
   if (--W.thunderTimer <= 0) { W.thunderOn = !W.thunderOn; W.thunderTimer = W.thunderOn ? 3600 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
