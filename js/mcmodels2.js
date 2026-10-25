@@ -80,7 +80,7 @@ const ILLAGER_PARTS = [
   { n: 'rleg', o: [-2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4]] }, { n: 'lleg', o: [2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4, 0, 1]] },
   { n: 'rarm', o: [-5, 2, 0], b: [[40, 46, -3, -2, -2, 4, 12, 4]] }, { n: 'larm', o: [5, 2, 0], b: [[40, 46, -1, -2, -2, 4, 12, 4, 0, 1]] },
 ];
-const WITCH_PARTS = [...MCMODELS.villager.parts,
+const WITCH_PARTS = [...MCMODELS.villager.parts.filter(p => p.n !== 'hat' && p.n !== 'hat_rim'),
   { n: 'hat', p: 'head', o: [-5, -10.03, -5], b: [[0, 64, 0, 0, 0, 10, 2, 10]] },
   { n: 'hat2', p: 'hat', o: [1.75, -4, 2], r: [-0.0524, 0, 0.0262], b: [[0, 76, 0, 0, 0, 7, 4, 7]] },
   { n: 'hat3', p: 'hat2', o: [1.75, -4, 2], r: [-0.1047, 0, 0.0524], b: [[0, 87, 0, 0, 0, 4, 4, 4]] },
@@ -326,6 +326,7 @@ const MOB_HELD = { skeleton: 'bow', stray: 'bow', wither_skeleton: 'stone_sword'
 function mobHeldTick() {
   for (const e of ENT) {
     if (e.kind !== 'mob' || !e.mesh || e.dead) continue;
+    if (e.def.gear) { e.def.gear(e); if (e.mushrooms) for (const m of e.mushrooms) R.setMeshLight(m, lightBright(e.x, e.y + e.h, e.z)); }
     const h = MOB_HELD[e.type], key = typeof h === 'function' ? h(e) : h;
     if (!key) continue;
     const P = e.mesh.userData.parts, arm = P && P.rarm; if (!arm || IID[key] == null) continue;
@@ -346,3 +347,38 @@ function mobHeldTick() {
   }
 }
 { const tick = mcmodels2Tick; mcmodels2Tick = function () { tick(); mobHeldTick(); }; }
+
+// ---------- sleeping foxes (vanilla pose): body on its side on the ground, legs tucked away, tail curled round,
+// head turned back over the body ----------
+if (MOBDEF.fox) { const old = MOBDEF.fox.anim; MOBDEF.fox.anim = (e, P, now) => {
+  if (!e.mesh.userData.mc) return old && old(e, P, now);
+  const pose = (n, x, y, z) => { const b = P[n]; if (!b) return; if (!b.userData.pos0) b.userData.pos0 = b.position.clone(); if (x == null) b.position.copy(b.userData.pos0); else b.position.set(-x / 16, (24 - y) / 16, z / 16); };
+  const sleep = !!e.sleeping;
+  for (const n of ['rleg', 'lleg', 'rleg2', 'lleg2']) hidePart(e, n, !sleep);
+  if (sleep) {
+    pose('body', 0, 21, -6); P.body.rotation.z = -Math.PI / 2;
+    pose('head', 1, 20.5, -3); P.head.rotation.set(0, 2.0944, Math.cos(now / 1850) / 22);
+    if (P.tail) P.tail.rotation.x = 2.618;
+  } else {
+    pose('body'); P.body.rotation.z = 0; pose('head'); P.head.rotation.z = 0;
+    if (P.tail) P.tail.rotation.x = baseRot(P.tail, 'x') + Math.sin(e.walk * 0.4) * 0.1;
+  }
+  if (P.mouthItem) R.setMeshLight(P.mouthItem, 1);
+}; }
+
+// ---------- zoglins: hoglins that spend 15 seconds out of the Nether turn into them; hostile to everything but creepers ----------
+if (MOBDEF.hoglin) {
+  MOBDEF.zoglin = { ...MOBDEF.hoglin, food: null, drops: [['rotten_flesh', 1, 3]], snd: 'growl', undead: 1, zoglin: 1 };
+  MCMODELS.zoglin = { ...MCMODELS.hoglin, tex: 'zoglin' };
+}
+function zoglinTick() {
+  if (typeof UNDEAD !== 'undefined') UNDEAD.add('zoglin'); // smite and healing potions treat them as undead
+  if (W.dim === -1) return;
+  for (const e of [...ENT]) {
+    if (e.type !== 'hoglin' || e.dead || e.kind !== 'mob') continue;
+    if ((e.outsideT = (e.outsideT || 0) + 1) < 300) continue;
+    const z = spawnMob('zoglin', e.x, e.y, e.z); z.yaw = e.yaw; z.baby = e.baby; z.persistent = e.persistent; if (e.eff) z.eff = e.eff;
+    addEffect(z, 'nausea', 200, 0); removeEnt(e);
+  }
+}
+{ const tick = mcmodels2Tick; mcmodels2Tick = function () { tick(); zoglinTick(); }; }

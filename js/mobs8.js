@@ -12,8 +12,11 @@ function mooshroomTexture() {
   return entTex.mooshroom = t;
 }
 function mooshroomGear(e) {
-  const P = e.mesh.userData.parts, body = P.body; if (!body || e.sheared) return;
-  for (const [x, z] of [[0.1, 0.25], [-0.15, -0.1], [0.05, -0.35]]) { const m = R.itemMesh(BID.red_mushroom); m.scale.setScalar(0.45); m.position.set(x, 1.32, z); e.mesh.add(m); } // on top of the back (model root space)
+  const P = e.mesh && e.mesh.userData.parts; if (!P || !P.body || e.sheared || e.mushrooms && e.mushrooms[0].parent) return;
+  e.mushrooms = [];
+  const add = (parent, x, y, z, ry) => { const m = R.itemMesh(BID.red_mushroom); m.scale.setScalar(0.5); m.position.set(x, y, z); m.rotation.y = ry; parent.add(m); e.mushrooms.push(m); };
+  add(e.mesh, 0.15, 1.6, 0.15, -0.84); add(e.mesh, -0.1, 1.6, -0.3, 0.73); // on the back (model root space; the back is at y 1.375)
+  if (P.head) add(P.head, 0, 0.48, 0.1, -1.36); // and on top of the head
 }
 function mooshroomUse(e, h) {
   if (!h || e.baby) return false;
@@ -163,7 +166,7 @@ function genericAnimal(e, dist) {
 }
 
 Object.assign(MOBDEF, {
-  mooshroom: { ...MOBDEF.cow, interact: (e, h) => mooshroomUse(e, h), init: e => mooshroomGear(e) },
+  mooshroom: { ...MOBDEF.cow, interact: (e, h) => mooshroomUse(e, h), init: e => mooshroomGear(e), gear: e => mooshroomGear(e) },
   panda: { hp: 20, w: 0.65, h: 1.25, speed: 0.04, xp: 2, snd: 'hmm', drops: [['bamboo', 0, 2]], parts: PANDA_M.parts, tw: 128, th: 64, tex: () => PANDA_M.tex(0), vtex: v => PANDA_M.tex(v), variant: () => Math.random() < 0.02 ? 1 : 0, food: ['bamboo'], ai: withDefault(pandaAI) },
   polar_bear: { hp: 30, w: 0.7, h: 1.4, speed: 0.06, xp: 2, snd: 'growl', neutral: 1, drops: [['cod', 0, 2], ['salmon', 0, 2]], parts: BEAR_M.parts, tw: 128, th: 64, tex: () => BEAR_M.tex(0), ai: withDefault(polarBearAI) },
   parrot: { hp: 6, w: 0.25, h: 0.9, speed: 0.1, xp: 2, snd: 'hmm', fly: 1, fallReduce: 99, drops: [['feather', 1, 2]], parts: PARROT_M.parts, tex: () => PARROT_M.tex(0), vtex: v => PARROT_M.tex(v), variant: () => (Math.random() * 5) | 0, ai: parrotAI, anim: parrotAnim, interact: (e, h) => parrotUse(e, h) },
