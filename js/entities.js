@@ -322,7 +322,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   // OptiFine emissive textures (*_e.png): glowing parts drawn at full brightness on top
   if (glow) extra(geos.m, new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, alphaTest: 0.05, skinning: true, polygonOffset: true, polygonOffsetFactor: -1 }), true);
   if (spec.big) for (const o of root.children) o.frustumCulled = false;
-  root.userData = { parts, inner, mat, mats: [mat, mat2, matT].filter(Boolean), mc: true };
+  root.userData = { parts, inner, mat, mat2, mats: [mat, mat2, matT].filter(Boolean), mc: true, skel: sk, main };
   return root;
 }
 function mergeGeos(gs) {

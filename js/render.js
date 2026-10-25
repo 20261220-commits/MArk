@@ -333,36 +333,64 @@ function stepAnimation(dt) {
 R.stepAnimation = stepAnimation;
 R.itemMesh = itemMesh; R.blockGeometry = blockGeometry; R.blockMaterial = blockMaterial; R.setMeshLight = setMeshLight; R.renderBlockIcons = renderBlockIcons;
 
-// ---------- first person hand ----------
+// ---------- first person hand (HeldItemRenderer: the skin's arm, or the held item, with the vanilla matrices) ----------
 const handScene = new THREE.Scene();
 const handCam = new THREE.PerspectiveCamera(70, 1, 0.01, 10);
-const skinTex = pixelTex(16, 16, g => { const r = trng(3); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = y < 4 ? ['#3aa8c8', '#2a98b8', '#4ab8d8'][r.int(3)] : ['#c98e6a', '#bd8460', '#d29a76'][r.int(3)]; g.fillRect(x, y, 1, 1); } });
-const armGeo = new THREE.BoxGeometry(0.16, 0.6, 0.16); armGeo.translate(0, -0.3, 0);
-const armMat = new THREE.MeshBasicMaterial({ map: skinTex });
-const arm = new THREE.Mesh(armGeo, armMat);
-const handGroup = new THREE.Group(); handScene.add(handGroup);
-let heldId = -1, heldMesh = null;
+const handGroup = new THREE.Group(); handGroup.matrixAutoUpdate = false; handScene.add(handGroup);
+let heldId = -1, heldMesh = null, armRoot = null, armMat = null;
 R.hand = { swing: 0, equip: 1, eat: 0, bow: 0, spy: false };
+function setHandSkin() { // the right arm and sleeve of the current skin, in vanilla model space
+  if (armRoot) { handGroup.remove(armRoot); armMat.dispose(); }
+  const sk = skinChoice(), tex = packTexture(sk.tex) || packTexture('steve'), aw = sk.slim ? 3 : 4, rx = sk.slim ? -2 : -3;
+  armMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1 });
+  const flip = new THREE.Group(); flip.scale.set(-1, -1, 1); flip.position.set(-5 / 16, (sk.slim ? 2.5 : 2) / 16, 0);
+  flip.add(new THREE.Mesh(boxGeo(aw, 12, 4, 40, 16, -(rx + aw), -10, -2, 0, 64, 64), armMat), new THREE.Mesh(boxGeo(aw, 12, 4, 40, 32, -(rx + aw), -10, -2, 0.25, 64, 64), armMat));
+  armRoot = new THREE.Group(); armRoot.add(flip); armRoot.visible = heldId <= 0; handGroup.add(armRoot);
+}
+R.setHandSkin = setHandSkin;
+const HM = new THREE.Matrix4(), HT = new THREE.Matrix4();
+const hmul = m => HM.multiply(m);
+const hT = (x, y, z) => hmul(HT.makeTranslation(x, y, z)), hX = d => hmul(HT.makeRotationX(d * Math.PI / 180)), hY = d => hmul(HT.makeRotationY(d * Math.PI / 180)), hZ = d => hmul(HT.makeRotationZ(d * Math.PI / 180));
 function updateHand(dt, id, light, bobX, bobY) {
+  if (!armRoot) setHandSkin();
   if (id !== heldId) {
     if (heldMesh) { handGroup.remove(heldMesh); heldMesh.material.dispose(); heldMesh = null; }
-    handGroup.remove(arm);
     heldId = id; R.hand.equip = 0;
-    if (id > 0) { heldMesh = itemMesh(id); handGroup.add(heldMesh); } else handGroup.add(arm);
+    if (id > 0) { heldMesh = itemMesh(id); heldMesh.matrixAutoUpdate = false; handGroup.add(heldMesh); }
+    armRoot.visible = id <= 0;
   }
   const h = R.hand; h.equip = Math.min(1, h.equip + dt * 6);
-  const sw = h.swing > 0 ? Math.sin((1 - h.swing) * Math.PI) : 0, sw2 = h.swing > 0 ? Math.sin(Math.sqrt(1 - h.swing) * Math.PI) : 0;
-  const c = new THREE.Color(light, light, light);
-  if (heldMesh) setMeshLight(heldMesh, light); else armMat.color.copy(c);
-  handGroup.position.set(0.5 + bobX - sw2 * 0.22, -0.44 + bobY - (1 - h.equip) * 0.6 + sw * 0.1 - h.eat * 0.05 * Math.abs(Math.sin(performance.now() / 60)), -0.85 + sw2 * -0.1);
-  handGroup.rotation.set(0, 0, 0);
-  if (heldMesh) {
-    if (heldMesh.userData.isBlock) { heldMesh.scale.setScalar(0.26); heldMesh.rotation.set(0.12, Math.PI / 4 + 0.15, 0); heldMesh.position.set(-0.04, 0.02, 0); }
-    else { heldMesh.scale.setScalar(0.42); heldMesh.rotation.set(-0.1, -Math.PI / 2 + 0.35, 0.4); heldMesh.position.set(0.02, 0.06, 0); }
-    if (h.eat > 0) { handGroup.position.x -= 0.35; handGroup.position.y += 0.15; handGroup.rotation.y = 0.6; }
-    if (h.bow > 0) { handGroup.position.x -= 0.25; heldMesh.rotation.set(0, -Math.PI / 2 + 0.1, 0.1); }
-  } else { arm.rotation.set(-1.35 - sw2 * 0.5, 0.35, 0.6 + sw * 0.4); arm.position.set(0.12, -0.12, 0.25); }
-  handGroup.rotation.x += -sw2 * 0.6; handGroup.rotation.y += sw * 0.3;
+  const p = h.swing > 0 ? 1 - h.swing : 0, eq = 1 - h.equip, sp = Math.sqrt(p), PI = Math.PI;
+  HM.identity(); hT(bobX, bobY, 0); // view bobbing
+  if (!heldMesh) {
+    armMat.color.setScalar(light);
+    hT(-0.3 * Math.sin(sp * PI) + 0.64000005, 0.4 * Math.sin(sp * PI * 2) - 0.6 - eq * 0.6, -0.4 * Math.sin(p * PI) - 0.71999997);
+    hY(45); hY(Math.sin(sp * PI) * 70); hZ(Math.sin(p * p * PI) * -20);
+    hT(-1, 3.6, 3.5); hZ(120); hX(200); hY(-135); hT(5.6, 0, 0);
+  } else {
+    setMeshLight(heldMesh, light);
+    if (h.eat > 0 && USE.kind === 'eat') { // applyEatOrDrinkTransformation
+      const f = Math.max(0, 32 - USE.t), g = f / 32;
+      if (g < 0.8) hT(0, Math.abs(Math.cos(f / 4 * PI) * 0.1), 0);
+      const k = 1 - Math.pow(g, 27); hT(k * 0.6, k * -0.5, 0); hY(k * 90); hX(k * 10); hZ(k * 30);
+      hT(0.56, -0.52 - eq * 0.6, -0.72);
+    } else if (h.bow > 0 && USE.kind === 'bow') { // drawing a bow
+      hT(0.56, -0.52 - eq * 0.6, -0.72);
+      hT(-0.2785682, 0.18344387, 0.15731531); hX(-13.935); hY(35.3); hZ(-9.785);
+      let m = USE.t / 20; m = Math.min(1, (m * m + m * 2) / 3);
+      if (m > 0.1) hT(0, Math.sin((USE.t - 0.1) * 1.3) * (m - 0.1) * 0.004, 0);
+      hT(0, 0, m * 0.04); hmul(HT.makeScale(1, 1, 1 + m * 0.2)); hY(-45);
+    } else {
+      hT(-0.4 * Math.sin(sp * PI), 0.2 * Math.sin(sp * PI * 2), -0.2 * Math.sin(p * PI));
+      hT(0.56, -0.52 - eq * 0.6, -0.72);
+      hY(45 + Math.sin(p * p * PI) * -20); const g = Math.sin(sp * PI); hZ(g * -20); hX(g * -80); hY(-45);
+    }
+    // the item model's first-person display transform (block.json / generated.json / handheld.json)
+    if (heldMesh.userData.isBlock) { hY(45); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
+    else { hT(1.13 / 16, 3.2 / 16, 1.13 / 16); hY(-90); hZ(25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
+    heldMesh.matrix.identity();
+  }
+  handGroup.matrix.copy(HM);
   handGroup.visible = !h.spy;
 }
 R.updateHand = updateHand;

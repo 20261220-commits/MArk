@@ -100,7 +100,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .arrow{width:calc(22 * var(--px));height:calc(15 * var(--px));background:#8b8b8b;clip-path:polygon(0 35%,60% 35%,60% 0,100% 50%,60% 100%,60% 65%,0 65%);position:relative}
 .arrow.prog::after{content:"";position:absolute;inset:0;width:calc(var(--p) * 100%);background:#fff}
 .flame{width:calc(14 * var(--px));height:calc(14 * var(--px));margin:calc(2 * var(--px)) auto;background:linear-gradient(to top,#ff8a1a calc(var(--p) * 100%),#8b8b8b calc(var(--p) * 100%));clip-path:polygon(50% 0,80% 35%,100% 65%,80% 100%,20% 100%,0 65%,20% 35%)}
-.doll{width:calc(52 * var(--px));height:calc(72 * var(--px));background:#000;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1*var(--px)) calc(-1*var(--px)) 0 #fff;display:grid;place-items:center}
+.doll{width:calc(52 * var(--px));height:calc(72 * var(--px));background:#000;overflow:hidden;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1*var(--px)) calc(-1*var(--px)) 0 #fff;display:grid;place-items:center}
 .doll-fig{position:relative;width:calc(16 * var(--px));height:calc(64 * var(--px))}
 .doll-fig i{position:absolute;display:block}
 .dh{left:calc(4*var(--px));top:0;width:calc(8*var(--px));height:calc(8*var(--px));background:linear-gradient(#3b2a16 30%,#c98e6a 30%)}
@@ -290,6 +290,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/player.js"></script>
 <script src="js/workstations.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/playermodel.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

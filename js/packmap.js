@@ -97,8 +97,11 @@ for (const k of ['jungle_sapling', 'acacia_sapling', 'dark_oak_sapling', 'allium
   'lily_pad', 'vine', 'soul_torch', 'end_rod', 'oak_trapdoor']) ITEM[k] = 'block/' + k;
 const ITEM_TINT = { lily_pad: 0x208030, vine: 0x48b518, leather_helmet: 0xa06540, leather_chestplate: 0xa06540, leather_leggings: 0xa06540, leather_boots: 0xa06540, short_grass: 0x7cbd6b, fern: 0x7cbd6b };
 const ENT = {
+  // player armour (models/armor/*_layer_1 for helmet, chestplate and boots, *_layer_2 for leggings)
+  ...Object.fromEntries(['leather', 'chainmail', 'iron', 'gold', 'diamond', 'netherite'].flatMap(m => [['armor_' + m + '_1', 'models/armor/' + m + '_layer_1'], ['armor_' + m + '_2', 'models/armor/' + m + '_layer_2']])),
+  armor_leather_1o: 'models/armor/leather_layer_1_overlay', armor_leather_2o: 'models/armor/leather_layer_2_overlay', armor_turtle_1: 'models/armor/turtle_layer_1',
   zombie: 'entity/zombie/zombie', skeleton: 'entity/skeleton/skeleton', creeper: 'entity/creeper/creeper', spider: 'entity/spider/spider', pig: 'entity/pig/pig',
-  cow: 'entity/cow/cow', sheep: 'entity/sheep/sheep', sheep_fur: 'entity/sheep/sheep_fur', chicken: 'entity/chicken', squid: 'entity/squid', steve: 'entity/steve',
+  cow: 'entity/cow/cow', sheep: 'entity/sheep/sheep', sheep_fur: 'entity/sheep/sheep_fur', chicken: 'entity/chicken', squid: 'entity/squid', steve: 'entity/steve', alex: 'entity/alex', elytra: 'entity/elytra',
   villager: 'entity/villager/villager', iron_golem: 'entity/iron_golem/iron_golem', enderman: 'entity/enderman/enderman', enderman_eyes: 'entity/enderman/enderman_eyes',
   blaze: 'entity/blaze', ghast: 'entity/ghast/ghast', ghast_shooting: 'entity/ghast/ghast_shooting', zombified_piglin: 'entity/piglin/zombified_piglin',
   magma_cube: 'entity/slime/magmacube', slime: 'entity/slime/slime', dragon: 'entity/enderdragon/dragon', dragon_eyes: 'entity/enderdragon/dragon_eyes',

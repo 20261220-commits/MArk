@@ -38,31 +38,3 @@ function offhandHud() {
 }
 const offItem = () => OFF.swapped ? INV.slots[OFF.slot] : INV.off;
 
-// ---------- armour drawn on the player model (third person) ----------
-// boxes per slot: [bone, x0, y0, z0, w, h, d, grow] in the model's pixel coordinates (as HUM_BODY)
-const PL_ARMOR_BOXES = [
-  [['head', -4, -8, -4, 8, 8, 8, 1]],
-  [['body', -4, 0, -2, 8, 12, 4, 1], ['rarm', -3, -2, -2, 4, 12, 4, 1], ['larm', -1, -2, -2, 4, 12, 4, 1]],
-  [['body', -4, 7, -2, 8, 5, 4, 0.5], ['rleg', -2, 0, -2, 4, 9, 4, 0.5], ['lleg', -2, 0, -2, 4, 9, 4, 0.5]],
-  [['rleg', -2, 8, -2, 4, 4, 4, 1], ['lleg', -2, 8, -2, 4, 4, 4, 1]],
-];
-const PLA = { key: '', meshes: [] };
-function playerArmorTick(model, light) {
-  const key = INV.armor.map(s => s ? s.id : 0).join(',');
-  if (key !== PLA.key) {
-    PLA.key = key; for (const m of PLA.meshes) { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); } PLA.meshes = [];
-    const P = model.userData.parts;
-    INV.armor.forEach((st, slot) => {
-      if (!st) return;
-      const a = ITEMS[st.id].armor, col = ARMOR_COL[a && a.mat] || (st.id === BID.pumpkin || st.id === BID.carved_pumpkin ? 0xe88a1a : st.id === BID.wither_skeleton_skull ? 0x2a2a2a : 0x888888);
-      const boxes = a && a.mat === 'elytra' ? [['body', -5, 0, 2, 10, 14, 1, 0]] : PL_ARMOR_BOXES[slot];
-      for (const [bone, x0, y0, z0, w, h, d, g] of boxes) {
-        if (!P[bone]) continue;
-        const m = new THREE.Mesh(new THREE.BoxGeometry((w + g * 2) / 16, (h + g * 2) / 16, (d + g * 2) / 16), new THREE.MeshBasicMaterial({ color: col }));
-        m.position.set(-(x0 + w / 2) / 16, -(y0 + h / 2) / 16, (z0 + d / 2) / 16); m.userData.col = new THREE.Color(col);
-        P[bone].add(m); PLA.meshes.push(m);
-      }
-    });
-  }
-  for (const m of PLA.meshes) m.material.color.copy(m.userData.col).multiplyScalar(light);
-}

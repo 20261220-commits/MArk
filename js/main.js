@@ -2,7 +2,6 @@
 const isTouch = matchMedia('(pointer:coarse)').matches && !matchMedia('(pointer:fine)').matches;
 let locked = false, view = 0; // 0 first person, 1 back, 2 front
 W.active = false; UI.paused = true;
-const playerModel = buildModel('player'); playerModel.visible = false; scene.add(playerModel);
 
 // ---------- pointer lock ----------
 function grabLock() { if (isTouch || !W.active || UI.screen || UI.chatOpen || UI.menu) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
@@ -312,19 +311,13 @@ function updateCamera(alpha, dt) {
   camera.position.set(x + cs * bx, ey + by, z - sn * bx);
   camera.rotation.set(PL.pitch, PL.yaw, Math.sin(bob * Math.PI) * 0.01 * ba + (PL.hurtT > 0 ? Math.sin(PL.hurtT / 10 * Math.PI) * 0.12 * (PL.hurtDir > 0 ? 1 : -1) : 0));
   if (PL.sleeping) camera.rotation.set(Math.PI / 2 - 0.4, PL.yaw, 0);
-  playerModel.visible = view > 0;
   if (view > 0) {
     const [dx, dy, dz] = lookDir(); const s = view === 1 ? -1 : 1;
     let d = 4; for (let t = 0.2; t <= 4; t += 0.2) { if (OPQ[getBlock(Math.floor(x + dx * s * t), Math.floor(ey + dy * s * t), Math.floor(z + dz * s * t))]) { d = t - 0.3; break; } }
     camera.position.set(x + dx * s * d, ey + dy * s * d, z + dz * s * d);
     if (view === 2) camera.rotation.set(-PL.pitch, PL.yaw + Math.PI, 0);
-    playerModel.position.set(x, y, z); playerModel.rotation.y = PL.yaw;
-    const P = playerModel.userData.parts, w = Math.sin(PL.bob * 2.2) * 0.8 * Math.min(1, spd * 2);
-    P.rleg.rotation.x = w; P.lleg.rotation.x = -w; P.rarm.rotation.x = -w * 0.8 - (R.hand.swing > 0 ? Math.sin(R.hand.swing * Math.PI) : 0); P.larm.rotation.x = w * 0.8;
-    P.head.rotation.x = -PL.pitch; if (PL.sneaking) { P.body.rotation.x = 0.3; } else P.body.rotation.x = 0;
-    for (const m of playerModel.userData.mats) m.color.setScalar(lightBright(x, y + 1, z));
-    playerArmorTick(playerModel, lightBright(x, y + 1, z));
   }
+  updatePlayerModel(dt, x, y, z, view > 0);
   // fov
   let fov = OPT.fov * (PL.sprinting ? 1.15 : 1) * (PL.flying && PL.sprinting ? 1.1 : 1);
   if (USE.kind === 'bow') fov *= 1 - Math.min(1, USE.t / 20) * 0.15;
@@ -367,6 +360,7 @@ function frame(now) {
   const h = PL.held();
   const hb = OPT.bob ? PL.bobAmt || 0 : 0, bob = PL.bobPrev + (PL.bob - PL.bobPrev) * alpha;
   R.updateHand(dt, PL.dead ? -1 : (h ? h.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb);
+  dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
@@ -453,6 +447,7 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
   ICON_URL = iconCanvas.toDataURL(); document.documentElement.style.setProperty('--icons', `url(${ICON_URL})`); // one copy of the sheet for every icon
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);
