@@ -460,7 +460,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
   if (opts.owner) { e.owner = opts.owner; e.persistent = true; } if (opts.sitting) e.sitting = 1;
-  if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; }
+  if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5); else if (d.scale) e.mesh.scale.setScalar(d.scale);
@@ -486,6 +486,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting
     if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
+    if (e.type === 'villager') { e.rep = (e.rep || 0) - 25; for (const v of ENT) if (v.type === 'villager' && v !== e && Math.hypot(v.x - e.x, v.z - e.z) < 16) v.rep = (v.rep || 0) - 5; } // gossip: minor_negative, heard by neighbours
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
@@ -545,10 +546,11 @@ function mobTick(e) {
   if (e.cart && cartHold(e)) return;
   mobExtraTick(e, dist);
   if (e.eff) effectTick(e);
+  if (e.jockey && jockeyTick(e)) return; // a chicken or spider carrying a jockey
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
   // AI
-  let mx = 0, mz = 0, speed = d.speed;
+  let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
   if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
@@ -639,13 +641,32 @@ function attackPlayer(e, dmg, tx, tz) {
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 // ---------- per-tick update ----------
+// baby zombies (5% of the zombie kind, never grow up, faster) and jockeys: 5% of babies ride a chicken, 1% of spiders carry a skeleton
+const ZOMBIE_KIND = new Set(['zombie', 'husk', 'drowned', 'zombie_villager']);
+function jockeyChance(e) {
+  if (!e || e.dead) return;
+  if (ZOMBIE_KIND.has(e.type) && Math.random() < 0.05) {
+    e.baby = 1e12; e.w = e.def.w * 0.5; e.h = e.def.h * 0.5; e.mesh.scale.setScalar(0.5); e.babySpeed = 1.5;
+    if (e.type !== 'drowned' && Math.random() < 0.05) { const c = ENT.find(o => o.type === 'chicken' && !o.dead && !o.jockey && Math.hypot(o.x - e.x, o.z - e.z) < 5) || spawnMob('chicken', e.x, e.y, e.z); if (c) mountMob(e, c); }
+  }
+  if (e.type === 'spider' && Math.random() < 0.01) { const s = spawnMob('skeleton', e.x, e.y + 1, e.z); if (s) mountMob(s, e); }
+}
+function mountMob(rider, mount) { rider.mount = mount; mount.jockey = rider; mount.persistent = rider.persistent = false; }
+// a mount carries its rider and goes where the rider wants (toward the rider's target)
+function jockeyTick(e) {
+  const r = e.jockey; if (!r || r.dead || r.deathT) { e.jockey = null; return false; }
+  const t = r.target || (PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead && Math.hypot(PL.x - e.x, PL.z - e.z) < 16 ? PL : null);
+  let mx = 0, mz = 0; if (t) { const dx = t.x - e.x, dz = t.z - e.z, l = Math.hypot(dx, dz) || 1; if (l > 1) { mx = dx / l; mz = dz / l; } faceTo(e, t.x, t.z); }
+  walkPhysics(e, mx, mz, (r.def.speed || 0.1) * (r.babySpeed || 1));
+  return true;
+}
 function entityTick() {
   PF.budget = 2; // A* searches per tick, shared by all mobs
   for (const e of ENT) {
     if (e.dead) continue;
     e.px = e.x; e.py = e.y; e.pz = e.z; e.pyaw = e.yaw; e.age++;
     if (!isLoaded(Math.floor(e.x), Math.floor(e.z))) { if (e.kind !== 'mob' && e.kind !== 'boat' && e.kind !== 'minecart') removeEnt(e); continue; }
-    if (e.kind === 'mob') mobTick(e);
+    if (e.kind === 'mob') { mobTick(e); if (e.mount) { const m = e.mount; if (m.dead || m.deathT) e.mount = null; else { e.x = m.x; e.z = m.z; e.y = m.y + m.h * 0.75; e.vy = 0; e.onGround = true; } } }
     else if (e.tick) e.tick(e);
     else if (e.kind === 'item' || e.kind === 'xp') {
       const fl = fluidAt(e.x, e.y + 0.1, e.z);
@@ -743,7 +764,7 @@ function trySpawnHostile() {
     if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
     const n = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < n; i++) spawnMob(t, x + .5 + i * 0.3, y, z + .5);
+    for (let i = 0; i < n; i++) jockeyChance(spawnMob(t, x + .5 + i * 0.3, y, z + .5));
     break;
   }
 }
@@ -791,7 +812,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);

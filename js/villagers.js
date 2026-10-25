@@ -10,6 +10,7 @@ function villagerRetexture(e) { const t = villagerTexture(e.vtype, e.prof); if (
 function villagerLifeTick() {
   if (W.tickN % 20) return;
   const vs = ENT.filter(e => e.type === 'villager' && !e.dead);
+  zombieSiege(vs);
   for (const [k, v] of VIL.claimed) if (v.dead || !ENT.includes(v)) VIL.claimed.delete(k);
   for (const e of vs) {
     // a lost job site
@@ -44,3 +45,20 @@ function villagerLifeTick() {
   MOBDEF.villager.save = e => ({ ...(save ? save(e) : {}), job: e.job || null, traded: !!e.traded, vfood: e.vfood || 0 });
   MOBDEF.villager.init = (e, o) => { if (init) init(e, o); if (o.job) e.job = o.job; if (o.traded) e.traded = true; if (o.vfood) e.vfood = o.vfood; if (o.baby && !o.prof) e.prof = 'none'; }; }
 PROF_NAME.none = '실업자';
+
+// zombie sieges (Java's VillageSiege): around midnight, 10% of nights, if the player is in a village with enough
+// villagers, about twenty zombies appear together at its edge and walk in
+function zombieSiege(vs) {
+  if (W.dim !== 0 || PL.difficulty === 0 || PL.dead || !gr('doMobSpawning')) return;
+  const day = Math.floor(W.time / 24000), t = ((W.time % 24000) + 24000) % 24000;
+  if (t < 18000 || t > 18400 || W.meta.siegeDay === day) return;
+  W.meta.siegeDay = day;
+  const near = vs.filter(v => Math.hypot(v.x - PL.x, v.z - PL.z) < 48); if (near.length < 5 || Math.random() >= 0.1) return;
+  const cx = near.reduce((a, v) => a + v.x, 0) / near.length, cz = near.reduce((a, v) => a + v.z, 0) / near.length;
+  for (let tries = 0; tries < 10; tries++) {
+    const a = Math.random() * Math.PI * 2, x = Math.floor(cx + Math.cos(a) * 32), z = Math.floor(cz + Math.sin(a) * 32), y = topY(x, z) + 1;
+    if (!isLoaded(x, z) || (getLight(x, y, z) & 15) > 7) continue;
+    for (let i = 0; i < 20; i++) { const zx = x + (Math.random() - .5) * 6, zz = z + (Math.random() - .5) * 6, e = spawnMob(Math.random() < 0.1 ? 'zombie_villager' : 'zombie', zx, topY(Math.floor(zx), Math.floor(zz)) + 1, zz); if (e) e.goal = [cx, cz]; }
+    return;
+  }
+}

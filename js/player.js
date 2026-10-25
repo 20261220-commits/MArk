@@ -306,7 +306,7 @@ function interactTick() {
   if (MINE.cd > 0) MINE.cd--;
   if (USE.placeCd > 0) USE.placeCd--;
   // mining
-  if (IN.attack && !PL.sleeping && TARGET && TARGET.type === 'block' && MINE.cd <= 0) {
+  if (IN.attack && !PL.sleeping && TARGET && TARGET.type === 'block' && MINE.cd <= 0 && PL.mode !== 'adventure') { // adventure mode: no breaking blocks
     const t = TARGET;
     if (creative()) { breakBlock(t.x, t.y, t.z); MINE.cd = 5; }
     else {
@@ -664,6 +664,7 @@ function placeCandle(t, c) {
   setBlock(x, y, z, ...S.candleBlock(c, 1, 0)); consume(); play('place', { mat: 'wool' }); swing();
 }
 function placeBlock(t, d) {
+  if (PL.mode === 'adventure') return; // adventure mode: no placing blocks
   let id = d.place, meta = d.pmeta || 0;
   const vi = d.vi != null ? d.vi : null, vsh = S.VSH[id];
   let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;

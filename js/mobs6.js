@@ -303,7 +303,13 @@ function villagerFlee(e) {
   if (r) { const dx = e.x - r.x, dz = e.z - r.z, l = Math.hypot(dx, dz) || 1; e.panic = 20; e.goal = [e.x + dx / l * 8, e.z + dz / l * 8]; }
 }
 // hero of the village: cheaper trades (30% plus 6.25% per level, at least one item)
-function tradePrice(o) { const h = PL.eff && PL.eff.hero_of_the_village; return h ? Math.max(1, Math.floor(o.an * (1 - 0.3 - 0.0625 * h.lv))) : o.an; }
+// Java's price: the base cost, less the villager's opinion of the player (gossip: curing, trading, being hit) times 0.05,
+// and less the hero of the village discount
+function tradePrice(o, v = GUI.ctx && GUI.ctx.e) {
+  const rep = v && v.rep ? v.rep : 0; let p = o.an - Math.floor(rep * 0.05 * (o.an >= 4 ? 1 : 0.5));
+  const h = PL.eff && PL.eff.hero_of_the_village; if (h) p = Math.floor(p * (1 - 0.3 - 0.0625 * h.lv));
+  return Math.max(1, Math.min(64, p));
+}
 
 const ILL = (m, o) => ({ tw: 128, th: 64, hp: 24, w: 0.3, h: 1.95, speed: 0.1, hostile: 1, xp: 5, snd: 'hmm', raider: 1, parts: m.parts, tex: () => m.tex(0), ai: illagerAI, anim: illagerAnim, onDeath: illagerDeath,
   init: (e, opts) => { if (opts.captain) e.captain = true; illagerGear(e); }, save: e => ({ captain: !!e.captain }), ...o });

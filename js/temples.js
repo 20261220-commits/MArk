@@ -90,7 +90,7 @@ function zombieVillagerTick(e) {
   if (e.age % 4 === 0) R.simpleParticle(e.x + (Math.random() - .5) * 0.6, e.y + 1 + Math.random(), e.z + (Math.random() - .5) * 0.6, [0.9, 0.3, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
   if (--e.curing > 0) return;
   removeEnt(e); const v = spawnMob('villager', e.x, e.y, e.z, { prof: e.prof || ['farmer', 'librarian', 'cleric', 'armorer'][Math.floor(Math.random() * 4)] }); v.persistent = true;
-  addEffect(v, 'nausea', 200, 0); play('levelup', { vol: 0.5 }); UI.advance && UI.advance('cure');
+  addEffect(v, 'nausea', 200, 0); play('levelup', { vol: 0.5 }); UI.advance && UI.advance('cure'); v.rep = (e.rep || 0) + 125; // gossip: major_positive 20 (x5) + minor_positive 25
 }
 // a villager killed by a zombie comes back as a zombie villager (normal 50%, hard always)
 function zombifyVillager(v, killer) {

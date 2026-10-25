@@ -284,7 +284,7 @@ function showMenu(name, data) {
   m.querySelectorAll('input[type=range]').forEach(r => r.oninput = () => { const k = r.dataset.opt; OPT[k] = +r.value; const fmt = { fov: v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v, rd: v => v + ' 청크', sens: v => v + '%', gamma: v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%', vol: v => v + '%', gui: v => v == 0 ? '자동' : v }[k]; $('v_' + k).textContent = fmt(+r.value); saveOpt(); });
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const MODE_NAME = { survival: '서바이벌', creative: '크리에이티브', hardcore: '하드코어', spectator: '관전자' };
+const MODE_NAME = { survival: '서바이벌', creative: '크리에이티브', hardcore: '하드코어', spectator: '관전자', adventure: '모험' };
 const MODE_DESC = { survival: '자원을 모으고, 제작하고, 레벨을 올리며 체력과 허기를 관리하세요.', creative: '무한한 자원, 자유로운 비행, 즉시 파괴. 마음껏 건축하세요.', hardcore: '서바이벌과 같지만 가장 어려운 난이도로 고정되며, 목숨은 하나뿐입니다.', spectator: '' };
 const DIFF_NAME = ['평화로움', '쉬움', '보통', '어려움'];
 $('menu').addEventListener('click', async e => {
@@ -333,7 +333,7 @@ function runCommand(cmd) {
   const num = (v, base) => v && v[0] === '~' ? base + (+(v.slice(1)) || 0) : +v;
   switch (c) {
     case 'help': ok('/gamemode · /time set|add|query · /weather · /give · /tp · /summon · /kill [@e[type=..]] · /seed · /difficulty · /xp <양>[L] · /spawnpoint · /setworldspawn · /clear · /gamerule <규칙> <값> · /effect give|clear · /enchant · /setblock · /fill · /locate <구조물> · /say · /me · /title · /list'); break;
-    case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
+    case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator', adventure: 'adventure', a: 'adventure', 2: 'adventure' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
     case 'time': { if (a[0] === 'query') { const q = a[1] === 'daytime' ? ((W.time % 24000) + 24000) % 24000 : a[1] === 'day' ? Math.floor(W.time / 24000) : W.tickN; ok('시간: ' + q); break; } const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
     case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.thunderOn = a[0] === 'thunder'; W.rainTimer = W.thunderTimer = 6000 + Math.random() * 12000; ok(a[0] === 'thunder' ? '날씨를 뇌우로 변경했습니다' : '날씨를 변경했습니다'); break;
     case 'give': { const k = (a[0] || '').replace('minecraft:', ''); const id = IID[k] != null ? IID[k] : ITEMS.findIndex(d => d && d.name === a[0]); if (id == null || id < 0 || !ITEMS[id]) return err('알 수 없는 아이템: ' + a[0]); const n = Math.max(1, Math.min(6400, +a[1] || 1)); let left = n; while (left > 0) { const m = Math.min(left, maxStack(id)); INV.giveOrDrop({ id, n: m }); left -= m; } ok(`[${itemName(id)}] ${n}개를 주었습니다`); break; }
@@ -392,7 +392,7 @@ function runCommand(cmd) {
     case 'say': case 'me': chatMsg((c === 'me' ? '* 플레이어 ' : '[플레이어] ') + a.join(' '), '#ffffff'); break;
     case 'title': { const t = a[0] && a[0].startsWith('@') ? a.slice(1) : a; if (t[0] === 'title' || t[0] === 'subtitle' || t[0] === 'actionbar') UI.flash(t.slice(1).join(' ').replace(/^"|"$/g, '')); break; }
     case 'setworldspawn': W.meta.worldSpawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; ok('세계 스폰 지점을 설정했습니다'); break;
-    case 'defaultgamemode': W.meta.mode = { survival: 'survival', creative: 'creative', adventure: 'survival', spectator: 'spectator' }[a[0]] || W.meta.mode; ok('기본 게임 모드: ' + W.meta.mode); break;
+    case 'defaultgamemode': W.meta.mode = { survival: 'survival', creative: 'creative', adventure: 'adventure', spectator: 'spectator' }[a[0]] || W.meta.mode; ok('기본 게임 모드: ' + W.meta.mode); break;
     case 'list': ok('접속한 플레이어 1명: 플레이어'); break;
     case 'kill': { const t = a[0] || '@s'; if (t.startsWith('@e')) { const m = t.match(/type=(?:minecraft:)?([a-z_]+)/); let n = 0; for (const e of [...ENT]) if (e.kind === 'mob' && !e.dead && (!m || e.type === m[1])) { removeEnt(e); n++; } ok(n + '마리를 없앴습니다'); } else hurtPlayer(1000, 'kill'); break; }
     case 'seed': ok('시드: ' + W.seed); break;
