@@ -127,6 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .acost{color:#3a9a10}.acost.bad{color:#d03030}
 .toffers{display:flex;flex-direction:column;gap:var(--px);max-height:calc(110*var(--px));overflow-y:auto}
 .toff{display:flex;align-items:center;gap:calc(3*var(--px));background:#8b8b8b;border:var(--px) solid #000;padding:var(--px) calc(3*var(--px));cursor:pointer;font:inherit}
+.scopts{display:grid;grid-template-columns:repeat(4,calc(18*var(--px)));gap:var(--px);max-height:calc(56*var(--px));overflow-y:auto;background:#8b8b8b;border:var(--px) solid #373737;padding:var(--px);min-width:calc(76*var(--px))}.scopt{width:calc(18*var(--px));height:calc(18*var(--px));padding:0;background:#c6c6c6;border:var(--px) solid #000;cursor:pointer;position:relative}.scopt.on{background:#fff}.scopt:hover{background:#ddd}
 .toff.on{background:#c8c8a0}.toff.off{opacity:.5}.toff:hover{background:#a0a0a0}
 .toff span{position:relative;display:block;width:calc(16*var(--px));height:calc(16*var(--px))}
 .tarr{width:calc(10*var(--px));height:calc(7*var(--px));background:#404040;clip-path:polygon(0 35%,60% 35%,60% 0,100% 50%,60% 100%,60% 65%,0 65%)}
@@ -287,6 +288,7 @@ body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
 <script src="js/inventory.js"></script>
 <script src="js/effects.js"></script>
 <script src="js/player.js"></script>
+<script src="js/workstations.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>

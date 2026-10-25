@@ -472,7 +472,9 @@ function interactBlock(t, dry) {
     case BID.note_block: if (!dry) { const tile = getTile(x, y, z) || { type: 'note', n: 0 }; tile.n = ((tile.n || 0) + 1) % 25; setTile(x, y, z, tile); playNote(x, y, z, tile.n); } return true;
     case BID.comparator: if (!dry) { setMeta(x, y, z, m ^ 4); play('click', { pitch: 0.55 }); rsMark(x, y, z); } return true;
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
-    case BID.grindstone: { const h = PL.held(); if (h && h.e && Object.keys(h.e).some(k => !k.endsWith('_curse'))) { if (!dry) { let xp = 0; const curses = {}; for (const [k, lv] of Object.entries(h.e)) if (k.endsWith('_curse')) curses[k] = lv; else xp += lv * 3; if (Object.keys(curses).length) h.e = curses; else delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
+    case BID.grindstone: if (!dry) UI.openScreen('grindstone', { x, y, z }); return true;
+    case BID.stonecutter: if (!dry) UI.openScreen('stonecutter', { x, y, z }); return true;
+    case BID.cartography_table: if (!dry) UI.openScreen('cartography', { x, y, z }); return true;
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
     case BID.trapped_chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); setMeta(x, y, z, m | 32); rsNotify(x, y, z); rsNotify(x, y - 1, z); UI.openScreen('chest', { x, y, z, title: '덫 상자' }); } return true;
     case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;

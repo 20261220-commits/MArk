@@ -282,9 +282,9 @@ function foxAI(e, dist) {
   walkPhysics(e, mx, mz, sp);
 }
 function foxMouth(e) { // show what the fox carries
-  const P = e.mesh.userData.parts; if (P.mouthItem) { P.snout.remove(P.mouthItem); P.mouthItem = null; }
-  if (!e.mouth) return;
-  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; P.snout.add(m); P.mouthItem = m;
+  const P = e.mesh.userData.parts, host = P.snout || P.head; if (P.mouthItem) { P.mouthItem.parent && P.mouthItem.parent.remove(P.mouthItem); P.mouthItem = null; }
+  if (!e.mouth || !host) return; // the Java model has no separate snout, so the item hangs from the head
+  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; host.add(m); P.mouthItem = m;
 }
 function foxAnim(e, P) {
   if (P.tail) P.tail.rotation.x = e.sleeping ? 0.2 : -0.3 + Math.sin(e.walk * 0.4) * 0.1;

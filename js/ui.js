@@ -150,6 +150,9 @@ UI.renderScreen = () => {
   } else if (T === 'anvil') {
     const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
     h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'stonecutter') { h = stonecutHtml();
+  } else if (T === 'cartography') { h = cartoHtml();
+  } else if (T === 'grindstone') { h = grindHtml();
   } else if (T === 'smithing') {
     h = `<div class="panel"><div class="cap">네더라이트 장비로 업그레이드</div><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">다이아몬드 장비 + 네더라이트 주괴</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'trade') {
@@ -428,6 +431,7 @@ function enchantOptions() {
   });
   return { shelves, list };
 }
+$('screen').addEventListener('click', e => { const sc = e.target.closest('[data-sc]'); if (sc && UI.screen === 'stonecutter') { GUI.ctx.sel = +sc.dataset.sc; play('click', { vol: 0.3 }); UI.renderScreen(); } });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-trade]'); if (b && UI.screen === 'trade') selectTrade(+b.dataset.trade); });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-loom]'); if (b && UI.screen === 'loom') { GUI.ctx.pat = b.dataset.loom; UI.renderScreen(); } });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-beacon]'); if (!b || UI.screen !== 'beacon') return; const [slot, k] = b.dataset.beacon.split(':'); if (slot === 'ok') beaconConfirm(); else beaconPick(slot, k); });

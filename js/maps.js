@@ -49,7 +49,7 @@ function surfaceAt(x, z) {
 }
 // fill in the part of the map around the player (a few rows per call)
 function mapUpdate(c) {
-  const m = c.m; if (m.dim !== W.dim) return;
+  const m = c.m; if (m.dim !== W.dim || m.locked) return;
   const sc = 1 << m.s, x0 = m.x - 64 * sc, z0 = m.z - 64 * sc;
   const pu = Math.floor((PL.x - x0) / sc), pv = Math.floor((PL.z - z0) / sc), R = Math.ceil(64 / sc) + 4;
   c.row = ((c.row || 0) + 1) % 8;

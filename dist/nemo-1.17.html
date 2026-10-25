@@ -127,6 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .acost{color:#3a9a10}.acost.bad{color:#d03030}
 .toffers{display:flex;flex-direction:column;gap:var(--px);max-height:calc(110*var(--px));overflow-y:auto}
 .toff{display:flex;align-items:center;gap:calc(3*var(--px));background:#8b8b8b;border:var(--px) solid #000;padding:var(--px) calc(3*var(--px));cursor:pointer;font:inherit}
+.scopts{display:grid;grid-template-columns:repeat(4,calc(18*var(--px)));gap:var(--px);max-height:calc(56*var(--px));overflow-y:auto;background:#8b8b8b;border:var(--px) solid #373737;padding:var(--px);min-width:calc(76*var(--px))}.scopt{width:calc(18*var(--px));height:calc(18*var(--px));padding:0;background:#c6c6c6;border:var(--px) solid #000;cursor:pointer;position:relative}.scopt.on{background:#fff}.scopt:hover{background:#ddd}
 .toff.on{background:#c8c8a0}.toff.off{opacity:.5}.toff:hover{background:#a0a0a0}
 .toff span{position:relative;display:block;width:calc(16*var(--px));height:calc(16*var(--px))}
 .tarr{width:calc(10*var(--px));height:calc(7*var(--px));background:#404040;clip-path:polygon(0 35%,60% 35%,60% 0,100% 50%,60% 100%,60% 65%,0 65%)}
@@ -10251,9 +10252,9 @@ function foxAI(e, dist) {
   walkPhysics(e, mx, mz, sp);
 }
 function foxMouth(e) { // show what the fox carries
-  const P = e.mesh.userData.parts; if (P.mouthItem) { P.snout.remove(P.mouthItem); P.mouthItem = null; }
-  if (!e.mouth) return;
-  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; P.snout.add(m); P.mouthItem = m;
+  const P = e.mesh.userData.parts, host = P.snout || P.head; if (P.mouthItem) { P.mouthItem.parent && P.mouthItem.parent.remove(P.mouthItem); P.mouthItem = null; }
+  if (!e.mouth || !host) return; // the Java model has no separate snout, so the item hangs from the head
+  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; host.add(m); P.mouthItem = m;
 }
 function foxAnim(e, P) {
   if (P.tail) P.tail.rotation.x = e.sleeping ? 0.2 : -0.3 + Math.sin(e.walk * 0.4) * 0.1;
@@ -11182,7 +11183,7 @@ function surfaceAt(x, z) {
 }
 // fill in the part of the map around the player (a few rows per call)
 function mapUpdate(c) {
-  const m = c.m; if (m.dim !== W.dim) return;
+  const m = c.m; if (m.dim !== W.dim || m.locked) return;
   const sc = 1 << m.s, x0 = m.x - 64 * sc, z0 = m.z - 64 * sc;
   const pu = Math.floor((PL.x - x0) / sc), pv = Math.floor((PL.z - z0) / sc), R = Math.ceil(64 / sc) + 4;
   c.row = ((c.row || 0) + 1) % 8;
@@ -12814,6 +12815,21 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 1, { group: 'ldye', accepts: st => !st || ITEMS[st.id].key.endsWith('_dye') }));
     L.push({ group: 'result', output: true, get: () => loomResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const d = ctx.items[1]; d.n--; if (!d.n) ctx.items[1] = null; play('click'); } });
     L.push(slotRef(ctx.items, 2, { group: 'lpat', accepts: st => !st || ITEMS[st.id].pattern != null, max: 1 })); // banner pattern item (kept, as in vanilla)
+  } else if (type === 'stonecutter') {
+    ctx.items = ctx.items || [null]; if (ctx.sel == null) ctx.sel = -1;
+    L.push(slotRef(ctx.items, 0, { group: 'scin' }));
+    L.push({ group: 'result', output: true, get: () => stonecutResult(ctx), set: () => {}, take: () => stonecutTake(ctx) });
+  } else if (type === 'cartography') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 'cmap', accepts: st => !st || st.id === IID.filled_map }));
+    L.push(slotRef(ctx.items, 1, { group: 'cadd', accepts: st => !st || st.id === IID.paper || st.id === IID.map || st.id === IID.glass_pane }));
+    L.push({ group: 'result', output: true, get: () => cartoResult(ctx), set: () => {}, make: () => { const r = cartoResult(ctx); cartoTake(ctx, r); return r; }, take: () => {} }); // the new map is only made when taken
+  } else if (type === 'grindstone') {
+    ctx.items = ctx.items || [null, null];
+    const ok = st => !st || !!ITEMS[st.id].dur || st.id === IID.enchanted_book || !!st.e;
+    L.push(slotRef(ctx.items, 0, { group: 'g0', accepts: ok, max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 'g1', accepts: ok, max: 1 }));
+    L.push({ group: 'result', output: true, get: () => grindResult(ctx), set: () => {}, take: () => grindTake(ctx) });
   } else if (type === 'beacon') {
     ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
     L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
@@ -12840,6 +12856,7 @@ function clickSlot(i, btn, shift) {
   if (sl.output) {
     const r = st; if (!r) return;
     if (sl.canTake && !sl.canTake()) return;
+    if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) INV.giveOrDrop({ id: rr.id, n: left }); sl.take(); break; } sl.take(); } }
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
     else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
@@ -12882,6 +12899,8 @@ function quickMove(i) {
     else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
+    else if (T === 'stonecutter') targets = idx(s => s.group === 'scin');
+    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && s.accepts(st));
     else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
@@ -12900,7 +12919,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
@@ -13524,7 +13543,9 @@ function interactBlock(t, dry) {
     case BID.note_block: if (!dry) { const tile = getTile(x, y, z) || { type: 'note', n: 0 }; tile.n = ((tile.n || 0) + 1) % 25; setTile(x, y, z, tile); playNote(x, y, z, tile.n); } return true;
     case BID.comparator: if (!dry) { setMeta(x, y, z, m ^ 4); play('click', { pitch: 0.55 }); rsMark(x, y, z); } return true;
     case BID.composter: { const h = PL.held(); if (!dry) composterUse(x, y, z, m, h); return true; }
-    case BID.grindstone: { const h = PL.held(); if (h && h.e && Object.keys(h.e).some(k => !k.endsWith('_curse'))) { if (!dry) { let xp = 0; const curses = {}; for (const [k, lv] of Object.entries(h.e)) if (k.endsWith('_curse')) curses[k] = lv; else xp += lv * 3; if (Object.keys(curses).length) h.e = curses; else delete h.e; delete h.rp; spawnXP(PL.x, PL.y + 1, PL.z, xp); play('anvil', { vol: 0.4 }); UI.hudDirty = true; } return true; } return false; }
+    case BID.grindstone: if (!dry) UI.openScreen('grindstone', { x, y, z }); return true;
+    case BID.stonecutter: if (!dry) UI.openScreen('stonecutter', { x, y, z }); return true;
+    case BID.cartography_table: if (!dry) UI.openScreen('cartography', { x, y, z }); return true;
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
     case BID.trapped_chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); setMeta(x, y, z, m | 32); rsNotify(x, y, z); rsNotify(x, y - 1, z); UI.openScreen('chest', { x, y, z, title: '덫 상자' }); } return true;
     case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
@@ -13892,6 +13913,71 @@ function elytraTick() {
 }
 
 </script>
+<script>/* js/workstations.js */
+// Work blocks with their own screens: the stonecutter (every vanilla stonecutting recipe), the cartography table
+// (zoom a map out, copy it, lock it) and the grindstone (repair two items into one, take enchantments off for XP).
+
+// ---------- stonecutter ----------
+// input key: outputs (key or key*count), as in vanilla 1.17
+const STONECUT = {};
+for (const row of 'andesite:andesite_slab*2,andesite_stairs,andesite_wall,polished_andesite,polished_andesite_slab*2,polished_andesite_stairs;blackstone:blackstone_slab*2,blackstone_stairs,blackstone_wall,chiseled_polished_blackstone,polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall,polished_blackstone_bricks,polished_blackstone,polished_blackstone_slab*2,polished_blackstone_stairs,polished_blackstone_wall;bricks:brick_slab*2,brick_stairs,brick_wall;cobbled_deepslate:chiseled_deepslate,cobbled_deepslate_slab*2,cobbled_deepslate_stairs,cobbled_deepslate_wall,deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_bricks,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles,polished_deepslate,polished_deepslate_slab*2,polished_deepslate_stairs,polished_deepslate_wall;nether_bricks:chiseled_nether_bricks,nether_brick_slab*2,nether_brick_stairs,nether_brick_wall;polished_blackstone:chiseled_polished_blackstone,polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall,polished_blackstone_bricks,polished_blackstone_slab*2,polished_blackstone_stairs,polished_blackstone_wall;quartz_block:chiseled_quartz_block,quartz_bricks,quartz_pillar,quartz_slab*2,quartz_stairs;red_sandstone:chiseled_red_sandstone,cut_red_sandstone,cut_red_sandstone_slab*2,red_sandstone_slab*2,red_sandstone_stairs,red_sandstone_wall;sandstone:chiseled_sandstone,cut_sandstone,cut_sandstone_slab*2,sandstone_slab*2,sandstone_stairs,sandstone_wall;stone_bricks:chiseled_stone_bricks,stone_brick_slab*2,stone_brick_stairs,stone_brick_wall;stone:chiseled_stone_bricks,stone_brick_slab*2,stone_brick_stairs,stone_brick_wall,stone_bricks,stone_slab*2,stone_stairs;cobblestone:cobblestone_slab*2,cobblestone_stairs,cobblestone_wall;copper_block:cut_copper,cut_copper_slab*2,cut_copper_stairs;cut_copper:cut_copper_slab*2,cut_copper_stairs;cut_red_sandstone:cut_red_sandstone_slab*2;cut_sandstone:cut_sandstone_slab*2;dark_prismarine:dark_prismarine_slab*2,dark_prismarine_stairs;deepslate_bricks:deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles;polished_deepslate:deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_bricks,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles,polished_deepslate_slab*2,polished_deepslate_stairs,polished_deepslate_wall;deepslate_tiles:deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall;diorite:diorite_slab*2,diorite_stairs,diorite_wall,polished_diorite,polished_diorite_slab*2,polished_diorite_stairs;end_stone_bricks:end_stone_brick_slab*2,end_stone_brick_stairs,end_stone_brick_wall;end_stone:end_stone_brick_slab*2,end_stone_brick_stairs,end_stone_brick_wall,end_stone_bricks;exposed_copper:exposed_cut_copper,exposed_cut_copper_slab*2,exposed_cut_copper_stairs;exposed_cut_copper:exposed_cut_copper_slab*2,exposed_cut_copper_stairs;granite:granite_slab*2,granite_stairs,granite_wall,polished_granite,polished_granite_slab*2,polished_granite_stairs;mossy_cobblestone:mossy_cobblestone_slab*2,mossy_cobblestone_stairs,mossy_cobblestone_wall;mossy_stone_bricks:mossy_stone_brick_slab*2,mossy_stone_brick_stairs,mossy_stone_brick_wall;oxidized_copper:oxidized_cut_copper,oxidized_cut_copper_slab*2,oxidized_cut_copper_stairs;oxidized_cut_copper:oxidized_cut_copper_slab*2,oxidized_cut_copper_stairs;polished_andesite:polished_andesite_slab*2,polished_andesite_stairs;basalt:polished_basalt;polished_blackstone_bricks:polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall;polished_diorite:polished_diorite_slab*2,polished_diorite_stairs;polished_granite:polished_granite_slab*2,polished_granite_stairs;prismarine_bricks:prismarine_brick_slab*2,prismarine_brick_stairs;prismarine:prismarine_slab*2,prismarine_stairs,prismarine_wall;purpur_block:purpur_pillar,purpur_slab*2,purpur_stairs;red_nether_bricks:red_nether_brick_slab*2,red_nether_brick_stairs,red_nether_brick_wall;smooth_quartz:smooth_quartz_slab*2,smooth_quartz_stairs;smooth_red_sandstone:smooth_red_sandstone_slab*2,smooth_red_sandstone_stairs;smooth_sandstone:smooth_sandstone_slab*2,smooth_sandstone_stairs;smooth_stone:smooth_stone_slab*2;waxed_copper_block:waxed_cut_copper,waxed_cut_copper_slab*2,waxed_cut_copper_stairs;waxed_cut_copper:waxed_cut_copper_slab*2,waxed_cut_copper_stairs;waxed_exposed_copper:waxed_exposed_cut_copper,waxed_exposed_cut_copper_slab*2,waxed_exposed_cut_copper_stairs;waxed_exposed_cut_copper:waxed_exposed_cut_copper_slab*2,waxed_exposed_cut_copper_stairs;waxed_oxidized_copper:waxed_oxidized_cut_copper,waxed_oxidized_cut_copper_slab*2,waxed_oxidized_cut_copper_stairs;waxed_oxidized_cut_copper:waxed_oxidized_cut_copper_slab*2,waxed_oxidized_cut_copper_stairs;waxed_weathered_copper:waxed_weathered_cut_copper,waxed_weathered_cut_copper_slab*2,waxed_weathered_cut_copper_stairs;waxed_weathered_cut_copper:waxed_weathered_cut_copper_slab*2,waxed_weathered_cut_copper_stairs;weathered_copper:weathered_cut_copper,weathered_cut_copper_slab*2,weathered_cut_copper_stairs;weathered_cut_copper:weathered_cut_copper_slab*2,weathered_cut_copper_stairs'.split(';')) { const [k, outs] = row.split(':'); STONECUT[k] = outs.split(',').map(o => { const [out, n] = o.split('*'); return [out, +(n || 1)]; }); }
+const stonecutOptions = ctx => { const s = ctx.items[0]; return s ? (STONECUT[ITEMS[s.id].key] || []).filter(([o]) => IID[o] != null) : []; };
+function stonecutResult(ctx) { const o = stonecutOptions(ctx)[ctx.sel]; return o ? { id: IID[o[0]], n: o[1] } : null; }
+function stonecutTake(ctx) { const s = ctx.items[0]; s.n--; if (!s.n) ctx.items[0] = null; play('click', { vol: 0.5 }); }
+function stonecutHtml() {
+  const c = GUI.ctx, opts = stonecutOptions(c); if (c.sel >= opts.length) c.sel = -1;
+  const btns = opts.map(([o, n], i) => `<button class="scopt ${i === c.sel ? 'on' : ''}" data-sc="${i}" title="${ITEMS[IID[o]].name}">${icon(IID[o], n)}</button>`).join('');
+  return `<div class="panel"><div class="cap">석재 절단기</div><div class="row top">${slotHtml(0)}<div class="scopts">${btns || '<p class="tip">돌 종류를 넣으세요</p>'}</div><div class="arrow"></div>${slotHtml(1, 'big')}</div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
+}
+
+// ---------- cartography table ----------
+// map + paper: zoom out one step (max 4); map + empty map: two copies; map + glass pane: a locked copy that no longer changes
+function cartoResult(ctx) {
+  const [m, x] = ctx.items; if (!m || m.id !== IID.filled_map || !m.map || !x) return null;
+  const md = mapStore()[m.map]; if (!md) return null;
+  if (x.id === IID.paper) return md.s < 4 && !md.locked ? { ...m, n: 1, zoom: true, name: m.name } : null;
+  if (x.id === IID.map) return { ...m, n: 2 };
+  if (x.id === IID.glass_pane) return md.locked ? null : { ...m, n: 1, lock: true };
+  return null;
+}
+function cartoTake(ctx, r) {
+  const [m, x] = ctx.items, md = mapStore()[m.map];
+  if (r && r.zoom) { const id = newMap(md.x, md.z, md.s + 1, null, md.dim); r.map = id; r.name = '지도 #' + id; delete r.zoom; }
+  if (r && r.lock) { const id = (W.meta.mapN = (W.meta.mapN || 0) + 1); mapStore()[id] = { ...md, marks: [...(md.marks || [])], locked: true }; MAPS.cache.delete(id); r.map = id; r.name = (m.name || '지도') + ' (잠김)'; delete r.lock; }
+  m.n--; if (!m.n) ctx.items[0] = null; x.n--; if (!x.n) ctx.items[1] = null;
+  play('page', { vol: 0.6 });
+}
+function cartoHtml() {
+  return `<div class="panel"><div class="cap">지도 제작대</div><div class="row top"><div class="col">${slotHtml(0)}${slotHtml(1)}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">지도 + 종이: 축소 · 지도 + 빈 지도: 복사 · 지도 + 유리판: 잠금</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+}
+
+// ---------- grindstone ----------
+const isCurse = k => k.endsWith('_curse');
+function grindResult(ctx) {
+  const [a, b] = ctx.items, one = a && b ? null : a || b;
+  if (a && b) { // two of the same damageable item: durabilities add up plus 5%, only curses survive
+    if (a.id !== b.id || !ITEMS[a.id].dur) return null;
+    const max = ITEMS[a.id].dur, left = Math.min(max, (max - (a.d || 0)) + (max - (b.d || 0)) + Math.floor(max * 0.05)), e = {};
+    for (const st of [a, b]) for (const [k, lv] of Object.entries(st.e || {})) if (isCurse(k)) e[k] = Math.max(e[k] || 0, lv);
+    const r = { id: a.id, n: 1, d: max - left }; if (Object.keys(e).length) r.e = e; return r;
+  }
+  if (!one || !one.e || !Object.keys(one.e).some(k => !isCurse(k))) return null;
+  const e = {}; for (const [k, lv] of Object.entries(one.e)) if (isCurse(k)) e[k] = lv;
+  const r = { ...one, n: 1 }; delete r.e; delete r.rc; if (Object.keys(e).length) r.e = e;
+  if (one.id === IID.enchanted_book && !r.e) r.id = IID.book;
+  return r;
+}
+function grindTake(ctx) {
+  let xp = 0; for (const st of ctx.items) if (st && st.e) for (const [k, lv] of Object.entries(st.e)) if (!isCurse(k)) xp += lv * 3; // experience back for the enchantments taken off
+  ctx.items[0] = ctx.items[1] = null;
+  if (xp && ctx.x != null) spawnXP(ctx.x + .5, ctx.y + 1, ctx.z + .5, Math.ceil(xp / 2 + Math.random() * xp / 2));
+  play('anvil', { vol: 0.4, pitch: 1.4 });
+}
+function grindHtml() {
+  return `<div class="panel"><div class="cap">숫돌</div><div class="row top"><div class="col">${slotHtml(0)}${slotHtml(1)}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">같은 아이템 두 개: 수리 (마법 부여는 저주만 남음) · 마법이 부여된 아이템 하나: 마법 해제, 경험치 돌려받기</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+}
+
+</script>
 <script>/* js/ui.js */
 // UI: menus, HUD, chat/commands, container screens.
 const $ = id => document.getElementById(id);
@@ -14045,6 +14131,9 @@ UI.renderScreen = () => {
   } else if (T === 'anvil') {
     const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
     h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  } else if (T === 'stonecutter') { h = stonecutHtml();
+  } else if (T === 'cartography') { h = cartoHtml();
+  } else if (T === 'grindstone') { h = grindHtml();
   } else if (T === 'smithing') {
     h = `<div class="panel"><div class="cap">네더라이트 장비로 업그레이드</div><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">다이아몬드 장비 + 네더라이트 주괴</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'trade') {
@@ -14323,6 +14412,7 @@ function enchantOptions() {
   });
   return { shelves, list };
 }
+$('screen').addEventListener('click', e => { const sc = e.target.closest('[data-sc]'); if (sc && UI.screen === 'stonecutter') { GUI.ctx.sel = +sc.dataset.sc; play('click', { vol: 0.3 }); UI.renderScreen(); } });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-trade]'); if (b && UI.screen === 'trade') selectTrade(+b.dataset.trade); });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-loom]'); if (b && UI.screen === 'loom') { GUI.ctx.pat = b.dataset.loom; UI.renderScreen(); } });
 $('screen').addEventListener('click', e => { const b = e.target.closest('[data-beacon]'); if (!b || UI.screen !== 'beacon') return; const [slot, k] = b.dataset.beacon.split(':'); if (slot === 'ok') beaconConfirm(); else beaconPick(slot, k); });

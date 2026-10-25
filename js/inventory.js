@@ -60,6 +60,21 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 1, { group: 'ldye', accepts: st => !st || ITEMS[st.id].key.endsWith('_dye') }));
     L.push({ group: 'result', output: true, get: () => loomResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const d = ctx.items[1]; d.n--; if (!d.n) ctx.items[1] = null; play('click'); } });
     L.push(slotRef(ctx.items, 2, { group: 'lpat', accepts: st => !st || ITEMS[st.id].pattern != null, max: 1 })); // banner pattern item (kept, as in vanilla)
+  } else if (type === 'stonecutter') {
+    ctx.items = ctx.items || [null]; if (ctx.sel == null) ctx.sel = -1;
+    L.push(slotRef(ctx.items, 0, { group: 'scin' }));
+    L.push({ group: 'result', output: true, get: () => stonecutResult(ctx), set: () => {}, take: () => stonecutTake(ctx) });
+  } else if (type === 'cartography') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 'cmap', accepts: st => !st || st.id === IID.filled_map }));
+    L.push(slotRef(ctx.items, 1, { group: 'cadd', accepts: st => !st || st.id === IID.paper || st.id === IID.map || st.id === IID.glass_pane }));
+    L.push({ group: 'result', output: true, get: () => cartoResult(ctx), set: () => {}, make: () => { const r = cartoResult(ctx); cartoTake(ctx, r); return r; }, take: () => {} }); // the new map is only made when taken
+  } else if (type === 'grindstone') {
+    ctx.items = ctx.items || [null, null];
+    const ok = st => !st || !!ITEMS[st.id].dur || st.id === IID.enchanted_book || !!st.e;
+    L.push(slotRef(ctx.items, 0, { group: 'g0', accepts: ok, max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 'g1', accepts: ok, max: 1 }));
+    L.push({ group: 'result', output: true, get: () => grindResult(ctx), set: () => {}, take: () => grindTake(ctx) });
   } else if (type === 'beacon') {
     ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
     L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
@@ -86,6 +101,7 @@ function clickSlot(i, btn, shift) {
   if (sl.output) {
     const r = st; if (!r) return;
     if (sl.canTake && !sl.canTake()) return;
+    if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) INV.giveOrDrop({ id: rr.id, n: left }); sl.take(); break; } sl.take(); } }
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
     else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
@@ -128,6 +144,8 @@ function quickMove(i) {
     else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
+    else if (T === 'stonecutter') targets = idx(s => s.group === 'scin');
+    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && s.accepts(st));
     else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
@@ -146,7 +164,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
