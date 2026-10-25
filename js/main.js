@@ -454,7 +454,7 @@ function autoRes() {
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
-  ICON_URL = iconCanvas.toDataURL();
+  ICON_URL = iconCanvas.toDataURL(); document.documentElement.style.setProperty('--icons', `url(${ICON_URL})`); // one copy of the sheet for every icon
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);
   document.documentElement.style.setProperty('--stoneTex', `url(${tileCanvas(S.T.stone, null, 4).toDataURL()})`);
   await dbOpen();

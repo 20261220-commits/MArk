@@ -92,7 +92,7 @@ for (const k of ('honeycomb tropical_fish tropical_fish_bucket fermented_spider_
   'pufferfish_bucket cod_bucket salmon_bucket').split(' ')) ITEM[k] = 'item/' + k;
 Object.assign(ITEM, { crossbow: 'item/crossbow_standby', tripwire_hook: 'block/tripwire_hook', rail: 'block/rail', powered_rail: 'block/powered_rail', detector_rail: 'block/detector_rail', activator_rail: 'block/activator_rail',
   // potion bottles and tipped arrows are tinted by the game with each potion's colour (base + overlay)
-  _potion: 'item/potion', _splash_potion: 'item/splash_potion', _lingering_potion: 'item/lingering_potion', _potion_overlay: 'item/potion_overlay', _arrow_base: 'item/tipped_arrow_base', _arrow_head: 'item/tipped_arrow_head', glass_bottle: 'item/glass_bottle' });
+  _potion: 'item/potion', _splash_potion: 'item/splash_potion', _lingering_potion: 'item/lingering_potion', _potion_overlay: 'item/potion_overlay', _spawn_egg: 'item/spawn_egg', _spawn_egg_overlay: 'item/spawn_egg_overlay', _arrow_base: 'item/tipped_arrow_base', _arrow_head: 'item/tipped_arrow_head', glass_bottle: 'item/glass_bottle' });
 for (const k of ['jungle_sapling', 'acacia_sapling', 'dark_oak_sapling', 'allium', 'azure_bluet', 'red_tulip', 'orange_tulip', 'white_tulip', 'pink_tulip', 'lily_of_the_valley', 'blue_orchid', 'wither_rose',
   'lily_pad', 'vine', 'soul_torch', 'end_rod', 'oak_trapdoor']) ITEM[k] = 'block/' + k;
 const ITEM_TINT = { lily_pad: 0x208030, vine: 0x48b518, leather_helmet: 0xa06540, leather_chestplate: 0xa06540, leather_leggings: 0xa06540, leather_boots: 0xa06540, short_grass: 0x7cbd6b, fern: 0x7cbd6b };

@@ -522,6 +522,13 @@ function useItem(first) {
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
   if (first && items6Use(t, h, d)) return;
+  if (d && d.egg && MOBDEF[d.egg] && t) {
+    if (t.type === 'ent' && t.e.kind === 'mob' && t.e.type === d.egg) { const b = spawnMob(d.egg, t.e.x, t.e.y, t.e.z, { baby: true }); if (b) b.baby = true; }
+    else if (t.type === 'block' && t.id === BID.spawner) { const tile = getTile(t.x, t.y, t.z); if (tile) { tile.mob = d.egg; tile.delay = 200; } else setTile(t.x, t.y, t.z, { type: 'spawner', mob: d.egg, delay: 200 }); }
+    else if (t.type === 'block') { const x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz; spawnMob(d.egg, x + .5, y, z + .5); }
+    else return;
+    if (!creative()) consume(); swing(); return;
+  }
   if (t && t.type === 'ent') {
     const e = t.e;
     if (e.kind === 'frame') { frameUse(e, h); return; }

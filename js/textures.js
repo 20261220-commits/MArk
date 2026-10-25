@@ -687,6 +687,8 @@ function potionSprite(col, form) {
   });
 }
 for (const d of ITEMS) if (d && d.pcol != null) SPR[d.key] = () => potionSprite(d.pcol, d.form);
+for (const d of ITEMS) if (d && d.eggCol) SPR[d.key] = () => { const base = PACKPX.items._spawn_egg, ov = PACKPX.items._spawn_egg_overlay, [a, b] = d.eggCol.map(hex); if (!base) return sprite(p => {});
+  return sprite(p => { for (let i = 0; i < 256; i++) { const x = i & 15, y = i >> 4, o = ov && ov[i * 4 + 3] > 0 ? ov : base[i * 4 + 3] > 0 ? base : null, c = o === ov ? b : a; if (o) p(x, y, [o[i * 4] * c[0] / 255, o[i * 4 + 1] * c[1] / 255, o[i * 4 + 2] * c[2] / 255]); } }); };
 SPR.glass_bottle = () => potionSprite(0xd8e8f4, 0); SPR.dragon_breath = () => potionSprite(0xc87ad8, 0);
 SPR.fermented_spider_eye = () => sprite(p => { blob(p, 8, 9, 5, 4.5, [hex(0xc86a5a), hex(0x9a3a3a), hex(0x6a1a2a), hex(0x3a0a1a)]); p(6, 8, hex(0x2a0a0a)); p(9, 8, hex(0x2a0a0a)); p(5, 6, hex(0xa8805a)); p(10, 6, hex(0xa8805a)); });
 SPR.glistering_melon_slice = () => sprite(p => { for (let y = 3; y < 14; y++) for (let x = 2; x < 14; x++) { const d = Math.hypot(x - 2, y - 14); if (d < 11 && d > 9.6) p(x, y, hex(0xe8c040)); else if (d <= 9.6 && x - 2 > 0 && 14 - y > 0) p(x, y, (x * 3 + y) % 5 === 0 ? hex(0xfff090) : hex(0xe8402a)); } });
@@ -755,7 +757,7 @@ let ICON_URL = '';
 function iconStyle(id, px = 32) {
   const cell = iconIndex[id]; if (cell == null) return '';
   const sc = px / ICON;
-  return `background-image:url(${ICON_URL});background-size:${iconCanvas.width * sc}px ${iconCanvas.height * sc}px;background-position:-${(cell % ICON_COLS) * ICON * sc}px -${Math.floor(cell / ICON_COLS) * ICON * sc}px`;
+  return `background-image:var(--icons);background-size:${iconCanvas.width * sc}px ${iconCanvas.height * sc}px;background-position:-${(cell % ICON_COLS) * ICON * sc}px -${Math.floor(cell / ICON_COLS) * ICON * sc}px`;
 }
 
 // crack overlay stages

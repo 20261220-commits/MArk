@@ -729,6 +729,20 @@ function blockDrops(b, meta, stack) {
 // Item ids are positions in ITEMS. Saved data is tagged with a hash of the key list it was written with
 // (world meta keeps each list), so ids can change between versions: loading remaps them by key.
 // Untagged data comes from before this table existed and uses today's order.
+// spawn eggs: [mob, name, shell colour, spot colour] (vanilla colours; the icon tints the resource pack's egg)
+for (const e of ('axolotl,아홀로틀,FBC1E3,A62D74;bat,박쥐,4C3E30,0F0F0F;bee,벌,EDC343,43241B;blaze,블레이즈,F6B201,FFF87E;cat,고양이,EFC88E,957256;cave_spider,동굴 거미,0C424E,A80E0E;chicken,닭,A1A1A1,FF0000;' +
+  'cod,대구,C1A76A,E5C48B;cow,소,443626,A1A1A1;creeper,크리퍼,0DA70B,000000;dolphin,돌고래,223B4D,F9F9F9;donkey,당나귀,534539,867566;drowned,드라운드,8FF1D7,799C65;elder_guardian,엘더 가디언,CECCBA,747693;' +
+  'enderman,엔더맨,161616,000000;endermite,엔더마이트,161616,6E6E6E;evoker,소환사,959B9B,1E1C1A;fox,여우,D5B69F,CC6920;ghast,가스트,F9F9F9,BCBCBC;glow_squid,발광 오징어,095656,85F1BC;goat,염소,A5947C,55493E;' +
+  'guardian,가디언,5A8272,F17D30;hoglin,호글린,C66E55,5F6464;horse,말,C09E7D,EEE500;husk,허스크,797061,E6CC94;llama,라마,C09E7D,995F40;magma_cube,마그마 큐브,340000,FCFC00;mooshroom,무시룸,A00F10,B7B7B7;' +
+  'mule,노새,1B0200,51331D;ocelot,오셀롯,EFDE7D,564434;panda,판다,E7E7E7,1B1B22;parrot,앵무새,0DA70B,FF0000;phantom,팬텀,43518A,88FF00;pig,돼지,F0A5A2,DB635F;piglin,피글린,995F40,F9F3A4;' +
+  'piglin_brute,피글린 야수,592A10,F9F3A4;pillager,약탈자,532F36,959B9B;polar_bear,북극곰,F2F2F2,959590;pufferfish,복어,F6B201,37C3F2;rabbit,토끼,995F40,734831;ravager,파괴수,757470,5B5049;' +
+  'salmon,연어,A00F10,0E8474;sheep,양,E7E7E7,FFB5B5;shulker,셜커,946794,4D3852;silverfish,좀벌레,6E6E6E,303030;skeleton,스켈레톤,C1C1C1,494949;skeleton_horse,스켈레톤 말,68684F,E5E5D8;' +
+  'slime,슬라임,51A03E,7EBF6E;spider,거미,342D27,A80E0E;squid,오징어,223B4D,708899;stray,스트레이,617677,DDEAEA;strider,스트라이더,9C3436,4D494D;trader_llama,상인 라마,EAA430,456296;' +
+  'tropical_fish,열대어,EF6915,FFF9EF;turtle,거북,E7E7E7,00AFAF;vex,벡스,7A90A4,E8EDF1;villager,주민,563C33,BD8B72;vindicator,변명자,959B9B,275E61;wandering_trader,떠돌이 상인,456296,EAA430;' +
+  'witch,마녀,340000,51A03E;wither_skeleton,위더 스켈레톤,141414,474D4D;wolf,늑대,D7D3D3,CEAF96;zoglin,조글린,C66E55,E6E6E6;zombie,좀비,00AFAF,799C65;zombie_horse,좀비 말,315234,97C284;' +
+  'zombie_villager,좀비 주민,563C33,799C65;zombified_piglin,좀비화 피글린,EA9393,4C7129').split(';')) {
+  const [k, n, a, b] = e.split(','); item(k + '_spawn_egg', n + ' 생성 알', { egg: k, eggCol: [parseInt(a, 16), parseInt(b, 16)] });
+}
 // block key (including variant keys) -> [block id, meta]
 const VKEY = {}; for (const b of BLOCKS) if (b) { VKEY[b.key] = [b.id, 0]; if (b.vk) b.vk.forEach((k, i) => { VKEY[k] = [b.id, i << (b.vshift || 0)]; }); }
 const ITEM_KEYS = Array.from(ITEMS, d => d ? d.key : null);
