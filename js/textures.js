@@ -445,28 +445,36 @@ function animateAtlas(dt) {
 // js/pack.js holds raw RGBA pixels (gzip+base64); they are written straight into the atlas
 // and sprite buffers, so no image decoding or canvas readback happens at runtime.
 const PACKPX = { data: null, items: {}, ent: {}, anim: {} };
+// write one pack's pixels into the atlas, sprites and skins (the built-in pack first, then a pack the player loaded)
+function applyPackData(P, D) {
+  if (!PACKPX.data) PACKPX.data = D;
+  for (const [name, off] of Object.entries(P.tiles)) {
+    const t = S.T[name]; if (t == null) continue;
+    const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+    for (let y = 0; y < TS; y++) AD.set(D.subarray(off + y * 64, off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4);
+  }
+  for (const [k, [off, frames]] of Object.entries(P.anim)) if (S.T[k] != null) PACKPX.anim[k] = { data: D, off, frames };
+  for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
+  for (const [k, [off, w, h]] of Object.entries(P.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
+  if (P.sky) { const [off, w, h] = P.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }
+  for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(a.data.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
+}
 async function loadPack() {
-  if (typeof PACK === 'undefined' || !window.DecompressionStream) return false;
+  if (!window.DecompressionStream) return false;
+  let ok = false;
   try {
-    const bin = Uint8Array.from(atob(PACK.data), c => c.charCodeAt(0));
-    const buf = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-    const D = new Uint8Array(buf); PACKPX.data = D;
-    for (const [name, off] of Object.entries(PACK.tiles)) {
-      const t = S.T[name]; if (t == null) continue;
-      const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
-      for (let y = 0; y < TS; y++) AD.set(D.subarray(off + y * 64, off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4);
+    if (typeof PACK !== 'undefined') {
+      const bin = Uint8Array.from(atob(PACK.data), c => c.charCodeAt(0));
+      applyPackData(PACK, new Uint8Array(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()));
+      ok = true;
     }
-    for (const [k, [off, frames]] of Object.entries(PACK.anim)) if (S.T[k] != null) PACKPX.anim[k] = { off, frames };
-    for (const [k, off] of Object.entries(PACK.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
-    for (const [k, [off, w, h]] of Object.entries(PACK.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
-    if (PACK.sky) { const [off, w, h] = PACK.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }
-    for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(D.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
-    atlasCtx.putImageData(atlasImg, 0, 0);
-    return true;
-  } catch (e) { console.warn('texture pack unavailable', e); return false; }
+  } catch (e) { console.warn('texture pack unavailable', e); }
+  try { if (typeof applyUserPack === 'function' && await applyUserPack()) ok = true; } catch (e) { console.warn('chosen resource pack unavailable', e); }
+  if (ok) atlasCtx.putImageData(atlasImg, 0, 0);
+  return ok;
 }
 // one 16x16 frame of an animated tile (water, lava, portal, fire, magma)
-function animFrame(k, i) { const a = PACKPX.anim[k]; if (!a) return null; const f = i % a.frames; return PACKPX.data.subarray(a.off + f * 1024, a.off + f * 1024 + 1024); }
+function animFrame(k, i) { const a = PACKPX.anim[k]; if (!a) return null; const f = i % a.frames; return a.data.subarray(a.off + f * 1024, a.off + f * 1024 + 1024); }
 
 // ---------- tinted tile canvas helper (for icons, particles) ----------
 const DEFAULT_TINT = { 1: hex(0x7cbd6b), 2: hex(0x59ae30), 3: hex(0x3f76e4), 4: hex(0x80a755), 5: hex(0x619961) };
