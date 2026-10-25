@@ -65,6 +65,17 @@ for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of [''
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
 const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
+// biome-tinted plant textures are grey in vanilla and get their colour from the biome; a pack that ships them already
+// coloured (Pixel Perfection's orange birch, green spruce...) would be coloured twice, so they are turned grey first,
+// at vanilla's average brightness for that texture
+const GRAY_MEAN = { oak_leaves: 144, spruce_leaves: 126, birch_leaves: 130, jungle_leaves: 153, acacia_leaves: 148, dark_oak_leaves: 150, grass_top: 147, short_grass: 140, fern: 124, tall_grass_bottom: 140, tall_grass_top: 140, large_fern_bottom: 124, large_fern_top: 124, vine: 116, lily_pad: 133 };
+function toGray(px, mean) {
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < px.length; i += 4) if (px[i + 3] >= 128) { r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
+  if (!n || Math.max(r, g, b) - Math.min(r, g, b) < n * 12) return; // already grey (vanilla-style)
+  const lum = (r * 0.299 + g * 0.587 + b * 0.114) / n, k = mean / lum;
+  for (let i = 0; i < px.length; i += 4) { const v = Math.min(255, Math.round((px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) * k)); px[i] = px[i + 1] = px[i + 2] = v; }
+}
 const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
 const ITEM = {};
@@ -165,6 +176,7 @@ function packBuild(load, extraTiles = [], extraItems = []) {
   for (const [tile, f] of Object.entries(TILE)) {
     const img = loadT(f); if (!img) continue;
     let px = new Uint8Array(crop16(img));
+    if (GRAY_MEAN[tile]) toGray(px, GRAY_MEAN[tile]);
     if (TINTED.has(tile)) for (let i = 3; i < px.length; i += 4) if (px[i] >= 128) px[i] = 240; // tint marker alpha
     out.tiles[tile] = put(px);
     if (tile.endsWith('_leaves')) { // opaque variant for "fast" graphics: holes filled with a dark leaf colour
