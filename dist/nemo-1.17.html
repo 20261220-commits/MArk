@@ -3319,6 +3319,9 @@ for (const c of ['tropical_a', 'tropical_b']) { ENT[c] = 'entity/fish/' + c; for
 Object.assign(ENT, { witch: 'entity/witch', wandering_trader: 'entity/wandering_trader', snow_golem: 'entity/snow_golem', polar_bear: 'entity/bear/polarbear', turtle: 'entity/turtle/big_sea_turtle',
   dolphin: 'entity/dolphin', phantom: 'entity/phantom', phantom_eyes: 'entity/phantom_eyes', cave_spider: 'entity/spider/cave_spider', red_mooshroom: 'entity/cow/red_mooshroom', brown_mooshroom: 'entity/cow/brown_mooshroom',
   guardian: 'entity/guardian', guardian_elder: 'entity/guardian_elder', wither: 'entity/wither/wither', wither_invulnerable: 'entity/wither/wither_invulnerable', pufferfish: 'entity/fish/pufferfish' });
+// 1.17 mobs (not in Pixel Perfection CE; a vanilla 1.17 jar or newer pack has them)
+Object.assign(ENT, { goat: 'entity/goat/goat', glow_squid: 'entity/squid/glow_squid' });
+for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 'entity/axolotl/axolotl_' + c;
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
@@ -12446,6 +12449,59 @@ MCMODELS.tropical_fish = { tex: 'tropical_a', tw: 32, th: 32, parts: [
   { n: 'fin', o: [0, 20.5, -3], b: [[10, -5, 0, -3, 0, 0, 3, 6]] }] };
 MCVTEX.tropical_fish = e => { const v = e.variant || 0, [bc, pc] = TFISH_COL[v % TFISH_COL.length]; return tintedLayers([['tropical_a', bc], ['tropical_a_pattern_' + (1 + ((v >> 1) % 6)), pc]]); };
 if (MOBDEF.tropical_fish) MOBDEF.tropical_fish.vtex = v => MCVTEX.tropical_fish({ variant: v });
+
+// ---------- 1.17 mobs, Java model layouts (used when the loaded resource pack has their textures; otherwise the
+// built-in models with painted skins stay) ----------
+Object.assign(MCMODELS, {
+  goat: { tex: 'goat', tw: 64, th: 64, parts: [
+    { n: 'head', o: [1, 14, 0], b: [[2, 61, -6, -11, -10, 3, 2, 1], [2, 61, 2, -11, -10, 3, 2, 1, 0, 1], [23, 52, -0.5, -3, -14, 0, 7, 5]] },
+    { n: 'horn2', p: 'head', o: [0, 0, 0], b: [[12, 55, -0.01, -16, -10, 2, 7, 2]] }, { n: 'horn', p: 'head', o: [0, 0, 0], b: [[12, 55, -2.99, -16, -10, 2, 7, 2]] },
+    { n: 'nose', p: 'head', o: [0, -8, -8], r: [0.9599, 0, 0], b: [[34, 46, -3, -4, -8, 5, 7, 10]] },
+    { n: 'body', o: [0, 24, 0], b: [[1, 1, -4, -17, -7, 9, 11, 16], [0, 28, -5, -18, -8, 11, 14, 11]] },
+    { n: 'lleg2', o: [1, 14, 4], b: [[36, 29, 0, 4, 0, 3, 6, 3]] }, { n: 'rleg2', o: [-3, 14, 4], b: [[49, 29, 0, 4, 0, 3, 6, 3]] },
+    { n: 'lleg', o: [1, 14, -6], b: [[49, 2, 0, 0, 0, 3, 10, 3]] }, { n: 'rleg', o: [-3, 14, -6], b: [[35, 2, 0, 0, 0, 3, 10, 3]] }] },
+  axolotl: { tex: 'axolotl_lucy', tw: 64, th: 64, parts: [
+    { n: 'body', o: [0, 20, 5], b: [[0, 11, -4, -2, -9, 8, 4, 10], [2, 17, 0, -3, -8, 0, 5, 9]] },
+    { n: 'head', p: 'body', o: [0, 0, -9], b: [[0, 1, -4, -3, -5, 8, 5, 5, 0.001]] },
+    { n: 'gillt', p: 'head', o: [0, -3, -1], b: [[3, 37, -4, -3, 0, 8, 3, 0, 0.001]] },
+    { n: 'gilll', p: 'head', o: [-4, 0, -1], b: [[0, 40, -3, -5, 0, 3, 7, 0, 0.001]] }, { n: 'gillr', p: 'head', o: [4, 0, -1], b: [[11, 40, 0, -5, 0, 3, 7, 0, 0.001]] },
+    { n: 'rleg2', p: 'body', o: [-3.5, 1, -1], b: [[2, 13, -2, 0, 0, 3, 5, 0, 0.001]] }, { n: 'lleg2', p: 'body', o: [3.5, 1, -1], b: [[2, 13, -1, 0, 0, 3, 5, 0, 0.001]] },
+    { n: 'rleg', p: 'body', o: [-3.5, 1, -8], b: [[2, 13, -2, 0, 0, 3, 5, 0, 0.001]] }, { n: 'lleg', p: 'body', o: [3.5, 1, -8], b: [[2, 13, -1, 0, 0, 3, 5, 0, 0.001]] },
+    { n: 'tail', p: 'body', o: [0, 0, 1], b: [[2, 19, 0, -3, 0, 0, 5, 12]] }] },
+  glow_squid: { ...MCMODELS.squid, tex: 'glow_squid' },
+});
+const AXO_TEX = ['axolotl_lucy', 'axolotl_wild', 'axolotl_gold', 'axolotl_cyan', 'axolotl_blue'];
+MCVTEX.axolotl = e => packTexture(AXO_TEX[e.variant] || AXO_TEX[0]);
+// the variant skin set at spawn has to match whichever model the mob got
+if (MOBDEF.axolotl) { const painted = MOBDEF.axolotl.vtex; MOBDEF.axolotl.vtex = v => PACKPX.ent[AXO_TEX[0]] ? packTexture(AXO_TEX[v] || AXO_TEX[0]) : painted(v); }
+
+// ---------- items mobs hold in their right hand, as in vanilla (bows, crossbows, swords, axes, tridents) ----------
+// The item hangs off the right-arm bone, so it hides with the arm (vindicators only show the axe while fighting).
+const MOB_HELD = { skeleton: 'bow', stray: 'bow', wither_skeleton: 'stone_sword', illusioner: 'bow', pillager: 'crossbow', vindicator: 'iron_axe', vex: 'iron_sword',
+  piglin: e => (e.id % 2 ? 'crossbow' : 'golden_sword'), piglin_brute: 'golden_axe', zombified_piglin: 'golden_sword', drowned: e => e.hasTrident && 'trident' };
+function mobHeldTick() {
+  for (const e of ENT) {
+    if (e.kind !== 'mob' || !e.mesh || e.dead) continue;
+    const h = MOB_HELD[e.type], key = typeof h === 'function' ? h(e) : h;
+    if (!key) continue;
+    const P = e.mesh.userData.parts, arm = P && P.rarm; if (!arm || IID[key] == null) continue;
+    if (!e.heldItem || e.heldItem.parent !== arm) {
+      const m = R.itemMesh(IID[key]), g = new THREE.Group(); g.add(m); m.scale.setScalar(0.62);
+      const bow = key === 'bow';
+      // grip at the bottom of the arm; blades point forward and up, bows stand upright facing out
+      // sprites are drawn diagonally (grip bottom-left): turn them upright, shift the grip into the hand, then lay
+      // blades, axes and crossbows pointing forward and stand bows up beside the arm
+      g.position.set(e.mesh.userData.mc ? 1 / 16 : 0, -10 / 16, -1 / 16);
+      m.rotation.z = Math.PI / 4; m.position.y = 0.18;
+      if (bow) { g.rotation.set(0, Math.PI / 2, 0); m.position.y = 0; }
+      else g.rotation.set(-Math.PI / 2, 0, 0);
+      if (key === 'trident') { m.scale.setScalar(0.9); m.position.y = 0.1; }
+      arm.add(g); e.heldItem = g;
+    }
+    R.setMeshLight(e.heldItem.children[0], lightBright(e.x, e.y + e.h * 0.6, e.z));
+  }
+}
+{ const tick = mcmodels2Tick; mcmodels2Tick = function () { tick(); mobHeldTick(); }; }
 
 </script>
 <script>/* js/villagers.js */

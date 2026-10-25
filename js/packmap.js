@@ -135,6 +135,9 @@ for (const c of ['tropical_a', 'tropical_b']) { ENT[c] = 'entity/fish/' + c; for
 Object.assign(ENT, { witch: 'entity/witch', wandering_trader: 'entity/wandering_trader', snow_golem: 'entity/snow_golem', polar_bear: 'entity/bear/polarbear', turtle: 'entity/turtle/big_sea_turtle',
   dolphin: 'entity/dolphin', phantom: 'entity/phantom', phantom_eyes: 'entity/phantom_eyes', cave_spider: 'entity/spider/cave_spider', red_mooshroom: 'entity/cow/red_mooshroom', brown_mooshroom: 'entity/cow/brown_mooshroom',
   guardian: 'entity/guardian', guardian_elder: 'entity/guardian_elder', wither: 'entity/wither/wither', wither_invulnerable: 'entity/wither/wither_invulnerable', pufferfish: 'entity/fish/pufferfish' });
+// 1.17 mobs (not in Pixel Perfection CE; a vanilla 1.17 jar or newer pack has them)
+Object.assign(ENT, { goat: 'entity/goat/goat', glow_squid: 'entity/squid/glow_squid' });
+for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 'entity/axolotl/axolotl_' + c;
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
