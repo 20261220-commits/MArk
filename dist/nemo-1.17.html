@@ -2457,6 +2457,12 @@ function genChunk(seed, cx, cz, dim, exp) {
   vein(15, 8, uni(0, 15));
   vein(17, 7, tri(16, 16));
   if (biome[8 * 16 + 8] === BIO.MOUNTAINS) for (let i = 3 + R.int(6); i > 0; i--) { const i2 = I(R.int(16), uni(4, 31), R.int(16)); if (blocks[i2] === 1) blocks[i2] = 18; }
+  // infested stone (silverfish) in mountains: 7 veins of up to 9 blocks below y 64, as vanilla (hashed, so other features keep their random rolls)
+  if (biome[8 * 16 + 8] === BIO.MOUNTAINS) for (let v = 0; v < 7; v++) {
+    let x = hash32(seed, cx * 16 + v, cz, 401) & 15, y = hash32(seed, cx, cz * 16 + v, 402) % 64, z = hash32(seed, cx + v, cz, 403) & 15;
+    for (let k = 0; k < 9; k++) { const i2 = I(x, y, z); if (blocks[i2] === 1) blocks[i2] = 1115; else if (blocks[i2] === 76) { blocks[i2] = 1115; meta[i2] = 6; }
+      const d = hash32(seed, v, k, cx * 31 + cz) % 6; x = Math.max(0, Math.min(15, x + (d === 0 ? 1 : d === 1 ? -1 : 0))); y = Math.max(1, Math.min(63, y + (d === 2 ? 1 : d === 3 ? -1 : 0))); z = Math.max(0, Math.min(15, z + (d === 4 ? 1 : d === 5 ? -1 : 0))); }
+  }
   const tiles = [];
   // 4. amethyst geode (1.17)
   if (R.int(24) === 0) {
@@ -2638,6 +2644,12 @@ function genChunk(seed, cx, cz, dim, exp) {
     if (b === BIO.SWAMP && h < SEA && blocks[I(x, SEA, z)] === WATER && blocks[I(x, SEA + 1, z)] === 0 && R() < 0.05) blocks[I(x, SEA + 1, z)] = 221; // lily pads
     if (h + 1 >= CH || blocks[above] !== 0) continue;
     const v = R();
+    // tall grass and large ferns (two blocks tall), chosen by hash so the rolls below stay the same
+    if (top === 2 && h + 2 < CH && !blocks[I(x, h + 2, z)]) {
+      const p = hash32(seed, x0 + x, z0 + z, 405) % 1000, fernB = b === BIO.TAIGA || b === BIO.SNOWY_TAIGA || b === BIO.JUNGLE;
+      const rate = b === BIO.PLAINS || b === BIO.SAVANNA ? 25 : fernB ? 20 : b === BIO.FOREST || b === BIO.BIRCH || b === BIO.FLOWER_FOREST || b === BIO.SWAMP || b === BIO.DARK_FOREST ? 8 : b === BIO.MOUNTAINS ? 4 : 0;
+      if (p < rate) { const id = fernB && p % 3 ? 1111 : 1110; blocks[above] = id; meta[above] = 0; blocks[I(x, h + 2, z)] = id; meta[I(x, h + 2, z)] = 8; continue; }
+    }
     if (top === 2) {
       if (b === BIO.PLAINS) { if (v < 0.22) blocks[above] = 29; else if (v < 0.235) blocks[above] = R() < 0.5 ? 31 : 32; else if (v < 0.245) blocks[above] = R() < 0.5 ? 33 : 34; else if (v < 0.25) { blocks[above] = 199; meta[above] = R.int(7); } else if (v < 0.2503) placePumpkins(x, h, z); }
       else if (b === BIO.JUNGLE) { if (v < 0.25) blocks[above] = R() < 0.5 ? 30 : 29; else if (v < 0.253) blocks[above] = 56; }
