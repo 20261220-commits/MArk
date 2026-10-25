@@ -123,15 +123,18 @@ function heldTransform(id, left, isBlock) {
   M.multiply(t.makeScale(sc, sc, sc));
   return M;
 }
+// what each hand really holds (the off-hand use swaps items for a moment): [main hand, off hand]
+const handItems = () => { const off = typeof offItem === 'function' ? offItem() : INV.off; return [typeof OFF !== 'undefined' && OFF.swapped ? INV.off : PL.held(), off]; };
+const mainRight = () => typeof OPT === 'undefined' || OPT.mainHand !== 'left';
 function updateHeld(m, items, light) {
   const ud = m.userData;
   items.forEach((st, k) => {
-    const id = st ? st.id : 0, key = String(id);
+    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, key = id + (rightArm ? 'r' : 'l');
     if (ud.heldKey[k] !== key) {
       ud.heldKey[k] = key; const old = ud.held[k]; if (old) { old.parent.remove(old); old.userData.item.material.dispose(); } ud.held[k] = null;
       if (id > 0) {
-        const im = R.itemMesh(id), g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, k === 1, im.userData.isBlock)); g.add(im); g.userData.item = im;
-        (k ? ud.parts.larm : ud.parts.rarm).add(g); ud.held[k] = g;
+        const im = R.itemMesh(id), g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, !rightArm, im.userData.isBlock)); g.add(im); g.userData.item = im;
+        (rightArm ? ud.parts.rarm : ud.parts.larm).add(g); ud.held[k] = g;
       }
     }
     if (ud.held[k]) R.setMeshLight(ud.held[k].userData.item, light);
@@ -172,12 +175,12 @@ function posePlayer(m, s) {
   // attack swing
   const p = s.swing;
   if (p > 0) {
-    A.body[1] = Math.sin(Math.sqrt(p) * Math.PI * 2) * 0.2;
+    A.body[1] = Math.sin(Math.sqrt(p) * Math.PI * 2) * 0.2 * (s.swingLeft ? -1 : 1);
     piv.rarm = [-Math.cos(A.body[1]) * 5, ay, Math.sin(A.body[1]) * 5]; piv.larm = [Math.cos(A.body[1]) * 5, ay, -Math.sin(A.body[1]) * 5];
     A.rarm[1] += A.body[1]; A.larm[1] += A.body[1]; A.larm[0] += A.body[1];
     let g = 1 - p; g *= g; g *= g; g = 1 - g;
     const h = Math.sin(g * Math.PI), i = Math.sin(p * Math.PI) * -(A.head[0] - 0.7) * 0.75;
-    A.rarm[0] -= h * 1.2 + i; A.rarm[1] += A.body[1] * 2; A.rarm[2] += Math.sin(p * Math.PI) * -0.4;
+    const sa = A[s.swingLeft ? 'larm' : 'rarm']; sa[0] -= h * 1.2 + i; sa[1] += A.body[1] * 2; sa[2] += Math.sin(p * Math.PI) * -0.4;
   }
   if (s.sneak) {
     A.body[0] = 0.5; A.rarm[0] += 0.4; A.larm[0] += 0.4;
@@ -214,17 +217,18 @@ function placePlayer(m, s, x, y, z) {
 // ---------- per frame: the third-person model ----------
 const PSTATE = { glideT: 0, deadT: 0 };
 function playerPoseInputs(dt) {
-  const h = PL.held(), off = typeof offItem === 'function' ? offItem() : INV.off;
+  const [h, off] = handItems(), swapped = typeof OFF !== 'undefined' && OFF.swapped;
   const use = USE.kind, using = !!use && use !== 'place';
   const kindOf = st => !st ? null : 'item';
-  let right = kindOf(h), left = kindOf(off), two = null;
-  if (using) {
-    if (use === 'bow') two = 'bow'; else if (use === 'crossbow') two = 'xcharge'; else if (use === 'shield') { if (h && h.id === IID.shield) right = 'block'; else left = 'block'; }
-    else if (use === 'trident') right = 'spear'; else if (use === 'spy') right = 'spy';
+  let mainK = kindOf(h), offK = kindOf(off), two = null;
+  if (using) { // the item in use is in the off hand while the off-hand use swaps it in
+    const k = use === 'shield' ? 'block' : use === 'trident' ? 'spear' : use === 'spy' ? 'spy' : null;
+    if (use === 'bow') two = 'bow'; else if (use === 'crossbow') two = 'xcharge'; else if (k) { if (swapped) offK = k; else mainK = k; }
   } else if (h && h.id === IID.crossbow && h.loaded) two = 'xbow';
+  let right = mainRight() ? mainK : offK, left = mainRight() ? offK : mainK;
   if (two === 'xbow' || two === 'bow') { right = left = null; }
   const vx = PL.x - PL.px, vz = PL.z - PL.pz;
-  return { headYaw: 0, headPitch: -PL.pitch, headPitchW: -PL.pitch, yaw: PL.yaw, right, left, two, charge: R.hand.bow || 0, swing: R.hand.swing > 0 ? 1 - R.hand.swing : 0,
+  return { headYaw: 0, headPitch: -PL.pitch, headPitchW: -PL.pitch, yaw: PL.yaw, right, left, two, charge: R.hand.bow || 0, swing: R.hand.swing > 0 ? 1 - R.hand.swing : 0, swingLeft: swapped === mainRight(),
     sneak: PL.sneaking && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
     swim: PL.sprinting && PL.eyeFluid === 1, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
 }
@@ -253,7 +257,7 @@ function updatePlayerModel(dt, x, y, z, visible) {
   posePlayer(m, s); placePlayer(m, s, x, y, z);
   const light = lightBright(x, y + 1, z), hurt = PL.hurtT > 0 || PL.dead;
   for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(new THREE.Color(1, 0.6, 0.6)); }
-  updateArmor(m, light); updateHeld(m, [PL.held(), typeof offItem === 'function' ? offItem() : INV.off], light);
+  updateArmor(m, light); updateHeld(m, handItems(), light);
 }
 
 // ---------- the inventory figure ----------
@@ -278,7 +282,7 @@ function dollRender(el, mx, my) {
   posePlayer(m, s);
   m.position.set(0, 0, 0); m.rotation.set(0, 0, 0, 'YXZ'); m.rotation.y = Math.PI + fx * 20 * DEG; m.rotation.x = 0; // facing the viewer
   for (const mt of m.userData.mats) mt.color.setScalar(1);
-  updateArmor(m, 1); updateHeld(m, [PL.held(), typeof offItem === 'function' ? offItem() : INV.off], 1);
+  updateArmor(m, 1); updateHeld(m, handItems(), 1);
   D.r.render(D.scene, D.cam);
 }
 const DOLL = { mx: innerWidth / 2, my: innerHeight / 2 };

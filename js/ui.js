@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve' };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -257,7 +257,7 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2><p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
@@ -296,6 +296,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'advs') { resumeGame(); UI.openScreen('adv'); }
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
+  else if (a === 'mainhand') { OPT.mainHand = OPT.mainHand === 'left' ? 'right' : 'left'; saveOpt(); R.setHandSkin(); showMenu('options'); }
   else if (a === 'packLoad') pickPackFile();
   else if (a === 'packReset') resetPack();
   else if (a === 'optDone') showMenu(UI.paused ? 'pause' : 'title');

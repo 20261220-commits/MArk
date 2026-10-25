@@ -360,7 +360,7 @@ function frame(now) {
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
   const h = PL.held();
   const hb = OPT.bob ? PL.bobAmt || 0 : 0, bob = PL.bobPrev + (PL.bob - PL.bobPrev) * alpha;
-  R.updateHand(dt, PL.dead ? -1 : (h ? h.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb);
+  { const [mh, oh] = handItems(); R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
