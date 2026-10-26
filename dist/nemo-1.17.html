@@ -16292,6 +16292,10 @@ function mpHandle(m, from) {
     case 'eff': if (!host && EFF[m.k]) addEffect(PL, m.k, m.dur, m.lv); return;
     case 'tile': mpApplyTile(m, from); return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
+    case 'xps': if (!host) mpMirrorXP(m.l); return;
+    case 'xp': if (host) spawnXP(+m.x, +m.y, +m.z, Math.min(2000, +m.v || 0)); return;
+    case 'pickxp': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'xp'); if (e) { removeEnt(e); mpSend({ t: 'givexp', v: e.value }, from); } } return;
+    case 'givexp': if (!host) { addXP(Math.min(2000, +m.v || 0)); play('xp', { vol: 0.3 }); } return;
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
@@ -16343,9 +16347,18 @@ function mpMirrorItems(l) {
   }
   for (const e of ENT) if (e.remote && e.kind === 'item' && !e.dead && !seen.has(e.rid)) removeEnt(e);
 }
+function mpMirrorXP(l) { // the host's experience orbs; walking into one asks the host for its points
+  const seen = new Set();
+  for (const [id, v, x, y, z] of l) {
+    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'xp');
+    if (!e) { const n0 = ENT.length; MP.allowSpawn = true; try { spawnXP(x, y, z, v); } finally { MP.allowSpawn = false; } e = ENT.slice(n0).find(q => q.kind === 'xp'); if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
+    e.tx = x; e.ty = y; e.tz = z;
+  }
+  for (const e of ENT) if (e.remote && e.kind === 'xp' && !e.dead && !seen.has(e.rid)) removeEnt(e);
+}
 function mpPuppetItem(e) {
   if (e.tx == null) return; e.x += (e.tx - e.x) * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += (e.tz - e.z) * 0.5;
-  if (!e.asked && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.2 && Math.abs(PL.z - e.z) < 1.2 && e.y > PL.y - 0.6 && e.y < PL.y + 2) { e.asked = true; mpSend({ t: 'pick', e: e.rid }); setTimeout(() => { e.asked = false; }, 1500); }
+  if (!e.asked && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.2 && Math.abs(PL.z - e.z) < 1.2 && e.y > PL.y - 0.6 && e.y < PL.y + 2) { e.asked = true; mpSend({ t: e.kind === 'xp' ? 'pickxp' : 'pick', e: e.rid }); setTimeout(() => { e.asked = false; }, 1500); }
 }
 // blocks: the player who did it sends it; the host applies guests' changes and passes them on
 // the host runs the whole world (fluids, crops, redstone, fire, mobs) and sends every change, batched once a tick;
@@ -16430,6 +16443,15 @@ function mpTick() {
     randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
     if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
   }
+  // experience orbs fly to the nearest player, guests included, and a guest gets the points on touching one
+  if (here.length) for (const e of ENT) {
+    if (e.dead || e.kind !== 'xp' || e.remote) continue;
+    const dh = Math.hypot(PL.x - e.x, PL.y + 0.8 - e.y, PL.z - e.z); let g = null, gd = 8;
+    for (const p of here) { const d = Math.hypot(p.s.x - e.x, p.s.y + 0.8 - e.y, p.s.z - e.z); if (d < gd && d < dh) { gd = d; g = p; } }
+    if (!g) continue;
+    if (gd < 1) { removeEnt(e); mpSend({ t: 'givexp', v: e.value }, g.id); continue; }
+    const f = (1 - gd / 8) ** 2 * 0.1; e.vx += (g.s.x - e.x) / gd * f; e.vy += (g.s.y + 0.8 - e.y) / gd * f; e.vz += (g.s.z - e.z) / gd * f;
+  }
   // containers that change by themselves (furnaces, brewing stands, campfires) near guests: sent when they change
   if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
     if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
@@ -16444,6 +16466,8 @@ function mpTick() {
     mpSend({ t: 'mobs', l }, p.id);
     const it = []; for (const e of ENT) { if (e.dead || e.kind !== 'item' || e.remote || Math.abs(e.x - p.s.x) > 32 || Math.abs(e.z - p.s.z) > 32) continue; if (!e.mpid) e.mpid = MP.eid++; it.push([e.mpid, { id: e.stack.id, n: e.stack.n, d: e.stack.d, e: e.stack.e }, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
     mpSend({ t: 'items', l: it }, p.id);
+    const xo = []; for (const e of ENT) { if (e.dead || e.kind !== 'xp' || e.remote || Math.abs(e.x - p.s.x) > 24 || Math.abs(e.z - p.s.z) > 24) continue; if (!e.mpid) e.mpid = MP.eid++; xo.push([e.mpid, e.value, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
+    mpSend({ t: 'xps', l: xo }, p.id);
   }
 }
 // guests: the host's mobs as puppets that move where the host says
@@ -16545,6 +16569,7 @@ function mpInstall() {
   const di = dropItem; dropItem = function (x, y, z, id, n, vel, delay, dur, extra) { // a guest's drops become the host's items, so everyone sees (and can take) them
     if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (!n || ITEMS[id] == null) return null; const st = extra ? { ...extra, id, n } : { id, n }; if (dur != null) st.d = dur; mpSend({ t: 'drop', x, y, z, st, vel: vel || null, delay: delay == null ? 10 : delay }); return null; }
     return di.apply(this, arguments); };
+  const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpSend({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
   const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z); };
   const ol = W.onChunkLoaded; W.onChunkLoaded = (c, fresh) => { if (ol) ol(c, fresh); if (MP.on) mpChunkLoaded(c); };
 }
