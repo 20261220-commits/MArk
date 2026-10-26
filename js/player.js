@@ -154,6 +154,17 @@ function damageItem(arr, i, n = 1) {
 // ---------- movement ----------
 function blockUnder() { return getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.2), Math.floor(PL.z)); }
 function inBlock(f) { return boxBlocks(PL, f); }
+// poses (Java's EntityPose): standing 1.8 tall, crouching 1.5 (fits under a 1.5-block gap), swimming / crawling 0.6;
+// a pose the space can't hold is forced down to the next one, as when crawling out from under a trapdoor
+function roomFor(h, x = PL.x, y = PL.y, z = PL.z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y + 1e-4 && BX[i + 1] < y + h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
+const POSE_H = { stand: 1.8, crouch: 1.5, swim: 0.6 }, POSE_EYE = { stand: 1.62, crouch: 1.27, swim: 0.4 };
+function updatePose(inWater, eyeF, spec) {
+  PL.swimming = !spec && !PL.flying && PL.sprinting && inWater && eyeF === 1 || (PL.swimming && inWater && PL.sprinting); // sprinting under water: swim
+  let pose = PL.swimming || PL.gliding ? 'swim' : PL.sneaking ? 'crouch' : 'stand';
+  if (!spec && !PL.flying && !PL.sleeping) { if (pose === 'stand' && !roomFor(1.8)) pose = roomFor(1.5) ? 'crouch' : 'swim'; else if (pose === 'crouch' && !roomFor(1.5)) pose = 'swim'; }
+  PL.pose = pose; PL.h = POSE_H[pose];
+  return pose;
+}
 function noCollision(x, y, z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + PL.h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y && BX[i + 1] < y + PL.h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
 function playerTick() {
   advTick();
@@ -177,7 +188,8 @@ function playerTick() {
   const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
   if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
-  if (PL.sneaking) { f *= 0.3; s *= 0.3; }
+  const pose = updatePose(inWater, eyeF, spec);
+  if (PL.sneaking || (pose === 'crouch') || (pose === 'swim' && !inWater && !PL.gliding)) { f *= 0.3; s *= 0.3; } // crouching or crawling: slow
   if (using) { f *= 0.2; s *= 0.2; }
   const canSprint = (PL.food > 6 || creative()) && !PL.sneaking && !using && f > 0.8 && !web;
   if ((IN.sprintKey || IN.wTap) && canSprint) PL.sprinting = true;
@@ -197,6 +209,7 @@ function playerTick() {
   } else if (inWater || inLava) {
     const ds = inWater ? enchLv(INV.armor[3], 'depth_strider') : 0;
     accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1) * (1 + ds * 0.6));
+    if (PL.swimming) { const d = Math.sin(PL.pitch); if (d <= 0 || IN.jump || fluidAt(PL.x, PL.y + 0.9, PL.z)) PL.vy += (d - PL.vy) * (d < -0.2 ? 0.085 : 0.06); } // swimming goes where you look (PlayerEntity.travel)
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
     const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
@@ -206,7 +219,7 @@ function playerTick() {
   } else {
     const slipB = blockUnder(), sl = BLOCKS[slipB] && BLOCKS[slipB].slip, slip = PL.onGround ? (sl === 2 ? 0.989 : sl ? 0.98 : 0.6) : 1;
     const fr = slip * 0.91;
-    accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
+    accel(PL.onGround ? sp * (0.21600002 / (slip * slip * slip)) : (PL.sprinting ? 0.026 : 0.02)); // LivingEntity.getMovementSpeed: the block's slipperiness cubed (not the friction): walking 4.317 m/s
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (scaf) { if (IN.jump) PL.vy = 0.2; else if (PL.sneaking) PL.vy = -0.15; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
@@ -252,7 +265,7 @@ function playerTick() {
   if (PL.onGround && !inWater) { PL.bob += moved; PL.stepDist += moved; if (PL.stepDist > 1.7) { PL.stepDist = 0; const b = blockUnder(); if (b) play('step', { mat: soundMat(b), vol: PL.sneaking ? 0.3 : 0.8 }); } }
   if (PL.sprinting && PL.onGround) PL.exh += moved * 0.1; else if (inWater) PL.exh += moved * 0.01;
   // eye height (sneak)
-  const targetEye = PL.sneaking ? 1.27 : 1.62; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
+  const targetEye = POSE_EYE[PL.pose || 'stand']; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();

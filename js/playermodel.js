@@ -118,7 +118,7 @@ function heldTransform(id, left, isBlock) {
   const s = left ? -1 : 1, M = new THREE.Matrix4(), t = new THREE.Matrix4();
   M.copy(FLIP3).multiply(t.makeRotationX(-90 * DEG)).multiply(t.makeRotationY(180 * DEG)).multiply(t.makeTranslation(s / 16, 0.125, -0.625));
   // display: block [75,45,0] [0,2.5,0] 0.375 · handheld [0,-90,55] [0,4,0.5] 0.85 · generated [0,0,0] [0,3,1] 0.55
-  const [rot, tr, sc] = isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55];
+  const [rot, tr, sc] = id === IID.shield ? [[0, 90, 0], left ? [10, 6, 12] : [10, 6, -4], 1] : isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55]; // shield.json thirdperson_*hand
   M.multiply(t.makeTranslation(s * tr[0] / 16, tr[1] / 16, tr[2] / 16));
   M.multiply(t.makeRotationFromEuler(new THREE.Euler(rot[0] * DEG, s * rot[1] * DEG, s * rot[2] * DEG, 'XYZ')));
   M.multiply(t.makeScale(sc, sc, sc));
@@ -230,8 +230,8 @@ function playerPoseInputs(dt) {
   if (two === 'xbow' || two === 'bow') { right = left = null; }
   const vx = PL.x - PL.px, vz = PL.z - PL.pz;
   return { headYaw: 0, headPitch: -PL.pitch, headPitchW: -PL.pitch, yaw: PL.yaw, right, left, two, charge: R.hand.bow || 0, swing: R.hand.swing > 0 ? 1 - R.hand.swing : 0, swingLeft: swapped === mainRight(),
-    sneak: PL.sneaking && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
-    swim: PL.sprinting && PL.eyeFluid === 1, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
+    sneak: (PL.sneaking || PL.pose === 'crouch') && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
+    swim: PL.pose === 'swim' && !PL.gliding, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
 }
 function tickBodyYaw(st, s, moveX, moveZ, dtT) {
   const d2 = moveX * moveX + moveZ * moveZ;

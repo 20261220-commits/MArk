@@ -321,7 +321,19 @@ const itemBlockMatBase = new THREE.ShaderMaterial({
 itemBlockMatBase.uniforms.map.value = atlasTex;
 const itemSpriteMatBase = new THREE.MeshBasicMaterial({ vertexColors: true });
 function blockMaterial() { const m = itemBlockMatBase.clone(); m.uniforms.map.value = atlasTex; return m; }
+// the shield is a 3D model in Java (ShieldEntityModel: a 12x22x1 plate and a handle, drawn by the builtin item renderer
+// with scale(1,-1,-1) from the item's corner), wearing entity/shield_base_nopattern
+let shieldGeo = null, shieldTex = null;
+function shieldMesh() {
+  if (!shieldGeo) { const g = mergeGeos([boxGeo(12, 22, 1, 0, 0, -6, -11, -2, 0, 64, 64), boxGeo(2, 6, 6, 26, 0, -1, -3, -1, 0, 64, 64)]);
+    g.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, -1)); g.applyMatrix4(new THREE.Matrix4().makeTranslation(-0.5, -0.5, -0.5)); g.deleteAttribute('skinIndex'); g.deleteAttribute('skinWeight'); shieldGeo = g; }
+  if (!shieldTex) shieldTex = packTexture('shield_nopattern') || pixelTex(64, 64, g => { g.fillStyle = '#9c7b47'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 14, 1); });
+  const m = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ map: shieldTex, alphaTest: 0.1, vertexColors: !!shieldGeo.attributes.color }));
+  m.userData.isBlock = false; m.userData.shield = true; return m;
+}
+R.shieldMesh = shieldMesh;
 function itemMesh(id) {
+  if (id === IID.shield && typeof boxGeo === 'function') return shieldMesh();
   const d = ITEMS[id];
   const isBlock = d && d.block && !d.sprite;
   const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), isBlock ? blockMaterial() : itemSpriteMatBase.clone());
@@ -447,7 +459,8 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
         hY(f * (45 + Math.sin(p * p * PI) * -20)); const g = Math.sin(sp * PI); hZ(f * g * -20); hX(g * -80); hY(f * -45);
       }
       // the item model's first-person display transform, mirrored for the left hand like Transformation.apply(leftHanded)
-      if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
+      if (H.mesh.userData.shield) { const L = f < 0; hT(f * (L ? 10 : -10) / 16, (L ? 0 : 2) / 16, -10 / 16); hY(f * 180); hZ(f * 5); hmul(HT.makeScale(1.25, 1.25, 1.25)); } // shield.json firstperson_*hand
+      else if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
       else { hT(f * 1.13 / 16, 3.2 / 16, 1.13 / 16); hY(f * -90); hZ(f * 25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
       H.mesh.matrix.identity();
     }
