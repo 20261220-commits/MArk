@@ -818,7 +818,8 @@ function makeGen(seed) {
     const cont = nC.fbm(wx / 900, wz / 900, 4) * 1.6 + 0.12;
     const land = smooth(-0.22, 0.02, cont);
     const mRaw = nM.fbm(wx / 420, wz / 420, 3);
-    const mount = smooth(0.12, 0.5, mRaw) * smooth(0.0, 0.25, cont);
+    const temp = nT.fbm(wx / 1100, wz / 1100, 3) * 1.6 + nX.n2(wx / 40, wz / 40) * 0.04;
+    const mount = smooth(0.12, 0.5, mRaw) * smooth(0.0, 0.25, cont) * (1 - smooth(0.2, 0.44, temp)); // mountains belong to temperate and cold climates, never beside deserts (Java's climate groups)
     const ridge = 1 - Math.abs(nM.n2(wx / 160, wz / 160));
     const hills = nD.fbm(wx / 130, wz / 130, 4);
     const detail = nD.n2(wx / 28, wz / 28);
@@ -832,7 +833,6 @@ function makeGen(seed) {
     const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.05 ? smooth(0.5, 0.62, mush) : 0;
     if (mk > 0) h = h + (SEA + 3 + hills * 4 - h) * mk;
     h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
-    const temp = nT.fbm(wx / 1100, wz / 1100, 3) * 1.6 + nX.n2(wx / 40, wz / 40) * 0.04;
     const hum = nH.fbm(wx / 900, wz / 900, 3) * 1.6;
     let b;
     if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.32 ? BIO.WARM_OCEAN : temp > 0.12 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
@@ -2203,7 +2203,13 @@ function genEnd(seed, cx, cz) {
   // end cities: a purpur tower with shulkers and a floating ship carrying elytra
   const ECR = 20, erx = Math.floor(cx / ECR), erz = Math.floor(cz / ECR);
   for (let a = erx - 1; a <= erx + 1; a++) for (let b = erz - 1; b <= erz + 1; b++) {
-    const c = endCityAt(seed, a, b, nA, nB); if (!c || !st.inside(c.x - 6, c.z - 6, c.x + 26, c.z + 6)) continue;
+    const c = endCityAt(seed, a, b, nA, nB); if (!c) continue;
+    if (STRUCTS && STRUCTS.t['end_city/base_floor']) { // the real pieces: grown by EndCityGenerator around the start
+      const ps = assembleEndCity(seed, c.x, c.y, c.z, rng(hash32(seed, a, b, 64)).int(4)), R = rng(hash32(seed, cx, cz, 65));
+      for (const p of ps) if (st.inside(p.box[0], p.box[2], p.box[3], p.box[5])) stampPiece(st, null, p, tiles, null, R, x0, z0);
+      continue;
+    }
+    if (!st.inside(c.x - 6, c.z - 6, c.x + 26, c.z + 6)) continue;
     stampEndCity(c, st, rng(hash32(seed, a, b, 62)), tiles);
   }
   // obsidian pillars with crystals (and iron-bar cages on the two smallest)
@@ -3356,11 +3362,12 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
       if (!d) for (let y = p.oy; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) st(wx, y, wz, 0, 0); }
     }
   }
+  let later = null;
   for (let k = 0; k < n; k += 4) {
     const [dx, dz] = XZ(bl[k], bl[k + 2]), wx = p.ox + dx, wz = p.oz + dz;
     if (wx < x0 || wx > x0 + 15 || wz < z0 || wz > z0 + 15) continue;
     let s = t.p[bl[k + 3]]; const nd = t.n[k >> 2];
-    if (nd && nd.data) { dataMarker(nd.data, wx, p.rigid ? p.oy + bl[k + 1] : H(wx, wz) + bl[k + 1], wz, p, tiles, R, st); continue; }
+    if (nd && nd.data) { (later || (later = [])).push([nd.data, wx, p.rigid ? p.oy + bl[k + 1] : H(wx, wz) + bl[k + 1], wz]); continue; } // after the blocks: chests sit under their markers
     if (nd && nd.j) s = nd.fin;
     if (proc) s = proc(s, wx, bl[k + 1], wz, R, p); if (!s) continue;
     let name = s.split('[')[0];
@@ -3373,6 +3380,7 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
     if (nd && nd.loot && st.get(wx, wy, wz) >= 0) tiles.push({ t: 'chest', i: tl(wx, wy, wz), loot: rollVanillaLoot(R, nd.loot) });
     if (v[0] === BID.red_bed && (v[1] & 4) === 0) { /* beds: the foot claims a villager */ }
   }
+  if (later) for (const [d, x, y, z] of later) dataMarker(d, x, y, z, p, tiles, R, st);
   for (const [ex, ey, ez, id] of t.e) {
     const [dx, dz] = XZ(Math.floor(ex), Math.floor(ez)), wx = p.ox + dx, wz = p.oz + dz;
     if (wx < x0 || wx > x0 + 15 || wz < z0 || wz > z0 + 15) continue;
@@ -3433,7 +3441,7 @@ function rollVanillaLoot(R, name) {
   }
   return out;
 }
-const LOOT_FALLBACK = name => /village/.test(name) ? (/smith|armorer|toolsmith|weaponsmith/.test(name) ? 'smith' : 'house') : /bastion_treasure/.test(name) ? 'bastion_treasure' : /bastion/.test(name) ? 'bastion' : /pillager_outpost/.test(name) ? 'outpost' : /igloo/.test(name) ? 'igloo' : /shipwreck_supply/.test(name) ? 'ship_supply' : /shipwreck_map/.test(name) ? 'ship_map' : /shipwreck_treasure/.test(name) ? 'ship_treasure' : /underwater_ruin_big/.test(name) ? 'ruin_big' : /underwater_ruin/.test(name) ? 'ruin_small' : /ruined_portal/.test(name) ? 'ruined_portal' : null;
+const LOOT_FALLBACK = name => /village/.test(name) ? (/smith|armorer|toolsmith|weaponsmith/.test(name) ? 'smith' : 'house') : /bastion_treasure/.test(name) ? 'bastion_treasure' : /bastion/.test(name) ? 'bastion' : /pillager_outpost/.test(name) ? 'outpost' : /igloo/.test(name) ? 'igloo' : /shipwreck_supply/.test(name) ? 'ship_supply' : /shipwreck_map/.test(name) ? 'ship_map' : /shipwreck_treasure/.test(name) ? 'ship_treasure' : /underwater_ruin_big/.test(name) ? 'ruin_big' : /underwater_ruin/.test(name) ? 'ruin_small' : /ruined_portal/.test(name) ? 'ruined_portal' : /end_city/.test(name) ? 'end_city' : null;
 // processors: what Java's processor lists do to the real pieces (mossy stone, crop mixes, zombie village decay, bastion cracks)
 function villageProc(type, zombie) {
   return (s, x, y, z, R, p) => {
@@ -3465,17 +3473,72 @@ function stampSingle(st, path, ox, oy, oz, rot, tiles, R, opts = {}) {
   stampPiece(st, null, p, tiles, opts.proc || null, R, st.x0, st.z0);
   return true;
 }
+// EndCityGenerator: towers, bridges, fat towers and (once) the ship, each part kept only if it doesn't run into another chain
+const ROT_V = (x, y, z, r) => r === 0 ? [x, y, z] : r === 1 ? [-z, y, x] : r === 2 ? [-x, y, -z] : [z, y, -x];
+const EC_SMALL_BRIDGES = [[0, [1, -1, 0]], [1, [6, -1, 1]], [3, [0, -1, 5]], [2, [5, -1, 6]]], EC_FAT_BRIDGES = [[0, [4, -1, 0]], [1, [12, -1, 4]], [3, [0, -1, 8]], [2, [8, -1, 12]]];
+function assembleEndCity(seed, x, y, z, rot) {
+  const key = 'ec:' + seed + ':' + x + ',' + z; let res = JIG_CACHE.get(key); if (res) return res;
+  const R = rng(hash32(seed, x, z, 641)), pieces = [], gen = { ship: false };
+  const make = (path, ox, oy, oz, r, air) => { const t = STRUCTS.t['end_city/' + path]; return t ? { path: 'end_city/' + path, t, rot: r, ox, oy, oz, rigid: true, ignoreAir: !air, box: tplBox(t, r, ox, oy, oz), chain: 0 } : null; };
+  const child = (list, par, off, path, r, air) => { const [dx, dy, dz] = ROT_V(off[0], off[1], off[2], par.rot), c = make(path, par.ox + dx, par.oy + dy, par.oz + dz, r === undefined ? par.rot : r, air); if (c) list.push(c); return c || par; };
+  const hit = (a, b) => a[0] <= b[3] && a[3] >= b[0] && a[1] <= b[4] && a[4] >= b[1] && a[2] <= b[5] && a[5] >= b[2];
+  const part = (fn, depth, par, off, target) => { // createPart: nested parts are checked against (and join) their caller's list
+    if (depth > 8) return false; const list = [];
+    if (!fn(depth, par, off, list)) return false;
+    const chain = R.int(1 << 30);
+    for (const p of list) { p.chain = chain; const o = target.find(q => hit(q.box, p.box)); if (o && o.chain !== par.chain) return false; }
+    target.push(...list); return true;
+  };
+  const TOWER = (depth, par, off, L) => {
+    let p = child(L, par, [3 + R.int(2), -3, 3 + R.int(2)], 'tower_base', undefined, true); p = child(L, p, [0, 7, 0], 'tower_piece', undefined, true);
+    let holder = R.int(3) === 0 ? p : null; const n = 1 + R.int(3);
+    for (let k = 0; k < n; k++) { p = child(L, p, [0, 4, 0], 'tower_piece', undefined, true); if (k < n - 1 && R() < 0.5) holder = p; }
+    if (holder) { for (const [r, o] of EC_SMALL_BRIDGES) if (R() < 0.5) { const b = child(L, holder, o, 'bridge_end', (par.rot + r) & 3, true); part(BRIDGE, depth + 1, b, null, L); } child(L, p, [-1, 4, -1], 'tower_top', undefined, true); }
+    else { if (depth !== 7) return part(FAT, depth + 1, p, null, L); child(L, p, [-1, 4, -1], 'tower_top', undefined, true); }
+    return true;
+  };
+  const BRIDGE = (depth, par, off, L) => {
+    const n = R.int(4) + 1; let p = child(L, par, [0, 0, -4], 'bridge_piece', undefined, true), j = 0;
+    for (let k = 0; k < n; k++) { if (R() < 0.5) { p = child(L, p, [0, j, -4], 'bridge_piece', undefined, true); j = 0; } else { p = R() < 0.5 ? child(L, p, [0, j, -4], 'bridge_steep_stairs', undefined, true) : child(L, p, [0, j, -8], 'bridge_gentle_stairs', undefined, true); j = 4; } }
+    if (!gen.ship && R.int(10 - depth) === 0) { child(L, p, [-8 + R.int(8), j, -70 + R.int(10)], 'ship', undefined, true); gen.ship = true; }
+    else if (!part(BUILDING, depth + 1, p, [-3, j + 1, -11], L)) return false;
+    child(L, p, [4, j, 0], 'bridge_end', (p.rot + 2) & 3, true);
+    return true;
+  };
+  const BUILDING = (depth, par, off, L) => {
+    if (depth > 8) return false;
+    let p = child(L, par, off, 'base_floor', undefined, true); const i = R.int(3);
+    if (i === 0) child(L, p, [-1, 4, -1], 'base_roof', undefined, true);
+    else if (i === 1) { p = child(L, p, [-1, 0, -1], 'second_floor_2', undefined, false); p = child(L, p, [-1, 8, -1], 'second_roof', undefined, false); part(TOWER, depth + 1, p, null, L); }
+    else { p = child(L, p, [-1, 0, -1], 'second_floor_2', undefined, false); p = child(L, p, [-1, 4, -1], 'third_floor_2', undefined, false); p = child(L, p, [-1, 8, -1], 'third_roof', undefined, true); part(TOWER, depth + 1, p, null, L); }
+    return true;
+  };
+  const FAT = (depth, par, off, L) => {
+    let p = child(L, par, [-3, 4, -3], 'fat_tower_base', undefined, true); p = child(L, p, [0, 4, 0], 'fat_tower_middle', undefined, true);
+    for (let i = 0; i < 2 && R.int(3) !== 0; i++) { p = child(L, p, [0, 8, 0], 'fat_tower_middle', undefined, true); for (const [r, o] of EC_FAT_BRIDGES) if (R() < 0.5) { const b = child(L, p, o, 'bridge_end', (par.rot + r) & 3, true); part(BRIDGE, depth + 1, b, null, L); } }
+    child(L, p, [-2, 8, -2], 'fat_tower_top', undefined, true);
+    return true;
+  };
+  let p = make('base_floor', x, y, z, rot, true); if (!p) { JIG_CACHE.set(key, []); return []; }
+  pieces.push(p);
+  for (const [o, path, air] of [[[-1, 0, -1], 'second_floor_1', false], [[-1, 4, -1], 'third_floor_1', false], [[-1, 8, -1], 'third_roof', true]]) { const l = []; p = child(l, p, o, path, undefined, air); pieces.push(...l); }
+  part(TOWER, 1, p, null, pieces);
+  JIG_CACHE.set(key, pieces); return pieces;
+}
 // data markers in structure files: the chest sits under the marker; drowned / elder guardians spawn there
 function dataMarker(d, x, y, z, p, tiles, R, st) {
   const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
   const LT = { chest: p.markerLoot || null, supply_chest: 'chests/shipwreck_supply', map_chest: 'chests/shipwreck_map', treasure_chest: 'chests/shipwreck_treasure' };
   if (d in LT && LT[d]) { const cy = y - 1; if (st.get(x, cy, z) === BID.chest || st.get(x, cy, z) === BID.trapped_chest) tiles.push({ t: 'chest', i: tl(x, cy, z), loot: rollVanillaLoot(R, LT[d]) }); st(x, y, z, 0, 0); return; }
   if (d === 'drowned') { st(x, y, z, 0, 0); tiles.push({ t: 'mob', i: tl(x, y, z), mob: 'drowned' }); return; }
+  if (d === 'Chest') { const cy = y - 1; st(x, y, z, 0, 0); if (st.get(x, cy, z) === BID.chest) tiles.push({ t: 'chest', i: tl(x, cy, z), loot: rollVanillaLoot(R, 'chests/end_city_treasure') }); return; }
+  if (d === 'Sentry') { st(x, y, z, 0, 0); tiles.push({ t: 'mob', i: tl(x, y, z), mob: 'shulker' }); return; }
+  if (d === 'Elytra') { st(x, y, z, 0, 0); tiles.push({ t: 'mob', i: tl(x, y, z), frame: 1, f: [3, 4, 2, 5][p.rot] /* rotation.rotate(SOUTH) */, item: 'elytra' }); return; }
   st(x, y, z, 0, 0);
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

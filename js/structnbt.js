@@ -53,7 +53,7 @@ function compactStructure(nbt) {
   const e = (nbt.entities || []).map(en => [en.pos[0], en.pos[1], en.pos[2], ((en.nbt && en.nbt.id) || '').replace('minecraft:', '')]);
   return { s: nbt.size, p: pal, b, n, e };
 }
-const STRUCT_DIRS = ['village/', 'pillager_outpost/', 'bastion/', 'igloo/', 'shipwreck/', 'underwater_ruin/', 'ruined_portal/', 'fossil/', 'nether_fossils/'];
+const STRUCT_DIRS = ['village/', 'pillager_outpost/', 'bastion/', 'igloo/', 'shipwreck/', 'underwater_ruin/', 'ruined_portal/', 'fossil/', 'nether_fossils/', 'end_city/', 'woodland_mansion/'];
 // zip index -> { path: compact structure } for the structures the generator knows how to use
 function extractStructures(files, progress) {
   const root = Object.keys(files).find(k => k.includes('data/minecraft/structures/')); if (!root) return null;
