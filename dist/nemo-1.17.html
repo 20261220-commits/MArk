@@ -214,6 +214,20 @@ kbd{font:inherit;background:#333;border:var(--px) solid #000;box-shadow:inset 0 
 #tPause{top:calc(8px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:44px;height:40px}
 #tChat{top:calc(8px + env(safe-area-inset-top,0px));right:calc(60px + env(safe-area-inset-right,0px));width:44px;height:40px}
 body.touch #bottom{bottom:calc(4px + env(safe-area-inset-bottom,0px))}
+body.vicons #bars img{width:calc(9 * var(--px));height:calc(9 * var(--px))}
+body.vicons #bars>div{gap:0;min-height:calc(9 * var(--px))}
+body.vicons #bars>div>img{margin-right:calc(-1 * var(--px))}
+body.vicons #cross{width:calc(15 * var(--px));height:calc(15 * var(--px));background:var(--g-cross) 0 0/100% 100%;image-rendering:pixelated}
+body.vicons #cross::before,body.vicons #cross::after{display:none}
+body.vicons #xpbar{width:calc(182 * var(--px));height:calc(5 * var(--px));border:0;background:var(--g-xpbg) 0 0/100% 100%;image-rendering:pixelated;margin-left:auto;margin-right:auto}
+body.vicons #xpbar>i{background:var(--g-xp) 0 0/calc(182 * var(--px)) 100%;image-rendering:pixelated}
+body.vwidgets #hotbar{width:calc(180 * var(--px));height:calc(20 * var(--px));border:0;box-shadow:none;background:var(--g-hotbar) 0 0/100% 100%;image-rendering:pixelated}
+body.vwidgets .hs{border-right:0}
+body.vwidgets #hsel{width:calc(24 * var(--px));height:calc(22 * var(--px));border:0;box-shadow:none;background:var(--g-sel) 0 0/100% 100%;image-rendering:pixelated}
+body.vwidgets #offslot{width:calc(29 * var(--px));height:calc(24 * var(--px));box-sizing:border-box;padding:calc(4 * var(--px)) 0 0 calc(3 * var(--px));place-items:start;border:0;box-shadow:none;background:var(--g-offl) 0 0/100% 100%;image-rendering:pixelated;left:calc(-30 * var(--px));top:calc(-2 * var(--px))}
+body.vwidgets #offslot.right{background-image:var(--g-offr);padding-left:calc(10 * var(--px));left:auto;right:calc(-30 * var(--px))}
+body.vglint .glint{background:var(--g-glint) 0 0/calc(32 * var(--px)) calc(32 * var(--px)) repeat;opacity:.8;animation:glint2 4s linear infinite}
+@keyframes glint2{to{background-position:calc(32 * var(--px)) calc(-32 * var(--px))}}
 </style>
 </head>
 <body>
@@ -3852,7 +3866,7 @@ function toGray(px, mean) {
 }
 const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
-const ITEM = {};
+const ITEM = { enchanted_golden_apple: 'item/golden_apple' };
 for (const k of ('stick coal charcoal iron_ingot gold_ingot iron_nugget gold_nugget diamond emerald lapis_lazuli redstone flint flint_and_steel string feather gunpowder bone ' +
   'bone_meal arrow bow leather wheat_seeds wheat bread apple golden_apple porkchop cooked_porkchop beef cooked_beef chicken cooked_chicken mutton cooked_mutton ' +
   'rotten_flesh melon_slice mushroom_stew bowl sugar paper book bucket water_bucket lava_bucket milk_bucket snowball clay_ball brick shears egg saddle name_tag ink_sac ' +
@@ -3934,6 +3948,25 @@ for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
+// the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
+Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
+  env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
+  pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
+  banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
+  conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book' });
+for (const n of ['kebab', 'aztec', 'alban', 'aztec2', 'bomb', 'plant', 'wasteland', 'pool', 'courbet', 'sea', 'sunset', 'creebet', 'wanderer', 'graham', 'match', 'bust', 'stage', 'void',
+  'skull_and_roses', 'wither', 'fighters', 'skeleton', 'donkey_kong', 'pointer', 'pigscene', 'burning_skull', 'back']) ENT['painting_' + n] = 'painting/' + n;
+for (const n of ['base', 'border', 'bricks', 'circle', 'creeper', 'cross', 'curly_border', 'diagonal_left', 'diagonal_right', 'diagonal_up_left', 'diagonal_up_right', 'flower', 'globe', 'gradient',
+  'gradient_up', 'half_horizontal', 'half_horizontal_bottom', 'half_vertical', 'half_vertical_right', 'mojang', 'piglin', 'rhombus', 'skull', 'small_stripes', 'square_bottom_left', 'square_bottom_right',
+  'square_top_left', 'square_top_right', 'straight_cross', 'stripe_bottom', 'stripe_center', 'stripe_downleft', 'stripe_downright', 'stripe_left', 'stripe_middle', 'stripe_right', 'stripe_top',
+  'triangle_bottom', 'triangle_top', 'triangles_bottom', 'triangles_top']) ENT['banner_' + n] = 'entity/banner/' + n;
+for (const n of ['absorption', 'bad_omen', 'blindness', 'conduit_power', 'dolphins_grace', 'fire_resistance', 'glowing', 'haste', 'health_boost', 'hero_of_the_village', 'hunger', 'invisibility',
+  'jump_boost', 'levitation', 'luck', 'mining_fatigue', 'nausea', 'night_vision', 'poison', 'regeneration', 'resistance', 'saturation', 'slow_falling', 'slowness', 'speed', 'strength', 'unluck',
+  'water_breathing', 'weakness', 'wither', 'instant_health', 'instant_damage']) ENT['effect_' + n] = 'mob_effect/' + n;
+for (const n of ['angry', 'bubble', 'bubble_pop_0', 'critical_hit', 'damage', 'drip_fall', 'drip_hang', 'drip_land', 'effect_0', 'enchanted_hit', 'explosion_0', 'flame', 'glint', 'glitter_0', 'glow', 'heart',
+  'lava', 'note', 'soul_fire_flame', 'spark_0', 'spell_0', 'splash_0', 'generic_0', 'generic_1', 'generic_2', 'generic_3', 'generic_4', 'generic_5', 'generic_6', 'generic_7', 'big_smoke_0', 'big_smoke_4',
+  'snowflake', 'spit', 'nautilus', 'witch', 'flash']) ENT['particle_' + n] = 'particle/' + n;
+for (const [n, k] of [['generic', 8], ['splash', 4], ['effect', 8], ['spell', 8], ['explosion', 16], ['spark', 8], ['big_smoke', 12], ['sweep', 8]]) for (let i = 0; i < k; i++) ENT['particle_' + n + '_' + i] = 'particle/' + n + '_' + i;
 // tiles not in TILE are looked up under their own name (or these vanilla 1.17 names); files renamed in 1.17
 const TILE_117 = { pointed_dripstone: 'pointed_dripstone_down_tip', small_dripleaf: 'small_dripleaf_stem_bottom', sculk_sensor_tendril: 'sculk_sensor_tendril_inactive' };
 const ENT_ALT = { 'entity/squid': 'entity/squid/squid' };
@@ -4006,6 +4039,21 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       const rot = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + y) * W + sx + x) * 4, d = (y * 16 + x) * 4; for (let c = 0; c < 4; c++) t[d + c] = P[s + c]; } return t; };
       const side = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = ((6 + x) * W + r) * 4, d = ((3 + r) * 16 + x) * 4; for (let k = 0; k < 4; k++) side[d + k] = P[s + k]; side[d + 3] = 255; }
       out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28)); out.tiles['bed_side' + sfx] = put(side);
+    }
+  }
+  { // tiles Java draws from entity / particle / item textures: nearest-neighbour scaled into 16x16
+    const region = (name, f, bw, x, y, w, h) => {
+      if (out.tiles[name] != null) return; const img = load(f); if (!img) return; const k = img.w / bw, t = new Uint8Array(16 * 16 * 4);
+      for (let ty = 0; ty < 16; ty++) for (let tx = 0; tx < 16; tx++) { const sx = Math.floor((x + tx * w / 16) * k), sy = Math.floor((y + ty * h / 16) * k), si = (sy * img.w + sx) * 4, d = (ty * 16 + tx) * 4; for (let c = 0; c < 4; c++) t[d + c] = img.px[si + c]; }
+      out.tiles[name] = put(t);
+    };
+    region('candle_flame', 'particle/flame', 8, 0, 0, 8, 8); region('brewing_bottle', 'item/glass_bottle', 16, 0, 0, 16, 16);
+    region('bell_body', 'entity/bell/bell_body', 32, 6, 6, 6, 7); region('dragon_head_front', 'entity/enderdragon/dragon', 256, 128, 46, 16, 16);
+    region('dragon_head_side', 'entity/enderdragon/dragon', 256, 112, 46, 16, 16); region('lectern_book', 'entity/enchanting_table_book', 64, 0, 0, 16, 10);
+    region('end_portal', 'entity/end_portal', 256, 0, 0, 16, 16);
+    const cd = load('block/candle'); if (cd && out.tiles.candle_wick == null) { // the wick: the candle texture's darkest pixel
+      let best = null, bl = 1e9; for (let i = 0; i < cd.px.length; i += 4) if (cd.px[i + 3] > 128) { const l = cd.px[i] + cd.px[i + 1] + cd.px[i + 2]; if (l < bl) { bl = l; best = i; } }
+      if (best != null) { const t = new Uint8Array(16 * 16 * 4); for (let i = 0; i < t.length; i += 4) for (let c = 0; c < 4; c++) t[i + c] = cd.px[best + c]; out.tiles.candle_wick = put(t); }
     }
   }
   for (const [k, f] of Object.entries(ITEM)) {
@@ -4146,7 +4194,7 @@ async function importPack(file, progress) {
   if (!key && structs) return { name: file.name, structsOnly: true };
   if (!key) throw new Error('assets/minecraft/textures 폴더가 없습니다 (리소스 팩이나 client.jar가 아님)');
   const root = key.slice(0, key.indexOf('assets/minecraft/')) + 'assets/minecraft/';
-  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && /^(textures\/(block|item|entity)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
+  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
   const imgs = new Map();
   for (let i = 0; i < want.length; i++) {
     const rel = want[i].slice(root.length), path = rel.startsWith('textures/') ? rel.slice(9, -4) : '../' + rel.slice(0, -4);
@@ -4154,7 +4202,7 @@ async function importPack(file, progress) {
     if (i % 200 === 0) { progress && progress(`텍스처 읽는 중 ${i} / ${want.length}`); await new Promise(r => setTimeout(r)); }
   }
   progress && progress('변환 중...');
-  const items = ITEMS.filter(d => d && !d.block).map(d => d.key);
+  const items = ITEMS.filter(d => d).map(d => d.key); // block items too: doors, cauldrons, candles... are flat sprites in Java
   const { out, data } = PACKMAP.packBuild(f => imgs.get(f) || null, S.TILES, items);
   const pack = { name: file.name, out, data, date: Date.now() };
   await upPut(pack);
@@ -4285,7 +4333,7 @@ const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furna
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
-  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', bamboo: 'bamboo_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
+  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', bamboo: 'bamboo_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
   ITEMS[b.id] = { id: b.id, key: b.key, name: b.name, stack: 64, place: b.id, block: b, sprite: SPRITE_BLOCKS[b.key] || null };
@@ -4399,7 +4447,7 @@ S.COLORS.forEach((c, i) => item(c + '_candle', S.COLKO[i] + ' 양초', { candle:
 item('tropical_fish', '열대어', { food: [1, 0.2] });
 item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
 item('pufferfish_bucket', '복어 양동이', { stack: 1 }); item('cod_bucket', '대구 양동이', { stack: 1 }); item('salmon_bucket', '연어 양동이', { stack: 1 });
-Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
+Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' });
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
 item('glow_berries', '발광 열매', { food: [2, 0.4] });
 item('enchanted_golden_apple', '마법이 부여된 황금 사과', { food: [4, 9.6], always: 1, glint: 1, sprite: 'golden_apple', eff: [['regeneration', 400, 1], ['absorption', 2400, 3], ['resistance', 6000, 0], ['fire_resistance', 6000, 0]] });
@@ -5752,6 +5800,29 @@ function discSprite(col) { return sprite(p => { for (let y = 1; y < 15; y++) for
 for (const d of ITEMS) if (d && d.disc) SPR[d.key] = () => discSprite(d.dcol);
 const BANNER_DYE = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
 S.COLORS.forEach((c, i) => { SPR[c + '_banner_item'] = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 1, hex(0x8a6a3b)); for (let y = 2; y < 15; y++) for (let x = 4; x < 12; x++) p(x, y, shade(hex(BANNER_DYE[i]), x === 4 ? 1.1 : x === 11 ? 0.8 : 1)); line(p, 7, 15, 8, 15, hex(0x8a6a3b)); }); });
+// Java draws banners and shields in the inventory from their entity textures: the same pixels, flattened into a 16x16 sprite
+function entSprite(draw) { const px = new Uint8ClampedArray(16 * 16 * 4); draw((x, y, r, g, b, a) => { if (x < 0 || y < 0 || x > 15 || y > 15) return; const i = (y * 16 + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = a; }); const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').putImageData(new ImageData(px, 16, 16), 0, 0); c._px = px; return c; }
+const entPx = (e, x, y, base) => { const k = e.w / base, i = (Math.floor(y * k) * e.w + Math.floor(x * k)) * 4; return [e.px[i], e.px[i + 1], e.px[i + 2], e.px[i + 3]]; };
+// the cloth of a banner (20x40) from banner_base + tinted pattern masks, as BannerBlockEntityRenderer layers them
+function bannerCloth(base, pats) {
+  const bb = PACKPX.ent.banner_base; if (!bb) return null;
+  const out = new Uint8ClampedArray(20 * 40 * 4);
+  for (let y = 0; y < 40; y++) for (let x = 0; x < 20; x++) { const [r, g, b, a] = entPx(bb, 1 + x, 1 + y, 64), i = (y * 20 + x) * 4; out[i] = r; out[i + 1] = g; out[i + 2] = b; out[i + 3] = a; }
+  for (const [p, ci] of [['base', base], ...(pats || [])]) {
+    const m = PACKPX.ent['banner_' + p]; if (!m) continue; const col = BANNER_DYE[ci];
+    const cr = (col >> 16) & 255, cg = (col >> 8) & 255, cb = col & 255;
+    for (let y = 0; y < 40; y++) for (let x = 0; x < 20; x++) { const [r, g, b, a] = entPx(m, 1 + x, 1 + y, 64); if (!a) continue; const f = a / 255, i = (y * 20 + x) * 4;
+      out[i] = out[i] * (1 - f) + r * cr / 255 * f; out[i + 1] = out[i + 1] * (1 - f) + g * cg / 255 * f; out[i + 2] = out[i + 2] * (1 - f) + b * cb / 255 * f; out[i + 3] = 255; }
+  }
+  return out;
+}
+S.COLORS.forEach((c, i) => { const prev = SPR[c + '_banner_item']; SPR[c + '_banner_item'] = () => {
+  const cl = bannerCloth(i), bb = PACKPX.ent.banner_base; if (!cl) return prev();
+  return entSprite(p => { for (let x = 3; x < 13; x++) { const [r, g, b, a] = entPx(bb, 2 + x * 2, 43, 64); p(x, 0, r, g, b, a || 255); } // the top bar
+    for (let y = 0; y < 15; y++) for (let x = 0; x < 8; x++) { const sx = Math.min(19, Math.floor(x * 20 / 8)), sy = Math.min(39, Math.floor(y * 40 / 15)), j = (sy * 20 + sx) * 4; p(4 + x, 1 + y, cl[j], cl[j + 1], cl[j + 2], 255); } });
+}; });
+{ const prev = SPR.shield; SPR.shield = () => { const e = PACKPX.ent.shield_nopattern; if (!e) return prev ? prev() : sprite(() => {});
+  return entSprite(p => { for (let y = 0; y < 16; y++) for (let x = 0; x < 10; x++) { const [r, g, b, a] = entPx(e, 1 + x * 12 / 10, 1 + y * 22 / 16, 64); if (a) p(3 + x, y, r, g, b, a); } }); }; }
 SPR.painting = () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 1; x < 15; x++) p(x, y, x < 2 || x > 13 || y < 3 || y > 12 ? hex(0x8a6a3b) : y < 8 ? hex(0x6ab0e8) : x < 8 ? hex(0x5aa84a) : hex(0xe8c040)); });
 SPR.armor_stand = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 14, hex(0x9a9a9a)); line(p, 7, 2, 7, 13, hex(0xa8865a)); line(p, 8, 2, 8, 13, hex(0x8a6a3b)); for (let x = 4; x < 12; x++) p(x, 5, hex(0xa8865a)); for (let x = 5; x < 11; x++) p(x, 9, hex(0xa8865a)); });
 SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));
@@ -6732,6 +6803,15 @@ const celMat = t => new THREE.MeshBasicMaterial({ map: t, transparent: true, fog
 const sun = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), celMat(sunTex)); sun.renderOrder = -9;
 const moon = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), celMat(moonTex)); moon.renderOrder = -9;
 scene.add(sun, moon);
+// a loaded jar/pack replaces the drawn sky with its environment textures (sun, the 8 moon phases, clouds)
+function entCanvas(key) { const e = PACKPX.ent[key]; if (!e) return null; const c = document.createElement('canvas'); c.width = e.w; c.height = e.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0); return c; }
+R.moonPhases = false;
+function applyPackSky() {
+  const sc = entCanvas('env_sun'); if (sc) { sunTex.image = sc; sunTex.needsUpdate = true; sun.geometry = new THREE.PlaneGeometry(90, 90); }
+  const mc = entCanvas('env_moon'); if (mc) { moonTex.image = mc; moonTex.repeat.set(1 / 4, 1 / 2); moonTex.needsUpdate = true; moon.geometry = new THREE.PlaneGeometry(60, 60); R.moonPhases = true; }
+  const cc = entCanvas('env_clouds'); if (cc) { cloudTex.image = cc; cloudTex.repeat.set(768 / (cc.width * 12), 768 / (cc.height * 12)); cloudTex.needsUpdate = true; } // a cloud pixel is 12 blocks
+}
+R.applyPackSky = applyPackSky;
 const starGeo = new THREE.BufferGeometry(); { const a = []; const r = trng(99); for (let i = 0; i < 900; i++) { const u = r() * 2 - 1, th = r() * Math.PI * 2, s = Math.sqrt(1 - u * u); a.push(Math.cos(th) * s * 400, u * 400, Math.sin(th) * s * 400); } starGeo.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); }
 const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
 const stars = new THREE.Points(starGeo, starMat); stars.renderOrder = -9; stars.frustumCulled = false; scene.add(stars);
@@ -6765,21 +6845,35 @@ const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PMAX * 3), pUV = new Float32Array(PMAX * 2), pSize = new Float32Array(PMAX), pCol = new Float32Array(PMAX * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute('puv', new THREE.BufferAttribute(pUV, 2)); pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1)); pGeo.setAttribute('pcol', new THREE.BufferAttribute(pCol, 3));
 const pMat = new THREE.ShaderMaterial({
-  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, scale: { value: 400 } }]),
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, sheet: { value: null }, scale: { value: 400 } }]),
   vertexShader: `attribute vec2 puv; attribute float psize; attribute vec3 pcol; uniform float scale; varying vec2 vUv; varying vec3 vCol;
     #include <fog_pars_vertex>
     void main(){ vUv = puv; vCol = pcol; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = psize * scale / -mvPosition.z; gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
     }`,
-  fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vCol;
+  fragmentShader: `uniform sampler2D map; uniform sampler2D sheet; varying vec2 vUv; varying vec3 vCol;
     #include <fog_pars_fragment>
-    void main(){ vec2 uv = vUv + gl_PointCoord * (4.0 / 512.0); vec4 t = texture2D(map, uv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
+    void main(){ vec4 t = vUv.x >= 2.0 ? texture2D(sheet, vUv - vec2(2.0, 0.0) + gl_PointCoord / 16.0) : texture2D(map, vUv + gl_PointCoord * (4.0 / 512.0)); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
     #include <fog_fragment>
     }`, fog: true });
 const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene.add(points);
 const parts = []; // {x,y,z,vx,vy,vz,life,size,u,v,r,g,b,grav}
 R.particles = parts;
 function spawnParticle(p) { if (parts.length >= PMAX) parts.shift(); parts.push(p); }
+// a loaded jar/pack's particle sprites (particle/*.png, 8x8 each) in a 16x16 sheet; each kind lists its frames as Java's particle json does
+const seq = (n, a, b) => { const r = []; for (let i = a; a <= b ? i <= b : i >= b; i += a <= b ? 1 : -1) r.push(n + '_' + i); return r; };
+const PKINDS = { smoke: seq('generic', 7, 0), portal: seq('generic', 0, 7), heart: ['heart'], angry: ['angry'], happy: ['glint'], note: ['note'], crit: ['critical_hit'], magic: ['enchanted_hit'],
+  flame: ['flame'], soul_flame: ['soul_fire_flame'], bubble: ['bubble'], splash: seq('splash', 0, 3), effect: seq('effect', 7, 0), spell: seq('spell', 7, 0), explosion: seq('explosion', 0, 15),
+  spark: seq('spark', 7, 0), big_smoke: seq('big_smoke', 0, 11), drip: ['drip_hang'], lava: ['lava'], glow: ['glow'], damage: ['damage'], sweep: seq('sweep', 0, 7), nautilus: ['nautilus'], snowflake: ['snowflake'], witch: ['witch'] };
+const PSHEET = { uv: null };
+function buildParticleSheet() {
+  const names = [...new Set(Object.values(PKINDS).flat())].filter(n => PACKPX.ent['particle_' + n]); if (!names.length) return;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; PSHEET.uv = {};
+  names.forEach((n, i) => { const e = PACKPX.ent['particle_' + n], src = document.createElement('canvas'); src.width = e.w; src.height = e.h; src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0);
+    const x = (i % 16) * 8, y = Math.floor(i / 16) * 8; g.drawImage(src, 0, 0, e.w, Math.min(e.h, e.w), x, y, 8, 8); PSHEET.uv[n] = [2 + x / 128, y / 128]; });
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; pMat.uniforms.sheet.value = t;
+}
+R.buildParticleSheet = buildParticleSheet;
 function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
   const t = S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
   const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
@@ -6792,7 +6886,11 @@ function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
 function simpleParticle(x, y, z, col, opts = {}) {
   const t = S.T.white_wool; // flat white tile, tinted by color
   spawnParticle({ x, y, z, vx: opts.vx || (Math.random() - .5), vy: opts.vy != null ? opts.vy : Math.random() * 1.5, vz: opts.vz || (Math.random() - .5), life: opts.life || 0.8, size: opts.size || 0.15,
-    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8 });
+    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8,
+    frames: PSHEET.uv && opts.kind && PKINDS[opts.kind] ? PKINDS[opts.kind].map(n => PSHEET.uv[n]).filter(Boolean) : null });
+  const p = parts[parts.length - 1]; if (p.frames && !p.frames.length) p.frames = null;
+  if (p.frames) { p.size *= 1.3; if (opts.kind === 'splash' || opts.kind === 'portal') p.frames = [p.frames[(Math.random() * p.frames.length) | 0]]; // sprites have clear margins; random-sprite kinds pick one
+    if (!['smoke', 'portal', 'effect', 'spell', 'explosion', 'big_smoke', 'spark'].includes(opts.kind)) { p.r = p.g = p.b = 1; if (opts.kind === 'note') { p.r = col[0]; p.g = col[1]; p.b = col[2]; } } } // most sprites carry their own colour
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
 function updateParticles(dt) {
@@ -6804,42 +6902,51 @@ function updateParticles(dt) {
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
     if (p.grav && SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { p.vy = 0; p.vx *= 0.5; p.vz *= 0.5; } else { p.x = nx; p.y = ny; p.z = nz; }
   }
-  for (const p of parts) { pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b; n++; }
+  for (const p of parts) { if (p.frames) { const f = p.frames[Math.min(p.frames.length - 1, Math.floor((1 - p.life / p.life0) * p.frames.length))]; p.u = f[0]; p.v = f[1]; }
+    pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b; n++; }
   pGeo.setDrawRange(0, n);
   for (const k of ['position', 'puv', 'psize', 'pcol']) pGeo.attributes[k].needsUpdate = true;
 }
 
-// ---------- rain / snow ----------
-const RAIN_N = 500;
-const rainGeo = new THREE.BufferGeometry(); const rainPos = new Float32Array(RAIN_N * 6);
-rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-const rainMat = new THREE.LineBasicMaterial({ color: 0x9ab4e8, transparent: true, opacity: 0.55, fog: true });
-const rain = new THREE.LineSegments(rainGeo, rainMat); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
-const drops = []; for (let i = 0; i < RAIN_N; i++) drops.push({ x: 0, y: -999, z: 0, s: 0 });
+// ---------- rain / snow (WorldRenderer.renderWeather: a textured quad per column around the camera, facing it) ----------
+const WR = 10, WCOLS = (2 * WR + 1) ** 2;
+function weatherCanvas(snow) { // drawn stand-ins until a jar/pack gives environment/rain.png and snow.png
+  return pixelTex(64, 256, g => { const r = trng(snow ? 7 : 3); for (let i = 0; i < (snow ? 90 : 60); i++) { const x = r.int(64), y = r.int(256); g.fillStyle = snow ? 'rgba(255,255,255,.95)' : 'rgba(170,190,235,.8)'; if (snow) g.fillRect(x, y, 2, 2); else g.fillRect(x, y, 1, 10 + r.int(14)); } });
+}
+const rainTex = weatherCanvas(false), snowTex = weatherCanvas(true);
+for (const t of [rainTex, snowTex]) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+const wGeo = [false, true].map(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(WCOLS * 12), 3)); g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(WCOLS * 8), 2));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(WCOLS * 16), 4)); const idx = new Uint16Array(WCOLS * 6); for (let i = 0; i < WCOLS; i++) idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6); g.setIndex(new THREE.BufferAttribute(idx, 1)); return g; });
+const wMat = [rainTex, snowTex].map(t => new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, alphaTest: 0.01, fog: true }));
+const wMesh = wGeo.map((g, i) => { const m = new THREE.Mesh(g, wMat[i]); m.frustumCulled = false; m.visible = false; m.renderOrder = 2; scene.add(m); return m; });
+const rain = wMesh[0];
+function applyPackWeather() {
+  for (const [k, t] of [['env_rain', rainTex], ['env_snow', snowTex]]) { const c = entCanvas(k); if (c) { t.image = c; t.needsUpdate = true; } }
+}
+R.applyPackWeather = applyPackWeather;
 const colTop = new Map(); let colTopT = 0;
 function updateRain(dt, px, py, pz, amt) {
-  rain.visible = amt > 0.05; if (!rain.visible) return;
-  rainMat.opacity = 0.55 * amt;
+  wMesh[0].visible = wMesh[1].visible = false; if (amt <= 0.05) return;
   colTopT -= dt; if (colTopT < 0) { colTop.clear(); colTopT = 1; }
   const top = (x, z) => { const k = x * 4096 + z; let v = colTop.get(k); if (v === undefined) { v = topY(x, z); colTop.set(k, v); } return v; };
-  const cold = S.BIOMES[biomeAt(Math.floor(px), Math.floor(pz))][4] <= 0.15, dry = biomeBase(Math.floor(px), Math.floor(pz)) === S.BIO.DESERT;
-  rainMat.color.setHex(cold ? 0xffffff : 0x9ab4e8);
-  const active = Math.floor(RAIN_N * amt * (dry ? 0 : 1));
-  for (let i = 0; i < RAIN_N; i++) {
-    const d = drops[i];
-    if (i >= active) { rainPos.fill(0, i * 6, i * 6 + 6); continue; }
-    let t = top(Math.floor(d.x), Math.floor(d.z));
-    if (d.y < t + 1 || d.y < py - 12 || Math.abs(d.x - px) > 14 || Math.abs(d.z - pz) > 14) {
-      d.x = px + (Math.random() * 2 - 1) * 14; d.z = pz + (Math.random() * 2 - 1) * 14; d.y = py + 10 + Math.random() * 10; d.s = cold ? 3 + Math.random() : 18 + Math.random() * 6;
-      t = top(Math.floor(d.x), Math.floor(d.z));
-      if (d.y < t + 1) { d.y = -999; rainPos.fill(0, i * 6, i * 6 + 6); continue; } // column is roofed above the drop (caves, houses): no rain here
-    }
-    d.y -= d.s * dt;
-    if (d.y < t + 1) { rainPos.fill(0, i * 6, i * 6 + 6); continue; } // passed the surface this frame: don't draw it below the roof
-    const len = cold ? 0.12 : 0.7, sw = cold ? Math.sin(d.y * 2 + i) * 0.05 : 0;
-    rainPos[i * 6] = d.x + sw; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z; rainPos[i * 6 + 3] = d.x + sw; rainPos[i * 6 + 4] = d.y + len; rainPos[i * 6 + 5] = d.z;
+  const X = Math.floor(px), Z = Math.floor(pz), Y = Math.floor(py), ticks = W.time + (W.tickFrac || 0), n = [0, 0];
+  for (let dz = -WR; dz <= WR; dz++) for (let dx = -WR; dx <= WR; dx++) {
+    const x = X + dx, z = Z + dz, b = biomeAt(x, z), base = biomeBase(x, z);
+    const temp = S.BIOMES[b][4]; if (temp > 0.95 || base === S.BIO.DESERT) continue; // no precipitation (deserts, savannas, badlands)
+    const t = top(x, z) + 1, y0 = Math.max(t, Y - WR), y1 = Math.max(t, Y + WR); if (y0 >= y1) continue;
+    const snow = temp - Math.max(0, t - 64) * 0.05 / 30 < 0.15, k = snow ? 1 : 0, i = n[k]++; // colder with height, as Biome.getTemperature
+    const cx = x + 0.5 - px, cz = z + 0.5 - pz, d = Math.hypot(cx, cz) || 1, ox = cz / d * 0.5, oz = -cx / d * 0.5;
+    const r = (x * x * 3121 + x * 45238971 ^ z * z * 418711 + z * 13761) & 31, P = wGeo[k].attributes.position.array, U = wGeo[k].attributes.uv.array, C = wGeo[k].attributes.color.array;
+    let v0, du = 0;
+    if (!snow) v0 = -((ticks + r) % 32 + (W.tickFrac || 0)) / 32 * (3 + (r & 7) / 8);
+    else { v0 = -((ticks & 511) + (W.tickFrac || 0)) / 512; du = ((r * 7919) % 100) / 100 + ticks * 0.01 * ((r & 3) - 1.5) / 10; }
+    const al = ((1 - (d * d) / (WR * WR)) * 0.5 + 0.5) * amt, wx = x + 0.5, wz = z + 0.5;
+    P.set([wx - ox, y1, wz - oz, wx + ox, y1, wz + oz, wx + ox, y0, wz + oz, wx - ox, y0, wz - oz], i * 12);
+    U.set([du, y1 * 0.25 + v0, du + 1, y1 * 0.25 + v0, du + 1, y0 * 0.25 + v0, du, y0 * 0.25 + v0], i * 8);
+    for (let q = 0; q < 4; q++) C.set([1, 1, 1, al], i * 16 + q * 4);
+    if (!snow && dx * dx + dz * dz < 25 && Math.random() < 0.004 * amt && t > Y - 6) simpleParticle(x + Math.random(), t + 0.05, z + Math.random(), [0.6, 0.7, 0.9], { kind: 'splash', size: 0.05, vy: 0.6, grav: 0.4, life: 0.35 }); // drops splashing on the ground
   }
-  rainGeo.attributes.position.needsUpdate = true;
+  for (const k of [0, 1]) { const g = wGeo[k]; if (!n[k]) continue; wMesh[k].visible = true; g.setDrawRange(0, n[k] * 6); for (const a of ['position', 'uv', 'color']) g.attributes[a].needsUpdate = true; }
 }
 
 // ---------- extruded item meshes (held + dropped) ----------
@@ -6913,6 +7020,13 @@ function itemMesh(id) {
   m.userData.isBlock = isBlock;
   return m;
 }
+// enchantment glint: an additive, scrolling layer over enchanted items and armour (misc/enchanted_item_glint.png once a jar/pack has it)
+const glintTex = pixelTex(64, 64, g => { const r = trng(77); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const v = (Math.sin((x + y) * 0.2) * 0.5 + 0.5) * 0.6 + r() * 0.4; g.fillStyle = `rgba(${130 * v | 0},${60 * v | 0},${210 * v | 0},1)`; g.fillRect(x, y, 1, 1); } });
+glintTex.wrapS = glintTex.wrapT = THREE.RepeatWrapping; glintTex.repeat.set(0.5, 0.5); glintTex.rotation = 0.17;
+function glintMaterial(skinning) { return new THREE.MeshBasicMaterial({ map: glintTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, depthFunc: THREE.LessEqualDepth, skinning: !!skinning, fog: false, polygonOffset: true, polygonOffsetFactor: -2 }); }
+function addGlint(mesh) { const g = new THREE.Mesh(mesh.geometry, glintMaterial()); g.userData.glint = true; g.renderOrder = 3; mesh.add(g); return mesh; }
+function applyPackGlint() { const c = entCanvas('glint'); if (c) { glintTex.image = c; glintTex.repeat.set(0.125, 0.125); glintTex.needsUpdate = true; const u = c.toDataURL(); document.documentElement.style.setProperty('--g-glint', `url(${u})`); document.body.classList.add('vglint'); } }
+R.addGlint = addGlint; R.glintMaterial = glintMaterial; R.applyPackGlint = applyPackGlint;
 // brightness for item/block meshes regardless of material kind
 function setMeshLight(mesh, v) { const m = mesh.material; if (m.uniforms) m.uniforms.light.value = v; else m.color.setScalar(v); }
 // render true 3D inventory icons for block items once at startup (Java GUI angle)
@@ -6987,11 +7101,12 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
   if (!armMat) setHandSkin();
   const h = R.hand, PI = Math.PI, right = OPT.mainHand !== 'left';
   [mainId, offId].forEach((id, k) => {
-    const H = HANDS[k];
-    if (id !== H.id) {
+    const H = HANDS[k], gl = !!(h.glint && h.glint[k]);
+    if (id !== H.id || gl !== !!H.gl) {
       if (H.mesh) { H.g.remove(H.mesh); H.mesh.material.dispose(); H.mesh = null; }
-      H.id = id; H.equip = 0; if (k === 0) h.equip = 0;
-      if (id > 0) { H.mesh = itemMesh(id); H.mesh.matrixAutoUpdate = false; H.g.add(H.mesh); }
+      if (id !== H.id) { H.equip = 0; if (k === 0) h.equip = 0; }
+      H.id = id; H.gl = gl;
+      if (id > 0) { H.mesh = itemMesh(id); if (gl) addGlint(H.mesh); H.mesh.matrixAutoUpdate = false; H.g.add(H.mesh); }
     }
     H.equip = Math.min(1, H.equip + dt * 6);
     const f = (k === 0) === right ? 1 : -1, act = k === active;
@@ -7078,7 +7193,9 @@ function renderFrame(dt, eye, under) {
   sun.material.opacity = moon.material.opacity = 1 - W.rain;
   stars.position.copy(camera.position); starMat.opacity = Math.max(0, 1 - day * 1.6) * (1 - W.rain); stars.rotation.z = ang;
   clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 128.33, camera.position.z); // 1.17 cloud height
-  cloudTex.offset.set((camera.position.x / 768) * 6 + performance.now() / 1e6, (-camera.position.z / 768) * 6);
+  cloudTex.offset.set((camera.position.x / 768) * cloudTex.repeat.x + (W.time + (W.tickFrac || 0)) * 0.03 / 768 * cloudTex.repeat.x, (-camera.position.z / 768) * cloudTex.repeat.y); // clouds drift 0.03 blocks a tick, like Java
+  { const tg = performance.now() / 1000; glintTex.offset.set((tg * 0.125) % 1, (tg * 0.0625) % 1); } // ~8 s per pass like Java
+  if (R.moonPhases) { const ph = Math.floor(W.time / 24000) % 8; moonTex.offset.set((ph % 4) / 4, ph < 4 ? 0.5 : 0); }
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment
@@ -7485,8 +7602,8 @@ function dropItem(x, y, z, id, n, vel, delay = 10, dur, extra) {
   const e = Ent('item', x, y, z); e.kind = 'item'; e.w = 0.125; e.h = 0.25; e.stack = extra ? { ...extra, id, n } : { id, n }; if (dur != null) e.stack.d = dur; else if (extra) delete e.stack.d;
   e.vx = vel ? vel[0] : (Math.random() - .5) * 0.2; e.vy = vel ? vel[1] : 0.2; e.vz = vel ? vel[2] : (Math.random() - .5) * 0.2;
   e.pickup = delay; e.spin = Math.random() * 6;
-  const m = R.itemMesh(id); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
-  if (n > 1) { const m2 = R.itemMesh(id); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
+  const gl = (extra && extra.e) || ITEMS[id].glint, m = R.itemMesh(id); if (gl) R.addGlint(m); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
+  if (n > 1) { const m2 = R.itemMesh(id); if (gl) R.addGlint(m2); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
   return addEnt(e);
 }
 function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropItem(x, y, z, st.id, st.n, vel, delay, st.d, st); }
@@ -7546,7 +7663,7 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
-  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
+  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
   const hit = (e, isPl) => {
@@ -7654,7 +7771,7 @@ function mobTick(e) {
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
-  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
@@ -7913,7 +8030,7 @@ function spawnerTick() {
       if (t.type !== 'spawner') continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
-      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
+      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
       t.delay = 200 + Math.floor(Math.random() * 600);
       if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - x, e.z - z) < 9) >= 6) continue;
@@ -8483,7 +8600,7 @@ function spawnFireball(x, y, z, dx, dy, dz, owner, small) {
 function fireballDeflect(e) { const [dx, dy, dz] = lookDir(); e.ax = dx * 0.1; e.ay = dy * 0.1; e.az = dz * 0.1; e.vx = dx; e.vy = dy; e.vz = dz; e.owner = PL; play('hit'); }
 function fireballTick(e) {
   e.vx = (e.vx + e.ax) * 0.95; e.vy = (e.vy + e.ay) * 0.95; e.vz = (e.vz + e.az) * 0.95;
-  if (Math.random() < 0.5) R.simpleParticle(e.x, e.y + e.h / 2, e.z, [0.4, 0.4, 0.4], { size: e.small ? 0.15 : 0.4, vy: 0.1, grav: 0, life: 0.4 });
+  if (Math.random() < 0.5) R.simpleParticle(e.x, e.y + e.h / 2, e.z, [0.4, 0.4, 0.4], { kind: 'smoke', size: e.small ? 0.15 : 0.4, vy: 0.1, grav: 0, life: 0.4 });
   const steps = Math.max(1, Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.3));
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps, cy = ny + e.h / 2;
@@ -8515,13 +8632,13 @@ function onThrownHit(e, x, y, z, hitMob) {
   if (td && td.lingering) { play('break', { mat: 'glass' }); potionBurst(x, y, z, POTION[td.potion].col); spawnCloud(x, Math.floor(y) + 0.05, z, td.potion); return; }
   if (e.thrown === IID.ender_pearl && Math.random() < 0.05) spawnMob('endermite', x, y, z);
   if (e.thrown === IID.ender_pearl && e.owner === PL && !PL.dead) {
-    for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.5, grav: 0 });
+    for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.5, grav: 0 });
     PL.x = x; PL.y = y + 0.05; PL.z = z; PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0;
     hurtPlayer(5, 'fall'); play('teleport');
   }
   if (hitMob) { if (e.thrown === IID.snowball) hurtMob(hitMob, hitMob.type === 'blaze' ? 3 : 0.001, e.owner === PL ? PL : null, e.vx, e.vz); else if (e.thrown === IID.egg) hurtMob(hitMob, 0.001, null, e.vx, e.vz); }
   if (e.thrown === IID.egg && Math.random() < 0.125) spawnMob('chicken', x, y, z, { baby: true });
-  if (e.thrown === IID.experience_bottle) { spawnXP(x, y + 0.3, z, 3 + Math.floor(Math.random() * 9)); play('break', { mat: 'glass' }); for (let i = 0; i < 10; i++) R.simpleParticle(x, y + 0.3, z, [0.4, 0.5, 1], { size: 0.1, vy: 1 }); }
+  if (e.thrown === IID.experience_bottle) { spawnXP(x, y + 0.3, z, 3 + Math.floor(Math.random() * 9)); play('break', { mat: 'glass' }); for (let i = 0; i < 10; i++) R.simpleParticle(x, y + 0.3, z, [0.4, 0.5, 1], { kind: 'splash', size: 0.1, vy: 1 }); }
   for (let i = 0; i < 6; i++) R.simpleParticle(x, y, z, e.thrown === IID.snowball ? [1, 1, 1] : [0.9, 0.85, 0.7], { size: 0.1, vy: 1 });
 }
 function throwEye() {
@@ -8535,7 +8652,7 @@ function throwEye() {
 function eyeTick(e) {
   const dx = e.tx - e.x, dz = e.tz - e.z, d = Math.hypot(dx, dz), sp = Math.min(0.5, d);
   if (e.age < 70) { e.x += dx / (d || 1) * sp * 0.6; e.z += dz / (d || 1) * sp * 0.6; e.y += (e.ty - e.y) * 0.05; }
-  R.simpleParticle(e.x, e.y, e.z, [0.6, 0.2, 0.9], { size: 0.1, vy: 0, grav: 0, life: 0.6 });
+  R.simpleParticle(e.x, e.y, e.z, [0.6, 0.2, 0.9], { kind: 'portal', size: 0.1, vy: 0, grav: 0, life: 0.6 });
   if (e.age > 80) { removeEnt(e); if (Math.random() < 0.8) dropItem(e.x, e.y, e.z, IID.ender_eye, 1); else play('break', { mat: 'glass' }); }
 }
 // ---------- boats ----------
@@ -8647,7 +8764,7 @@ function blazeAI(e, dist) {
   } else { e.vy -= 0.01; if (e.onGround) e.vy = 0; if (Math.random() < 0.01) { e.vx += (Math.random() - .5) * 0.2; e.vz += (Math.random() - .5) * 0.2; } }
   e.vy = Math.max(e.vy, -0.06);
   turn(e); flyMove(e, 0.85);
-  if (Math.random() < 0.4) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + Math.random() * 1.8, e.z + (Math.random() - .5) * .6, [0.4, 0.4, 0.4], { size: 0.2, vy: 0.4, grav: 0, life: 0.5 });
+  if (Math.random() < 0.4) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + Math.random() * 1.8, e.z + (Math.random() - .5) * .6, [0.4, 0.4, 0.4], { kind: 'smoke', size: 0.2, vy: 0.4, grav: 0, life: 0.5 });
 }
 function slimeAI(e, dist) {
   const sz = e.size || 1;
@@ -8693,7 +8810,7 @@ function endermanTeleport(e, cx = e.x, cz = e.z) {
     const x = Math.floor(cx + (Math.random() - .5) * 32), z = Math.floor(cz + (Math.random() - .5) * 32); if (!isLoaded(x, z)) continue;
     let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || FLUID[getBlock(x, y, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)]) continue;
-    for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.3, grav: 0 });
+    for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.3, grav: 0 });
     e.x = e.px = x + .5; e.y = e.py = y; e.z = e.pz = z + .5; e.path = null; play('teleport', { vol: 0.5 }); return true;
   }
   return false;
@@ -9107,7 +9224,7 @@ function mobInteract(e, h, d) {
   if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); return true; }
+    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
   }
   return false;
 }
@@ -9723,7 +9840,7 @@ function vibrate(x, y, z) {
     const power = Math.max(1, 15 - Math.floor(15 * d / 8));
     setMeta(sx, sy, sz, 1 | (power << 4)); rsNotify(sx, sy, sz); schedule(sx, sy, sz, 40);
     play('click', { pitch: 1.8, vol: 0.4 });
-    for (let i = 0; i < 6; i++) { const t = i / 6; R.simpleParticle(x + (cx - x) * t, y + (cy - y) * t, z + (cz - z) * t, [0.2, 0.85, 0.9], { size: 0.08, vx: 1e-4, vy: 0, vz: 1e-4, grav: 0, life: 0.5 }); }
+    for (let i = 0; i < 6; i++) { const t = i / 6; R.simpleParticle(x + (cx - x) * t, y + (cy - y) * t, z + (cz - z) * t, [0.2, 0.85, 0.9], { kind: 'glow', size: 0.08, vx: 1e-4, vy: 0, vz: 1e-4, grav: 0, life: 0.5 }); }
   }
 }
 SCHED_TICK[BID.sculk_sensor] = (x, y, z, b, m) => {
@@ -9759,7 +9876,7 @@ function frameMesh(e) {
   const g = new THREE.Group(), plate = new THREE.Mesh(frameGeo, new THREE.MeshBasicMaterial({ map: FRAME_TEX[k] }));
   g.add(plate); g.userData.plate = plate;
   if (e.item) {
-    const im = R.itemMesh(e.item.id); im.scale.setScalar(im.userData.isBlock ? 0.3 : 0.5); im.position.z = im.userData.isBlock ? 0.12 : 0.05;
+    const im = R.itemMesh(e.item.id); if (e.item.e || ITEMS[e.item.id].glint) R.addGlint(im); im.scale.setScalar(im.userData.isBlock ? 0.3 : 0.5); im.position.z = im.userData.isBlock ? 0.12 : 0.05;
     im.rotation.z = -e.rot * Math.PI / 4; g.add(im); g.userData.item = im;
   }
   return g;
@@ -9868,7 +9985,7 @@ function applyPotion(target, type, scale = 1) {
 }
 function potionBurst(x, y, z, col, n = 24) {
   const c = [((col >> 16) & 255) / 255, ((col >> 8) & 255) / 255, (col & 255) / 255];
-  for (let i = 0; i < n; i++) R.simpleParticle(x, y + 0.2, z, c, { size: 0.12, vy: 0.5 + Math.random() * 1.5, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1 });
+  for (let i = 0; i < n; i++) R.simpleParticle(x, y + 0.2, z, c, { kind: 'effect', size: 0.12, vy: 0.5 + Math.random() * 1.5, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1 });
 }
 // splash potion landed: everything within 4 blocks, weaker with distance
 function splashPotion(id, x, y, z, direct) {
@@ -9893,7 +10010,7 @@ function spawnCloud(x, y, z, type, opts = {}) {
 function cloudTick(e) {
   e.r -= e.shrink; if (e.r <= 0.4 || e.age > e.dur) { removeEnt(e); return; }
   const c = [((e.col >> 16) & 255) / 255, ((e.col >> 8) & 255) / 255, (e.col & 255) / 255];
-  if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
+  if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { kind: 'effect', size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
   if (e.age % 5) return;
   const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT); if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {
@@ -10128,7 +10245,7 @@ function campfireTick(c, i, t) {
   // smoke drifts up (higher over a hay bale: a signal fire)
   if (lit && Math.hypot(PL.x - x, PL.z - z) < 40 && W.tickN % 3 === 0) {
     const sig = getBlock(x, y - 1, z) === BID.hay_block;
-    R.simpleParticle(x + .3 + Math.random() * .4, y + .8, z + .3 + Math.random() * .4, [0.62, 0.62, 0.62], { size: 0.2, vx: (Math.random() - .5) * 0.1, vy: 0.6, vz: (Math.random() - .5) * 0.1, grav: -0.05, life: sig ? 8 : 3 });
+    R.simpleParticle(x + .3 + Math.random() * .4, y + .8, z + .3 + Math.random() * .4, [0.62, 0.62, 0.62], { kind: 'big_smoke', size: 0.2, vx: (Math.random() - .5) * 0.1, vy: 0.6, vz: (Math.random() - .5) * 0.1, grav: -0.05, life: sig ? 8 : 3 });
   }
   // items lying on it
   const k0 = x + ',' + y + ',' + z, cur = cfMeshes.get(k0), ver = t.ver || 0;
@@ -10257,6 +10374,8 @@ const PAINTINGS = [ // key, width, height (blocks), palette
 const paintTex = {};
 function paintingTexture(key) {
   if (paintTex[key]) return paintTex[key];
+  const pc = typeof entCanvas === 'function' && entCanvas('painting_' + key); // the game's own painting, when a jar or pack has it
+  if (pc) { const t = new THREE.CanvasTexture(pc); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return paintTex[key] = t; }
   const [, w, h, pal] = PAINTINGS.find(p => p[0] === key), c = document.createElement('canvas'); c.width = w * 16; c.height = h * 16;
   const g = c.getContext('2d'), r = trng(key.length * 131 + key.charCodeAt(1));
   g.fillStyle = pal[1]; g.fillRect(0, 0, c.width, c.height);
@@ -10359,6 +10478,8 @@ const DYE_HEX = ['#f9fffe', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f
 const bannerTex = {};
 function bannerTexture(base, pats) {
   const key = base + ':' + JSON.stringify(pats || []); if (bannerTex[key]) return bannerTex[key];
+  const cl = typeof bannerCloth === 'function' && bannerCloth(base, pats);
+  if (cl) { const c = document.createElement('canvas'); c.width = BW; c.height = BH; c.getContext('2d').putImageData(new ImageData(cl, BW, BH), 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return bannerTex[key] = t; }
   const c = document.createElement('canvas'); c.width = BW; c.height = BH; const g = c.getContext('2d'), img = g.createImageData(BW, BH), r = trng(9);
   const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const col = new Array(BW * BH).fill(0).map(() => hexRGB(DYE_HEX[base]));
@@ -10635,8 +10756,8 @@ function cartTick(e) {
   if (e.passenger) { const p = e.passenger; if (p.dead || p.cart !== e) e.passenger = null; else { p.x = e.x; p.y = e.y + 0.1; p.z = e.z; p.vx = p.vy = p.vz = 0; } }
   if (e.rider === PL) { PL.x = e.x; PL.y = e.y + e.rideY; PL.z = e.z; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; }
   // loads
-  if (e.ctype === 'tnt' && e.fuse > 0) { if (--e.fuse <= 0) { tntCartExplode(e); return; } if (e.age % 2) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.6, 0.6, 0.6], { size: 0.12, vy: 0.4, grav: -0.02, life: 0.5 }); }
-  if (e.ctype === 'furnace' && e.fuel > 0) { e.fuel--; if (e.age % 3 === 0) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.3, 0.3, 0.3], { size: 0.25, vy: 0.5, grav: -0.04, life: 1 }); }
+  if (e.ctype === 'tnt' && e.fuse > 0) { if (--e.fuse <= 0) { tntCartExplode(e); return; } if (e.age % 2) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.6, 0.6, 0.6], { kind: 'smoke', size: 0.12, vy: 0.4, grav: -0.02, life: 0.5 }); }
+  if (e.ctype === 'furnace' && e.fuel > 0) { e.fuel--; if (e.age % 3 === 0) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.25, vy: 0.5, grav: -0.04, life: 1 }); }
   if (e.ctype === 'hopper' && e.age % 4 === 0) cartTransfer(e);
   if (e.y < -40) removeEnt(e);
 }
@@ -10796,7 +10917,7 @@ function horseRide(e) {
     if (++e.rideT > 30 + Math.random() * 30) {
       e.rideT = 0;
       if (Math.random() * 100 < e.temper) horseTame(e);
-      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); }
+      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); }
     }
     return;
   }
@@ -10809,7 +10930,7 @@ function horseRide(e) {
   walkPhysics(e, f || s ? mx / l : 0, f || s ? mz / l : 0, f || s ? sp : 0);
   e.fallY = null; PL.fallDist = 0;
 }
-function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); ADVT.tamed(e); }
+function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); ADVT.tamed(e); }
 function horseInteract(e, h, d) {
   if (e.baby) { if (d && (h.id === IID.golden_apple || h.id === IID.golden_carrot || h.id === IID.apple || h.id === IID.wheat || h.id === IID.sugar)) { e.baby = Math.max(1, e.baby - 2400); consume(); swing(); return true; } return false; }
   const tame = e.owner === 'player';
@@ -10886,8 +11007,8 @@ function catInteract(e, h, d) {
   }
   if (d && (h.id === IID.cod || h.id === IID.salmon)) {
     consume(); swing();
-    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 }); }
-    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { size: 0.12, vy: 1, grav: 0 });
+    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 }); }
+    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.12, vy: 1, grav: 0 });
     return true;
   }
   return false;
@@ -11168,7 +11289,7 @@ function beeAI(e, dist) {
     if (Math.hypot(fx - e.x, fy - e.y, fz - e.z) < 1.2) { beeEnter(e); return; }
     fly(fx, fy + 0.3, fz, 0.13);
     // pollinating crops on the way home
-    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4 }); } } }
+    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.08, vy: 0.4 }); } } }
     return;
   }
   // look for a flower, hover at it for a while to collect nectar
@@ -11420,7 +11541,7 @@ function illagerAI(e, dist) {
   if (e.raidMove) { [mx, mz] = e.raidMove; e.raidMove = null; }
   // ravagers trample crops and tear through leaves
   if (d.ravager && e.hitH) { const fx = Math.floor(e.x + Math.sign(e.vx || mx) * 1.2), fz = Math.floor(e.z + Math.sign(e.vz || mz) * 1.2); for (let dy = 0; dy < 3; dy++) { const b = getBlock(fx, Math.floor(e.y) + dy, fz); if (S.LEAF[b] || RTYPE[b] === RT.CROP) { breakNaturally(fx, Math.floor(e.y) + dy, fz, b, getMeta(fx, Math.floor(e.y) + dy, fz)); } } }
-  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { size: 0.12, vy: 0.5, grav: 0 }); }
+  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { kind: 'angry', size: 0.12, vy: 0.5, grav: 0 }); }
   walkPhysics(e, mx, mz, sp);
 }
 function illagerAnim(e, P) {
@@ -11707,7 +11828,7 @@ function witherSkullTick(e) {
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
-  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { size: 0.12, vy: 0, grav: 0, life: 0.4 });
+  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { kind: 'smoke', size: 0.12, vy: 0, grav: 0, life: 0.4 });
 }
 function witherRose(mob) { // a mob killed by the wither leaves a wither rose
   const x = Math.floor(mob.x), y = Math.floor(mob.y), z = Math.floor(mob.z);
@@ -11773,8 +11894,8 @@ function conduitTick() {
     if (!t.on) continue;
     const range = Math.floor(n / 7) * 16;
     if (Math.hypot(PL.x - x - .5, PL.y - y, PL.z - z - .5) < range && (PL.inWater || (W.rain > 0.5 && W.dim === 0))) addEffect(PL, 'conduit_power', 260, 0);
-    if (n >= 42) { const foe = ENT.find(e => e.kind === 'mob' && !e.dead && e.def.hostile && e.inWater && Math.hypot(e.x - x, e.y - y, e.z - z) < 8); if (foe) { hurtMob(foe, 4, null); for (let i = 0; i < 6; i++) R.simpleParticle(foe.x, foe.y + foe.h / 2, foe.z, [0.4, 0.8, 1], { size: 0.12, vy: 0.6 }); } }
-    if (Math.random() < 0.3) R.simpleParticle(x + .5 + (Math.random() - .5) * 3, y + .5 + (Math.random() - .5) * 3, z + .5 + (Math.random() - .5) * 3, [0.5, 0.8, 0.9], { size: 0.08, vy: 0.2, grav: 0, life: 1 });
+    if (n >= 42) { const foe = ENT.find(e => e.kind === 'mob' && !e.dead && e.def.hostile && e.inWater && Math.hypot(e.x - x, e.y - y, e.z - z) < 8); if (foe) { hurtMob(foe, 4, null); for (let i = 0; i < 6; i++) R.simpleParticle(foe.x, foe.y + foe.h / 2, foe.z, [0.4, 0.8, 1], { kind: 'bubble', size: 0.12, vy: 0.6 }); } }
+    if (Math.random() < 0.3) R.simpleParticle(x + .5 + (Math.random() - .5) * 3, y + .5 + (Math.random() - .5) * 3, z + .5 + (Math.random() - .5) * 3, [0.5, 0.8, 0.9], { kind: 'bubble', size: 0.08, vy: 0.2, grav: 0, life: 1 });
   }
 }
 
@@ -11938,6 +12059,7 @@ function mapUpdate(c) {
 function mapViewTick() {
   const h = PL.held() && PL.held().id === IID.filled_map ? PL.held() : offItem(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
   if (!MAPS.view) { MAPS.view = document.createElement('canvas'); MAPS.view.id = 'mapview'; MAPS.view.width = MAPS.view.height = 128; document.body.appendChild(MAPS.view); MAPS.ctx = MAPS.view.getContext('2d'); }
+  if (!MAPS.bgSet && PACKPX.ent.map_bg) { MAPS.bgSet = true; const bg = entCanvas('map_bg'); MAPS.view.style.cssText += `;background:url(${bg.toDataURL()}) 0 0/100% 100%;padding:calc(var(--px) * 7);border:0;box-sizing:content-box;image-rendering:pixelated`; } // the paper around the map
   MAPS.view.hidden = !show; if (!show) return;
   const c = mapData(h.map); if (!c) return;
   if (W.tickN % 2 === 0) mapUpdate(c);
@@ -11950,6 +12072,14 @@ function drawMap(c) {
   for (let i = 0; i < 128 * 128; i++) { const p = c.px[i]; const col = p ? pal[p - 1] : [222, 206, 168]; img.data[i * 4] = col[0]; img.data[i * 4 + 1] = col[1]; img.data[i * 4 + 2] = col[2]; img.data[i * 4 + 3] = 255; }
   g.putImageData(img, 0, 0);
   const sc = 1 << m.s, toU = x => (x - (m.x - 64 * sc)) / sc, toV = z => (z - (m.z - 64 * sc)) / sc;
+  const MI = PACKPX.ent.map_icons && (MAPS.icons || (MAPS.icons = entCanvas('map_icons'))); // the jar's map_icons.png: 8x8 icons, 16 per row
+  if (MI) {
+    const k = MI.width / 128, icon = (i, u, v, rot) => { g.save(); g.translate(Math.round(u), Math.round(v)); if (rot) g.rotate(rot); g.imageSmoothingEnabled = false; g.drawImage(MI, (i % 16) * 8 * k, Math.floor(i / 16) * 8 * k, 8 * k, 8 * k, -4, -4, 8, 8); g.restore(); };
+    for (const [mx, mz, kind] of m.marks) icon(kind === 'x' ? 26 : kind === 'monument' ? 9 : 8, toU(mx), toV(mz));
+    if (m.dim === W.dim) { let u = toU(PL.x), v = toV(PL.z); const off = u < 0 || v < 0 || u > 127 || v > 127, far = off && (u < -320 || v < -320 || u > 447 || v > 447);
+      u = Math.max(0, Math.min(127, u)); v = Math.max(0, Math.min(127, v)); icon(off ? (far ? 7 : 6) : 0, u, v, off ? 0 : Math.round(-PL.yaw / (Math.PI / 8)) * (Math.PI / 8)); }
+    return;
+  }
   for (const [mx, mz, kind] of m.marks) { const u = toU(mx), v = toV(mz); g.fillStyle = kind === 'x' ? '#c01818' : kind === 'monument' ? '#2a9a8a' : '#6a4a2a'; if (kind === 'x') { g.fillRect(u - 3, v - 1, 7, 2); g.fillRect(u - 1, v - 3, 2, 7); } else { g.fillRect(u - 3, v - 3, 7, 7); g.fillStyle = '#fff'; g.fillRect(u - 1, v - 1, 2, 2); } }
   if (m.dim === W.dim) { // the player: a white arrow (a dot at the map edge when off the map)
     let u = toU(PL.x), v = toV(PL.z); const off = u < 0 || v < 0 || u > 127 || v > 127; u = Math.max(2, Math.min(125, u)); v = Math.max(2, Math.min(125, v));
@@ -12090,7 +12220,7 @@ function zombieVillagerUse(e, h) {
 }
 function zombieVillagerTick(e) {
   if (!e.curing) return;
-  if (e.age % 4 === 0) R.simpleParticle(e.x + (Math.random() - .5) * 0.6, e.y + 1 + Math.random(), e.z + (Math.random() - .5) * 0.6, [0.9, 0.3, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
+  if (e.age % 4 === 0) R.simpleParticle(e.x + (Math.random() - .5) * 0.6, e.y + 1 + Math.random(), e.z + (Math.random() - .5) * 0.6, [0.9, 0.3, 0.3], { kind: 'effect', size: 0.08, vy: 0.4, grav: 0 });
   if (--e.curing > 0) return;
   removeEnt(e); const v = spawnMob('villager', e.x, e.y, e.z, { prof: e.prof || ['farmer', 'librarian', 'cleric', 'armorer'][Math.floor(Math.random() * 4)] }); v.persistent = true;
   addEffect(v, 'nausea', 200, 0); play('levelup', { vol: 0.5 }); UI.advance && UI.advance('cure'); v.rep = (e.rep || 0) + 125; // gossip: major_positive 20 (x5) + minor_positive 25
@@ -12312,7 +12442,7 @@ function parrotAI(e, dist) {
 function parrotUse(e, h) {
   if (h && h.id === IID.cookie) { consume(); addEffect(e, 'poison', 400, 0); hurtMob(e, 999, PL); return true; }
   if (e.owner === 'player') { e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-  if (h && (h.id === IID.wheat_seeds || h.id === IID.melon_seeds || h.id === IID.pumpkin_seeds || h.id === IID.beetroot_seeds)) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.1, vy: 1, grav: 0 }); } return true; }
+  if (h && (h.id === IID.wheat_seeds || h.id === IID.melon_seeds || h.id === IID.pumpkin_seeds || h.id === IID.beetroot_seeds)) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.1, vy: 1, grav: 0 }); } return true; }
   return false;
 }
 function parrotAnim(e, P, now) { const f = e.flying ? Math.sin(now / 50) * 0.9 : 0; if (P.rwing) { P.rwing.rotation.z = -f; P.lwing.rotation.z = f; } }
@@ -12328,7 +12458,7 @@ function ocelotAI(e, dist) {
 }
 function ocelotUse(e, h) {
   if (!h || (h.id !== IID.cod && h.id !== IID.salmon) || e.trusting) return false;
-  consume(); swing(); if (Math.random() < 1 / 3) { e.trusting = true; e.persistent = true; for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.1, vy: 1, grav: 0 }); }
+  consume(); swing(); if (Math.random() < 1 / 3) { e.trusting = true; e.persistent = true; for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.1, vy: 1, grav: 0 }); }
   return true;
 }
 
@@ -12679,7 +12809,7 @@ function launchRocket(x, y, z, st, rider, shot) {
 // the particle pattern of one star
 function burstStar(x, y, z, st) {
   const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
-  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { kind: 'spark', size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
   if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
     const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
     if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }
@@ -12699,7 +12829,7 @@ function rocketExplode(r) {
   for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
 }
 function rocketTick() {
-  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { kind: 'spark', size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
   for (let i = ROCKETS.length - 1; i >= 0; i--) {
     const r = ROCKETS[i];
     if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; }
@@ -13445,7 +13575,7 @@ function villagerLifeTick() {
         const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz, p = JOB_SITES().get(getBlock(x, y, z));
         if (!p || VIL.claimed.has(x + ',' + y + ',' + z)) continue; const d = Math.hypot(dx, dy, dz); if (d < bd) { bd = d; best = [x, y, z, p]; }
       }
-      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { size: 0.1, vy: 1, grav: 0 }); }
+      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { kind: 'happy', size: 0.1, vy: 1, grav: 0 }); }
     }
     if (e.job) VIL.claimed.set(e.job.join(','), e);
     // food lying close by is picked up
@@ -13460,7 +13590,7 @@ function villagerLifeTick() {
     const a = adults[i], b = adults[j]; if (Math.hypot(a.x - b.x, a.z - b.z) > 8 || a.breedCd > W.tickN || b.breedCd > W.tickN) continue;
     a.vfood -= 12; b.vfood -= 12; a.breedCd = b.breedCd = W.tickN + 6000;
     const kid = spawnMob('villager', (a.x + b.x) / 2, a.y, (a.z + b.z) / 2, { baby: true, vtype: a.vtype, prof: 'none' }); kid.persistent = true;
-    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 });
+    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 });
     return;
   }
 }
@@ -13788,10 +13918,12 @@ const meleeBonus = () => 3 * effLv(PL, 'strength') - 4 * effLv(PL, 'weakness');
 const digMul = () => (1 + 0.2 * effLv(PL, 'haste') + 0.2 * effLv(PL, 'conduit_power')) * Math.pow(0.3, Math.min(4, effLv(PL, 'mining_fatigue')));
 // HUD: effects with their level and time left, top right
 const ROMAN_E = ['', '', ' II', ' III', ' IV', ' V'];
+const EFF_URL = {};
+const effIconCss = k => { if (EFF_URL[k] === undefined) { const c = typeof entCanvas === 'function' && entCanvas('effect_' + k); EFF_URL[k] = c ? c.toDataURL() : null; } return EFF_URL[k] ? `background:url(${EFF_URL[k]}) 0 0/100% 100%;image-rendering:pixelated;border:0` : `background:${EFF[k][1]}`; }; // the jar's mob_effect icon
 function renderEffects() {
   const el = document.getElementById('effects'); if (!el) return;
   const list = PL.eff ? Object.entries(PL.eff) : [];
-  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="background:${EFF[k][1]}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
+  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="${effIconCss(k)}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
 }
 // mending: picked-up experience repairs a damaged mending item first (2 durability per point)
 function mendWithXP(v) {
@@ -13912,7 +14044,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
     offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
-    if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+    if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { kind: 'happy', size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
   UI.hudDirty = true;
@@ -14157,7 +14289,7 @@ function attackEntity(e) {
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
-  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { size: 0.08, vy: 1 }); }
+  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
@@ -14323,10 +14455,10 @@ function composterUse(x, y, z, m, h) {
   if ((m & 15) >= 8) { setMeta(x, y, z, 0); dropItem(x + .5, y + 1, z + .5, IID.bone_meal, 1); play('pop'); return; }
   const c = h && COMPOST[ITEMS[h.id].key]; if (!c) return;
   consume(); swing();
-  if (Math.random() < c) { const lv = (m & 15) + 1; setMeta(x, y, z, lv); for (let i = 0; i < 6; i++) R.simpleParticle(x + .3 + Math.random() * .4, y + 1, z + .3 + Math.random() * .4, [0.3, 0.8, 0.2], { size: 0.08, vy: 0.5 }); }
+  if (Math.random() < c) { const lv = (m & 15) + 1; setMeta(x, y, z, lv); for (let i = 0; i < 6; i++) R.simpleParticle(x + .3 + Math.random() * .4, y + 1, z + .3 + Math.random() * .4, [0.3, 0.8, 0.2], { kind: 'happy', size: 0.08, vy: 0.5 }); }
   play('place', { mat: 'grass', vol: 0.6 });
 }
-function playNote(x, y, z, n) { const b = getBlock(x, y - 1, z), inst = b === BID.sand || b === BID.gravel ? 'snare' : OPQ[b] && BLOCKS[b].tool === S.TOOL.PICK ? 'bass' : 'harp'; play('note', { pitch: Math.pow(2, (n - 12) / 12), inst }); R.simpleParticle(x + .5, y + 1.2, z + .5, [n / 24, 1 - n / 24, 0.5], { size: 0.2, vy: 0.5, grav: 0, life: 0.6 }); }
+function playNote(x, y, z, n) { const b = getBlock(x, y - 1, z), inst = b === BID.sand || b === BID.gravel ? 'snare' : OPQ[b] && BLOCKS[b].tool === S.TOOL.PICK ? 'bass' : 'harp'; play('note', { pitch: Math.pow(2, (n - 12) / 12), inst }); R.simpleParticle(x + .5, y + 1.2, z + .5, [n / 24, 1 - n / 24, 0.5], { kind: 'note', size: 0.2, vy: 0.5, grav: 0, life: 0.6 }); }
 // horizontal facing of the player: 0 north (-z), 1 east, 2 south, 3 west
 function facingDir() { const a = ((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); return [0, 3, 2, 1][Math.round(a / (Math.PI / 2)) % 4]; }
 function entityBlocks(x, y, z) {
@@ -14364,7 +14496,7 @@ function useItem(first) {
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
     if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
-    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
+    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }
   if (t && t.type === 'block') {
@@ -14453,7 +14585,7 @@ function placeEndCrystal(t) {
   return true;
 }
 function boneMeal(x, y, z, id) {
-  for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
+  for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.08, vy: 0.4, grav: 0 });
   const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
   if (id === BID.wheat) { setMeta(x, y, z, Math.min(7, getMeta(x, y, z) + 2 + Math.floor(Math.random() * 4))); return true; }
   if (id === BID.stem) { const m = getMeta(x, y, z); if (m & 16 || (m & 7) === 7) return false; setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
@@ -14635,7 +14767,7 @@ function useRod() {
 }
 function bobberTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1;
-  if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
+  if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { kind: 'splash', size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
   else e.vy -= 0.04;
   physMove(e, e.vx, e.vy, e.vz); e.vx *= 0.92; e.vz *= 0.92;
   const h = PL.held(); if (!h || h.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e);
@@ -14816,6 +14948,34 @@ const SPR_HUD = {
   armorEmpty: hudSprite(['kk...kk', 'kEkkkEk', 'kEEEEEk', 'kEEEEEk', '.kEEEk.', '.kEEEk.', '..kkk..'], { k: '#2a2a2a', E: '#4a4a4a' }),
   bubble: hudSprite(['..bbb..', '.bwllb.', 'bwlllb.', 'bllllb.', '.bllb..', '..bb...', '.......'].map(r => r), { b: '#1a3a8a', w: '#ffffff', l: '#6aa8ff' }),
 };
+SPR_HUD.poison = mkHeart(1, 1, '#94841c', '#c8c060'); SPR_HUD.poisonHalf = mkHeart(1, 0, '#94841c', '#c8c060');
+SPR_HUD.wither = mkHeart(1, 1, '#2a2a2a', '#6a6a6a'); SPR_HUD.witherHalf = mkHeart(1, 0, '#2a2a2a', '#6a6a6a');
+SPR_HUD.frozen = mkHeart(1, 1, '#6ac8e8', '#e0f8ff'); SPR_HUD.frozenHalf = mkHeart(1, 0, '#6ac8e8', '#e0f8ff');
+SPR_HUD.hardHalf = mkHeart(1, 0, '#b01010', '#ffd0d0'); SPR_HUD.goldHalf = mkHeart(1, 0, '#e8c020', '#fff2a0');
+SPR_HUD.hunger = SPR_HUD.food; SPR_HUD.hungerHalf = SPR_HUD.foodHalf; SPR_HUD.hungerEmpty = SPR_HUD.foodEmpty; SPR_HUD.pop = SPR_HUD.bubble;
+// a loaded client.jar / pack: the HUD from its gui/icons.png and gui/widgets.png (hearts are a container plus a fill, as in Java)
+function applyGuiPack() {
+  const crop = (key, x, y, w, h, base, under) => { const e = PACKPX.ent[key]; if (!e) return null; const k = e.w / base, c = document.createElement('canvas'); c.width = w * k; c.height = h * k; const g = c.getContext('2d');
+    const src = document.createElement('canvas'); src.width = e.w; src.height = e.h; src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0);
+    for (const [ux, uy] of under || []) g.drawImage(src, ux * k, uy * k, w * k, h * k, 0, 0, w * k, h * k);
+    if (x != null) g.drawImage(src, x * k, y * k, w * k, h * k, 0, 0, w * k, h * k); return c; };
+  const css = document.documentElement.style;
+  if (PACKPX.ent.gui_icons) {
+    const ic = (x, y, bg) => crop('gui_icons', x, y, 9, 9, 256, bg ? [bg] : null).toDataURL(), H = [16, 0], HH = [16, 45], F = [16, 27];
+    Object.assign(SPR_HUD, { heart: ic(52, 0, H), half: ic(61, 0, H), empty: ic(null, null, H), gold: ic(160, 0, H), goldHalf: ic(169, 0, H), hard: ic(52, 45, HH), hardHalf: ic(61, 45, HH),
+      poison: ic(88, 0, H), poisonHalf: ic(97, 0, H), wither: ic(124, 0, H), witherHalf: ic(133, 0, H), frozen: ic(178, 0, H), frozenHalf: ic(187, 0, H),
+      food: ic(52, 27, F), foodHalf: ic(61, 27, F), foodEmpty: ic(null, null, F), hunger: ic(88, 27, [133, 27]), hungerHalf: ic(97, 27, [133, 27]), hungerEmpty: ic(null, null, [133, 27]),
+      armor: ic(34, 9), armorHalf: ic(25, 9), armorEmpty: ic(16, 9), bubble: ic(16, 18), pop: ic(25, 18) });
+    css.setProperty('--g-cross', `url(${crop('gui_icons', 0, 0, 15, 15, 256).toDataURL()})`);
+    css.setProperty('--g-xpbg', `url(${crop('gui_icons', 0, 64, 182, 5, 256).toDataURL()})`); css.setProperty('--g-xp', `url(${crop('gui_icons', 0, 69, 182, 5, 256).toDataURL()})`);
+    document.body.classList.add('vicons');
+  }
+  if (PACKPX.ent.gui_widgets) {
+    css.setProperty('--g-hotbar', `url(${crop('gui_widgets', 0, 0, 182, 22, 256).toDataURL()})`); css.setProperty('--g-sel', `url(${crop('gui_widgets', 0, 22, 24, 22, 256).toDataURL()})`);
+    css.setProperty('--g-offl', `url(${crop('gui_widgets', 24, 22, 29, 24, 256).toDataURL()})`); css.setProperty('--g-offr', `url(${crop('gui_widgets', 53, 22, 29, 24, 256).toDataURL()})`);
+    document.body.classList.add('vwidgets');
+  }
+}
 function icon(id, n, d, e) {
   if (!id) return '';
   const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
@@ -14849,15 +15009,18 @@ function renderHud(dt) {
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
-    for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
-    if (PL.absorb > 0) for (let i = 0; i < Math.ceil(PL.absorb / 2); i++) hearts.push(`<img src="${SPR_HUD.gold}">`);
+    const kind = effLv(PL, 'poison') ? 'poison' : effLv(PL, 'wither') ? 'wither' : PL.frozen >= 140 ? 'frozen' : hard ? 'hard' : 'heart'; // Java's heart types
+    const full = SPR_HUD[kind], halfS = kind === 'heart' ? SPR_HUD.half : SPR_HUD[kind + 'Half'];
+    for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? full : v === 1 ? halfS : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
+    if (PL.absorb > 0) { const ab = Math.ceil(PL.absorb); for (let i = 0; i < Math.ceil(ab / 2); i++) hearts.push(`<img src="${ab - i * 2 >= 2 ? SPR_HUD.gold : SPR_HUD.goldHalf}">`); }
     $('hearts').innerHTML = hearts.join('');
-    const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD.food : v === 1 ? SPR_HUD.foodHalf : SPR_HUD.foodEmpty}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }
+    const hu = effLv(PL, 'hunger') ? 'hunger' : 'food';
+    const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD[hu] : v === 1 ? SPR_HUD[hu + 'Half'] : SPR_HUD[hu + 'Empty']}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }
     $('food').innerHTML = fd.join('');
     const [ap] = armorPoints(); const ar = [];
     if (ap > 0) for (let i = 0; i < 10; i++) { const v = ap - i * 2; ar.push(`<img src="${v >= 2 ? SPR_HUD.armor : v === 1 ? SPR_HUD.armorHalf : SPR_HUD.armorEmpty}">`); }
     $('armorbar').innerHTML = ar.join('');
-    const air = []; if (PL.air < 300) { const n = Math.ceil(Math.max(0, PL.air) / 30); for (let i = 0; i < n; i++) air.push(`<img src="${SPR_HUD.bubble}">`); }
+    const air = []; if (PL.air < 300) { const full = Math.floor(Math.max(0, PL.air) * 10 / 300), pop = Math.ceil(Math.max(0, PL.air) * 10 / 300) - full; for (let i = 0; i < full; i++) air.push(`<img src="${SPR_HUD.bubble}">`); if (pop) air.push(`<img src="${SPR_HUD.pop}">`); }
     $('air').innerHTML = air.join('');
   }
   $('xpbar').firstElementChild.style.width = (PL.xpP * 100) + '%';
@@ -15616,7 +15779,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light) {
-  const ud = m.userData, key = INV.armor.map(s => s ? s.id : 0).join(',');
+  const ud = m.userData, key = INV.armor.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
     for (const a of ud.armor) { a.parent.remove(a); a.material.dispose(); } ud.armor = [];
@@ -15638,11 +15801,12 @@ function updateArmor(m, light) {
         const mesh = new THREE.SkinnedMesh(geo, mat); mesh.bind(ud.skel, ud.main.bindMatrix); mesh.frustumCulled = false; m.add(mesh); ud.armor.push(mesh);
       };
       add(tex, a.mat === 'leather' ? new THREE.Color(0xa06540) : null);
+      if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });
     if (ud.mat2) ud.mat2.visible = elytra;
   }
-  for (const a of ud.armor) { if (a.userData.item) R.setMeshLight(a.userData.item, light); else if (a.material.color) { a.material.color.setScalar(light); if (a.material.userData.col) a.material.color.multiply(a.material.userData.col); } }
+  for (const a of ud.armor) { if (a.userData.glint) continue; if (a.userData.item) R.setMeshLight(a.userData.item, light); else if (a.material.color) { a.material.color.setScalar(light); if (a.material.userData.col) a.material.color.multiply(a.material.userData.col); } }
 }
 // items in the hands (HeldItemFeatureRenderer + the item models' third-person display transforms)
 const HANDHELD = id => { const d = ITEMS[id]; if (!d) return false; if (d.tool) return true; return /^(stick|bone|blaze_rod|bamboo|fishing_rod|carrot_on_a_stick|warped_fungus_on_a_stick|debug_stick)$/.test(d.key); };
@@ -15662,11 +15826,11 @@ const mainRight = () => typeof OPT === 'undefined' || OPT.mainHand !== 'left';
 function updateHeld(m, items, light) {
   const ud = m.userData;
   items.forEach((st, k) => {
-    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, key = id + (rightArm ? 'r' : 'l');
+    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, gl = st && (st.e || ITEMS[id].glint), key = id + (rightArm ? 'r' : 'l') + (gl ? 'g' : '');
     if (ud.heldKey[k] !== key) {
       ud.heldKey[k] = key; const old = ud.held[k]; if (old) { old.parent.remove(old); old.userData.item.material.dispose(); } ud.held[k] = null;
       if (id > 0) {
-        const im = R.itemMesh(id), g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, !rightArm, im.userData.isBlock)); g.add(im); g.userData.item = im;
+        const im = R.itemMesh(id), g = new THREE.Group(); if (gl) R.addGlint(im); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, !rightArm, im.userData.isBlock)); g.add(im); g.userData.item = im;
         (rightArm ? ud.parts.rarm : ud.parts.larm).add(g); ud.held[k] = g;
       }
     }
@@ -16188,7 +16352,7 @@ function frame(now) {
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
   const h = PL.held();
   const hb = OPT.bob ? PL.bobAmt || 0 : 0, bob = PL.bobPrev + (PL.bob - PL.bobPrev) * alpha;
-  { const [mh, oh] = handItems(); R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
+  { const [mh, oh] = handItems(); R.hand.glint = [mh && (mh.e || ITEMS[mh.id].glint), oh && (oh.e || ITEMS[oh.id].glint)]; R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
@@ -16253,10 +16417,10 @@ function ambientParticles(dt, px, py, pz) {
     const x = ambList[k], y = ambList[k + 1], z = ambList[k + 2], b = ambList[k + 3], m = ambList[k + 4];
     if (b === BID.torch) {
       let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.2; }
-      R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
-      if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
+      R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { kind: 'flame', vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
+      if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { kind: 'smoke', vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
     } else if (Math.random() < 0.3) {
-      R.simpleParticle(x + 0.3 + Math.random() * 0.4, y + 0.2 + Math.random() * 0.3, z + 0.3 + Math.random() * 0.4, [1, 0.6, 0.15], { vx: 0, vz: 0, vy: 0.1, size: 0.05, life: 0.4, grav: 0 });
+      R.simpleParticle(x + 0.3 + Math.random() * 0.4, y + 0.2 + Math.random() * 0.3, z + 0.3 + Math.random() * 0.4, [1, 0.6, 0.15], { kind: 'flame', vx: 0, vz: 0, vy: 0.1, size: 0.05, life: 0.4, grav: 0 });
     }
   }
 }
@@ -16276,6 +16440,7 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }

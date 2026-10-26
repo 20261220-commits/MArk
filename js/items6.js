@@ -118,7 +118,7 @@ function launchRocket(x, y, z, st, rider, shot) {
 // the particle pattern of one star
 function burstStar(x, y, z, st) {
   const cols = (st.colors.length ? st.colors : [0]).map(dyeRGB), fade = st.fade && st.fade.length ? st.fade.map(dyeRGB) : null, life = st.trail ? 2.2 : 1.3;
-  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
+  const P = (vx, vy, vz, k) => { R.simpleParticle(x, y, z, cols[k % cols.length], { kind: 'spark', size: 0.32, vx, vy, vz, grav: 0.2, life, fade: fade ? fade[k % fade.length] : null }); if (st.twinkle) SPARKS.push({ t: W.tickN + 14 + Math.floor(Math.random() * 10), x: x + vx * 0.6, y: y + vy * 0.6, z: z + vz * 0.6, col: [1, 1, 1], tw: true }); };
   if (st.shape === 2 || st.shape === 3) { // flat shapes, turned to a random heading
     const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), pts = [];
     if (st.shape === 2) for (let k = 0; k < 10; k++) { const r0 = k % 2 ? 0.45 : 1, r1 = k % 2 ? 1 : 0.45, t0 = k / 10 * Math.PI * 2, t1 = (k + 1) / 10 * Math.PI * 2; for (let j = 0; j < 6; j++) { const f = j / 6, r = r0 + (r1 - r0) * f, t = t0 + (t1 - t0) * f; pts.push([Math.sin(t) * r, Math.cos(t) * r]); } }
@@ -138,7 +138,7 @@ function rocketExplode(r) {
   for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
 }
 function rocketTick() {
-  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
+  for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { kind: 'spark', size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
   for (let i = ROCKETS.length - 1; i >= 0; i--) {
     const r = ROCKETS[i];
     if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; }

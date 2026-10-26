@@ -95,7 +95,7 @@ function horseRide(e) {
     if (++e.rideT > 30 + Math.random() * 30) {
       e.rideT = 0;
       if (Math.random() * 100 < e.temper) horseTame(e);
-      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); }
+      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); }
     }
     return;
   }
@@ -108,7 +108,7 @@ function horseRide(e) {
   walkPhysics(e, f || s ? mx / l : 0, f || s ? mz / l : 0, f || s ? sp : 0);
   e.fallY = null; PL.fallDist = 0;
 }
-function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); ADVT.tamed(e); }
+function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); ADVT.tamed(e); }
 function horseInteract(e, h, d) {
   if (e.baby) { if (d && (h.id === IID.golden_apple || h.id === IID.golden_carrot || h.id === IID.apple || h.id === IID.wheat || h.id === IID.sugar)) { e.baby = Math.max(1, e.baby - 2400); consume(); swing(); return true; } return false; }
   const tame = e.owner === 'player';
@@ -185,8 +185,8 @@ function catInteract(e, h, d) {
   }
   if (d && (h.id === IID.cod || h.id === IID.salmon)) {
     consume(); swing();
-    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 }); }
-    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { size: 0.12, vy: 1, grav: 0 });
+    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 }); }
+    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.12, vy: 1, grav: 0 });
     return true;
   }
   return false;

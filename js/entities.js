@@ -370,8 +370,8 @@ function dropItem(x, y, z, id, n, vel, delay = 10, dur, extra) {
   const e = Ent('item', x, y, z); e.kind = 'item'; e.w = 0.125; e.h = 0.25; e.stack = extra ? { ...extra, id, n } : { id, n }; if (dur != null) e.stack.d = dur; else if (extra) delete e.stack.d;
   e.vx = vel ? vel[0] : (Math.random() - .5) * 0.2; e.vy = vel ? vel[1] : 0.2; e.vz = vel ? vel[2] : (Math.random() - .5) * 0.2;
   e.pickup = delay; e.spin = Math.random() * 6;
-  const m = R.itemMesh(id); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
-  if (n > 1) { const m2 = R.itemMesh(id); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
+  const gl = (extra && extra.e) || ITEMS[id].glint, m = R.itemMesh(id); if (gl) R.addGlint(m); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
+  if (n > 1) { const m2 = R.itemMesh(id); if (gl) R.addGlint(m2); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
   return addEnt(e);
 }
 function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropItem(x, y, z, st.id, st.n, vel, delay, st.d, st); }
@@ -431,7 +431,7 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
-  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
+  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
   const hit = (e, isPl) => {
@@ -539,7 +539,7 @@ function mobTick(e) {
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
-  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
@@ -798,7 +798,7 @@ function spawnerTick() {
       if (t.type !== 'spawner') continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
-      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
+      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
       t.delay = 200 + Math.floor(Math.random() * 600);
       if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - x, e.z - z) < 9) >= 6) continue;

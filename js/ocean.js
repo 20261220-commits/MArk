@@ -49,8 +49,8 @@ function conduitTick() {
     if (!t.on) continue;
     const range = Math.floor(n / 7) * 16;
     if (Math.hypot(PL.x - x - .5, PL.y - y, PL.z - z - .5) < range && (PL.inWater || (W.rain > 0.5 && W.dim === 0))) addEffect(PL, 'conduit_power', 260, 0);
-    if (n >= 42) { const foe = ENT.find(e => e.kind === 'mob' && !e.dead && e.def.hostile && e.inWater && Math.hypot(e.x - x, e.y - y, e.z - z) < 8); if (foe) { hurtMob(foe, 4, null); for (let i = 0; i < 6; i++) R.simpleParticle(foe.x, foe.y + foe.h / 2, foe.z, [0.4, 0.8, 1], { size: 0.12, vy: 0.6 }); } }
-    if (Math.random() < 0.3) R.simpleParticle(x + .5 + (Math.random() - .5) * 3, y + .5 + (Math.random() - .5) * 3, z + .5 + (Math.random() - .5) * 3, [0.5, 0.8, 0.9], { size: 0.08, vy: 0.2, grav: 0, life: 1 });
+    if (n >= 42) { const foe = ENT.find(e => e.kind === 'mob' && !e.dead && e.def.hostile && e.inWater && Math.hypot(e.x - x, e.y - y, e.z - z) < 8); if (foe) { hurtMob(foe, 4, null); for (let i = 0; i < 6; i++) R.simpleParticle(foe.x, foe.y + foe.h / 2, foe.z, [0.4, 0.8, 1], { kind: 'bubble', size: 0.12, vy: 0.6 }); } }
+    if (Math.random() < 0.3) R.simpleParticle(x + .5 + (Math.random() - .5) * 3, y + .5 + (Math.random() - .5) * 3, z + .5 + (Math.random() - .5) * 3, [0.5, 0.8, 0.9], { kind: 'bubble', size: 0.08, vy: 0.2, grav: 0, life: 1 });
   }
 }
 

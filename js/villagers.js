@@ -22,7 +22,7 @@ function villagerLifeTick() {
         const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz, p = JOB_SITES().get(getBlock(x, y, z));
         if (!p || VIL.claimed.has(x + ',' + y + ',' + z)) continue; const d = Math.hypot(dx, dy, dz); if (d < bd) { bd = d; best = [x, y, z, p]; }
       }
-      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { size: 0.1, vy: 1, grav: 0 }); }
+      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { kind: 'happy', size: 0.1, vy: 1, grav: 0 }); }
     }
     if (e.job) VIL.claimed.set(e.job.join(','), e);
     // food lying close by is picked up
@@ -37,7 +37,7 @@ function villagerLifeTick() {
     const a = adults[i], b = adults[j]; if (Math.hypot(a.x - b.x, a.z - b.z) > 8 || a.breedCd > W.tickN || b.breedCd > W.tickN) continue;
     a.vfood -= 12; b.vfood -= 12; a.breedCd = b.breedCd = W.tickN + 6000;
     const kid = spawnMob('villager', (a.x + b.x) / 2, a.y, (a.z + b.z) / 2, { baby: true, vtype: a.vtype, prof: 'none' }); kid.persistent = true;
-    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 });
+    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 });
     return;
   }
 }

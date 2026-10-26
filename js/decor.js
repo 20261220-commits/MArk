@@ -14,6 +14,8 @@ const PAINTINGS = [ // key, width, height (blocks), palette
 const paintTex = {};
 function paintingTexture(key) {
   if (paintTex[key]) return paintTex[key];
+  const pc = typeof entCanvas === 'function' && entCanvas('painting_' + key); // the game's own painting, when a jar or pack has it
+  if (pc) { const t = new THREE.CanvasTexture(pc); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return paintTex[key] = t; }
   const [, w, h, pal] = PAINTINGS.find(p => p[0] === key), c = document.createElement('canvas'); c.width = w * 16; c.height = h * 16;
   const g = c.getContext('2d'), r = trng(key.length * 131 + key.charCodeAt(1));
   g.fillStyle = pal[1]; g.fillRect(0, 0, c.width, c.height);
@@ -116,6 +118,8 @@ const DYE_HEX = ['#f9fffe', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f
 const bannerTex = {};
 function bannerTexture(base, pats) {
   const key = base + ':' + JSON.stringify(pats || []); if (bannerTex[key]) return bannerTex[key];
+  const cl = typeof bannerCloth === 'function' && bannerCloth(base, pats);
+  if (cl) { const c = document.createElement('canvas'); c.width = BW; c.height = BH; c.getContext('2d').putImageData(new ImageData(cl, BW, BH), 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return bannerTex[key] = t; }
   const c = document.createElement('canvas'); c.width = BW; c.height = BH; const g = c.getContext('2d'), img = g.createImageData(BW, BH), r = trng(9);
   const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const col = new Array(BW * BH).fill(0).map(() => hexRGB(DYE_HEX[base]));

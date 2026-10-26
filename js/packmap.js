@@ -78,7 +78,7 @@ function toGray(px, mean) {
 }
 const TINTED = new Set(['grass_top', 'short_grass', 'fern', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top', 'sugar_cane', 'oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves', 'lily_pad', 'vine', 'redstone_dust_dot', 'redstone_dust_line0', 'redstone_dust_line1', 'melon_stem', 'pumpkin_stem', 'attached_melon_stem', 'attached_pumpkin_stem']);
 // item key -> item/ texture (block/ prefix for items drawn with a block texture)
-const ITEM = {};
+const ITEM = { enchanted_golden_apple: 'item/golden_apple' };
 for (const k of ('stick coal charcoal iron_ingot gold_ingot iron_nugget gold_nugget diamond emerald lapis_lazuli redstone flint flint_and_steel string feather gunpowder bone ' +
   'bone_meal arrow bow leather wheat_seeds wheat bread apple golden_apple porkchop cooked_porkchop beef cooked_beef chicken cooked_chicken mutton cooked_mutton ' +
   'rotten_flesh melon_slice mushroom_stew bowl sugar paper book bucket water_bucket lava_bucket milk_bucket snowball clay_ball brick shears egg saddle name_tag ink_sac ' +
@@ -160,6 +160,25 @@ for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
+// the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
+Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
+  env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
+  pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
+  banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
+  conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book' });
+for (const n of ['kebab', 'aztec', 'alban', 'aztec2', 'bomb', 'plant', 'wasteland', 'pool', 'courbet', 'sea', 'sunset', 'creebet', 'wanderer', 'graham', 'match', 'bust', 'stage', 'void',
+  'skull_and_roses', 'wither', 'fighters', 'skeleton', 'donkey_kong', 'pointer', 'pigscene', 'burning_skull', 'back']) ENT['painting_' + n] = 'painting/' + n;
+for (const n of ['base', 'border', 'bricks', 'circle', 'creeper', 'cross', 'curly_border', 'diagonal_left', 'diagonal_right', 'diagonal_up_left', 'diagonal_up_right', 'flower', 'globe', 'gradient',
+  'gradient_up', 'half_horizontal', 'half_horizontal_bottom', 'half_vertical', 'half_vertical_right', 'mojang', 'piglin', 'rhombus', 'skull', 'small_stripes', 'square_bottom_left', 'square_bottom_right',
+  'square_top_left', 'square_top_right', 'straight_cross', 'stripe_bottom', 'stripe_center', 'stripe_downleft', 'stripe_downright', 'stripe_left', 'stripe_middle', 'stripe_right', 'stripe_top',
+  'triangle_bottom', 'triangle_top', 'triangles_bottom', 'triangles_top']) ENT['banner_' + n] = 'entity/banner/' + n;
+for (const n of ['absorption', 'bad_omen', 'blindness', 'conduit_power', 'dolphins_grace', 'fire_resistance', 'glowing', 'haste', 'health_boost', 'hero_of_the_village', 'hunger', 'invisibility',
+  'jump_boost', 'levitation', 'luck', 'mining_fatigue', 'nausea', 'night_vision', 'poison', 'regeneration', 'resistance', 'saturation', 'slow_falling', 'slowness', 'speed', 'strength', 'unluck',
+  'water_breathing', 'weakness', 'wither', 'instant_health', 'instant_damage']) ENT['effect_' + n] = 'mob_effect/' + n;
+for (const n of ['angry', 'bubble', 'bubble_pop_0', 'critical_hit', 'damage', 'drip_fall', 'drip_hang', 'drip_land', 'effect_0', 'enchanted_hit', 'explosion_0', 'flame', 'glint', 'glitter_0', 'glow', 'heart',
+  'lava', 'note', 'soul_fire_flame', 'spark_0', 'spell_0', 'splash_0', 'generic_0', 'generic_1', 'generic_2', 'generic_3', 'generic_4', 'generic_5', 'generic_6', 'generic_7', 'big_smoke_0', 'big_smoke_4',
+  'snowflake', 'spit', 'nautilus', 'witch', 'flash']) ENT['particle_' + n] = 'particle/' + n;
+for (const [n, k] of [['generic', 8], ['splash', 4], ['effect', 8], ['spell', 8], ['explosion', 16], ['spark', 8], ['big_smoke', 12], ['sweep', 8]]) for (let i = 0; i < k; i++) ENT['particle_' + n + '_' + i] = 'particle/' + n + '_' + i;
 // tiles not in TILE are looked up under their own name (or these vanilla 1.17 names); files renamed in 1.17
 const TILE_117 = { pointed_dripstone: 'pointed_dripstone_down_tip', small_dripleaf: 'small_dripleaf_stem_bottom', sculk_sensor_tendril: 'sculk_sensor_tendril_inactive' };
 const ENT_ALT = { 'entity/squid': 'entity/squid/squid' };
@@ -232,6 +251,21 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       const rot = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + y) * W + sx + x) * 4, d = (y * 16 + x) * 4; for (let c = 0; c < 4; c++) t[d + c] = P[s + c]; } return t; };
       const side = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = ((6 + x) * W + r) * 4, d = ((3 + r) * 16 + x) * 4; for (let k = 0; k < 4; k++) side[d + k] = P[s + k]; side[d + 3] = 255; }
       out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28)); out.tiles['bed_side' + sfx] = put(side);
+    }
+  }
+  { // tiles Java draws from entity / particle / item textures: nearest-neighbour scaled into 16x16
+    const region = (name, f, bw, x, y, w, h) => {
+      if (out.tiles[name] != null) return; const img = load(f); if (!img) return; const k = img.w / bw, t = new Uint8Array(16 * 16 * 4);
+      for (let ty = 0; ty < 16; ty++) for (let tx = 0; tx < 16; tx++) { const sx = Math.floor((x + tx * w / 16) * k), sy = Math.floor((y + ty * h / 16) * k), si = (sy * img.w + sx) * 4, d = (ty * 16 + tx) * 4; for (let c = 0; c < 4; c++) t[d + c] = img.px[si + c]; }
+      out.tiles[name] = put(t);
+    };
+    region('candle_flame', 'particle/flame', 8, 0, 0, 8, 8); region('brewing_bottle', 'item/glass_bottle', 16, 0, 0, 16, 16);
+    region('bell_body', 'entity/bell/bell_body', 32, 6, 6, 6, 7); region('dragon_head_front', 'entity/enderdragon/dragon', 256, 128, 46, 16, 16);
+    region('dragon_head_side', 'entity/enderdragon/dragon', 256, 112, 46, 16, 16); region('lectern_book', 'entity/enchanting_table_book', 64, 0, 0, 16, 10);
+    region('end_portal', 'entity/end_portal', 256, 0, 0, 16, 16);
+    const cd = load('block/candle'); if (cd && out.tiles.candle_wick == null) { // the wick: the candle texture's darkest pixel
+      let best = null, bl = 1e9; for (let i = 0; i < cd.px.length; i += 4) if (cd.px[i + 3] > 128) { const l = cd.px[i] + cd.px[i + 1] + cd.px[i + 2]; if (l < bl) { bl = l; best = i; } }
+      if (best != null) { const t = new Uint8Array(16 * 16 * 4); for (let i = 0; i < t.length; i += 4) for (let c = 0; c < 4; c++) t[i + c] = cd.px[best + c]; out.tiles.candle_wick = put(t); }
     }
   }
   for (const [k, f] of Object.entries(ITEM)) {

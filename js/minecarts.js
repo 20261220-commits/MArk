@@ -211,8 +211,8 @@ function cartTick(e) {
   if (e.passenger) { const p = e.passenger; if (p.dead || p.cart !== e) e.passenger = null; else { p.x = e.x; p.y = e.y + 0.1; p.z = e.z; p.vx = p.vy = p.vz = 0; } }
   if (e.rider === PL) { PL.x = e.x; PL.y = e.y + e.rideY; PL.z = e.z; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; }
   // loads
-  if (e.ctype === 'tnt' && e.fuse > 0) { if (--e.fuse <= 0) { tntCartExplode(e); return; } if (e.age % 2) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.6, 0.6, 0.6], { size: 0.12, vy: 0.4, grav: -0.02, life: 0.5 }); }
-  if (e.ctype === 'furnace' && e.fuel > 0) { e.fuel--; if (e.age % 3 === 0) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.3, 0.3, 0.3], { size: 0.25, vy: 0.5, grav: -0.04, life: 1 }); }
+  if (e.ctype === 'tnt' && e.fuse > 0) { if (--e.fuse <= 0) { tntCartExplode(e); return; } if (e.age % 2) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.6, 0.6, 0.6], { kind: 'smoke', size: 0.12, vy: 0.4, grav: -0.02, life: 0.5 }); }
+  if (e.ctype === 'furnace' && e.fuel > 0) { e.fuel--; if (e.age % 3 === 0) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.25, vy: 0.5, grav: -0.04, life: 1 }); }
   if (e.ctype === 'hopper' && e.age % 4 === 0) cartTransfer(e);
   if (e.y < -40) removeEnt(e);
 }

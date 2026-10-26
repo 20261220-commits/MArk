@@ -10,7 +10,7 @@ const NO_ITEM = new Set(['air', 'water', 'lava', 'wheat', 'farmland', 'lit_furna
 const SPRITE_BLOCKS = { short_grass: 'short_grass', fern: 'fern', dandelion: 'dandelion', poppy: 'poppy', cornflower: 'cornflower', oxeye_daisy: 'oxeye_daisy',
   dead_bush: 'dead_bush', sugar_cane: 'sugar_cane_item', oak_sapling: 'oak_sapling', spruce_sapling: 'spruce_sapling', birch_sapling: 'birch_sapling', torch: 'torch',
   amethyst_cluster: 'amethyst_cluster', spore_blossom: 'spore_blossom', small_dripleaf: 'small_dripleaf_top', hanging_roots: 'hanging_roots', small_amethyst_bud: 'small_amethyst_bud', medium_amethyst_bud: 'medium_amethyst_bud', large_amethyst_bud: 'large_amethyst_bud', pointed_dripstone: 'pointed_dripstone', glow_lichen: 'glow_lichen', ladder: 'ladder', cobweb: 'cobweb', brown_mushroom: 'brown_mushroom', red_mushroom: 'red_mushroom',
-  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', bamboo: 'bamboo_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', red_bed: 'bed_item', lantern: 'lantern_item' };
+  oak_door: 'oak_door_item', kelp: 'kelp', seagrass: 'seagrass', bamboo: 'bamboo_item', rail: 'rail', powered_rail: 'powered_rail', detector_rail: 'detector_rail', activator_rail: 'activator_rail', lantern: 'lantern_item' };
 for (const b of BLOCKS) {
   if (!b || NO_ITEM.has(b.key)) continue;
   ITEMS[b.id] = { id: b.id, key: b.key, name: b.name, stack: 64, place: b.id, block: b, sprite: SPRITE_BLOCKS[b.key] || null };
@@ -124,7 +124,7 @@ S.COLORS.forEach((c, i) => item(c + '_candle', S.COLKO[i] + ' 양초', { candle:
 item('tropical_fish', '열대어', { food: [1, 0.2] });
 item('axolotl_bucket', '아홀로틀 양동이', { stack: 1 }); item('tropical_fish_bucket', '열대어 양동이', { stack: 1 });
 item('pufferfish_bucket', '복어 양동이', { stack: 1 }); item('cod_bucket', '대구 양동이', { stack: 1 }); item('salmon_bucket', '연어 양동이', { stack: 1 });
-Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' }); ITEMS[IID.lightning_rod].sprite = 'lightning_rod_item';
+Object.assign(ITEMS[IID.candle], { candle: -1, sprite: 'candle_item' });
 // ---- everything below is newer than the item id table (see the end of this file), so its order is free ----
 item('glow_berries', '발광 열매', { food: [2, 0.4] });
 item('enchanted_golden_apple', '마법이 부여된 황금 사과', { food: [4, 9.6], always: 1, glint: 1, sprite: 'golden_apple', eff: [['regeneration', 400, 1], ['absorption', 2400, 3], ['resistance', 6000, 0], ['fire_resistance', 6000, 0]] });

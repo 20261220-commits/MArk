@@ -149,7 +149,7 @@ function illagerAI(e, dist) {
   if (e.raidMove) { [mx, mz] = e.raidMove; e.raidMove = null; }
   // ravagers trample crops and tear through leaves
   if (d.ravager && e.hitH) { const fx = Math.floor(e.x + Math.sign(e.vx || mx) * 1.2), fz = Math.floor(e.z + Math.sign(e.vz || mz) * 1.2); for (let dy = 0; dy < 3; dy++) { const b = getBlock(fx, Math.floor(e.y) + dy, fz); if (S.LEAF[b] || RTYPE[b] === RT.CROP) { breakNaturally(fx, Math.floor(e.y) + dy, fz, b, getMeta(fx, Math.floor(e.y) + dy, fz)); } } }
-  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { size: 0.12, vy: 0.5, grav: 0 }); }
+  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { kind: 'angry', size: 0.12, vy: 0.5, grav: 0 }); }
   walkPhysics(e, mx, mz, sp);
 }
 function illagerAnim(e, P) {

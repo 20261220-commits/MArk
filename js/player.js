@@ -105,7 +105,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
     offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
-    if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
+    if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { kind: 'happy', size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
   if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
   UI.hudDirty = true;
@@ -350,7 +350,7 @@ function attackEntity(e) {
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
-  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { size: 0.08, vy: 1 }); }
+  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
@@ -516,10 +516,10 @@ function composterUse(x, y, z, m, h) {
   if ((m & 15) >= 8) { setMeta(x, y, z, 0); dropItem(x + .5, y + 1, z + .5, IID.bone_meal, 1); play('pop'); return; }
   const c = h && COMPOST[ITEMS[h.id].key]; if (!c) return;
   consume(); swing();
-  if (Math.random() < c) { const lv = (m & 15) + 1; setMeta(x, y, z, lv); for (let i = 0; i < 6; i++) R.simpleParticle(x + .3 + Math.random() * .4, y + 1, z + .3 + Math.random() * .4, [0.3, 0.8, 0.2], { size: 0.08, vy: 0.5 }); }
+  if (Math.random() < c) { const lv = (m & 15) + 1; setMeta(x, y, z, lv); for (let i = 0; i < 6; i++) R.simpleParticle(x + .3 + Math.random() * .4, y + 1, z + .3 + Math.random() * .4, [0.3, 0.8, 0.2], { kind: 'happy', size: 0.08, vy: 0.5 }); }
   play('place', { mat: 'grass', vol: 0.6 });
 }
-function playNote(x, y, z, n) { const b = getBlock(x, y - 1, z), inst = b === BID.sand || b === BID.gravel ? 'snare' : OPQ[b] && BLOCKS[b].tool === S.TOOL.PICK ? 'bass' : 'harp'; play('note', { pitch: Math.pow(2, (n - 12) / 12), inst }); R.simpleParticle(x + .5, y + 1.2, z + .5, [n / 24, 1 - n / 24, 0.5], { size: 0.2, vy: 0.5, grav: 0, life: 0.6 }); }
+function playNote(x, y, z, n) { const b = getBlock(x, y - 1, z), inst = b === BID.sand || b === BID.gravel ? 'snare' : OPQ[b] && BLOCKS[b].tool === S.TOOL.PICK ? 'bass' : 'harp'; play('note', { pitch: Math.pow(2, (n - 12) / 12), inst }); R.simpleParticle(x + .5, y + 1.2, z + .5, [n / 24, 1 - n / 24, 0.5], { kind: 'note', size: 0.2, vy: 0.5, grav: 0, life: 0.6 }); }
 // horizontal facing of the player: 0 north (-z), 1 east, 2 south, 3 west
 function facingDir() { const a = ((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); return [0, 3, 2, 1][Math.round(a / (Math.PI / 2)) % 4]; }
 function entityBlocks(x, y, z) {
@@ -557,7 +557,7 @@ function useItem(first) {
     if (e.kind !== 'mob') return;
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
     if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
-    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); swing(); return; }
+    if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); swing(); return; }
     return;
   }
   if (t && t.type === 'block') {
@@ -646,7 +646,7 @@ function placeEndCrystal(t) {
   return true;
 }
 function boneMeal(x, y, z, id) {
-  for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4, grav: 0 });
+  for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 0.5 + Math.random() * .5, z + Math.random(), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.08, vy: 0.4, grav: 0 });
   const lb = lushBoneMeal(x, y, z, id); if (lb != null) return lb;
   if (id === BID.wheat) { setMeta(x, y, z, Math.min(7, getMeta(x, y, z) + 2 + Math.floor(Math.random() * 4))); return true; }
   if (id === BID.stem) { const m = getMeta(x, y, z); if (m & 16 || (m & 7) === 7) return false; setMeta(x, y, z, (m & ~7) | Math.min(7, (m & 7) + 2 + Math.floor(Math.random() * 4))); return true; }
@@ -828,7 +828,7 @@ function useRod() {
 }
 function bobberTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1;
-  if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
+  if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { kind: 'splash', size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
   else e.vy -= 0.04;
   physMove(e, e.vx, e.vy, e.vz); e.vx *= 0.92; e.vz *= 0.92;
   const h = PL.held(); if (!h || h.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e);

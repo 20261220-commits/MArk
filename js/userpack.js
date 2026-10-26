@@ -112,7 +112,7 @@ async function importPack(file, progress) {
   if (!key && structs) return { name: file.name, structsOnly: true };
   if (!key) throw new Error('assets/minecraft/textures 폴더가 없습니다 (리소스 팩이나 client.jar가 아님)');
   const root = key.slice(0, key.indexOf('assets/minecraft/')) + 'assets/minecraft/';
-  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && /^(textures\/(block|item|entity)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
+  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
   const imgs = new Map();
   for (let i = 0; i < want.length; i++) {
     const rel = want[i].slice(root.length), path = rel.startsWith('textures/') ? rel.slice(9, -4) : '../' + rel.slice(0, -4);
@@ -120,7 +120,7 @@ async function importPack(file, progress) {
     if (i % 200 === 0) { progress && progress(`텍스처 읽는 중 ${i} / ${want.length}`); await new Promise(r => setTimeout(r)); }
   }
   progress && progress('변환 중...');
-  const items = ITEMS.filter(d => d && !d.block).map(d => d.key);
+  const items = ITEMS.filter(d => d).map(d => d.key); // block items too: doors, cauldrons, candles... are flat sprites in Java
   const { out, data } = PACKMAP.packBuild(f => imgs.get(f) || null, S.TILES, items);
   const pack = { name: file.name, out, data, date: Date.now() };
   await upPut(pack);

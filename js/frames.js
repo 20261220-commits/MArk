@@ -15,7 +15,7 @@ function frameMesh(e) {
   const g = new THREE.Group(), plate = new THREE.Mesh(frameGeo, new THREE.MeshBasicMaterial({ map: FRAME_TEX[k] }));
   g.add(plate); g.userData.plate = plate;
   if (e.item) {
-    const im = R.itemMesh(e.item.id); im.scale.setScalar(im.userData.isBlock ? 0.3 : 0.5); im.position.z = im.userData.isBlock ? 0.12 : 0.05;
+    const im = R.itemMesh(e.item.id); if (e.item.e || ITEMS[e.item.id].glint) R.addGlint(im); im.scale.setScalar(im.userData.isBlock ? 0.3 : 0.5); im.position.z = im.userData.isBlock ? 0.12 : 0.05;
     im.rotation.z = -e.rot * Math.PI / 4; g.add(im); g.userData.item = im;
   }
   return g;

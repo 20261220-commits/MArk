@@ -83,7 +83,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light) {
-  const ud = m.userData, key = INV.armor.map(s => s ? s.id : 0).join(',');
+  const ud = m.userData, key = INV.armor.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
     for (const a of ud.armor) { a.parent.remove(a); a.material.dispose(); } ud.armor = [];
@@ -105,11 +105,12 @@ function updateArmor(m, light) {
         const mesh = new THREE.SkinnedMesh(geo, mat); mesh.bind(ud.skel, ud.main.bindMatrix); mesh.frustumCulled = false; m.add(mesh); ud.armor.push(mesh);
       };
       add(tex, a.mat === 'leather' ? new THREE.Color(0xa06540) : null);
+      if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });
     if (ud.mat2) ud.mat2.visible = elytra;
   }
-  for (const a of ud.armor) { if (a.userData.item) R.setMeshLight(a.userData.item, light); else if (a.material.color) { a.material.color.setScalar(light); if (a.material.userData.col) a.material.color.multiply(a.material.userData.col); } }
+  for (const a of ud.armor) { if (a.userData.glint) continue; if (a.userData.item) R.setMeshLight(a.userData.item, light); else if (a.material.color) { a.material.color.setScalar(light); if (a.material.userData.col) a.material.color.multiply(a.material.userData.col); } }
 }
 // items in the hands (HeldItemFeatureRenderer + the item models' third-person display transforms)
 const HANDHELD = id => { const d = ITEMS[id]; if (!d) return false; if (d.tool) return true; return /^(stick|bone|blaze_rod|bamboo|fishing_rod|carrot_on_a_stick|warped_fungus_on_a_stick|debug_stick)$/.test(d.key); };
@@ -129,11 +130,11 @@ const mainRight = () => typeof OPT === 'undefined' || OPT.mainHand !== 'left';
 function updateHeld(m, items, light) {
   const ud = m.userData;
   items.forEach((st, k) => {
-    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, key = id + (rightArm ? 'r' : 'l');
+    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, gl = st && (st.e || ITEMS[id].glint), key = id + (rightArm ? 'r' : 'l') + (gl ? 'g' : '');
     if (ud.heldKey[k] !== key) {
       ud.heldKey[k] = key; const old = ud.held[k]; if (old) { old.parent.remove(old); old.userData.item.material.dispose(); } ud.held[k] = null;
       if (id > 0) {
-        const im = R.itemMesh(id), g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, !rightArm, im.userData.isBlock)); g.add(im); g.userData.item = im;
+        const im = R.itemMesh(id), g = new THREE.Group(); if (gl) R.addGlint(im); g.matrixAutoUpdate = false; g.matrix.copy(heldTransform(id, !rightArm, im.userData.isBlock)); g.add(im); g.userData.item = im;
         (rightArm ? ud.parts.rarm : ud.parts.larm).add(g); ud.held[k] = g;
       }
     }

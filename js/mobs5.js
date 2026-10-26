@@ -137,7 +137,7 @@ function beeAI(e, dist) {
     if (Math.hypot(fx - e.x, fy - e.y, fz - e.z) < 1.2) { beeEnter(e); return; }
     fly(fx, fy + 0.3, fz, 0.13);
     // pollinating crops on the way home
-    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4 }); } } }
+    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.08, vy: 0.4 }); } } }
     return;
   }
   // look for a flower, hover at it for a while to collect nectar

@@ -27,6 +27,34 @@ const SPR_HUD = {
   armorEmpty: hudSprite(['kk...kk', 'kEkkkEk', 'kEEEEEk', 'kEEEEEk', '.kEEEk.', '.kEEEk.', '..kkk..'], { k: '#2a2a2a', E: '#4a4a4a' }),
   bubble: hudSprite(['..bbb..', '.bwllb.', 'bwlllb.', 'bllllb.', '.bllb..', '..bb...', '.......'].map(r => r), { b: '#1a3a8a', w: '#ffffff', l: '#6aa8ff' }),
 };
+SPR_HUD.poison = mkHeart(1, 1, '#94841c', '#c8c060'); SPR_HUD.poisonHalf = mkHeart(1, 0, '#94841c', '#c8c060');
+SPR_HUD.wither = mkHeart(1, 1, '#2a2a2a', '#6a6a6a'); SPR_HUD.witherHalf = mkHeart(1, 0, '#2a2a2a', '#6a6a6a');
+SPR_HUD.frozen = mkHeart(1, 1, '#6ac8e8', '#e0f8ff'); SPR_HUD.frozenHalf = mkHeart(1, 0, '#6ac8e8', '#e0f8ff');
+SPR_HUD.hardHalf = mkHeart(1, 0, '#b01010', '#ffd0d0'); SPR_HUD.goldHalf = mkHeart(1, 0, '#e8c020', '#fff2a0');
+SPR_HUD.hunger = SPR_HUD.food; SPR_HUD.hungerHalf = SPR_HUD.foodHalf; SPR_HUD.hungerEmpty = SPR_HUD.foodEmpty; SPR_HUD.pop = SPR_HUD.bubble;
+// a loaded client.jar / pack: the HUD from its gui/icons.png and gui/widgets.png (hearts are a container plus a fill, as in Java)
+function applyGuiPack() {
+  const crop = (key, x, y, w, h, base, under) => { const e = PACKPX.ent[key]; if (!e) return null; const k = e.w / base, c = document.createElement('canvas'); c.width = w * k; c.height = h * k; const g = c.getContext('2d');
+    const src = document.createElement('canvas'); src.width = e.w; src.height = e.h; src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0);
+    for (const [ux, uy] of under || []) g.drawImage(src, ux * k, uy * k, w * k, h * k, 0, 0, w * k, h * k);
+    if (x != null) g.drawImage(src, x * k, y * k, w * k, h * k, 0, 0, w * k, h * k); return c; };
+  const css = document.documentElement.style;
+  if (PACKPX.ent.gui_icons) {
+    const ic = (x, y, bg) => crop('gui_icons', x, y, 9, 9, 256, bg ? [bg] : null).toDataURL(), H = [16, 0], HH = [16, 45], F = [16, 27];
+    Object.assign(SPR_HUD, { heart: ic(52, 0, H), half: ic(61, 0, H), empty: ic(null, null, H), gold: ic(160, 0, H), goldHalf: ic(169, 0, H), hard: ic(52, 45, HH), hardHalf: ic(61, 45, HH),
+      poison: ic(88, 0, H), poisonHalf: ic(97, 0, H), wither: ic(124, 0, H), witherHalf: ic(133, 0, H), frozen: ic(178, 0, H), frozenHalf: ic(187, 0, H),
+      food: ic(52, 27, F), foodHalf: ic(61, 27, F), foodEmpty: ic(null, null, F), hunger: ic(88, 27, [133, 27]), hungerHalf: ic(97, 27, [133, 27]), hungerEmpty: ic(null, null, [133, 27]),
+      armor: ic(34, 9), armorHalf: ic(25, 9), armorEmpty: ic(16, 9), bubble: ic(16, 18), pop: ic(25, 18) });
+    css.setProperty('--g-cross', `url(${crop('gui_icons', 0, 0, 15, 15, 256).toDataURL()})`);
+    css.setProperty('--g-xpbg', `url(${crop('gui_icons', 0, 64, 182, 5, 256).toDataURL()})`); css.setProperty('--g-xp', `url(${crop('gui_icons', 0, 69, 182, 5, 256).toDataURL()})`);
+    document.body.classList.add('vicons');
+  }
+  if (PACKPX.ent.gui_widgets) {
+    css.setProperty('--g-hotbar', `url(${crop('gui_widgets', 0, 0, 182, 22, 256).toDataURL()})`); css.setProperty('--g-sel', `url(${crop('gui_widgets', 0, 22, 24, 22, 256).toDataURL()})`);
+    css.setProperty('--g-offl', `url(${crop('gui_widgets', 24, 22, 29, 24, 256).toDataURL()})`); css.setProperty('--g-offr', `url(${crop('gui_widgets', 53, 22, 29, 24, 256).toDataURL()})`);
+    document.body.classList.add('vwidgets');
+  }
+}
 function icon(id, n, d, e) {
   if (!id) return '';
   const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
@@ -60,15 +88,18 @@ function renderHud(dt) {
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
-    for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? (hard ? SPR_HUD.hard : SPR_HUD.heart) : v === 1 ? SPR_HUD.half : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
-    if (PL.absorb > 0) for (let i = 0; i < Math.ceil(PL.absorb / 2); i++) hearts.push(`<img src="${SPR_HUD.gold}">`);
+    const kind = effLv(PL, 'poison') ? 'poison' : effLv(PL, 'wither') ? 'wither' : PL.frozen >= 140 ? 'frozen' : hard ? 'hard' : 'heart'; // Java's heart types
+    const full = SPR_HUD[kind], halfS = kind === 'heart' ? SPR_HUD.half : SPR_HUD[kind + 'Half'];
+    for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? full : v === 1 ? halfS : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
+    if (PL.absorb > 0) { const ab = Math.ceil(PL.absorb); for (let i = 0; i < Math.ceil(ab / 2); i++) hearts.push(`<img src="${ab - i * 2 >= 2 ? SPR_HUD.gold : SPR_HUD.goldHalf}">`); }
     $('hearts').innerHTML = hearts.join('');
-    const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD.food : v === 1 ? SPR_HUD.foodHalf : SPR_HUD.foodEmpty}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }
+    const hu = effLv(PL, 'hunger') ? 'hunger' : 'food';
+    const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD[hu] : v === 1 ? SPR_HUD[hu + 'Half'] : SPR_HUD[hu + 'Empty']}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }
     $('food').innerHTML = fd.join('');
     const [ap] = armorPoints(); const ar = [];
     if (ap > 0) for (let i = 0; i < 10; i++) { const v = ap - i * 2; ar.push(`<img src="${v >= 2 ? SPR_HUD.armor : v === 1 ? SPR_HUD.armorHalf : SPR_HUD.armorEmpty}">`); }
     $('armorbar').innerHTML = ar.join('');
-    const air = []; if (PL.air < 300) { const n = Math.ceil(Math.max(0, PL.air) / 30); for (let i = 0; i < n; i++) air.push(`<img src="${SPR_HUD.bubble}">`); }
+    const air = []; if (PL.air < 300) { const full = Math.floor(Math.max(0, PL.air) * 10 / 300), pop = Math.ceil(Math.max(0, PL.air) * 10 / 300) - full; for (let i = 0; i < full; i++) air.push(`<img src="${SPR_HUD.bubble}">`); if (pop) air.push(`<img src="${SPR_HUD.pop}">`); }
     $('air').innerHTML = air.join('');
   }
   $('xpbar').firstElementChild.style.width = (PL.xpP * 100) + '%';

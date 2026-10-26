@@ -100,7 +100,7 @@ function spawnFireball(x, y, z, dx, dy, dz, owner, small) {
 function fireballDeflect(e) { const [dx, dy, dz] = lookDir(); e.ax = dx * 0.1; e.ay = dy * 0.1; e.az = dz * 0.1; e.vx = dx; e.vy = dy; e.vz = dz; e.owner = PL; play('hit'); }
 function fireballTick(e) {
   e.vx = (e.vx + e.ax) * 0.95; e.vy = (e.vy + e.ay) * 0.95; e.vz = (e.vz + e.az) * 0.95;
-  if (Math.random() < 0.5) R.simpleParticle(e.x, e.y + e.h / 2, e.z, [0.4, 0.4, 0.4], { size: e.small ? 0.15 : 0.4, vy: 0.1, grav: 0, life: 0.4 });
+  if (Math.random() < 0.5) R.simpleParticle(e.x, e.y + e.h / 2, e.z, [0.4, 0.4, 0.4], { kind: 'smoke', size: e.small ? 0.15 : 0.4, vy: 0.1, grav: 0, life: 0.4 });
   const steps = Math.max(1, Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.3));
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps, cy = ny + e.h / 2;
@@ -132,13 +132,13 @@ function onThrownHit(e, x, y, z, hitMob) {
   if (td && td.lingering) { play('break', { mat: 'glass' }); potionBurst(x, y, z, POTION[td.potion].col); spawnCloud(x, Math.floor(y) + 0.05, z, td.potion); return; }
   if (e.thrown === IID.ender_pearl && Math.random() < 0.05) spawnMob('endermite', x, y, z);
   if (e.thrown === IID.ender_pearl && e.owner === PL && !PL.dead) {
-    for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.5, grav: 0 });
+    for (let i = 0; i < 16; i++) R.simpleParticle(x + (Math.random() - .5), y + Math.random() * 2, z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.5, grav: 0 });
     PL.x = x; PL.y = y + 0.05; PL.z = z; PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0;
     hurtPlayer(5, 'fall'); play('teleport');
   }
   if (hitMob) { if (e.thrown === IID.snowball) hurtMob(hitMob, hitMob.type === 'blaze' ? 3 : 0.001, e.owner === PL ? PL : null, e.vx, e.vz); else if (e.thrown === IID.egg) hurtMob(hitMob, 0.001, null, e.vx, e.vz); }
   if (e.thrown === IID.egg && Math.random() < 0.125) spawnMob('chicken', x, y, z, { baby: true });
-  if (e.thrown === IID.experience_bottle) { spawnXP(x, y + 0.3, z, 3 + Math.floor(Math.random() * 9)); play('break', { mat: 'glass' }); for (let i = 0; i < 10; i++) R.simpleParticle(x, y + 0.3, z, [0.4, 0.5, 1], { size: 0.1, vy: 1 }); }
+  if (e.thrown === IID.experience_bottle) { spawnXP(x, y + 0.3, z, 3 + Math.floor(Math.random() * 9)); play('break', { mat: 'glass' }); for (let i = 0; i < 10; i++) R.simpleParticle(x, y + 0.3, z, [0.4, 0.5, 1], { kind: 'splash', size: 0.1, vy: 1 }); }
   for (let i = 0; i < 6; i++) R.simpleParticle(x, y, z, e.thrown === IID.snowball ? [1, 1, 1] : [0.9, 0.85, 0.7], { size: 0.1, vy: 1 });
 }
 function throwEye() {
@@ -152,7 +152,7 @@ function throwEye() {
 function eyeTick(e) {
   const dx = e.tx - e.x, dz = e.tz - e.z, d = Math.hypot(dx, dz), sp = Math.min(0.5, d);
   if (e.age < 70) { e.x += dx / (d || 1) * sp * 0.6; e.z += dz / (d || 1) * sp * 0.6; e.y += (e.ty - e.y) * 0.05; }
-  R.simpleParticle(e.x, e.y, e.z, [0.6, 0.2, 0.9], { size: 0.1, vy: 0, grav: 0, life: 0.6 });
+  R.simpleParticle(e.x, e.y, e.z, [0.6, 0.2, 0.9], { kind: 'portal', size: 0.1, vy: 0, grav: 0, life: 0.6 });
   if (e.age > 80) { removeEnt(e); if (Math.random() < 0.8) dropItem(e.x, e.y, e.z, IID.ender_eye, 1); else play('break', { mat: 'glass' }); }
 }
 // ---------- boats ----------
@@ -264,7 +264,7 @@ function blazeAI(e, dist) {
   } else { e.vy -= 0.01; if (e.onGround) e.vy = 0; if (Math.random() < 0.01) { e.vx += (Math.random() - .5) * 0.2; e.vz += (Math.random() - .5) * 0.2; } }
   e.vy = Math.max(e.vy, -0.06);
   turn(e); flyMove(e, 0.85);
-  if (Math.random() < 0.4) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + Math.random() * 1.8, e.z + (Math.random() - .5) * .6, [0.4, 0.4, 0.4], { size: 0.2, vy: 0.4, grav: 0, life: 0.5 });
+  if (Math.random() < 0.4) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + Math.random() * 1.8, e.z + (Math.random() - .5) * .6, [0.4, 0.4, 0.4], { kind: 'smoke', size: 0.2, vy: 0.4, grav: 0, life: 0.5 });
 }
 function slimeAI(e, dist) {
   const sz = e.size || 1;
@@ -310,7 +310,7 @@ function endermanTeleport(e, cx = e.x, cz = e.z) {
     const x = Math.floor(cx + (Math.random() - .5) * 32), z = Math.floor(cz + (Math.random() - .5) * 32); if (!isLoaded(x, z)) continue;
     let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || FLUID[getBlock(x, y, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)]) continue;
-    for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { size: 0.12, vy: 0.3, grav: 0 });
+    for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.3, grav: 0 });
     e.x = e.px = x + .5; e.y = e.py = y; e.z = e.pz = z + .5; e.path = null; play('teleport', { vol: 0.5 }); return true;
   }
   return false;

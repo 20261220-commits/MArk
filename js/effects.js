@@ -50,10 +50,12 @@ const meleeBonus = () => 3 * effLv(PL, 'strength') - 4 * effLv(PL, 'weakness');
 const digMul = () => (1 + 0.2 * effLv(PL, 'haste') + 0.2 * effLv(PL, 'conduit_power')) * Math.pow(0.3, Math.min(4, effLv(PL, 'mining_fatigue')));
 // HUD: effects with their level and time left, top right
 const ROMAN_E = ['', '', ' II', ' III', ' IV', ' V'];
+const EFF_URL = {};
+const effIconCss = k => { if (EFF_URL[k] === undefined) { const c = typeof entCanvas === 'function' && entCanvas('effect_' + k); EFF_URL[k] = c ? c.toDataURL() : null; } return EFF_URL[k] ? `background:url(${EFF_URL[k]}) 0 0/100% 100%;image-rendering:pixelated;border:0` : `background:${EFF[k][1]}`; }; // the jar's mob_effect icon
 function renderEffects() {
   const el = document.getElementById('effects'); if (!el) return;
   const list = PL.eff ? Object.entries(PL.eff) : [];
-  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="background:${EFF[k][1]}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
+  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="${effIconCss(k)}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
 }
 // mending: picked-up experience repairs a damaged mending item first (2 durability per point)
 function mendWithXP(v) {

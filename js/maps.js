@@ -66,6 +66,7 @@ function mapUpdate(c) {
 function mapViewTick() {
   const h = PL.held() && PL.held().id === IID.filled_map ? PL.held() : offItem(), show = h && h.id === IID.filled_map && h.map && !UI.screen;
   if (!MAPS.view) { MAPS.view = document.createElement('canvas'); MAPS.view.id = 'mapview'; MAPS.view.width = MAPS.view.height = 128; document.body.appendChild(MAPS.view); MAPS.ctx = MAPS.view.getContext('2d'); }
+  if (!MAPS.bgSet && PACKPX.ent.map_bg) { MAPS.bgSet = true; const bg = entCanvas('map_bg'); MAPS.view.style.cssText += `;background:url(${bg.toDataURL()}) 0 0/100% 100%;padding:calc(var(--px) * 7);border:0;box-sizing:content-box;image-rendering:pixelated`; } // the paper around the map
   MAPS.view.hidden = !show; if (!show) return;
   const c = mapData(h.map); if (!c) return;
   if (W.tickN % 2 === 0) mapUpdate(c);
@@ -78,6 +79,14 @@ function drawMap(c) {
   for (let i = 0; i < 128 * 128; i++) { const p = c.px[i]; const col = p ? pal[p - 1] : [222, 206, 168]; img.data[i * 4] = col[0]; img.data[i * 4 + 1] = col[1]; img.data[i * 4 + 2] = col[2]; img.data[i * 4 + 3] = 255; }
   g.putImageData(img, 0, 0);
   const sc = 1 << m.s, toU = x => (x - (m.x - 64 * sc)) / sc, toV = z => (z - (m.z - 64 * sc)) / sc;
+  const MI = PACKPX.ent.map_icons && (MAPS.icons || (MAPS.icons = entCanvas('map_icons'))); // the jar's map_icons.png: 8x8 icons, 16 per row
+  if (MI) {
+    const k = MI.width / 128, icon = (i, u, v, rot) => { g.save(); g.translate(Math.round(u), Math.round(v)); if (rot) g.rotate(rot); g.imageSmoothingEnabled = false; g.drawImage(MI, (i % 16) * 8 * k, Math.floor(i / 16) * 8 * k, 8 * k, 8 * k, -4, -4, 8, 8); g.restore(); };
+    for (const [mx, mz, kind] of m.marks) icon(kind === 'x' ? 26 : kind === 'monument' ? 9 : 8, toU(mx), toV(mz));
+    if (m.dim === W.dim) { let u = toU(PL.x), v = toV(PL.z); const off = u < 0 || v < 0 || u > 127 || v > 127, far = off && (u < -320 || v < -320 || u > 447 || v > 447);
+      u = Math.max(0, Math.min(127, u)); v = Math.max(0, Math.min(127, v)); icon(off ? (far ? 7 : 6) : 0, u, v, off ? 0 : Math.round(-PL.yaw / (Math.PI / 8)) * (Math.PI / 8)); }
+    return;
+  }
   for (const [mx, mz, kind] of m.marks) { const u = toU(mx), v = toV(mz); g.fillStyle = kind === 'x' ? '#c01818' : kind === 'monument' ? '#2a9a8a' : '#6a4a2a'; if (kind === 'x') { g.fillRect(u - 3, v - 1, 7, 2); g.fillRect(u - 1, v - 3, 2, 7); } else { g.fillRect(u - 3, v - 3, 7, 7); g.fillStyle = '#fff'; g.fillRect(u - 1, v - 1, 2, 2); } }
   if (m.dim === W.dim) { // the player: a white arrow (a dot at the map edge when off the map)
     let u = toU(PL.x), v = toV(PL.z); const off = u < 0 || v < 0 || u > 127 || v > 127; u = Math.max(2, Math.min(125, u)); v = Math.max(2, Math.min(125, v));

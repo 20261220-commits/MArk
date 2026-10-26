@@ -107,6 +107,15 @@ const celMat = t => new THREE.MeshBasicMaterial({ map: t, transparent: true, fog
 const sun = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), celMat(sunTex)); sun.renderOrder = -9;
 const moon = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), celMat(moonTex)); moon.renderOrder = -9;
 scene.add(sun, moon);
+// a loaded jar/pack replaces the drawn sky with its environment textures (sun, the 8 moon phases, clouds)
+function entCanvas(key) { const e = PACKPX.ent[key]; if (!e) return null; const c = document.createElement('canvas'); c.width = e.w; c.height = e.h; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0); return c; }
+R.moonPhases = false;
+function applyPackSky() {
+  const sc = entCanvas('env_sun'); if (sc) { sunTex.image = sc; sunTex.needsUpdate = true; sun.geometry = new THREE.PlaneGeometry(90, 90); }
+  const mc = entCanvas('env_moon'); if (mc) { moonTex.image = mc; moonTex.repeat.set(1 / 4, 1 / 2); moonTex.needsUpdate = true; moon.geometry = new THREE.PlaneGeometry(60, 60); R.moonPhases = true; }
+  const cc = entCanvas('env_clouds'); if (cc) { cloudTex.image = cc; cloudTex.repeat.set(768 / (cc.width * 12), 768 / (cc.height * 12)); cloudTex.needsUpdate = true; } // a cloud pixel is 12 blocks
+}
+R.applyPackSky = applyPackSky;
 const starGeo = new THREE.BufferGeometry(); { const a = []; const r = trng(99); for (let i = 0; i < 900; i++) { const u = r() * 2 - 1, th = r() * Math.PI * 2, s = Math.sqrt(1 - u * u); a.push(Math.cos(th) * s * 400, u * 400, Math.sin(th) * s * 400); } starGeo.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); }
 const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
 const stars = new THREE.Points(starGeo, starMat); stars.renderOrder = -9; stars.frustumCulled = false; scene.add(stars);
@@ -140,21 +149,35 @@ const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PMAX * 3), pUV = new Float32Array(PMAX * 2), pSize = new Float32Array(PMAX), pCol = new Float32Array(PMAX * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute('puv', new THREE.BufferAttribute(pUV, 2)); pGeo.setAttribute('psize', new THREE.BufferAttribute(pSize, 1)); pGeo.setAttribute('pcol', new THREE.BufferAttribute(pCol, 3));
 const pMat = new THREE.ShaderMaterial({
-  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, scale: { value: 400 } }]),
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: atlasTex }, sheet: { value: null }, scale: { value: 400 } }]),
   vertexShader: `attribute vec2 puv; attribute float psize; attribute vec3 pcol; uniform float scale; varying vec2 vUv; varying vec3 vCol;
     #include <fog_pars_vertex>
     void main(){ vUv = puv; vCol = pcol; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = psize * scale / -mvPosition.z; gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
     }`,
-  fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vCol;
+  fragmentShader: `uniform sampler2D map; uniform sampler2D sheet; varying vec2 vUv; varying vec3 vCol;
     #include <fog_pars_fragment>
-    void main(){ vec2 uv = vUv + gl_PointCoord * (4.0 / 512.0); vec4 t = texture2D(map, uv); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
+    void main(){ vec4 t = vUv.x >= 2.0 ? texture2D(sheet, vUv - vec2(2.0, 0.0) + gl_PointCoord / 16.0) : texture2D(map, vUv + gl_PointCoord * (4.0 / 512.0)); if (t.a < 0.5) discard; float tm = step(t.a, 0.97); gl_FragColor = vec4(t.rgb * vCol, 1.0);
     #include <fog_fragment>
     }`, fog: true });
 const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene.add(points);
 const parts = []; // {x,y,z,vx,vy,vz,life,size,u,v,r,g,b,grav}
 R.particles = parts;
 function spawnParticle(p) { if (parts.length >= PMAX) parts.shift(); parts.push(p); }
+// a loaded jar/pack's particle sprites (particle/*.png, 8x8 each) in a 16x16 sheet; each kind lists its frames as Java's particle json does
+const seq = (n, a, b) => { const r = []; for (let i = a; a <= b ? i <= b : i >= b; i += a <= b ? 1 : -1) r.push(n + '_' + i); return r; };
+const PKINDS = { smoke: seq('generic', 7, 0), portal: seq('generic', 0, 7), heart: ['heart'], angry: ['angry'], happy: ['glint'], note: ['note'], crit: ['critical_hit'], magic: ['enchanted_hit'],
+  flame: ['flame'], soul_flame: ['soul_fire_flame'], bubble: ['bubble'], splash: seq('splash', 0, 3), effect: seq('effect', 7, 0), spell: seq('spell', 7, 0), explosion: seq('explosion', 0, 15),
+  spark: seq('spark', 7, 0), big_smoke: seq('big_smoke', 0, 11), drip: ['drip_hang'], lava: ['lava'], glow: ['glow'], damage: ['damage'], sweep: seq('sweep', 0, 7), nautilus: ['nautilus'], snowflake: ['snowflake'], witch: ['witch'] };
+const PSHEET = { uv: null };
+function buildParticleSheet() {
+  const names = [...new Set(Object.values(PKINDS).flat())].filter(n => PACKPX.ent['particle_' + n]); if (!names.length) return;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; PSHEET.uv = {};
+  names.forEach((n, i) => { const e = PACKPX.ent['particle_' + n], src = document.createElement('canvas'); src.width = e.w; src.height = e.h; src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(e.px), e.w, e.h), 0, 0);
+    const x = (i % 16) * 8, y = Math.floor(i / 16) * 8; g.drawImage(src, 0, 0, e.w, Math.min(e.h, e.w), x, y, 8, 8); PSHEET.uv[n] = [2 + x / 128, y / 128]; });
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; pMat.uniforms.sheet.value = t;
+}
+R.buildParticleSheet = buildParticleSheet;
 function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
   const t = S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
   const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
@@ -167,7 +190,11 @@ function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
 function simpleParticle(x, y, z, col, opts = {}) {
   const t = S.T.white_wool; // flat white tile, tinted by color
   spawnParticle({ x, y, z, vx: opts.vx || (Math.random() - .5), vy: opts.vy != null ? opts.vy : Math.random() * 1.5, vz: opts.vz || (Math.random() - .5), life: opts.life || 0.8, size: opts.size || 0.15,
-    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8 });
+    u: ((t % S.TPR) * 16 + 4) / S.ATL, v: (((t / S.TPR) | 0) * 16 + 4) / S.ATL, r: col[0], g: col[1], b: col[2], grav: opts.grav != null ? opts.grav : 0.3, c0: opts.fade ? col : null, fade: opts.fade || null, life0: opts.life || 0.8,
+    frames: PSHEET.uv && opts.kind && PKINDS[opts.kind] ? PKINDS[opts.kind].map(n => PSHEET.uv[n]).filter(Boolean) : null });
+  const p = parts[parts.length - 1]; if (p.frames && !p.frames.length) p.frames = null;
+  if (p.frames) { p.size *= 1.3; if (opts.kind === 'splash' || opts.kind === 'portal') p.frames = [p.frames[(Math.random() * p.frames.length) | 0]]; // sprites have clear margins; random-sprite kinds pick one
+    if (!['smoke', 'portal', 'effect', 'spell', 'explosion', 'big_smoke', 'spark'].includes(opts.kind)) { p.r = p.g = p.b = 1; if (opts.kind === 'note') { p.r = col[0]; p.g = col[1]; p.b = col[2]; } } } // most sprites carry their own colour
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
 function updateParticles(dt) {
@@ -179,42 +206,51 @@ function updateParticles(dt) {
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
     if (p.grav && SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { p.vy = 0; p.vx *= 0.5; p.vz *= 0.5; } else { p.x = nx; p.y = ny; p.z = nz; }
   }
-  for (const p of parts) { pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b; n++; }
+  for (const p of parts) { if (p.frames) { const f = p.frames[Math.min(p.frames.length - 1, Math.floor((1 - p.life / p.life0) * p.frames.length))]; p.u = f[0]; p.v = f[1]; }
+    pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b; n++; }
   pGeo.setDrawRange(0, n);
   for (const k of ['position', 'puv', 'psize', 'pcol']) pGeo.attributes[k].needsUpdate = true;
 }
 
-// ---------- rain / snow ----------
-const RAIN_N = 500;
-const rainGeo = new THREE.BufferGeometry(); const rainPos = new Float32Array(RAIN_N * 6);
-rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-const rainMat = new THREE.LineBasicMaterial({ color: 0x9ab4e8, transparent: true, opacity: 0.55, fog: true });
-const rain = new THREE.LineSegments(rainGeo, rainMat); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
-const drops = []; for (let i = 0; i < RAIN_N; i++) drops.push({ x: 0, y: -999, z: 0, s: 0 });
+// ---------- rain / snow (WorldRenderer.renderWeather: a textured quad per column around the camera, facing it) ----------
+const WR = 10, WCOLS = (2 * WR + 1) ** 2;
+function weatherCanvas(snow) { // drawn stand-ins until a jar/pack gives environment/rain.png and snow.png
+  return pixelTex(64, 256, g => { const r = trng(snow ? 7 : 3); for (let i = 0; i < (snow ? 90 : 60); i++) { const x = r.int(64), y = r.int(256); g.fillStyle = snow ? 'rgba(255,255,255,.95)' : 'rgba(170,190,235,.8)'; if (snow) g.fillRect(x, y, 2, 2); else g.fillRect(x, y, 1, 10 + r.int(14)); } });
+}
+const rainTex = weatherCanvas(false), snowTex = weatherCanvas(true);
+for (const t of [rainTex, snowTex]) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+const wGeo = [false, true].map(() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(WCOLS * 12), 3)); g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(WCOLS * 8), 2));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(WCOLS * 16), 4)); const idx = new Uint16Array(WCOLS * 6); for (let i = 0; i < WCOLS; i++) idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6); g.setIndex(new THREE.BufferAttribute(idx, 1)); return g; });
+const wMat = [rainTex, snowTex].map(t => new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: THREE.DoubleSide, vertexColors: true, alphaTest: 0.01, fog: true }));
+const wMesh = wGeo.map((g, i) => { const m = new THREE.Mesh(g, wMat[i]); m.frustumCulled = false; m.visible = false; m.renderOrder = 2; scene.add(m); return m; });
+const rain = wMesh[0];
+function applyPackWeather() {
+  for (const [k, t] of [['env_rain', rainTex], ['env_snow', snowTex]]) { const c = entCanvas(k); if (c) { t.image = c; t.needsUpdate = true; } }
+}
+R.applyPackWeather = applyPackWeather;
 const colTop = new Map(); let colTopT = 0;
 function updateRain(dt, px, py, pz, amt) {
-  rain.visible = amt > 0.05; if (!rain.visible) return;
-  rainMat.opacity = 0.55 * amt;
+  wMesh[0].visible = wMesh[1].visible = false; if (amt <= 0.05) return;
   colTopT -= dt; if (colTopT < 0) { colTop.clear(); colTopT = 1; }
   const top = (x, z) => { const k = x * 4096 + z; let v = colTop.get(k); if (v === undefined) { v = topY(x, z); colTop.set(k, v); } return v; };
-  const cold = S.BIOMES[biomeAt(Math.floor(px), Math.floor(pz))][4] <= 0.15, dry = biomeBase(Math.floor(px), Math.floor(pz)) === S.BIO.DESERT;
-  rainMat.color.setHex(cold ? 0xffffff : 0x9ab4e8);
-  const active = Math.floor(RAIN_N * amt * (dry ? 0 : 1));
-  for (let i = 0; i < RAIN_N; i++) {
-    const d = drops[i];
-    if (i >= active) { rainPos.fill(0, i * 6, i * 6 + 6); continue; }
-    let t = top(Math.floor(d.x), Math.floor(d.z));
-    if (d.y < t + 1 || d.y < py - 12 || Math.abs(d.x - px) > 14 || Math.abs(d.z - pz) > 14) {
-      d.x = px + (Math.random() * 2 - 1) * 14; d.z = pz + (Math.random() * 2 - 1) * 14; d.y = py + 10 + Math.random() * 10; d.s = cold ? 3 + Math.random() : 18 + Math.random() * 6;
-      t = top(Math.floor(d.x), Math.floor(d.z));
-      if (d.y < t + 1) { d.y = -999; rainPos.fill(0, i * 6, i * 6 + 6); continue; } // column is roofed above the drop (caves, houses): no rain here
-    }
-    d.y -= d.s * dt;
-    if (d.y < t + 1) { rainPos.fill(0, i * 6, i * 6 + 6); continue; } // passed the surface this frame: don't draw it below the roof
-    const len = cold ? 0.12 : 0.7, sw = cold ? Math.sin(d.y * 2 + i) * 0.05 : 0;
-    rainPos[i * 6] = d.x + sw; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z; rainPos[i * 6 + 3] = d.x + sw; rainPos[i * 6 + 4] = d.y + len; rainPos[i * 6 + 5] = d.z;
+  const X = Math.floor(px), Z = Math.floor(pz), Y = Math.floor(py), ticks = W.time + (W.tickFrac || 0), n = [0, 0];
+  for (let dz = -WR; dz <= WR; dz++) for (let dx = -WR; dx <= WR; dx++) {
+    const x = X + dx, z = Z + dz, b = biomeAt(x, z), base = biomeBase(x, z);
+    const temp = S.BIOMES[b][4]; if (temp > 0.95 || base === S.BIO.DESERT) continue; // no precipitation (deserts, savannas, badlands)
+    const t = top(x, z) + 1, y0 = Math.max(t, Y - WR), y1 = Math.max(t, Y + WR); if (y0 >= y1) continue;
+    const snow = temp - Math.max(0, t - 64) * 0.05 / 30 < 0.15, k = snow ? 1 : 0, i = n[k]++; // colder with height, as Biome.getTemperature
+    const cx = x + 0.5 - px, cz = z + 0.5 - pz, d = Math.hypot(cx, cz) || 1, ox = cz / d * 0.5, oz = -cx / d * 0.5;
+    const r = (x * x * 3121 + x * 45238971 ^ z * z * 418711 + z * 13761) & 31, P = wGeo[k].attributes.position.array, U = wGeo[k].attributes.uv.array, C = wGeo[k].attributes.color.array;
+    let v0, du = 0;
+    if (!snow) v0 = -((ticks + r) % 32 + (W.tickFrac || 0)) / 32 * (3 + (r & 7) / 8);
+    else { v0 = -((ticks & 511) + (W.tickFrac || 0)) / 512; du = ((r * 7919) % 100) / 100 + ticks * 0.01 * ((r & 3) - 1.5) / 10; }
+    const al = ((1 - (d * d) / (WR * WR)) * 0.5 + 0.5) * amt, wx = x + 0.5, wz = z + 0.5;
+    P.set([wx - ox, y1, wz - oz, wx + ox, y1, wz + oz, wx + ox, y0, wz + oz, wx - ox, y0, wz - oz], i * 12);
+    U.set([du, y1 * 0.25 + v0, du + 1, y1 * 0.25 + v0, du + 1, y0 * 0.25 + v0, du, y0 * 0.25 + v0], i * 8);
+    for (let q = 0; q < 4; q++) C.set([1, 1, 1, al], i * 16 + q * 4);
+    if (!snow && dx * dx + dz * dz < 25 && Math.random() < 0.004 * amt && t > Y - 6) simpleParticle(x + Math.random(), t + 0.05, z + Math.random(), [0.6, 0.7, 0.9], { kind: 'splash', size: 0.05, vy: 0.6, grav: 0.4, life: 0.35 }); // drops splashing on the ground
   }
-  rainGeo.attributes.position.needsUpdate = true;
+  for (const k of [0, 1]) { const g = wGeo[k]; if (!n[k]) continue; wMesh[k].visible = true; g.setDrawRange(0, n[k] * 6); for (const a of ['position', 'uv', 'color']) g.attributes[a].needsUpdate = true; }
 }
 
 // ---------- extruded item meshes (held + dropped) ----------
@@ -288,6 +324,13 @@ function itemMesh(id) {
   m.userData.isBlock = isBlock;
   return m;
 }
+// enchantment glint: an additive, scrolling layer over enchanted items and armour (misc/enchanted_item_glint.png once a jar/pack has it)
+const glintTex = pixelTex(64, 64, g => { const r = trng(77); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const v = (Math.sin((x + y) * 0.2) * 0.5 + 0.5) * 0.6 + r() * 0.4; g.fillStyle = `rgba(${130 * v | 0},${60 * v | 0},${210 * v | 0},1)`; g.fillRect(x, y, 1, 1); } });
+glintTex.wrapS = glintTex.wrapT = THREE.RepeatWrapping; glintTex.repeat.set(0.5, 0.5); glintTex.rotation = 0.17;
+function glintMaterial(skinning) { return new THREE.MeshBasicMaterial({ map: glintTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, depthFunc: THREE.LessEqualDepth, skinning: !!skinning, fog: false, polygonOffset: true, polygonOffsetFactor: -2 }); }
+function addGlint(mesh) { const g = new THREE.Mesh(mesh.geometry, glintMaterial()); g.userData.glint = true; g.renderOrder = 3; mesh.add(g); return mesh; }
+function applyPackGlint() { const c = entCanvas('glint'); if (c) { glintTex.image = c; glintTex.repeat.set(0.125, 0.125); glintTex.needsUpdate = true; const u = c.toDataURL(); document.documentElement.style.setProperty('--g-glint', `url(${u})`); document.body.classList.add('vglint'); } }
+R.addGlint = addGlint; R.glintMaterial = glintMaterial; R.applyPackGlint = applyPackGlint;
 // brightness for item/block meshes regardless of material kind
 function setMeshLight(mesh, v) { const m = mesh.material; if (m.uniforms) m.uniforms.light.value = v; else m.color.setScalar(v); }
 // render true 3D inventory icons for block items once at startup (Java GUI angle)
@@ -362,11 +405,12 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
   if (!armMat) setHandSkin();
   const h = R.hand, PI = Math.PI, right = OPT.mainHand !== 'left';
   [mainId, offId].forEach((id, k) => {
-    const H = HANDS[k];
-    if (id !== H.id) {
+    const H = HANDS[k], gl = !!(h.glint && h.glint[k]);
+    if (id !== H.id || gl !== !!H.gl) {
       if (H.mesh) { H.g.remove(H.mesh); H.mesh.material.dispose(); H.mesh = null; }
-      H.id = id; H.equip = 0; if (k === 0) h.equip = 0;
-      if (id > 0) { H.mesh = itemMesh(id); H.mesh.matrixAutoUpdate = false; H.g.add(H.mesh); }
+      if (id !== H.id) { H.equip = 0; if (k === 0) h.equip = 0; }
+      H.id = id; H.gl = gl;
+      if (id > 0) { H.mesh = itemMesh(id); if (gl) addGlint(H.mesh); H.mesh.matrixAutoUpdate = false; H.g.add(H.mesh); }
     }
     H.equip = Math.min(1, H.equip + dt * 6);
     const f = (k === 0) === right ? 1 : -1, act = k === active;
@@ -453,7 +497,9 @@ function renderFrame(dt, eye, under) {
   sun.material.opacity = moon.material.opacity = 1 - W.rain;
   stars.position.copy(camera.position); starMat.opacity = Math.max(0, 1 - day * 1.6) * (1 - W.rain); stars.rotation.z = ang;
   clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 128.33, camera.position.z); // 1.17 cloud height
-  cloudTex.offset.set((camera.position.x / 768) * 6 + performance.now() / 1e6, (-camera.position.z / 768) * 6);
+  cloudTex.offset.set((camera.position.x / 768) * cloudTex.repeat.x + (W.time + (W.tickFrac || 0)) * 0.03 / 768 * cloudTex.repeat.x, (-camera.position.z / 768) * cloudTex.repeat.y); // clouds drift 0.03 blocks a tick, like Java
+  { const tg = performance.now() / 1000; glintTex.offset.set((tg * 0.125) % 1, (tg * 0.0625) % 1); } // ~8 s per pass like Java
+  if (R.moonPhases) { const ph = Math.floor(W.time / 24000) % 8; moonTex.offset.set((ph % 4) / 4, ph < 4 ? 0.5 : 0); }
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment

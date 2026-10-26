@@ -362,7 +362,7 @@ function frame(now) {
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
   const h = PL.held();
   const hb = OPT.bob ? PL.bobAmt || 0 : 0, bob = PL.bobPrev + (PL.bob - PL.bobPrev) * alpha;
-  { const [mh, oh] = handItems(); R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
+  { const [mh, oh] = handItems(); R.hand.glint = [mh && (mh.e || ITEMS[mh.id].glint), oh && (oh.e || ITEMS[oh.id].glint)]; R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
@@ -427,10 +427,10 @@ function ambientParticles(dt, px, py, pz) {
     const x = ambList[k], y = ambList[k + 1], z = ambList[k + 2], b = ambList[k + 3], m = ambList[k + 4];
     if (b === BID.torch) {
       let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.2; }
-      R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
-      if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
+      R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { kind: 'flame', vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
+      if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { kind: 'smoke', vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
     } else if (Math.random() < 0.3) {
-      R.simpleParticle(x + 0.3 + Math.random() * 0.4, y + 0.2 + Math.random() * 0.3, z + 0.3 + Math.random() * 0.4, [1, 0.6, 0.15], { vx: 0, vz: 0, vy: 0.1, size: 0.05, life: 0.4, grav: 0 });
+      R.simpleParticle(x + 0.3 + Math.random() * 0.4, y + 0.2 + Math.random() * 0.3, z + 0.3 + Math.random() * 0.4, [1, 0.6, 0.15], { kind: 'flame', vx: 0, vz: 0, vy: 0.1, size: 0.05, life: 0.4, grav: 0 });
     }
   }
 }
@@ -450,6 +450,7 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }

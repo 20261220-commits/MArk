@@ -17,7 +17,7 @@ function vibrate(x, y, z) {
     const power = Math.max(1, 15 - Math.floor(15 * d / 8));
     setMeta(sx, sy, sz, 1 | (power << 4)); rsNotify(sx, sy, sz); schedule(sx, sy, sz, 40);
     play('click', { pitch: 1.8, vol: 0.4 });
-    for (let i = 0; i < 6; i++) { const t = i / 6; R.simpleParticle(x + (cx - x) * t, y + (cy - y) * t, z + (cz - z) * t, [0.2, 0.85, 0.9], { size: 0.08, vx: 1e-4, vy: 0, vz: 1e-4, grav: 0, life: 0.5 }); }
+    for (let i = 0; i < 6; i++) { const t = i / 6; R.simpleParticle(x + (cx - x) * t, y + (cy - y) * t, z + (cz - z) * t, [0.2, 0.85, 0.9], { kind: 'glow', size: 0.08, vx: 1e-4, vy: 0, vz: 1e-4, grav: 0, life: 0.5 }); }
   }
 }
 SCHED_TICK[BID.sculk_sensor] = (x, y, z, b, m) => {

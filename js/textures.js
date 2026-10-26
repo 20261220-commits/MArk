@@ -704,6 +704,29 @@ function discSprite(col) { return sprite(p => { for (let y = 1; y < 15; y++) for
 for (const d of ITEMS) if (d && d.disc) SPR[d.key] = () => discSprite(d.dcol);
 const BANNER_DYE = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
 S.COLORS.forEach((c, i) => { SPR[c + '_banner_item'] = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 1, hex(0x8a6a3b)); for (let y = 2; y < 15; y++) for (let x = 4; x < 12; x++) p(x, y, shade(hex(BANNER_DYE[i]), x === 4 ? 1.1 : x === 11 ? 0.8 : 1)); line(p, 7, 15, 8, 15, hex(0x8a6a3b)); }); });
+// Java draws banners and shields in the inventory from their entity textures: the same pixels, flattened into a 16x16 sprite
+function entSprite(draw) { const px = new Uint8ClampedArray(16 * 16 * 4); draw((x, y, r, g, b, a) => { if (x < 0 || y < 0 || x > 15 || y > 15) return; const i = (y * 16 + x) * 4; px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = a; }); const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').putImageData(new ImageData(px, 16, 16), 0, 0); c._px = px; return c; }
+const entPx = (e, x, y, base) => { const k = e.w / base, i = (Math.floor(y * k) * e.w + Math.floor(x * k)) * 4; return [e.px[i], e.px[i + 1], e.px[i + 2], e.px[i + 3]]; };
+// the cloth of a banner (20x40) from banner_base + tinted pattern masks, as BannerBlockEntityRenderer layers them
+function bannerCloth(base, pats) {
+  const bb = PACKPX.ent.banner_base; if (!bb) return null;
+  const out = new Uint8ClampedArray(20 * 40 * 4);
+  for (let y = 0; y < 40; y++) for (let x = 0; x < 20; x++) { const [r, g, b, a] = entPx(bb, 1 + x, 1 + y, 64), i = (y * 20 + x) * 4; out[i] = r; out[i + 1] = g; out[i + 2] = b; out[i + 3] = a; }
+  for (const [p, ci] of [['base', base], ...(pats || [])]) {
+    const m = PACKPX.ent['banner_' + p]; if (!m) continue; const col = BANNER_DYE[ci];
+    const cr = (col >> 16) & 255, cg = (col >> 8) & 255, cb = col & 255;
+    for (let y = 0; y < 40; y++) for (let x = 0; x < 20; x++) { const [r, g, b, a] = entPx(m, 1 + x, 1 + y, 64); if (!a) continue; const f = a / 255, i = (y * 20 + x) * 4;
+      out[i] = out[i] * (1 - f) + r * cr / 255 * f; out[i + 1] = out[i + 1] * (1 - f) + g * cg / 255 * f; out[i + 2] = out[i + 2] * (1 - f) + b * cb / 255 * f; out[i + 3] = 255; }
+  }
+  return out;
+}
+S.COLORS.forEach((c, i) => { const prev = SPR[c + '_banner_item']; SPR[c + '_banner_item'] = () => {
+  const cl = bannerCloth(i), bb = PACKPX.ent.banner_base; if (!cl) return prev();
+  return entSprite(p => { for (let x = 3; x < 13; x++) { const [r, g, b, a] = entPx(bb, 2 + x * 2, 43, 64); p(x, 0, r, g, b, a || 255); } // the top bar
+    for (let y = 0; y < 15; y++) for (let x = 0; x < 8; x++) { const sx = Math.min(19, Math.floor(x * 20 / 8)), sy = Math.min(39, Math.floor(y * 40 / 15)), j = (sy * 20 + sx) * 4; p(4 + x, 1 + y, cl[j], cl[j + 1], cl[j + 2], 255); } });
+}; });
+{ const prev = SPR.shield; SPR.shield = () => { const e = PACKPX.ent.shield_nopattern; if (!e) return prev ? prev() : sprite(() => {});
+  return entSprite(p => { for (let y = 0; y < 16; y++) for (let x = 0; x < 10; x++) { const [r, g, b, a] = entPx(e, 1 + x * 12 / 10, 1 + y * 22 / 16, 64); if (a) p(3 + x, y, r, g, b, a); } }); }; }
 SPR.painting = () => sprite(p => { for (let y = 2; y < 14; y++) for (let x = 1; x < 15; x++) p(x, y, x < 2 || x > 13 || y < 3 || y > 12 ? hex(0x8a6a3b) : y < 8 ? hex(0x6ab0e8) : x < 8 ? hex(0x5aa84a) : hex(0xe8c040)); });
 SPR.armor_stand = () => sprite(p => { for (let x = 3; x < 13; x++) p(x, 14, hex(0x9a9a9a)); line(p, 7, 2, 7, 13, hex(0xa8865a)); line(p, 8, 2, 8, 13, hex(0x8a6a3b)); for (let x = 4; x < 12; x++) p(x, 5, hex(0xa8865a)); for (let x = 5; x < 11; x++) p(x, 9, hex(0xa8865a)); });
 SPR.item_frame_item = () => frameSprite(hex(0x9c7b47)); SPR.glow_item_frame_item = () => frameSprite(hex(0x5ac8b8));

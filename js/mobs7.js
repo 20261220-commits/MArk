@@ -106,7 +106,7 @@ function witherSkullTick(e) {
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
-  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { size: 0.12, vy: 0, grav: 0, life: 0.4 });
+  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { kind: 'smoke', size: 0.12, vy: 0, grav: 0, life: 0.4 });
 }
 function witherRose(mob) { // a mob killed by the wither leaves a wither rose
   const x = Math.floor(mob.x), y = Math.floor(mob.y), z = Math.floor(mob.z);
