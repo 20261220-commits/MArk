@@ -91,8 +91,8 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
-  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   return L;
 }
 function clickSlot(i, btn, shift) {

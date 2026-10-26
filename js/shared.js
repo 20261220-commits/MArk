@@ -29,7 +29,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -595,6 +595,22 @@ function rotBox(b, f) { const [x0, y0, z0, x1, y1, z1] = b; return f === 0 ? b :
 const DIR6_IDS = new Set([125, 126, 129, 130, 131]), fix6 = (id, m) => DIR6_IDS.has(id) && (m & 7) > 5 ? (m & ~7) | 5 : m;
 // blocks that take another block's shape (trapped chests, damaged anvils, the extra slab / stair / wall sets)
 const SHAPE_AS = { 1102: 44, 1116: 250, 1117: 250, 1118: 251, 1119: 251, 1120: 253 };
+// Java's model elements for blocks whose shapes plain boxes can't draw: [from, to, rotation [axis, degrees, origin] | null,
+// faces {e,w,u,d,s,n: [tile, u0, v0, u1, v1, uv rotation]}] (block/lectern.json, block/grindstone.json)
+const LECTERN_TOP = ['x', -22.5, [8, 8, 8]], FN = { e: 0, w: 1, u: 2, d: 3, s: 4, n: 5 }, NV = [0, 0, 0], PV = [0, 0, 0];
+const MODEL_ELS = {
+  242: meta => [
+    [[0, 0, 0], [16, 2, 16], null, { n: ['lectern_base', 0, 14, 16, 16], e: ['lectern_base', 0, 6, 16, 8], s: ['lectern_base', 0, 6, 16, 8], w: ['lectern_base', 0, 6, 16, 8], u: ['lectern_base', 0, 0, 16, 16, 180], d: ['oak_planks', 0, 0, 16, 16] }],
+    [[4, 2, 4], [12, 15, 12], null, { n: ['lectern_front', 0, 0, 8, 13], e: ['lectern_sides', 2, 16, 15, 8, 90], s: ['lectern_front', 8, 3, 16, 16], w: ['lectern_sides', 2, 8, 15, 16, 90] }],
+    [[0.0125, 12, 3], [15.9875, 16, 16], LECTERN_TOP, { n: ['lectern_sides', 0, 0, 16, 4], e: ['lectern_sides', 0, 4, 13, 8], s: ['lectern_sides', 0, 4, 16, 8], w: ['lectern_sides', 0, 4, 13, 8], u: ['lectern_top', 0, 1, 16, 14, 180], d: ['oak_planks', 0, 0, 16, 13] }],
+    ...(meta & 4 ? [[[1, 16, 4], [15, 17, 15], LECTERN_TOP, { u: ['lectern_book', 0, 0, 16, 16], n: ['lectern_book', 0, 15, 16, 16], s: ['lectern_book', 0, 15, 16, 16], e: ['lectern_book', 0, 15, 16, 16], w: ['lectern_book', 0, 15, 16, 16] }]] : [])],
+  241: () => [
+    [[12, 0, 6], [14, 7, 10], null, { n: ['dark_oak_log', 2, 9, 4, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 12, 9, 14, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 12, 6, 14, 10] }],
+    [[2, 0, 6], [4, 7, 10], null, { n: ['dark_oak_log', 12, 9, 14, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 2, 9, 4, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 2, 6, 4, 10] }],
+    [[12, 7, 5], [14, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], e: ['grindstone_pivot', 0, 0, 6, 6], s: ['grindstone_pivot', 6, 0, 8, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[2, 7, 5], [4, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], s: ['grindstone_pivot', 6, 0, 8, 6], w: ['grindstone_pivot', 0, 0, 6, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[4, 4, 2], [12, 16, 14], null, { n: ['grindstone_round', 0, 0, 8, 12], e: ['grindstone_side', 0, 0, 12, 12], s: ['grindstone_round', 0, 0, 8, 12], w: ['grindstone_side', 0, 0, 12, 12], u: ['grindstone_round', 0, 0, 8, 12], d: ['grindstone_round', 0, 0, 8, 12] }]],
+};
 function shapes(id, meta) {
   meta = fix6(id, meta); id = SHAPE_AS[id] || id;
   switch (id) {
@@ -2951,8 +2967,8 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
-      const boxes = shapes(id, meta);
-      boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
+      if (MODEL_ELS[id]) modelFaces(id, meta, x, y, z, MODEL_ELS[id](meta), meta & 3, Cu, cFlip);
+      else boxFaces(id, meta, x, y, z, shapes(id, meta), Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);
       if (id === 1086 && (meta & 3)) crossAt(x, y, z, (meta & 3) === 2 ? T.bamboo_leaves : T.bamboo_small_leaves, 0, 1, 0.05);
     } else if (rt === RT.TBOX) {
@@ -3032,6 +3048,28 @@ function meshChunk(B, M, L, bio, opts) {
     }
     quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false);
     if (up) { for (let k = 0; k < 4; k++) CS[k][1] -= 1 / 32; const t = CS[1]; CS[1] = CS[3]; CS[3] = t; quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false); } // underside of a slope
+  }
+  // blocks drawn from Java's own model elements (models/block/*.json): boxes with per-face uvs and uv rotation, an
+  // optional element rotation (the lectern's sloped top) and the blockstate's y rotation from the facing
+  function rotP(v, ax, a, o) { const c = Math.cos(a), s = Math.sin(a), i = ax === 'x' ? 1 : 0, j = ax === 'z' ? 1 : 2, p = v[i] - o[i], q = v[j] - o[j];
+    if (ax === 'y') { v[0] = o[0] + p * c + q * s; v[2] = o[2] - p * s + q * c; } else { v[i] = o[i] + p * c - q * s; v[j] = o[j] + p * s + q * c; } }
+  function modelFaces(id, meta, x, y, z, els, yRot, OUT, OFL) {
+    const ya = -yRot * Math.PI / 2, C8 = [8, 8, 8], Z3 = [0, 0, 0];
+    for (const [fr, to, er, faces] of els) for (const fk in faces) {
+      const f = FN[fk], F = FACES[f], [tn, u0, v0, u1, v1, ur] = faces[fk];
+      NV[0] = F.n[0]; NV[1] = F.n[1]; NV[2] = F.n[2];
+      if (er) rotP(NV, er[0], er[1] * Math.PI / 180, Z3); if (yRot) rotP(NV, 'y', ya, Z3);
+      const an = [Math.abs(NV[0]), Math.abs(NV[1]), Math.abs(NV[2])], axn = an[0] > an[1] && an[0] > an[2] ? 0 : an[1] > an[2] ? 1 : 2, sgn = NV[axn] > 0 ? 1 : -1;
+      const g = axn === 0 ? (sgn > 0 ? 0 : 1) : axn === 1 ? (sgn > 0 ? 2 : 3) : (sgn > 0 ? 4 : 5);
+      for (let k = 0; k < 4; k++) { const c = F.c[k]; PV[0] = c[0] ? to[0] : fr[0]; PV[1] = c[1] ? to[1] : fr[1]; PV[2] = c[2] ? to[2] : fr[2];
+        if (er) rotP(PV, er[0], er[1] * Math.PI / 180, er[2]); if (yRot) rotP(PV, 'y', ya, C8);
+        CS[k][0] = x + PV[0] / 16; CS[k][1] = y + PV[1] / 16; CS[k][2] = z + PV[2] / 16; }
+      const G = FACES[g], edge = !er && ((sgn > 0 ? Math.max(CS[0][axn], CS[2][axn]) : Math.min(CS[0][axn], CS[2][axn])) - [x, y, z][axn]) === (sgn > 0 ? 1 : 0);
+      if (edge && OPQ[blk(x + G.n[0], y + G.n[1], z + G.n[2])]) continue;
+      if (edge) flatLight(x + G.n[0], y + G.n[1], z + G.n[2]); else flatLight(x, y, z);
+      SH4[0] = SH4[1] = SH4[2] = SH4[3] = G.s;
+      quad(OUT, OFL, CS, T[tn] != null ? T[tn] : FT[id * 4], u0, v0, u1, v1, (4 - ((ur || 0) / 90)) & 3, L4, SH4, false);
+    }
   }
   function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {

@@ -40,7 +40,7 @@ const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 var
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
-  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = true; };
+  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = c.urgent = true; }; // edits are remeshed first, on their own worker
   m(cx, cz);
   if (lx === 0) m(cx - 1, cz); else if (lx === 15) m(cx + 1, cz);
   if (lz === 0) m(cx, cz - 1); else if (lz === 15) m(cx, cz + 1);
@@ -491,6 +491,8 @@ const NWORK = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1))
 const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
+// one more worker only for chunks the player just changed: a broken or placed block never waits behind terrain generation
+const editWorker = new Worker(workerURL); editWorker.busy = 0; editWorker.onmessage = e => onWorker(editWorker, e.data);
 const bufPool = [];
 for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
@@ -511,7 +513,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m, m.ver]);
+    if (m.ver === c.urgentVer) W.meshInbox.unshift([c, m, m.ver]); else W.meshInbox.push([c, m, m.ver]);
   }
 }
 // a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
@@ -555,8 +557,8 @@ function requestGen(cx, cz) {
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
-function requestMesh(c, opts) {
-  const w = idleWorker(3); if (!w) return false;
+function requestMesh(c, opts, urgent) {
+  const w = urgent && editWorker.busy < 2 ? editWorker : idleWorker(3); if (!w) return false;
   const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
@@ -577,7 +579,7 @@ function requestMesh(c, opts) {
       }
     }
   }
-  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; // unique across chunks, so a stale job can never match a reloaded chunk
+  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; if (urgent) { c.urgent = false; c.urgentVer = c.ver; } // unique across chunks, so a stale job can never match a reloaded chunk
   w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
@@ -667,6 +669,8 @@ function buildSpiral(r) { const a = []; for (let dx = -r; dx <= r; dx++) for (le
 function streamChunks(px, pz, rd, meshOpts, budget) {
   const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = rd + 1;
   if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; }
+  // chunks the player just changed come first, even while an older mesh of them is still on its way
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const c = chunkAt(pcx + dx, pcz + dz); if (c && c.urgent && c.dirty && meshable(c)) requestMesh(c, meshOpts, true); }
   // meshing first (nearest first): visible chunks beat far terrain generation
   let sent = 0;
   for (const [dx, dz] of spiral) {

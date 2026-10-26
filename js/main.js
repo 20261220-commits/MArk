@@ -357,7 +357,7 @@ function frame(now) {
   // selection & crack
   const t = !UI.paused && TARGET && TARGET.type === 'block' ? TARGET : null;
   if (t && view === 0 && !UI.hideHud) R.setSelection(t.x, t.y, t.z, selShape(t.id, t.m) || [[0, 0, 0, 16, 16, 16]]); else R.sel.visible = false;
-  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) { R.crack.visible = true; R.crack.position.set(t.x + .5, t.y + .5, t.z + .5); R.crack.material.map = R.crackTexs[Math.min(9, Math.floor(MINE.prog * 10))]; } else R.crack.visible = false;
+  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) R.setCrack(t.x, t.y, t.z, t.id, getMeta(t.x, t.y, t.z), Math.floor(MINE.prog * 10)); else R.crack.visible = false;
   // hand
   if (R.hand.swing > 0) R.hand.swing = Math.max(0, R.hand.swing - dt * 3.5);
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
@@ -444,6 +444,16 @@ function autoRes() {
   if (old !== R.pixelScale) R.resize();
 }
 
+// which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their
+// 3D block model even though a sprite-sized texture exists (end rods, trapdoors, the small dripleaf, spore blossoms)
+function javaItemModels() {
+  const flat = { glass_pane: 'glass', lilac: 'lilac_top', rose_bush: 'rose_bush_top', peony: 'peony_top', sunflower: 'sunflower_top', tall_grass: 'tall_grass_top', large_fern: 'large_fern_top', weeping_vines: 'weeping_vines_plant', twisting_vines: 'twisting_vines_plant' };
+  for (const c of S.COLORS) flat[c + '_stained_glass_pane'] = c + '_stained_glass';
+  for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const k of [c + '_coral', c + '_coral_fan', 'dead_' + c + '_coral', 'dead_' + c + '_coral_fan']) flat[k] = k;
+  for (const k in flat) { const id = IID[k]; if (id != null && S.T[flat[k]] != null && !PACKPX.items[k]) ITEMS[id].sprite = flat[k]; }
+  for (const k of ['end_rod', 'spore_blossom', 'small_dripleaf', ...['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'iron'].map(w => w + '_trapdoor')]) { const id = IID[k]; if (id != null) ITEMS[id].sprite = null; }
+}
+
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
@@ -451,8 +461,9 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  javaItemModels();
   if (UPACK.stale) setTimeout(() => UI.flash('설정 → 리소스 팩에서 client.jar 를 다시 불러오면 원작 텍스처가 더 많이 적용됩니다'), 1500);
-  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); R.applyPackCracks(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
