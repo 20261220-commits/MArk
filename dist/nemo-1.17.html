@@ -9902,13 +9902,14 @@ function lushUse(t, h, d) {
   if (d.tool && d.tool.type === S.TOOL.HOE && id === BID.rooted_dirt) { setBlock(x, y, z, 3); dropItem(x + .5, y + .5 + t.ny * 0.6, z + .5, BID.hanging_roots, 1); damageItem(INV.slots, INV.sel, 1); play('place', { mat: 'gravel' }); swing(); return true; }
   if (h.id === IID.glow_berries || h.id === BID.small_dripleaf || h.id === BID.big_dripleaf) {
     const px = x + t.nx, py = y + t.ny, pz = z + t.nz, cur = getBlock(px, py, pz);
-    if (cur && !REPL[cur]) return true;
+    if (cur && !REPL[cur] && !(cur === 27 && h.id === BID.small_dripleaf)) return true;
     if (h.id === IID.glow_berries) { // glow berries plant a cave vine under a ceiling or another vine
       const up = getBlock(px, py + 1, pz); if (!OPQ[up] && up !== BID.cave_vines) return false;
       setBlock(px, py, pz, BID.cave_vines, 0);
     } else if (h.id === BID.small_dripleaf) {
       const below = getBlock(px, py - 1, pz), above = getBlock(px, py + 1, pz);
-      if ((below !== BID.clay && below !== BID.moss_block) || (above && !REPL[above])) return true;
+      const wet = getBlock(px, py, pz) === 27 && (below === 2 || below === 3 || below === BID.coarse_dirt || below === BID.podzol || below === BID.rooted_dirt || below === BID.farmland); // or on dirt under water, as in 1.17
+      if ((below !== BID.clay && below !== BID.moss_block && !wet) || (above && !REPL[above] && above !== 27)) return true;
       setBlock(px, py + 1, pz, BID.small_dripleaf, 8, { noUpdate: true }); setBlock(px, py, pz, BID.small_dripleaf, 0);
     } else { // big dripleaf: faces away from the player; placing one on another turns the lower one into stem
       if (getBlock(px, py - 1, pz) === BID.big_dripleaf) setBlock(px, py - 1, pz, BID.big_dripleaf_stem, 0, { noUpdate: true });
@@ -14762,7 +14763,7 @@ function placeBlock(t, d) {
   const b = BLOCKS[id];
   // placement rules
   if (b.plant) {
-    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : b.plant >= 15 ? true : OPQ[below]; // 15+: sea plants, checked by oceanPlace
+    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : b.plant === 11 ? OPQ[getBlock(x, y + 1, z)] : b.plant >= 15 ? true : OPQ[below]; // 11: hangs under a block (spore blossom, hanging roots) // 15+: sea plants, checked by oceanPlace
     if (!ok) return;
     if (id === BID.cactus && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)])) return;
   }
@@ -15424,14 +15425,16 @@ $('chatIn').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const v = $('chatIn').value.trim(); closeChat(); if (v) { if (v[0] === '/') runCommand(v.slice(1)); else { chatMsg('<' + (MP.on ? MP.name : '플레이어') + '> ' + v); if (MP.on) mpSend({ t: 'chat', name: MP.name, text: v }); } } }
 });
 function runCommand(cmd) {
-  const [c, ...a] = cmd.split(/\s+/);
+  let [c, ...a] = cmd.split(/\s+/);
+  const isTarget = v => v && (v[0] === '@' || v === '플레이어' || (typeof MP !== 'undefined' && v === MP.name));
+  if ((c === 'give' || c === 'clear' || c === 'tp' || c === 'teleport') && isTarget(a[0]) && (c !== 'tp' && c !== 'teleport' || a.length >= 4)) a = a.slice(1); // Java's "<target>" first: this game has one player
   const err = t => chatMsg(t, '#ff5555'), ok = t => chatMsg(t, '#aaaaaa');
   if (!W.cheats && c !== 'help' && c !== 'seed') return err('이 세계에서는 명령어가 허용되지 않습니다');
   const num = (v, base) => v && v[0] === '~' ? base + (+(v.slice(1)) || 0) : +v;
   switch (c) {
     case 'help': ok('/gamemode · /time set|add|query · /weather · /give · /tp · /summon · /kill [@e[type=..]] · /seed · /difficulty · /xp <양>[L] · /spawnpoint · /setworldspawn · /clear · /gamerule <규칙> <값> · /effect give|clear · /enchant · /setblock · /fill · /locate <구조물> · /say · /me · /title · /list'); break;
     case 'gamemode': { const m = { survival: 'survival', s: 'survival', 0: 'survival', creative: 'creative', c: 'creative', 1: 'creative', spectator: 'spectator', sp: 'spectator', 3: 'spectator', adventure: 'adventure', a: 'adventure', 2: 'adventure' }[a[0]]; if (!m) return err('알 수 없는 게임 모드'); PL.mode = m; if (m !== 'creative' && m !== 'spectator') PL.flying = false; if (m === 'spectator') PL.flying = true; UI.hudDirty = true; ok('게임 모드를 ' + MODE_NAME[m] + '(으)로 변경했습니다'); break; }
-    case 'time': { if (a[0] === 'query') { const q = a[1] === 'daytime' ? ((W.time % 24000) + 24000) % 24000 : a[1] === 'day' ? Math.floor(W.time / 24000) : W.tickN; ok('시간: ' + q); break; } const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + t + '(으)로 설정했습니다'); break; }
+    case 'time': { if (a[0] === 'query') { const q = a[1] === 'daytime' ? ((W.time % 24000) + 24000) % 24000 : a[1] === 'day' ? Math.floor(W.time / 24000) : W.tickN; ok('시간: ' + q); break; } const v = a[1]; const t = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 }[v] ?? +v; if (isNaN(t)) return err('시간 값이 잘못되었습니다'); if (a[0] === 'add') W.time += t; else W.time = Math.floor(W.time / 24000) * 24000 + t; ok('시간을 ' + (((W.time % 24000) + 24000) % 24000) + '(으)로 설정했습니다'); break; }
     case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.thunderOn = a[0] === 'thunder'; W.rainTimer = W.thunderTimer = 6000 + Math.random() * 12000; ok(a[0] === 'thunder' ? '날씨를 뇌우로 변경했습니다' : '날씨를 변경했습니다'); break;
     case 'give': { const k = (a[0] || '').replace('minecraft:', ''); const id = IID[k] != null ? IID[k] : ITEMS.findIndex(d => d && d.name === a[0]); if (id == null || id < 0 || !ITEMS[id]) return err('알 수 없는 아이템: ' + a[0]); const n = Math.max(1, Math.min(6400, +a[1] || 1)); let left = n; while (left > 0) { const m = Math.min(left, maxStack(id)); INV.giveOrDrop({ id, n: m }); left -= m; } ok(`[${itemName(id)}] ${n}개를 주었습니다`); break; }
     case 'teleport': case 'tp': { if (a[0] && a[0].startsWith('@')) a.shift(); const x = num(a[0], PL.x), y = num(a[1], PL.y), z = num(a[2], PL.z); if ([x, y, z].some(isNaN)) return err('좌표가 잘못되었습니다'); PL.x = PL.px = x; PL.y = PL.py = y; PL.z = PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; ok(`${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}(으)로 순간이동했습니다`); break; }

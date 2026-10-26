@@ -94,13 +94,14 @@ function lushUse(t, h, d) {
   if (d.tool && d.tool.type === S.TOOL.HOE && id === BID.rooted_dirt) { setBlock(x, y, z, 3); dropItem(x + .5, y + .5 + t.ny * 0.6, z + .5, BID.hanging_roots, 1); damageItem(INV.slots, INV.sel, 1); play('place', { mat: 'gravel' }); swing(); return true; }
   if (h.id === IID.glow_berries || h.id === BID.small_dripleaf || h.id === BID.big_dripleaf) {
     const px = x + t.nx, py = y + t.ny, pz = z + t.nz, cur = getBlock(px, py, pz);
-    if (cur && !REPL[cur]) return true;
+    if (cur && !REPL[cur] && !(cur === 27 && h.id === BID.small_dripleaf)) return true;
     if (h.id === IID.glow_berries) { // glow berries plant a cave vine under a ceiling or another vine
       const up = getBlock(px, py + 1, pz); if (!OPQ[up] && up !== BID.cave_vines) return false;
       setBlock(px, py, pz, BID.cave_vines, 0);
     } else if (h.id === BID.small_dripleaf) {
       const below = getBlock(px, py - 1, pz), above = getBlock(px, py + 1, pz);
-      if ((below !== BID.clay && below !== BID.moss_block) || (above && !REPL[above])) return true;
+      const wet = getBlock(px, py, pz) === 27 && (below === 2 || below === 3 || below === BID.coarse_dirt || below === BID.podzol || below === BID.rooted_dirt || below === BID.farmland); // or on dirt under water, as in 1.17
+      if ((below !== BID.clay && below !== BID.moss_block && !wet) || (above && !REPL[above] && above !== 27)) return true;
       setBlock(px, py + 1, pz, BID.small_dripleaf, 8, { noUpdate: true }); setBlock(px, py, pz, BID.small_dripleaf, 0);
     } else { // big dripleaf: faces away from the player; placing one on another turns the lower one into stem
       if (getBlock(px, py - 1, pz) === BID.big_dripleaf) setBlock(px, py - 1, pz, BID.big_dripleaf_stem, 0, { noUpdate: true });
