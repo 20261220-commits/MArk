@@ -870,7 +870,7 @@ function entityRender(alpha, now) {
     if (e.dead || !e.mesh) continue;
     const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha, z = e.pz + (e.z - e.pz) * alpha;
     const dx = x - camera.position.x, dz = z - camera.position.z;
-    const far = !(e.def && e.def.boss) && dx * dx + dz * dz > Math.min(R.rd * 16, 80) ** 2; // keeps draw calls low on weak GPUs
+    const far = !(e.def && e.def.boss) && dx * dx + dz * dz > Math.min(R.rd * 16 - 12, 80) ** 2; // keeps draw calls low on weak GPUs (and nothing past the fog)
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {

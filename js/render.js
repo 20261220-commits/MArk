@@ -461,6 +461,12 @@ const SKY_DAY = new THREE.Color(0x78a7ff), FOG_DAY = new THREE.Color(0xc0d8ff), 
 const DUSK = new THREE.Color(0xff8a3a), WATER_FOG = new THREE.Color(0x0b2a6a), LAVA_FOG = new THREE.Color(0xc04a10), RAIN_SKY = new THREE.Color(0x5a6470);
 const tmpC = new THREE.Color(), tmpC2 = new THREE.Color(), fogCol = new THREE.Color(), sunDir = new THREE.Vector3(), lookV = new THREE.Vector3(); // reused every frame (no GC churn)
 R.rd = 6; R.fov = 70; R.fovMul = 1;
+// chunks wholly past the fog end are drawn as plain fog colour anyway: skip their draw calls and triangles
+function fogCull() {
+  const cx = camera.position.x, cz = camera.position.z, lim = (fog.far + 1) ** 2;
+  for (const c of W.chunks.values()) { if (!c.mesh) continue; const x0 = c.cx * 16, z0 = c.cz * 16, dx = cx < x0 ? x0 - cx : cx > x0 + 16 ? cx - x0 - 16 : 0, dz = cz < z0 ? z0 - cz : cz > z0 + 16 ? cz - z0 - 16 : 0, v = dx * dx + dz * dz <= lim;
+    for (const k of ['o', 'c', 't']) if (c.mesh[k]) c.mesh[k].visible = v; }
+}
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setPixelRatio(R.basePR * R.pixelScale); renderer.setSize(w, h, false);
@@ -494,7 +500,7 @@ function renderFrame(dt, eye, under) {
   else if (under === 'snow') { fog.color.setRGB(0.85, 0.9, 0.95); fog.near = 0; fog.far = 2; }
   else { const end = rd - 12; fog.color.copy(fogCol); fog.near = end * (W.rain > 0.5 ? 0.35 : 0.75); fog.far = end * (W.rain > 0.5 ? 0.85 : 1.0); } // ends inside the loaded chunks, wherever the eye stands in its own chunk
   if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; } // blindness: thick black fog
-  renderer.setClearColor(fog.color);
+  renderer.setClearColor(fog.color); fogCull();
   sky.visible = !under; sky.position.copy(camera.position);
   sun.position.copy(camera.position).addScaledVector(sunDir, 300); sun.lookAt(camera.position);
   moon.position.copy(camera.position).addScaledVector(sunDir, -300); moon.lookAt(camera.position);
@@ -523,7 +529,7 @@ function renderOtherDim(dt, eye, under) {
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (nether) { fog.color.copy(netherFog); fog.near = Math.min(rd - 12, 96) * 0.05; fog.far = Math.min(rd - 12, 96) * 0.9; }
   else { fog.color.copy(END_SKY); fog.near = (rd - 12) * 0.5; fog.far = rd - 12; stars.position.copy(camera.position); starMat.opacity = 0.35; }
-  renderer.setClearColor(fog.color);
+  renderer.setClearColor(fog.color); fogCull();
   for (const m of [matOpaque, matCutout, matTrans]) {
     m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = nether ? 0.24 : 0.08;
     m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma;
