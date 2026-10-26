@@ -36,6 +36,7 @@ function getMeta(x, y, z) { if (y < 0 || y >= CH) return 0; const c = chunkAt(x 
 function getLight(x, y, z) { if (y >= CH) return 0xf0; if (y < 0) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.light[(y << 8) | ((z & 15) << 4) | (x & 15)] : 0xf0; }
 function isLoaded(x, z) { return !!chunkAt(x >> 4, z >> 4); }
 function biomeAt(x, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.biome[((z & 15) << 4) | (x & 15)] : 1; }
+const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 variant (taiga hills -> taiga), for spawning rules
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
@@ -139,8 +140,10 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (y < 0 || y >= CH) return false;
   const c = chunkAt(x >> 4, z >> 4); if (!c) return false;
   const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i], oldM = c.meta[i];
+  if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
+  if (MP.on && MP.local && !MP.applying) mpBlockChanged(x, y, z, id, meta); // multiplayer: what a player did reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -177,6 +180,13 @@ function plantOK(b, x, y, z, m) {
     }
     case 13: return m & 8 ? below === b : (below === BID.clay || below === BID.moss_block) && above === b; // small dripleaf: two blocks tall
     case 14: return below !== 0; // moss carpet
+    case 15: return OPQ[below] || below === BID.kelp_plant || below === BID.kelp; // kelp
+    case 16: return OPQ[below]; // seagrass
+    case 17: return m & 8 ? below === b : OPQ[below] && above === b; // tall seagrass
+    case 18: return supportedBy(below); // corals, fans, sea pickles
+    case 19: return below === BID.bamboo || BAMBOO_SOIL.has(below); // bamboo
+    case 20: return m & 8 ? below === b : (below === BID.grass_block || below === BID.dirt || below === BID.podzol) && above === b; // tall flowers
+    default: if (typeof plant6OK === 'function') return plant6OK(b, x, y, z, m, below, above);
   }
   return true;
 }
@@ -198,7 +208,10 @@ function neighborUpdate(x, y, z) {
     else if (d.plant === 2) ok = below === 9 || below === 3 || below === 2;
     else if (d.plant === 3) { ok = below === b || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27)); }
     else if (d.plant === 4) { ok = (below === b || below === 9) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
-    else if (d.plant === 5) ok = below === BID.farmland;
+    else if (d.plant === 5) {
+      ok = below === BID.farmland;
+      if (ok && b === BID.stem && (m & 16)) { const dd = DIRS[(m >> 5) & 3]; if (getBlock(x + dd[0], y, z + dd[2]) !== (m & 8 ? BID.melon : BID.pumpkin)) setMeta(x, y, z, (m & 8) | 7); } // the fruit was taken
+    }
     else if (d.plant === 6) ok = OPQ[below];
     else if (d.plant === 7) ok = OPQ[below] || below === BID.soul_sand;
     else if (d.plant === 8) ok = below === BID.soul_sand;
@@ -233,6 +246,8 @@ function neighborUpdate(x, y, z) {
   if (b === BID.tnt && W.onTntCheck) W.onTntCheck(x, y, z);
   if (b === BID.nether_portal) { if (!portalIntact(x, y, z)) setBlock(x, y, z, 0); return; }
   if (b === BID.fire) { if (!SOLID[below]) setBlock(x, y, z, 0); return; }
+  if ((b === BID.tripwire || b === BID.flower_pot) && !supportedBy(below)) { breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.tripwire_hook_block) { const [ax, , az] = DIRS[m & 3]; if (!OPQ[getBlock(x - ax, y, z - az)]) { breakNaturally(x, y, z, b, m); return; } }
   if (d.rail && !supportedBy(below)) { breakNaturally(x, y, z, b, m); return; }
   if (d.connect) updateConnections(x, y, z, b);
   if (d.rs || S.DOOR[b] || b === BID.tnt || b === BID.oak_trapdoor) {
@@ -337,7 +352,7 @@ function randomTicks(px, pz) {
   const pcx = px >> 4, pcz = pz >> 4, R = 6;
   for (let cx = pcx - R; cx <= pcx + R; cx++) for (let cz = pcz - R; cz <= pcz + R; cz++) {
     const c = chunkAt(cx, cz); if (!c || !meshable(c)) continue; // neighbours must be loaded (leaf decay, spreading)
-    for (let s = 0, ns = (c.maxY >> 4) + 1; s < ns; s++) for (let k = 0; k < 3; k++) { // only sections that contain blocks
+    for (let s = 0, ns = (c.maxY >> 4) + 1, rts = gr('randomTickSpeed'); s < ns; s++) for (let k = 0; k < rts; k++) { // only sections that contain blocks
       const r = (Math.random() * 4096) | 0, i = (s << 12) | r, b = c.blocks[i];
       if (!b || !RANDOM_TICK[b]) continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
@@ -360,6 +375,18 @@ const grow = (x, y, z, b, m) => {
   if (m < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, m + 1);
 };
 RANDOM_TICK[BID.wheat] = grow;
+// pumpkin / melon stems: grow to age 7, then try to put a fruit on a random side (on dirt, grass, farmland...) and bend toward it
+const FRUIT_SOIL = new Set([2, 3, BID.farmland, BID.podzol, BID.coarse_dirt, BID.moss_block, BID.rooted_dirt]);
+RANDOM_TICK[BID.stem] = (x, y, z, b, m) => {
+  if (m & 16 || lightLevelAbove(x, y - 1, z) < 9) return;
+  const wet = (getMeta(x, y - 1, z) & 7) > 0;
+  if (Math.random() > (wet ? 0.33 : 0.14)) return;
+  if ((m & 7) < 7) { setMeta(x, y, z, m + 1); return; }
+  const f = (Math.random() * 4) | 0, d = DIRS[f], fx = x + d[0], fz = z + d[2];
+  if (getBlock(fx, y, fz) !== 0 || !FRUIT_SOIL.has(getBlock(fx, y - 1, fz))) return;
+  setBlock(fx, y, fz, m & 8 ? BID.melon : BID.pumpkin);
+  setMeta(x, y, z, (m & 15) | 16 | (f << 5));
+};
 // carrots / potatoes / beetroots share one block: type in meta bits 3-4, age in bits 0-2
 RANDOM_TICK[BID.crops2] = (x, y, z, b, m) => { if (lightLevelAbove(x, y - 1, z) < 9) return; const age = m & 7, wet = (getMeta(x, y - 1, z) & 7) > 0; if (age < 7 && Math.random() < (wet ? 0.33 : 0.14)) setMeta(x, y, z, (m & ~7) | (age + 1)); };
 for (const [sap, type] of [[BID.oak_sapling, 0], [BID.birch_sapling, 2], [BID.spruce_sapling, 3], [BID.jungle_sapling, 4], [BID.acacia_sapling, 5], [BID.dark_oak_sapling, 6]]) RANDOM_TICK[sap] = (x, y, z, b, m) => {
@@ -411,7 +438,7 @@ RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   for (let dx = -4; dx <= 4 && !wet; dx++) for (let dz = -4; dz <= 4 && !wet; dz++) for (let dy = 0; dy <= 1; dy++) if (getBlock(x + dx, y + dy, z + dz) === 27) { wet = true; break; }
   if (wet || (W.rain > 0.5 && W.dim === 0 && (getLight(x, y + 1, z) >> 4) === 15)) { if (m !== 7) setMeta(x, y, z, 7); } // rain only reaches farmland open to the sky
   else if (m > 0) setMeta(x, y, z, m - 1);
-  else if (getBlock(x, y + 1, z) !== BID.wheat) setBlock(x, y, z, 3);
+  else if (BLOCKS[getBlock(x, y + 1, z)].plant !== 5) setBlock(x, y, z, 3); // dry farmland under a crop stays tilled
 };
 for (const b of BLOCKS) if (b && b.oxid) RANDOM_TICK[b.id] = (x, y, z, id, m) => { if (!(m & BLOCKS[id].wax) && Math.random() < 0.02) setBlock(x, y, z, BLOCKS[id].oxid, m); }; // waxed copper never oxidises; shape bits (slab half, stair facing) stay
 // budding amethyst (1.17): small bud -> medium -> large -> cluster, each pointing away from the budding block
@@ -487,12 +514,30 @@ function handleWorker(m) {
     W.meshInbox.push([c, m, m.ver]);
   }
 }
+// a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
+function lootStack(key, n, x, wx, wz, seed) {
+  const sp = typeof lootSpecial === 'function' && lootSpecial(x && x.map ? { buried_treasure: 'buried_treasure_map', monument: 'ocean_explorer_map', mansion: 'woodland_explorer_map' }[x.map] || key : key, wx, wz); if (sp) return sp;
+  const id = IID[key]; if (id == null) return null;
+  const st = { id, n }; if (!x) return st;
+  const d = ITEMS[id];
+  if (x.dmg != null && d.dur) st.d = Math.min(d.dur - 1, Math.max(0, Math.round(d.dur * (1 - x.dmg))));
+  if (x.ench) {
+    const r = S.rng(seed);
+    if (x.ench > 1 && enchKinds(id).length) st.e = rollEnchant(id, x.ench, seed);
+    else { const ks = Object.keys(ENCH).filter(k => id === IID.enchanted_book || id === IID.book || ENCH[k][2].some(t => enchKinds(id).includes(t))); if (ks.length) { const k = ks[r.int(ks.length)]; st.e = { [k]: 1 + r.int(ENCH[k][1]) }; } }
+    if (id === IID.book && st.e) st.id = IID.enchanted_book;
+    if (st.e && !Object.keys(st.e).length) delete st.e;
+  }
+  return st;
+}
 function addChunk(cx, cz, d, tiles) {
   const c = new Chunk(cx, cz, d);
   W.chunks.set(c.key, c); W.lastKey = -1;
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
-    if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'chest', items }); }
+    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); c.tiles.set(t.i, { type: 'chest', items }); }
+    else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
+    else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
     else if (t.type) c.tiles.set(t.i, t);
@@ -506,7 +551,7 @@ function addChunk(cx, cz, d, tiles) {
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
   w.busy++; const id = jobId++; W.pending.set(ckey(cx, cz), id);
-  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim });
+  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim, exp: W.exp });
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
@@ -585,7 +630,7 @@ saveWorker.onmessage = e => {
 const saveDone = k => savePending.has(k) ? new Promise(r => { const w = saveWaiters.get(k) || []; w.push(r); saveWaiters.set(k, w); }) : null;
 // unloading: the chunk's arrays are handed to the worker without copying; sync: encode here (page is closing)
 function saveChunk(c, unloading, sync) {
-  if (!c.modified || W.pano) return; c.modified = false;
+  if (!c.modified || W.pano || (W.meta && W.meta.remote)) return; c.modified = false; // a multiplayer guest keeps nothing: the host's world is the real one
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }

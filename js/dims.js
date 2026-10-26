@@ -7,11 +7,11 @@ function switchDim(to, x, y, z, arrive) {
   resetWorld(true);
   for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   if (typeof bossBar === 'function') bossBar(null);
-  W.dim = to; W.arrive = arrive || null;
+  const from = W.dim; W.dim = to; W.arrive = arrive || null;
   PL.x = x; PL.y = y; PL.z = z; PL.px = x; PL.py = y; PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.portalT = 0; PL.portalLock = true;
   if (W.meta) W.meta.dim = to;
+  if (typeof ADVT !== 'undefined') { ADVT.dim(to); advNetherTravel(from, to); }
   clearInput(); UI.paused = true; showMenu('loading', DIM_NAME[to] + '(으)로 이동하는 중'); loadingFrom = performance.now();
-  UI.advance && UI.advance(to === -1 ? 'nether' : to === 1 ? 'end' : 'home');
 }
 // after the destination chunks are loaded: find or build a portal, or the End platform
 function arriveDim() {
@@ -23,6 +23,7 @@ function arriveDim() {
     const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
     if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
     PL.y = y + 1;
+  } else if (a === 'anchor') { anchorArrive();
   } else if (a === 'gateway' || a === 'gatehome') {
     const x0 = Math.floor(PL.x), z0 = Math.floor(PL.z); let best = null;
     for (let r = 0; r <= 24 && !best; r += 2) for (let dx = -r; dx <= r && !best; dx += 2) for (let dz = -r; dz <= r && !best; dz += 2) { const t = topY(x0 + dx, z0 + dz); if (t > 30 && getBlock(x0 + dx, t, z0 + dz) === BID.end_stone) best = [x0 + dx, t + 1, z0 + dz]; }
@@ -95,6 +96,6 @@ function portalTick() {
   const ov = $('ovPortal'); if (ov) ov.style.opacity = Math.min(1, (PL.portalT || 0) / 80) * 0.8;
 }
 // fire burns out unless it sits on netherrack or magma
-RANDOM_TICK[BID.fire] = (x, y, z) => { const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
+RANDOM_TICK[BID.fire] = (x, y, z) => { if (!gr('doFireTick')) return; const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
 function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }

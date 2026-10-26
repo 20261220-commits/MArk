@@ -45,7 +45,7 @@ const AXO_PREY = new Set(['cod', 'salmon', 'tropical_fish', 'squid', 'glow_squid
 Object.assign(MOBDEF, {
   axolotl: { hp: 14, w: 0.375, h: 0.42, speed: 0.1, xp: 2, snd: 'splash', drops: [], parts: AXO_PARTS, tex: () => axolotlTex(0), vtex: axolotlTex,
     variant: () => (Math.random() * 4) | 0, food: 'tropical_fish_bucket', ai: axolotlAI, anim: axolotlAnim },
-  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
+  tropical_fish: { hp: 3, w: 0.25, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['tropical_fish', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: TFISH_PARTS, tex: () => tropicalFishTex(0), vtex: tropicalFishTex,
     variant: () => (Math.random() * TFISH_COL.length) | 0 },
 });
 
@@ -80,7 +80,7 @@ function axolotlAI(e, dist) {
     const mate = ENT.find(o => o !== e && o.type === 'axolotl' && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8);
     if (mate) {
       e.goal = [mate.x, mate.y, mate.z];
-      if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.2) { e.love = mate.love = 0; spawnMob('axolotl', e.x, e.y, e.z, { baby: true, variant: Math.random() < 1 / 1200 ? 4 : (Math.random() < 0.5 ? e : mate).variant }); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); }
+      if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.2) { e.love = mate.love = 0; spawnMob('axolotl', e.x, e.y, e.z, { baby: true, variant: Math.random() < 1 / 1200 ? 4 : (Math.random() < 0.5 ? e : mate).variant }); ADVT.bred('axolotl'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); }
     }
   }
   const lure = PL.held() && PL.held().id === IID.tropical_fish_bucket && dist < 8 && !e.love && PL.mode !== 'spectator';
@@ -138,12 +138,11 @@ function trySpawnAxolotl() {
     return;
   }
 }
-// there are no warm ocean biomes, so tropical fish school in ocean chunks next to warm land (jungle, desert, savanna, badlands)
+// tropical fish school in warm and lukewarm oceans; pufferfish too
 function spawnWarmFish(c) {
-  const b = c.biome[8 * 16 + 8]; if (b !== S.BIO.OCEAN && b !== S.BIO.BEACH) return;
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.15) return;
-  const x0 = c.cx * 16 + 8, z0 = c.cz * 16 + 8, warm = [S.BIO.JUNGLE, S.BIO.DESERT, S.BIO.SAVANNA, S.BIO.BADLANDS];
-  if (![[48, 0], [-48, 0], [0, 48], [0, -48], [34, 34], [-34, -34], [34, -34], [-34, 34]].some(([dx, dz]) => warm.includes(biomeAt(x0 + dx, z0 + dz)))) return;
+  const b = S.BB[c.biome[8 * 16 + 8]]; if (b !== S.BIO.WARM_OCEAN && b !== S.BIO.LUKEWARM_OCEAN) return;
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.25) return;
+  if (R0() < 0.3) { for (let i = 0; i < 1 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(9); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('pufferfish', x + .5, y, z + .5); } return; }
   const v = R0.int(TFISH_COL.length);
   for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
 }

@@ -15,7 +15,7 @@ function campfireTick(c, i, t) {
   // smoke drifts up (higher over a hay bale: a signal fire)
   if (lit && Math.hypot(PL.x - x, PL.z - z) < 40 && W.tickN % 3 === 0) {
     const sig = getBlock(x, y - 1, z) === BID.hay_block;
-    R.simpleParticle(x + .3 + Math.random() * .4, y + .8, z + .3 + Math.random() * .4, [0.62, 0.62, 0.62], { size: 0.2, vx: (Math.random() - .5) * 0.1, vy: 0.6, vz: (Math.random() - .5) * 0.1, grav: -0.05, life: sig ? 8 : 3 });
+    R.simpleParticle(x + .3 + Math.random() * .4, y + .8, z + .3 + Math.random() * .4, [0.62, 0.62, 0.62], { kind: 'big_smoke', size: 0.2, vx: (Math.random() - .5) * 0.1, vy: 0.6, vz: (Math.random() - .5) * 0.1, grav: -0.05, life: sig ? 8 : 3 });
   }
   // items lying on it
   const k0 = x + ',' + y + ',' + z, cur = cfMeshes.get(k0), ver = t.ver || 0;

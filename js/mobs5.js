@@ -137,7 +137,7 @@ function beeAI(e, dist) {
     if (Math.hypot(fx - e.x, fy - e.y, fz - e.z) < 1.2) { beeEnter(e); return; }
     fly(fx, fy + 0.3, fz, 0.13);
     // pollinating crops on the way home
-    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { size: 0.08, vy: 0.4 }); } } }
+    if (e.nectar && e.age % 20 === 0) { for (let dy = 1; dy <= 2; dy++) { const bx = Math.floor(e.x), by = Math.floor(e.y) - dy, bz = Math.floor(e.z), b = getBlock(bx, by, bz); if ((b === BID.wheat || b === BID.crops2) && (getMeta(bx, by, bz) & 7) < 7 && Math.random() < 0.3) { setMeta(bx, by, bz, getMeta(bx, by, bz) + 1); for (let i = 0; i < 3; i++) R.simpleParticle(bx + Math.random(), by + 0.8, bz + Math.random(), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.08, vy: 0.4 }); } } }
     return;
   }
   // look for a flower, hover at it for a while to collect nectar
@@ -204,6 +204,7 @@ function hiveUse(t, h) {
   if (h.id === IID.shears) { dropItem(x + .5, y + 1, z + .5, IID.honeycomb, 3); damageItem(INV.slots, INV.sel, 1); play('click'); }
   else { consume(); INV.giveOrDrop({ id: IID.honey_bottle, n: 1 }); play('splash', { vol: 0.4 }); }
   setMeta(x, y, z, m & 3);
+  if (hiveCalm(x, y, z)) advGrant('husbandry/safely_harvest_honey');
   if (!hiveCalm(x, y, z)) { const tile = getTile(x, y, z); releaseBees(x, y, z, tile, true); for (const e of ENT) if (e.type === 'bee' && !e.dead && Math.hypot(e.x - x, e.z - z) < 16) e.target = PL; }
   swing(); return true;
 }
@@ -222,12 +223,13 @@ function animalTick() {
   if (W.tickN % 1200 === 600) trySpawnPhantoms();
   if (W.tickN % 12000 === 6000) trySpawnPatrol();
   if (W.tickN % 200 === 100) outpostSpawn();
+  if (W.tickN % 24000 === 1000 && typeof trySpawnTrader === 'function') trySpawnTrader();
   if (W.tickN % 10 === 0 && INV.armor[0] && INV.armor[0].id === IID.turtle_helmet && fluidAt(PL.x, PL.y + PL.eyeH, PL.z) !== 1) addEffect(PL, 'water_breathing', 200, 0);
 }
 function inBerryBush(e) { return boxBlocks(e, b => b === BID.sweet_berry_bush) ; }
 
 Object.assign(MOBDEF, {
-  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['dried_kelp'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
+  turtle: { hp: 30, w: 0.6, h: 0.4, speed: 0.04, xp: 2, snd: 'splash', drops: [['seagrass', 0, 2]], parts: TURTLE_M.parts, tw: 128, th: 64, tex: () => TURTLE_M.tex(0), food: ['seagrass'], ai: turtleAI, anim: turtleAnim, onGrow: turtleGrow,
     save: e => ({ home: e.home || null, pregnant: !!e.pregnant }), init: (e, o) => { if (o.home) e.home = o.home; if (o.pregnant) e.pregnant = true; } },
   dolphin: { hp: 10, w: 0.45, h: 0.6, speed: 0.12, xp: 2, snd: 'splash', neutral: 1, drops: [['cod', 0, 1]], parts: DOLPHIN_M.parts, tex: () => DOLPHIN_M.tex(0), ai: dolphinAI, anim: dolphinAnim },
   bee: { hp: 10, w: 0.35, h: 0.6, speed: 0.07, xp: 2, snd: 'hmm', neutral: 1, fly: 1, fallReduce: 99, drops: [], parts: BEE_M.parts, tex: () => BEE_M.tex(0), food: [...FLOWERS].map(id => BLOCKS[id].key).filter(k => IID[k] != null),

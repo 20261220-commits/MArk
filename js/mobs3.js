@@ -67,10 +67,10 @@ function pickSkin(type, e) {
 const ZDEF = MOBDEF.zombie, SKDEF = MOBDEF.skeleton;
 Object.assign(MOBDEF, {
   husk: { ...ZDEF, burn: 0, drops: [['rotten_flesh', 0, 2]] },
-  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2], ['copper_ingot', 0, 0]] },
-  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
+  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
+  stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]], extraDrop: [['slowness_arrow', 0.5]] },
   wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
-  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [['gold_ingot', 0, 0]], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
+  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
   hoglin: { hp: 40, w: 0.7, h: 1.4, speed: 0.1, hostile: 1, dmg: 6, xp: 5, snd: 'growl', drops: [['porkchop', 2, 4], ['leather', 0, 1]], parts: BOXPARTS(16, 14, 26), tex: () => solidBox('#c08060'), food: 'crimson_fungus' },
   strider: { hp: 20, w: 0.45, h: 1.7, speed: 0.06, xp: 2, snd: 'hmm', fireproof: 1, drops: [['string', 2, 5]], parts: BOXPARTS(16, 14, 16), tex: () => solidBox('#a04040'), ai: striderAI, food: 'warped_fungus' },
   shulker: { hp: 30, w: 0.5, h: 1, speed: 0, hostile: 1, xp: 5, snd: 'click', drops: [['shulker_shell', 0, 1]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#9a6aa0'), ai: shulkerAI, anim: shulkerAnim, noPush: 1, kbRes: 1 },
@@ -78,8 +78,8 @@ Object.assign(MOBDEF, {
   silverfish: { hp: 8, w: 0.2, h: 0.3, speed: 0.12, hostile: 1, dmg: 1, xp: 5, snd: 'spider', drops: [], parts: BOXPARTS(6, 4, 10), tex: () => solidBox('#8a8a8a') },
   wolf: { hp: 8, w: 0.3, h: 0.85, speed: 0.12, xp: 2, snd: 'bleat', drops: [], parts: BOXPARTS(6, 6, 10), tex: () => solidBox('#d0d0d0'), ai: wolfAI, anim: wolfAnim, food: 'bone' },
   bat: { hp: 6, w: 0.25, h: 0.9, speed: 0.05, xp: 0, snd: 'click', drops: [], parts: BOXPARTS(6, 6, 6), tex: () => solidBox('#4a3a2a'), ai: batAI, anim: batAnim },
-  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1], ['bone_meal', 0, 0]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
-  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
+  cod: { hp: 3, w: 0.25, h: 0.3, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['cod', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(2, 4, 7), tex: () => solidBox('#a08060') },
+  salmon: { hp: 3, w: 0.35, h: 0.4, speed: 0.04, xp: 1, snd: 'splash', water: 1, fish: 1, drops: [['salmon', 1, 1]], extraDrop: [['bone_meal', 0.05]], parts: BOXPARTS(3, 5, 8), tex: () => solidBox('#b04040') },
 });
 MOBDEF.drowned.drops = [['rotten_flesh', 0, 2]];
 // ---------- AI ----------
@@ -96,7 +96,7 @@ function piglinAI(e, dist) {
     walkPhysics(e, 0, 0, 0); return;
   }
   // pick up gold ingots lying nearby
-  if (!e.target) for (const it of ENT) if (it.kind === 'item' && !it.dead && it.stack.id === IID.gold_ingot && Math.hypot(it.x - e.x, it.z - e.z) < 1.2 && Math.abs(it.y - e.y) < 1.5) { it.stack.n--; if (!it.stack.n) removeEnt(it); e.barter = 120; return; }
+  if (!e.target) for (const it of ENT) if (it.kind === 'item' && !it.dead && it.stack.id === IID.gold_ingot && Math.hypot(it.x - e.x, it.z - e.z) < 1.2 && Math.abs(it.y - e.y) < 1.5) { it.stack.n--; if (!it.stack.n) removeEnt(it); e.barter = 120; if (it.byPlayer) advGrant('nether/distract_piglin', 'distract_piglin'); return; }
   let mx = 0, mz = 0;
   if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.def.dmg, mx, mz); } }
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
@@ -179,20 +179,21 @@ function swimAssist(e) { if (e.def.swim && e.inWater && e.target) { e.vy += Math
 // ---------- player interaction with the new mobs ----------
 function mobInteract(e, h, d) {
   if (e.def.interact && e.def.interact(e, h, d)) return true;
-  if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { e.barter = 120; consume(); swing(); play('hmm'); return true; }
+  if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); UI.advance('wolf'); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); return true; }
+    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
   }
   return false;
 }
 // ---------- spawning ----------
 function overworldReplace(t, x, y, z) {
-  const b = biomeAt(x, z);
+  const b = biomeBase(x, z);
   if (t === 'zombie' && (b === S.BIO.DESERT || b === S.BIO.BADLANDS) && Math.random() < 0.8 && (getLight(x, y, z) >> 4) > 8) return 'husk';
   if (t === 'skeleton' && (b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FROZEN_OCEAN) && Math.random() < 0.8) return 'stray';
   if (t === 'zombie' && FLUID[getBlock(x, y, z)] === 1) return 'drowned';
   if (t === 'zombie' && Math.random() < 0.05) return 'witch';
+  if (t === 'zombie' && Math.random() < 0.05) return 'zombie_villager';
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
 }
@@ -217,12 +218,12 @@ function trySpawnAmbient() {
 }
 // chunk-load spawns: wolf packs in forests/taigas, fish in water
 function spawnExtraForChunk(c) {
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 19)), b = c.biome[8 * 16 + 8];
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 19)), b = S.BB[c.biome[8 * 16 + 8]];
   if ((b === S.BIO.TAIGA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FOREST) && R0() < 0.03) {
     for (let i = 0; i < 2 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12); let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 2) spawnMob('wolf', x + .5, y + 1, z + .5); }
   }
-  if ((b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) && R0() < 0.08) {
-    const t = b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN ? 'salmon' : 'cod';
+  if ((S.isOceanBio(b) || b === S.BIO.RIVER) && R0() < 0.08) {
+    const t = b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN || b === S.BIO.COLD_OCEAN ? 'salmon' : 'cod';
     for (let i = 0; i < 3 + R0.int(4); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(10); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
   }
 }

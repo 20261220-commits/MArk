@@ -1,5 +1,5 @@
 // Inventory model + container screens with Java Edition click semantics.
-const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
+const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), off: null, sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
 const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
@@ -20,17 +20,18 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); return r ? { id: r.out, n: r.n } : null; }
+function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
+  if (type === 'adv') return L; // the advancements screen has no slots
   if (type === 'inv' || type === 'craft') {
     const grid = type === 'inv' ? INV.craft2 : INV.craft3, w = type === 'inv' ? 2 : 3;
     grid.forEach((_, i) => L.push(slotRef(grid, i, { group: 'grid' })));
-    L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
-    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && st.id === BID.pumpkin), max: 1 }));
+    L.push({ group: 'result', output: true, get: () => craftResult(grid, w), set: () => {}, take: () => { { const r = craftResult(grid, w); if (r) { statOf('crafted', r.id, r.n); stat('craft_item', r.n); } } for (let i = 0; i < grid.length; i++) if (grid[i]) { grid[i].n--; if (grid[i].n <= 0) grid[i] = null; } } });
+    if (type === 'inv') for (let i = 0; i < 4; i++) L.push(slotRef(INV.armor, i, { group: 'armor', canTake: () => creative() || !enchLv(INV.armor[i], 'binding_curse'), accepts: st => !st || (ITEMS[st.id].armor && ITEMS[st.id].armor.slot === i) || (i === 0 && isHeadwear(st.id)), max: 1 }));
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
-    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, { group: 'cont' }));
+    for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes
   } else if (type === 'horse') {
     const e = ctx.horse;
     L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));
@@ -55,10 +56,26 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
   } else if (type === 'loom') {
-    ctx.items = ctx.items || [null, null];
+    ctx.items = ctx.items || [null, null, null];
     L.push(slotRef(ctx.items, 0, { group: 'lban', accepts: st => !st || (ITEMS[st.id].block && ITEMS[st.id].place === BID.banner), max: 1 }));
     L.push(slotRef(ctx.items, 1, { group: 'ldye', accepts: st => !st || ITEMS[st.id].key.endsWith('_dye') }));
     L.push({ group: 'result', output: true, get: () => loomResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const d = ctx.items[1]; d.n--; if (!d.n) ctx.items[1] = null; play('click'); } });
+    L.push(slotRef(ctx.items, 2, { group: 'lpat', accepts: st => !st || ITEMS[st.id].pattern != null, max: 1 })); // banner pattern item (kept, as in vanilla)
+  } else if (type === 'stonecutter') {
+    ctx.items = ctx.items || [null]; if (ctx.sel == null) ctx.sel = -1;
+    L.push(slotRef(ctx.items, 0, { group: 'scin' }));
+    L.push({ group: 'result', output: true, get: () => stonecutResult(ctx), set: () => {}, take: () => stonecutTake(ctx) });
+  } else if (type === 'cartography') {
+    ctx.items = ctx.items || [null, null];
+    L.push(slotRef(ctx.items, 0, { group: 'cmap', accepts: st => !st || st.id === IID.filled_map }));
+    L.push(slotRef(ctx.items, 1, { group: 'cadd', accepts: st => !st || st.id === IID.paper || st.id === IID.map || st.id === IID.glass_pane }));
+    L.push({ group: 'result', output: true, get: () => cartoResult(ctx), set: () => {}, make: () => { const r = cartoResult(ctx); cartoTake(ctx, r); return r; }, take: () => {} }); // the new map is only made when taken
+  } else if (type === 'grindstone') {
+    ctx.items = ctx.items || [null, null];
+    const ok = st => !st || !!ITEMS[st.id].dur || st.id === IID.enchanted_book || !!st.e;
+    L.push(slotRef(ctx.items, 0, { group: 'g0', accepts: ok, max: 1 }));
+    L.push(slotRef(ctx.items, 1, { group: 'g1', accepts: ok, max: 1 }));
+    L.push({ group: 'result', output: true, get: () => grindResult(ctx), set: () => {}, take: () => grindTake(ctx) });
   } else if (type === 'beacon') {
     ctx.tile = getTile(ctx.x, ctx.y, ctx.z); ctx.items = ctx.items || [null];
     L.push(slotRef(ctx.items, 0, { group: 'bpay', accepts: st => !st || BEACON_PAY().has(st.id), max: 1 }));
@@ -74,6 +91,7 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
   return L;
 }
@@ -84,6 +102,7 @@ function clickSlot(i, btn, shift) {
   if (sl.output) {
     const r = st; if (!r) return;
     if (sl.canTake && !sl.canTake()) return;
+    if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) INV.giveOrDrop({ id: rr.id, n: left }); sl.take(); break; } sl.take(); } }
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
     else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
@@ -126,6 +145,8 @@ function quickMove(i) {
     else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
+    else if (T === 'stonecutter') targets = idx(s => s.group === 'scin');
+    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && s.accepts(st));
     else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
     else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
@@ -144,7 +165,7 @@ function collectToCursor() {
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
   if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
   for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
   if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
@@ -202,14 +223,15 @@ function smithResult(c) {
 function tradeResult(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
+  if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
   const out = { id: o.b, n: o.bn }; if (o.ench) { if (!o.e) { const keys = Object.keys(ENCH), k = keys[Math.floor(Math.random() * keys.length)]; o.e = { [k]: 1 + Math.floor(Math.random() * ENCH[k][1]) }; } out.e = { ...o.e }; }
   return out;
 }
 function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
-  o.uses++; if (o.ench) o.e = null;
-  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade');
+  o.uses++; if (o.ench) o.e = null; o.made = null; c.e.traded = true; // the villager keeps its job from now on
+  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade'); stat('traded_with_villager'); if (c.e) c.e.rep = Math.min(150, (c.e.rep || 0) + 2); // trading gossip
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
 }

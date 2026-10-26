@@ -33,7 +33,7 @@ function brewTick(c, i, t) {
   else {
     if (!t.time) t.time = 400;
     if (--t.time <= 0) {
-      for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1 }; }
+      for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1, brewed: 1 }; } // brewed: picked up -> advancement
       ing.n--; if (!ing.n) t.items[3] = null; t.fuel--; c.modified = c.edited = true;
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.5 });
@@ -54,7 +54,7 @@ function applyPotion(target, type, scale = 1) {
 }
 function potionBurst(x, y, z, col, n = 24) {
   const c = [((col >> 16) & 255) / 255, ((col >> 8) & 255) / 255, (col & 255) / 255];
-  for (let i = 0; i < n; i++) R.simpleParticle(x, y + 0.2, z, c, { size: 0.12, vy: 0.5 + Math.random() * 1.5, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1 });
+  for (let i = 0; i < n; i++) R.simpleParticle(x, y + 0.2, z, c, { kind: 'effect', size: 0.12, vy: 0.5 + Math.random() * 1.5, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1 });
 }
 // splash potion landed: everything within 4 blocks, weaker with distance
 function splashPotion(id, x, y, z, direct) {
@@ -79,7 +79,7 @@ function spawnCloud(x, y, z, type, opts = {}) {
 function cloudTick(e) {
   e.r -= e.shrink; if (e.r <= 0.4 || e.age > e.dur) { removeEnt(e); return; }
   const c = [((e.col >> 16) & 255) / 255, ((e.col >> 8) & 255) / 255, (e.col & 255) / 255];
-  if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
+  if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { kind: 'effect', size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
   if (e.age % 5) return;
   const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT); if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {

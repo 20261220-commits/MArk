@@ -15,11 +15,13 @@ function strongPower(x, y, z) {
   for (let k = 0; k < 6; k++) {
     const [dx, dy, dz] = S.DIR6[k], nx = x + dx, ny = y + dy, nz = z + dz, b = getBlock(nx, ny, nz);
     if (b === RSB.lever || b === RSB.button) { const m = getMeta(nx, ny, nz); if (m & 8) { const a = switchAttach(nx, ny, nz, m); if (a[0] === x && a[1] === y && a[2] === z) return 15; } }
-    else if (b === RSB.plate) { if (dy === 1 && getMeta(nx, ny, nz) & 1) return 15; }
+    else if (b === RSB.plate) { if (dy === 1) { const l = plateLevel(nx, ny, nz, getMeta(nx, ny, nz)); if (l) return l; } }
+    else if (b === BID.trapped_chest) { if (dy === 1 && getMeta(nx, ny, nz) & 32) return 1; }
     else if (b === RSB.torch) { if (dy === -1) return 15; } // a torch strongly powers the block above it
     else if (b === RSB.rep) { const m = getMeta(nx, ny, nz); if ((m & 16) && dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return 15; } }
     else if (b === BID.comparator) { const m = getMeta(nx, ny, nz); if (dy === 0) { const d = DIRS[m & 3]; if (nx + d[0] === x && nz + d[2] === z) return compOut(nx, ny, nz); } }
     else if (b === BID.observer) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } }
+    else if (b === BID.tripwire_hook_block) { const m = getMeta(nx, ny, nz); if (m & 8) { const d = DIRS[m & 3]; if (nx - d[0] === x && ny === y && nz - d[2] === z) return 15; } } // a tripped hook strongly powers its wall
     else if (b === BID.detector_rail) { if (dy === 1 && (getMeta(nx, ny, nz) & 8)) return 15; } // like a pressure plate
     else if (b === BID.sculk_sensor && dy === 1) { const m = getMeta(nx, ny, nz); if ((m & 3) === 1) return m >> 4; } // an active sensor strongly powers the block it sits on
     else if (b === BID.chain) { const m = getMeta(nx, ny, nz); if (S.isRod(b, m) && (m & 128)) { const d = S.DIR6[m & 7]; if (nx - d[0] === x && ny - d[1] === y && nz - d[2] === z) return 15; } } // a struck lightning rod strongly powers what it stands on
@@ -37,7 +39,7 @@ function wireConn(x, y, z) { // horizontal directions the dust visually connects
   const c = [0, 0, 0, 0], above = OPQ[getBlock(x, y + 1, z)];
   DIRS.forEach(([dx, , dz], d) => {
     const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if (nd && nd.rs && (nd.rs !== 'rail' || n === BID.detector_rail) && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
+    if (nd && nd.rs && nd.rs !== 'trip' && (nd.rs !== 'rail' || n === BID.detector_rail) && nd.rs !== 'lamp' && nd.rs !== 'piston' && nd.rs !== 'head' && nd.rs !== 'hopper' && nd.rs !== 'dispenser' && nd.rs !== 'dropper' && nd.rs !== 'note' && nd.rs !== 'observer' && ((n !== RSB.rep && n !== BID.comparator) || ((getMeta(x + dx, y, z + dz) & 3) & 1) === (d & 1))) c[d] = 1;
     else if (n === BID.redstone_block) c[d] = 1;
     else if (!OPQ[n] && getBlock(x + dx, y - 1, z + dz) === RSB.wire) c[d] = 1;
     else if (!above && getBlock(x + dx, y + 1, z + dz) === RSB.wire) c[d] = 1;
@@ -57,7 +59,8 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
   const m = getMeta(x, y, z);
   switch (b) {
     case RSB.lever: case RSB.button: return m & 8 ? 15 : 0;
-    case RSB.plate: return m & 1 ? 15 : 0;
+    case RSB.plate: return plateLevel(x, y, z, m);
+    case BID.trapped_chest: return m & 32 ? 1 : 0;
     case BID.redstone_block: return 15;
     case RSB.torch: { const a = torchAttach(x, y, z, m); return a[0] === x + dx && a[1] === y + dy && a[2] === z + dz ? 0 : 15; }
     case RSB.rep: { if (!(m & 16) || dy) return 0; const d = DIRS[m & 3]; return d[0] === dx && d[2] === dz ? 15 : 0; }
@@ -67,6 +70,8 @@ function emitted(x, y, z, dx, dy, dz, forWire) {
     case BID.chain: return S.isRod(b, m) && (m & 128) ? 15 : 0;
     case BID.sculk_sensor: return (m & 3) === 1 ? m >> 4 : 0;
     case BID.detector_rail: return m & 8 ? 15 : 0;
+    case BID.tripwire_hook_block: return m & 8 ? 15 : 0;
+    case BID.lectern: return m & 8 ? 15 : 0; // a page turn gives a short pulse
     case RSB.wire: if (forWire || dy === 1) return 0; if (dy === -1) return m & 15; return wirePointsAt(x, y, z, x + dx, z + dz) ? m & 15 : 0;
   }
   if (isConductor(b)) { const s = strongPower(x, y, z); return forWire ? s : Math.max(s, weakPower(x, y, z)); }
@@ -168,6 +173,7 @@ function rsComponent(x, y, z, b) {
 }
 function rsDelayed(x, y, z) {
   const b = getBlock(x, y, z), m = getMeta(x, y, z);
+  if (b === BID.lectern) { if (m & 8) { setMeta(x, y, z, m & ~8); rsNotify(x, y, z); } return; }
   if (b === RSB.torch || b === RSB.torchOff) {
     const a = torchAttach(x, y, z, m), ab = getBlock(a[0], a[1], a[2]);
     const pw = isConductor(ab) ? Math.max(strongPower(a[0], a[1], a[2]), weakPower(a[0], a[1], a[2])) : 0;
@@ -192,68 +198,104 @@ function rsDelayed(x, y, z) {
   else if (S.isRod(b, m) && (m & 128)) { setMeta(x, y, z, m & ~128); rsNotify(x, y, z); }
   else if (b === RSB.button && (m & 8)) { setMeta(x, y, z, m & ~8); play('click'); const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]); }
   else if (b === BID.detector_rail && (m & 8)) detectorCheck(x, y, z, m);
+  else if (b === BID.tripwire_hook_block && (m & 8)) hookDelayed(x, y, z, m);
   else if (b === RSB.plate && (m & 1)) {
     if (plateOccupied(x, y, z)) rsLater(x, y, z, 10);
-    else { setMeta(x, y, z, 0); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
+    else { setMeta(x, y, z, m & ~1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); }
   }
 }
 // ---------- pistons ----------
 const immovable = b => { const d = BLOCKS[b]; return !d || d.hard < 0 || b === BID.obsidian || b === BID.crying_obsidian || b === BID.furnace || b === BID.lit_furnace || b === BID.chest || b === BID.enchanting_table || b === BID.spawner || b === RSB.head || b === BID.anvil || b === BID.end_portal_frame || b === BID.red_bed || b === BID.oak_door; };
 const breaksOnPush = b => REPL[b] || FLUID[b] || RTYPE[b] === RT.CROSS || RTYPE[b] === RT.TORCH || RTYPE[b] === RT.CROP || b === RSB.wire || b === RSB.lever || b === RSB.button || b === RSB.plate || b === RSB.rep || b === BID.ladder || b === BID.lantern || b === BID.cobweb || b === BID.cactus || b === BID.sugar_cane || BLOCKS[b].leaves && false;
+// which blocks move (Java's structure resolver): the line in front of the piston, plus everything slime and honey
+// blocks stick to (they do not stick to each other), at most 12; anything fragile in the way is broken
+const isStickyBlock = b => b === BID.slime_block || b === BID.honey_block;
+const sticksTo = (a, b) => !((a === BID.slime_block && b === BID.honey_block) || (a === BID.honey_block && b === BID.slime_block));
+function resolveMove(sx, sy, sz, dx, dy, dz, skip) {
+  const moving = new Map(), breaks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z;
+  const visit = (x, y, z, pushed) => {
+    const k = K(x, y, z); if (moving.has(k) || skip.has(k)) return true;
+    if (y < 0 || y >= CH || !isLoaded(x, z)) return !pushed;
+    const id = getBlock(x, y, z);
+    if (!id) return true;
+    if (breaksOnPush(id)) { if (pushed) breaks.set(k, [x, y, z]); return true; }
+    if (immovable(id)) return !pushed; // a sticky block simply lets go of what cannot move
+    if (moving.size >= 12) return false;
+    moving.set(k, [x, y, z, id, getMeta(x, y, z), getTile(x, y, z)]);
+    if (!visit(x + dx, y + dy, z + dz, true)) return false;
+    if (isStickyBlock(id)) for (const [ex, ey, ez] of S.DIR6) {
+      if (ex === dx && ey === dy && ez === dz) continue;
+      const nx = x + ex, ny = y + ey, nz = z + ez, nb = getBlock(nx, ny, nz);
+      if (!nb || breaksOnPush(nb) || immovable(nb) || !sticksTo(id, nb)) continue;
+      if (!visit(nx, ny, nz, false)) return false;
+    }
+    return true;
+  };
+  if (!visit(sx, sy, sz, true)) return null;
+  // cells the moved blocks land in that hold something fragile
+  for (const [x, y, z] of moving.values()) { const k = K(x + dx, y + dy, z + dz), t = getBlock(x + dx, y + dy, z + dz); if (!moving.has(k) && !skip.has(k) && t && breaksOnPush(t)) breaks.set(k, [x + dx, y + dy, z + dz]); }
+  return { moving: [...moving.values()], breaks: [...breaks.values()] };
+}
+function applyMove(r, dx, dy, dz) {
+  for (const [x, y, z] of r.breaks) { const id = getBlock(x, y, z); if (!id) continue; if (!FLUID[id] && W.onDrop) W.onDrop(x, y, z, blockDrops(id, getMeta(x, y, z), null).items, 0); setBlock(x, y, z, 0, 0, { noUpdate: true }); }
+  for (const [x, y, z] of r.moving) setBlock(x, y, z, 0, 0, { noUpdate: true, keepTile: false, dry: true });
+  for (const [x, y, z, id, mm, t] of r.moving) { setBlock(x + dx, y + dy, z + dz, id, mm, { noUpdate: true }); if (t) setTile(x + dx, y + dy, z + dz, t); }
+  for (const [x, y, z] of r.moving) { neighborUpdate(x, y, z); neighborUpdate(x + dx, y + dy, z + dz); rsNotify(x, y, z); rsNotify(x + dx, y + dy, z + dz); }
+  pushEntitiesAt(r.moving.map(([x, y, z]) => [x + dx, y + dy, z + dz]), dx, dy, dz);
+}
 function pistonExtend(x, y, z, b, m) {
-  const f = m & 7, [dx, dy, dz] = S.DIR6[f], line = [];
-  let cx = x + dx, cy = y + dy, cz = z + dz;
-  for (;;) {
-    if (cy < 0 || cy >= CH || !isLoaded(cx, cz)) return;
-    const id = getBlock(cx, cy, cz);
-    if (!id || breaksOnPush(id)) break;
-    if (immovable(id) || line.length >= 12) return;
-    line.push([cx, cy, cz, id, getMeta(cx, cy, cz), getTile(cx, cy, cz)]);
-    cx += dx; cy += dy; cz += dz;
-  }
-  const end = getBlock(cx, cy, cz);
-  if (end && end !== 0) { const dr = blockDrops(end, getMeta(cx, cy, cz), null); if (W.onDrop && !FLUID[end]) W.onDrop(cx, cy, cz, dr.items, 0); }
-  for (let i = line.length - 1; i >= 0; i--) { const [px, py, pz, id, mm, t] = line[i]; setBlock(px + dx, py + dy, pz + dz, id, mm, { noUpdate: true }); if (t) setTile(px + dx, py + dy, pz + dz, t); }
+  const f = m & 7, [dx, dy, dz] = S.DIR6[f];
+  const r = resolveMove(x + dx, y + dy, z + dz, dx, dy, dz, new Set([x + ',' + y + ',' + z]));
+  if (!r) return;
+  applyMove(r, dx, dy, dz);
   setMeta(x, y, z, m | 8);
-  setBlock(x + dx, y + dy, z + dz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
+  const hx = x + dx, hy = y + dy, hz = z + dz; if (getBlock(hx, hy, hz) && breaksOnPush(getBlock(hx, hy, hz))) setBlock(hx, hy, hz, 0, 0, { noUpdate: true });
+  setBlock(hx, hy, hz, RSB.head, f | (b === RSB.sticky ? 8 : 0));
   markDirty(x, z);
-  for (const [px, py, pz] of line) { neighborUpdate(px + dx, py + dy, pz + dz); rsNotify(px + dx, py + dy, pz + dz); }
-  rsNotify(cx, cy, cz);
-  pushEntities(x + dx, y + dy, z + dz, line.length + 1, dx, dy, dz);
+  pushEntitiesAt([[hx, hy, hz]], dx, dy, dz);
   play('piston', { vol: 0.6 });
 }
 function pistonRetract(x, y, z, b, m) {
   const f = m & 7, [dx, dy, dz] = S.DIR6[f];
   setMeta(x, y, z, m & ~8);
   if (getBlock(x + dx, y + dy, z + dz) === RSB.head) setBlock(x + dx, y + dy, z + dz, 0, 0);
-  if (b === RSB.sticky) {
+  if (b === RSB.sticky) { // pull what is in front of the head back by one, with everything stuck to it
     const px = x + dx * 2, py = y + dy * 2, pz = z + dz * 2, id = getBlock(px, py, pz);
-    if (id && !immovable(id) && !breaksOnPush(id)) { const mm = getMeta(px, py, pz), t = getTile(px, py, pz); setBlock(px, py, pz, 0, 0, { noUpdate: true }); setBlock(x + dx, y + dy, z + dz, id, mm); if (t) setTile(x + dx, y + dy, z + dz, t); rsNotify(px, py, pz); }
+    if (id && !immovable(id) && !breaksOnPush(id)) { const r = resolveMove(px, py, pz, -dx, -dy, -dz, new Set([x + ',' + y + ',' + z])); if (r) applyMove(r, -dx, -dy, -dz); }
   }
   markDirty(x, z); rsNotify(x + dx, y + dy, z + dz);
   play('piston', { vol: 0.5, pitch: 0.8 });
 }
-function pushEntities(x, y, z, n, dx, dy, dz) {
-  const hit = (e, w, h) => { for (let i = 0; i < n; i++) { const bx = x + dx * i, by = y + dy * i, bz = z + dz * i; if (e.x + w > bx && e.x - w < bx + 1 && e.y + h > by && e.y < by + 1 && e.z + w > bz && e.z - w < bz + 1) return true; } return false; };
-  if (hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
-  for (const e of ENT) if (!e.dead && hit(e, e.w, e.h)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
+// entities standing in or on moved blocks go with them
+function pushEntitiesAt(cells, dx, dy, dz) {
+  const hit = (e, w, h) => cells.some(([bx, by, bz]) => e.x + w > bx && e.x - w < bx + 1 && e.z + w > bz && e.z - w < bz + 1 && e.y + h > by && e.y < by + 1.05);
+  if (!spectator() && hit(PL, PL.w, PL.h)) { PL.x += dx; PL.y += dy * 1.01; PL.z += dz; if (dy > 0) PL.vy = Math.max(PL.vy, 0); }
+  for (const e of ENT) if (!e.dead && hit(e, e.w || 0.2, e.h || 0.2)) { e.x += dx; e.y += dy * 1.01; e.z += dz; }
 }
 // ---------- pressure plates & player interaction ----------
-function plateOccupied(x, y, z) {
-  const inside = (e, w) => e.x + w > x && e.x - w < x + 1 && e.z + w > z && e.z - w < z + 1 && e.y >= y - 0.01 && e.y < y + 0.5;
-  if (!spectator() && !PL.dead && inside(PL, PL.w)) return true;
-  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat' || e.kind === 'minecart') && inside(e, e.w)) return true;
-  return false;
+const plateKind = m => (m >> 4) & 15, plateAll = k => k >= 1 && k <= 8 || k >= 10;
+function plateCount(x, y, z, m) {
+  const inside = (e, w) => e.x + w > x && e.x - w < x + 1 && e.z + w > z && e.z - w < z + 1 && e.y >= y - 0.01 && e.y < y + 0.5, all = plateAll(plateKind(m));
+  let n = !spectator() && !PL.dead && inside(PL, PL.w) ? 1 : 0;
+  for (const e of ENT) if (!e.dead && (e.kind === 'mob' || e.kind === 'boat' || e.kind === 'minecart' || (all && (e.kind === 'item' || e.kind === 'arrow'))) && inside(e, e.w || 0.125)) n += e.kind === 'item' ? e.stack.n : 1;
+  return n;
+}
+const plateOccupied = (x, y, z) => plateCount(x, y, z, getMeta(x, y, z)) > 0;
+function plateLevel(x, y, z, m) {
+  if (!(m & 1)) return 0;
+  const k = plateKind(m); if (k < 10) return 15;
+  const n = plateCount(x, y, z, m); return Math.min(15, k === 10 ? n : Math.ceil(n / 10));
 }
 function plateCheck(e, w) {
   const x = Math.floor(e.x), y = Math.floor(e.y + 0.01), z = Math.floor(e.z);
   if (getBlock(x, y, z) !== RSB.plate) return;
   const m = getMeta(x, y, z); if (m & 1) return;
-  setMeta(x, y, z, 1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); rsLater(x, y, z, 20);
+  if (e.kind === 'item' && !plateAll(plateKind(m))) return;
+  setMeta(x, y, z, m | 1); play('click'); rsNotify(x, y, z); rsNotify(x, y - 1, z); rsLater(x, y, z, 20);
 }
 function useSwitch(x, y, z, b, m) {
   if (b === RSB.lever) { setMeta(x, y, z, m ^ 8); play('click', { pitch: m & 8 ? 0.5 : 0.6 }); }
-  else if (b === RSB.button) { if (m & 8) return; setMeta(x, y, z, m | 8); play('click'); rsLater(x, y, z, 20); }
+  else if (b === RSB.button) { if (m & 8) return; setMeta(x, y, z, m | 8); play('click'); const k = (m >> 4) & 15; rsLater(x, y, z, k >= 1 && k <= 8 ? 30 : 20); }
   else if (b === RSB.rep) { setMeta(x, y, z, (m & ~12) | ((((m >> 2) & 3) + 1) & 3) << 2); play('click'); return; }
   const a = switchAttach(x, y, z, m); rsNotify(x, y, z); rsNotify(a[0], a[1], a[2]);
 }
@@ -338,4 +380,5 @@ function targetHit(x, y, z, hx, hy, hz) {
   const dx = hx - x - .5, dy = hy - y - .5, dz = hz - z - .5, d = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 2 > 0.999 ? Math.hypot(dx, dy, dz) : Math.hypot(dx, dy, dz));
   const v = Math.max(1, Math.round(15 - d * 15 * 1.2));
   setMeta(x, y, z, (getMeta(x, y, z) & ~15) | v); rsNotify(x, y, z); rsLater(x, y, z, 20);
+  return v;
 }

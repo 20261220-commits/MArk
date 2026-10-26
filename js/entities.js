@@ -15,7 +15,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
     for (let y = ay; y <= by; y++) {
       if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
-      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); else if (id === BID.scaffolding && PHYS.scafTop && PHYS.feetY >= y + 1 - 1e-3) pushBox(x, y + 0.875, z, x + 1, y + 1, z + 1); continue; } // scaffolding: stand on top unless sneaking
       const bs = S.collide(id, getMeta(x, y, z));
       if (!bs) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       for (const b of bs) pushBox(x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16);
@@ -25,7 +25,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
 }
 // move an AABB entity (x,y,z = feet centre, w = half width, h = height); stepUp for players/mobs
 function physMove(e, dx, dy, dz, stepUp = 0) {
-  const w = e.w, h = e.h, eps = 1e-7;
+  const w = e.w, h = e.h, eps = 1e-7; PHYS.feetY = e.y;
   const n = gatherBoxes(e.x - w + Math.min(dx, 0) - eps, e.y + Math.min(dy, 0), e.z - w + Math.min(dz, 0) - eps, e.x + w + Math.max(dx, 0) + eps, e.y + h + Math.max(dy, 0) + stepUp, e.z + w + Math.max(dz, 0) + eps);
   const odx = dx, ody = dy, odz = dz;
   const clipY = (x, y, z, d) => { for (let i = 0; i < n * 6; i += 6) { if (BX[i + 3] <= x - w + eps || BX[i] >= x + w - eps || BX[i + 5] <= z - w + eps || BX[i + 2] >= z + w - eps) continue; if (d > 0 && BX[i + 1] >= y + h - eps) d = Math.min(d, BX[i + 1] - (y + h)); else if (d < 0 && BX[i + 4] <= y + eps) d = Math.max(d, BX[i + 4] - y); } return d; };
@@ -57,7 +57,7 @@ function boxBlocks(e, fn) { // iterate blocks overlapping the entity box
   for (let x = Math.floor(e.x - e.w); x <= Math.floor(e.x + e.w); x++) for (let y = Math.floor(e.y); y <= Math.floor(e.y + e.h - 0.01); y++) for (let z = Math.floor(e.z - e.w); z <= Math.floor(e.z + e.w); z++) if (fn(getBlock(x, y, z), x, y, z)) return true;
   return false;
 }
-function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
+function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); if (!FLUID[b]) return S.WLOG[b] && S.isWet(b, getMeta(Math.floor(x), Math.floor(y), Math.floor(z))) ? 1 : 0; const m = getMeta(Math.floor(x), Math.floor(y), Math.floor(z)); const top = Math.floor(y) + ((m & 8) || getBlock(Math.floor(x), Math.floor(y) + 1, Math.floor(z)) === b ? 1 : (m ? (8 - (m & 7)) / 9 : 0.89)); return y < top ? FLUID[b] : 0; }
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
@@ -128,7 +128,7 @@ const QUAD = (legH, bodyY, bodyBox, headP, headBox, legX, legZ0, legZ1) => [
   ['rleg2', [legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]], ['lleg2', [-legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]],
 ];
 const MOBDEF = {
-  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], parts: HUMAN(4), armsOut: 1,
+  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], extraDrop: [['iron_ingot', 0.0083], ['carrot', 0.0083], ['potato', 0.0083]], parts: HUMAN(4), armsOut: 1,
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, (k, x, y) => k === 'top' ? hex(0x3a5a2a) : hex(0x5d8f4c), r, .15, { front: (g, x, y) => { px(g, x + 1, y + 3, '#1a2a12', 2, 1); px(g, x + 5, y + 3, '#1a2a12', 2, 1); px(g, x + 3, y + 5, '#3a5a2a', 2, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => y > 9 ? hex(0x3b3fa0) : hex(0x1fa0a8), r); paintBox(g, 40, 16, 4, 12, 4, (k, x, y) => y < 4 ? hex(0x1fa0a8) : hex(0x5d8f4c), r); paintBox(g, 0, 16, 4, 12, 4, (k, x, y) => y > 9 ? hex(0x4a4a4a) : hex(0x3b3fa0), r); }) },
   skeleton: { hp: 20, w: 0.3, h: 1.99, speed: 0.12, hostile: 1, ranged: 1, burn: 1, xp: 5, snd: 'rattle', drops: [['bone', 0, 2], ['arrow', 0, 2]], parts: HUMAN(2),
@@ -225,6 +225,7 @@ const MCMODELS = {
     ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const a = i * Math.PI * 2 / 8; return { n: 't' + i, o: [Math.cos(a) * 5, 15, Math.sin(a) * 5], r: [0, -a + Math.PI / 2, 0], b: [[48, 0, -1, 0, -1, 2, 18, 2]] }; })] },
   villager: { tex: 'villager', tw: 64, th: 64, parts: [
     { n: 'head', o: [0, 0, 0], b: [[0, 0, -4, -10, -4, 8, 10, 8], [24, 0, -1, -3, -6, 2, 4, 2]] },
+    { n: 'hat', p: 'head', o: [0, 0, 0], b: [[32, 0, -4, -10, -4, 8, 10, 8, 0.51]] }, { n: 'hat_rim', p: 'hat', o: [0, 0, 0], r: [-Math.PI / 2, 0, 0], b: [[30, 47, -8, -8, -6, 16, 16, 1]] },
     { n: 'body', o: [0, 0, 0], b: [[16, 20, -4, 0, -3, 8, 12, 6], [0, 38, -4, 0, -3, 8, 18, 6, 0.5]] },
     { n: 'arms', o: [0, 3, -1], r: [-0.75, 0, 0], b: [[44, 22, -8, -2, -2, 4, 8, 4], [44, 22, 4, -2, -2, 4, 8, 4, 0, 1], [40, 38, -4, 2, -2, 8, 4, 4]] },
     { n: 'rleg', o: [-2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4]] }, { n: 'lleg', o: [2, 12, 0], b: [[0, 22, -2, 0, -2, 4, 12, 4, 0, 1]] }] },
@@ -250,6 +251,18 @@ const MCMODELS = {
     { n: 'base', o: [0, 24, 0], b: [[0, 16, -6, 0, -6, 12, 4, 12]] },
     { n: 'glass', o: [0, 8, 0], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 }, { n: 'glass2', p: 'glass', o: [0, 0, 0], r: [0.785, 0, 0.615], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 },
     { n: 'core', p: 'glass', o: [0, 0, 0], r: [0.785, 0.785, 0], b: [[32, 0, -4, -4, -4, 8, 8, 8, -1.5]] }] },
+  minecart: { tex: 'minecart_ent', tw: 64, th: 32, parts: [ // MinecartEntityModel (drawn 18 px lower than a mob, like MinecartEntityRenderer)
+    { n: 'bottom', o: [0, 22, 0], r: [Math.PI / 2, 0, 0], b: [[0, 10, -10, -8, -1, 20, 16, 2]] },
+    { n: 'front', o: [-9, 22, 0], r: [0, Math.PI * 1.5, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }, { n: 'back', o: [9, 22, 0], r: [0, Math.PI / 2, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] },
+    { n: 'left', o: [0, 22, -7], r: [0, Math.PI, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }, { n: 'right', o: [0, 22, 7], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }] },
+  armor_stand: { tex: 'armorstand', tw: 64, th: 64, parts: [ // ArmorStandEntityModel in its default pose
+    { n: 'head', o: [0, 1, 0], b: [[0, 0, -1, -7, -1, 2, 7, 2]] }, { n: 'body', o: [0, 0, 0], b: [[0, 26, -6, 0, -1.5, 12, 3, 3]] },
+    { n: 'rarm', o: [-5, 2, 0], r: [-0.262, 0, 0.175], b: [[24, 0, -2, -2, -1, 2, 12, 2]] }, { n: 'larm', o: [5, 2, 0], r: [-0.175, 0, -0.175], b: [[32, 16, 0, -2, -1, 2, 12, 2, 0, 1]] },
+    { n: 'rleg', o: [-1.9, 12, 0], r: [0.017, 0, 0.017], b: [[8, 0, -1, 0, -1, 2, 11, 2]] }, { n: 'lleg', o: [1.9, 12, 0], r: [-0.017, 0, -0.017], b: [[40, 16, -1, 0, -1, 2, 11, 2, 0, 1]] },
+    { n: 'sticks', o: [0, 0, 0], b: [[16, 0, -3, 3, -1, 2, 7, 2], [48, 16, 1, 3, -1, 2, 7, 2], [0, 48, -4, 10, -1, 8, 2, 2]] },
+    { n: 'base', o: [0, 12, 0], b: [[0, 32, -6, 11, -6, 12, 1, 12]] }] },
+  sign: { tex: 'sign_oak', tw: 64, th: 32, parts: [ // SignBlockEntityRenderer: board and stick
+    { n: 'board', o: [0, 0, 0], b: [[0, 0, -12, -14, -1, 24, 12, 2]] }, { n: 'stick', o: [0, 0, 0], b: [[0, 14, -1, -2, -1, 2, 14, 2]] }] },
   boat: { tex: 'boat', tw: 128, th: 64, parts: [
     { n: 'bottom', o: [0, 21, 1], r: [Math.PI / 2, 0, 0], b: [[0, 0, -14, -9, -3, 28, 16, 3]] },
     { n: 'back', o: [-15, 20, 4], r: [0, Math.PI * 1.5, 0], b: [[0, 19, -13, -7, -1, 18, 6, 2]] }, { n: 'front', o: [15, 20, 0], r: [0, Math.PI / 2, 0], b: [[0, 27, -8, -7, -1, 16, 6, 2]] },
@@ -258,6 +271,8 @@ const MCMODELS = {
 const entTex = {};
 function packTexture(key) {
   if (entTex[key]) return entTex[key];
+  if (key === 'zombie_villager' && typeof zombieVillagerTexture === 'function') return zombieVillagerTexture();
+  if (key === 'mooshroom' && typeof mooshroomTexture === 'function') return mooshroomTexture();
   const e = PACKPX.ent[key]; if (!e) return null;
   const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
@@ -307,7 +322,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   const tk = opts.skin && PACKPX.ent[opts.skin] ? opts.skin : spec.tex;
   const tex2 = spec.tex2 && packTexture(spec.tex2), eyes = spec.eyes && packTexture(spec.eyes), glow = PACKPX.ent[tk + '_e'] && packTexture(tk + '_e');
   const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.1, skinning: true });
-  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null;
+  const mat2 = tex2 ? new THREE.MeshBasicMaterial({ map: tex2, vertexColors: true, alphaTest: 0.1, skinning: true }) : null; if (mat2) mat2.userData.layer = true; // second-texture layer (sheep wool, horse armour, llama carpets)
   const matT = geos.tr ? new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, skinning: true }) : null;
   const root = new THREE.Group(), { inner, parts, list } = buildBones(spec);
   const main = new THREE.SkinnedMesh(geos.m, mat); main.add(inner); root.add(main);
@@ -319,7 +334,7 @@ function buildMCModel(type, spec, tex, opts = {}) {
   // OptiFine emissive textures (*_e.png): glowing parts drawn at full brightness on top
   if (glow) extra(geos.m, new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, alphaTest: 0.05, skinning: true, polygonOffset: true, polygonOffsetFactor: -1 }), true);
   if (spec.big) for (const o of root.children) o.frustumCulled = false;
-  root.userData = { parts, inner, mat, mats: [mat, mat2, matT].filter(Boolean), mc: true };
+  root.userData = { parts, inner, mat, mat2, mats: [mat, mat2, matT].filter(Boolean), mc: true, skel: sk, main };
   return root;
 }
 function mergeGeos(gs) {
@@ -367,19 +382,27 @@ function dropItem(x, y, z, id, n, vel, delay = 10, dur, extra) {
   const e = Ent('item', x, y, z); e.kind = 'item'; e.w = 0.125; e.h = 0.25; e.stack = extra ? { ...extra, id, n } : { id, n }; if (dur != null) e.stack.d = dur; else if (extra) delete e.stack.d;
   e.vx = vel ? vel[0] : (Math.random() - .5) * 0.2; e.vy = vel ? vel[1] : 0.2; e.vz = vel ? vel[2] : (Math.random() - .5) * 0.2;
   e.pickup = delay; e.spin = Math.random() * 6;
-  const m = R.itemMesh(id); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
-  if (n > 1) { const m2 = R.itemMesh(id); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
+  const gl = (extra && extra.e) || ITEMS[id].glint, m = R.itemMesh(id); if (gl) R.addGlint(m); const g = new THREE.Group(); g.add(m); m.scale.setScalar(m.userData.isBlock ? 0.25 : 0.4); e.inner = m; e.mesh = g;
+  if (n > 1) { const m2 = R.itemMesh(id); if (gl) R.addGlint(m2); m2.scale.copy(m.scale); m2.position.set(0.06, 0.05, 0.06); g.add(m2); }
   return addEnt(e);
 }
 function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropItem(x, y, z, st.id, st.n, vel, delay, st.d, st); }
 W.onDrop = (x, y, z, items, xp) => { for (const [id, n] of items) dropItem(x + 0.5, y + 0.3, z + 0.5, id, n); if (xp) spawnXP(x + .5, y + .5, z + .5, xp); };
 const xpMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.fillStyle = '#3a5a00'; g.fillRect(1, 1, 6, 6); g.fillStyle = '#c8ff3a'; g.fillRect(2, 2, 4, 4); g.fillStyle = '#ffff9a'; g.fillRect(2, 2, 2, 2); return c; })()), fog: true });
 xpMat.map.magFilter = THREE.NearestFilter;
+const XP_ORB_TEX = {};
+function xpOrbMat(v) {
+  const e = PACKPX.ent.xp_orb; if (!e) return xpMat;
+  const i = [2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3].findIndex(t => v >= t), idx = i < 0 ? 0 : 10 - i;
+  if (!XP_ORB_TEX[idx]) { const k = e.w / 64, c = document.createElement('canvas'); c.width = c.height = 16 * k; const src = entCanvas('xp_orb'); c.getContext('2d').drawImage(src, (idx % 4) * 16 * k, Math.floor(idx / 4) * 16 * k, 16 * k, 16 * k, 0, 0, 16 * k, 16 * k); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; XP_ORB_TEX[idx] = t; }
+  return new THREE.SpriteMaterial({ map: XP_ORB_TEX[idx], transparent: true, alphaTest: 0.1 });
+}
 function spawnXP(x, y, z, amt) {
   while (amt > 0) {
     const v = amt >= 17 ? 17 : amt >= 7 ? 7 : amt >= 3 ? 3 : 1; amt -= v;
     const e = Ent('xp', x, y, z); e.kind = 'xp'; e.w = 0.125; e.h = 0.25; e.value = v; e.vx = (Math.random() - .5) * .2; e.vy = .2; e.vz = (Math.random() - .5) * .2;
-    const sp = new THREE.Sprite(xpMat); sp.scale.setScalar(0.18 + Math.min(v, 17) * 0.01); e.mesh = sp; addEnt(e);
+    const sp = new THREE.Sprite(xpOrbMat(v)); sp.scale.setScalar(PACKPX.ent.xp_orb ? 0.3 : 0.18 + Math.min(v, 17) * 0.01); e.mesh = sp; addEnt(e);
+    if (PACKPX.ent.xp_orb) { const t0 = Math.random() * 100; e.render = (se, x, y, z) => { se.mesh.position.set(x, y + 0.1, z); const a = (performance.now() / 50 + t0) / 2; se.mesh.material.color.setRGB((Math.sin(a) + 1) * 0.5, 1, (Math.sin(a + 4.1888) + 1) * 0.1); }; }
   }
 }
 // ---------- falling blocks & TNT ----------
@@ -392,17 +415,30 @@ function primeTNT(x, y, z, fuse = 80) {
   e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse');
 }
 // ---------- arrows ----------
-const arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
-const arrowMat = new THREE.MeshBasicMaterial({ color: 0x8a6a3b });
+let arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
+let arrowMat = new THREE.MeshBasicMaterial({ color: 0x8a6a3b });
+// ArrowEntityRenderer: two crossed 16x5 planes and a 5x5 cross at the back, 0.05625 blocks a pixel
+function arrowPackModel() {
+  const tex = packTexture('arrow_ent'); if (!tex) return;
+  const s = 0.05625, P = [], U = [], q = (a, b, c, d, u0, v0, u1, v1) => { P.push(...a, ...b, ...c, ...a, ...c, ...d); U.push(u0, v1, u1, v1, u1, v0, u0, v1, u1, v0, u0, v0); };
+  for (const r of [0, 1]) { const w = 2 * s, L = 8 * s, A = r ? [0, w, 0] : [w, 0, 0]; // shaft planes along z
+    q([-A[0], -A[1], -L], [-A[0], -A[1], L], [A[0], A[1], L], [A[0], A[1], -L], 0, 0, 16 / 32, 5 / 32); }
+  const b = 2 * s, z = -7 * s; q([-b, -b, z], [b, -b, z], [b, b, z], [-b, b, z], 0, 5 / 32, 5 / 32, 10 / 32);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  arrowGeo = g; arrowMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
+}
+let HURTPROJ = null; // the projectile behind the hurtMob call in progress (advancements)
 function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
-  const e = Ent('arrow', x, y, z); e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;
+  const e = Ent('arrow', x, y, z); e.from = [x, z]; e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;
   e.mesh = new THREE.Mesh(arrowGeo, arrowMat.clone()); addEnt(e); play('bow', { vol: 0.6 });
   return e;
 }
 // ---------- explosions ----------
 function resistance(b) { const d = BLOCKS[b]; if (!d || d.hard < 0) return 3600000; if (FLUID[b]) return 100; if (b === BID.obsidian) return 1200; if (d.tool === S.TOOL.PICK) return Math.max(3, d.hard * 4); return d.hard * 1.5 + 0.1; }
+let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing
 function explode(x, y, z, power, fire) {
   vibrate(x, y, z);
+  const noGrief = MOB_BLAST && !gr('mobGriefing');
   play('explode');
   const broken = new Map();
   for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) for (let k = 0; k < 16; k++) {
@@ -412,7 +448,7 @@ function explode(x, y, z, power, fire) {
     while (f > 0) {
       const bx = Math.floor(px2), by = Math.floor(py2), bz = Math.floor(pz2), b = getBlock(bx, by, bz);
       if (b) f -= (resistance(b) + 0.3) * 0.3;
-      if (f > 0 && b && by > 0) broken.set(bx + ',' + by + ',' + bz, b);
+      if (f > 0 && b && by > 0 && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
       px2 += dx * 0.3; py2 += dy * 0.3; pz2 += dz * 0.3; f -= 0.225;
     }
   }
@@ -425,7 +461,7 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
-  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
+  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
   const hit = (e, isPl) => {
@@ -433,7 +469,7 @@ function explode(x, y, z, power, fire) {
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
     if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
-    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp); else if (e.kind === 'minecart') cartBlast(e, dmg); else if (e.kind === 'item' || e.kind === 'xp') removeEnt(e); }
+    else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
   hit(PL, true);
@@ -441,7 +477,8 @@ function explode(x, y, z, power, fire) {
 function dropTileContents(x, y, z, t) {
   if (t.items) for (const st of t.items) if (st) dropStack(x + .5, y + .5, z + .5, st);
 }
-W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
+const HIVE_KEEP = { on: null }; // set while the player silk-touches a hive: its bees go into the dropped item
+W.onTileRemoved = (x, y, z, t) => { if (t.type === 'hive' && HIVE_KEEP.on) { HIVE_KEEP.on.bees = t.bees || []; for (const e of ENT) if (e.type === 'bee' && e.hive && e.hive[0] === x && e.hive[1] === y && e.hive[2] === z) e.hive = null; if (HIVE_KEEP.on.bees.length >= 3) advGrant('husbandry/silk_touch_nest'); } else if (t.type === 'hive') releaseBees(x, y, z, t, true); dropTileContents(x, y, z, t); if (t.type === 'banner' && !creative()) dropStack(x + .5, y + .5, z + .5, bannerItem(t)); };
 W.onTntCheck = () => {};
 
 // ---------- mobs ----------
@@ -453,7 +490,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
   if (opts.owner) { e.owner = opts.owner; e.persistent = true; } if (opts.sitting) e.sitting = 1;
-  if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; }
+  if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
   if (e.baby) e.mesh.scale.setScalar(0.5); else if (d.scale) e.mesh.scale.setScalar(d.scale);
@@ -471,6 +508,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.inv > 0) return false;
   if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
   if (e.def.armorMul) dmg *= e.def.armorMul(e);
+  if (attacker === PL) stat('damage_dealt', Math.round(Math.min(dmg, Math.max(0, e.hp)) * 10));
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
   const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
@@ -478,6 +516,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting
     if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
+    if (e.type === 'villager') { e.rep = (e.rep || 0) - 25; for (const v of ENT) if (v.type === 'villager' && v !== e && Math.hypot(v.x - e.x, v.z - e.z) < 16) v.rep = (v.rep || 0) - 5; } // gossip: minor_negative, heard by neighbours
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
@@ -490,10 +529,12 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.def.slime) slimeDeath(e);
     e.killedByPlayer = attacker === PL || src === 'player';
     if (e.def.onDeath) e.def.onDeath(e);
+    headDrop(e);
+    if (e.type === 'villager' && typeof zombifyVillager === 'function') zombifyVillager(e, attacker);
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
     if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
-    if (attacker === PL || src === 'player') {
+    if ((attacker === PL || src === 'player') && gr('doMobLoot')) {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
       const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
       if (!noDrop) for (const [k, lo, hi] of e.def.drops) { let n = lo + Math.floor(Math.random() * (hi - lo + 1 + loot)); if (e.fire > 0) { const cooked = { rabbit: 'cooked_rabbit', porkchop: 'cooked_porkchop', beef: 'cooked_beef', chicken: 'cooked_chicken', mutton: 'cooked_mutton' }[k]; if (cooked) { dropItem(e.x, e.y + .5, e.z, IID[cooked], n); continue; } } if (n > 0 && !e.baby) dropItem(e.x, e.y + .5, e.z, IID[k], n); }
@@ -503,7 +544,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
-      if (e.def.hostile) UI.advance('hunter');
+      if (typeof ADVT !== 'undefined') ADVT.kill(e, HURTPROJ);
+      stat('mob_kills'); statOf('killed', e.type);
     }
   }
   return true;
@@ -515,6 +557,7 @@ function canSee(ax, ay, az, bx, by, bz) {
 }
 function mobTick(e) {
   const d = e.def;
+  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y + 0.2; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
@@ -526,17 +569,18 @@ function mobTick(e) {
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
-  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
   if (e.cart && cartHold(e)) return;
   mobExtraTick(e, dist);
   if (e.eff) effectTick(e);
+  if (e.jockey && jockeyTick(e)) return; // a chicken or spider carrying a jockey
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
   // AI
-  let mx = 0, mz = 0, speed = d.speed;
+  let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
   if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
@@ -555,7 +599,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); explode(e.x, e.y + 0.8, e.z, 3); return; } }
+      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = true; chargedExplode(e); } else { MOB_BLAST = true; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -566,7 +610,7 @@ function mobTick(e) {
     const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
     if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
-    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); UI.advance('breed'); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
+    else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -627,13 +671,32 @@ function attackPlayer(e, dmg, tx, tz) {
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 // ---------- per-tick update ----------
+// baby zombies (5% of the zombie kind, never grow up, faster) and jockeys: 5% of babies ride a chicken, 1% of spiders carry a skeleton
+const ZOMBIE_KIND = new Set(['zombie', 'husk', 'drowned', 'zombie_villager']);
+function jockeyChance(e) {
+  if (!e || e.dead) return;
+  if (ZOMBIE_KIND.has(e.type) && Math.random() < 0.05) {
+    e.baby = 1e12; e.w = e.def.w * 0.5; e.h = e.def.h * 0.5; e.mesh.scale.setScalar(0.5); e.babySpeed = 1.5;
+    if (e.type !== 'drowned' && Math.random() < 0.05) { const c = ENT.find(o => o.type === 'chicken' && !o.dead && !o.jockey && Math.hypot(o.x - e.x, o.z - e.z) < 5) || spawnMob('chicken', e.x, e.y, e.z); if (c) mountMob(e, c); }
+  }
+  if (e.type === 'spider' && Math.random() < 0.01) { const s = spawnMob('skeleton', e.x, e.y + 1, e.z); if (s) mountMob(s, e); }
+}
+function mountMob(rider, mount) { rider.mount = mount; mount.jockey = rider; mount.persistent = rider.persistent = false; }
+// a mount carries its rider and goes where the rider wants (toward the rider's target)
+function jockeyTick(e) {
+  const r = e.jockey; if (!r || r.dead || r.deathT) { e.jockey = null; return false; }
+  const t = r.target || (PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead && Math.hypot(PL.x - e.x, PL.z - e.z) < 16 ? PL : null);
+  let mx = 0, mz = 0; if (t) { const dx = t.x - e.x, dz = t.z - e.z, l = Math.hypot(dx, dz) || 1; if (l > 1) { mx = dx / l; mz = dz / l; } faceTo(e, t.x, t.z); }
+  walkPhysics(e, mx, mz, (r.def.speed || 0.1) * (r.babySpeed || 1));
+  return true;
+}
 function entityTick() {
   PF.budget = 2; // A* searches per tick, shared by all mobs
   for (const e of ENT) {
     if (e.dead) continue;
     e.px = e.x; e.py = e.y; e.pz = e.z; e.pyaw = e.yaw; e.age++;
     if (!isLoaded(Math.floor(e.x), Math.floor(e.z))) { if (e.kind !== 'mob' && e.kind !== 'boat' && e.kind !== 'minecart') removeEnt(e); continue; }
-    if (e.kind === 'mob') mobTick(e);
+    if (e.kind === 'mob') { mobTick(e); if (e.mount) { const m = e.mount; if (m.dead || m.deathT) e.mount = null; else { e.x = m.x; e.z = m.z; e.y = m.y + m.h * 0.75; e.vy = 0; e.onGround = true; } } }
     else if (e.tick) e.tick(e);
     else if (e.kind === 'item' || e.kind === 'xp') {
       const fl = fluidAt(e.x, e.y + 0.1, e.z);
@@ -646,9 +709,10 @@ function entityTick() {
       if (e.pickup > 0) e.pickup--;
       if (e.kind === 'item') {
         if (e.age > 6000) { removeEnt(e); continue; }
+        if ((e.age & 3) === 0 && e.onGround !== false) plateCheck(e);
         if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && same(o.stack, e.stack) && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
         if (e.pickup <= 0 && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.3 && e.y > PL.y - 0.8 && e.y < PL.y + 2.3 && Math.abs(PL.z - e.z) < 1.3) {
-          const left = INV.add(e.stack); if (left < e.stack.n) { play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
+          const left = INV.add(e.stack); if (left < e.stack.n) { statOf('picked', e.stack.id, e.stack.n - left); play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
         }
       }
       if (e.y < -40) removeEnt(e);
@@ -684,7 +748,7 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) { const v = targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (v === 15 && e.owner === PL && e.from && Math.hypot(nx - e.from[0], nz - e.from[1]) >= 30 && typeof advGrant === 'function') advGrant('adventure/bullseye'); } if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
@@ -697,7 +761,10 @@ function arrowTick(e) {
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
       if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour
       if (e.trident) { tridentHit(e, o); break; }
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      if (e.flame && !o.def.fireproof) o.fire = Math.max(o.fire || 0, 100);
+      HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e);
+      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx * (1 + (e.punch || 0)), e.vz * (1 + (e.punch || 0)), e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      HURTPROJ = null;
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
       removeEnt(e); return;
     }
@@ -715,6 +782,7 @@ function trySpawnHostile() {
     const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, R.rd * 16 - 30);
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
+    if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
     const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
     if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
@@ -726,16 +794,16 @@ function trySpawnHostile() {
     if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
     const n = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < n; i++) spawnMob(t, x + .5 + i * 0.3, y, z + .5);
+    for (let i = 0; i < n; i++) jockeyChance(spawnMob(t, x + .5 + i * 0.3, y, z + .5));
     break;
   }
 }
 function spawnAnimalsForChunk(c) {
-  const b = c.biome[8 * 16 + 8];
+  const b = S.BB[c.biome[8 * 16 + 8]];
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 9));
   if (R0() > 0.1) return;
   let types;
-  if (b === S.BIO.OCEAN || b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN) {
+  if (S.isOceanBio(b) || b === S.BIO.RIVER) {
     const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
@@ -760,7 +828,7 @@ function spawnerTick() {
       if (t.type !== 'spawner') continue;
       const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
-      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
+      if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
       t.delay = 200 + Math.floor(Math.random() * 600);
       if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - x, e.z - z) < 9) >= 6) continue;
@@ -774,7 +842,7 @@ R.onChunkUnloaded = c => {
   for (const e of ENT) {
     if (e.dead) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && !e.def.hostile && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }]);
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
@@ -790,10 +858,10 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
-    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof }); }
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
 // ---------- render update (interpolated) ----------
@@ -802,7 +870,7 @@ function entityRender(alpha, now) {
     if (e.dead || !e.mesh) continue;
     const x = e.px + (e.x - e.px) * alpha, y = e.py + (e.y - e.py) * alpha, z = e.pz + (e.z - e.pz) * alpha;
     const dx = x - camera.position.x, dz = z - camera.position.z;
-    const far = !(e.def && e.def.boss) && dx * dx + dz * dz > Math.min(R.rd * 16, 80) ** 2; // keeps draw calls low on weak GPUs
+    const far = !(e.def && e.def.boss) && dx * dx + dz * dz > Math.min(R.rd * 16 - 12, 80) ** 2; // keeps draw calls low on weak GPUs (and nothing past the fog)
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {
@@ -826,8 +894,8 @@ function entityRender(alpha, now) {
       }
       const flash = e.fuse > 0 && Math.floor(e.fuse / 3) % 2 === 0;
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
-      for (const m2 of e.mesh.userData.own) { if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else m2.color.setScalar(bb); }
-      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.def.scale || 1);
+      for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
+      if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

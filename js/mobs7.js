@@ -21,7 +21,7 @@ function witherCheck(x, y, z) {
     if (!isSoul(getBlock(mx, y - 2, mz))) continue;
     if (SOLID[getBlock(mx - ax, y - 2, mz - az)] || SOLID[getBlock(mx + ax, y - 2, mz + az)]) continue; // the corners under the arms must be clear
     for (const [a, c] of row) { setBlock(a, y, c, 0); setBlock(a, y - 1, c, 0); } setBlock(mx, y - 2, mz, 0);
-    const w = spawnMob('wither', mx + .5, y - 2, mz + .5); w.charge = 220; w.hp = 1; w.persistent = true; play('ghast', { pitch: 0.3, vol: 1 });
+    const w = spawnMob('wither', mx + .5, y - 2, mz + .5); w.charge = 220; w.hp = 1; w.persistent = true; advGrant('nether/summon_wither'); play('ghast', { pitch: 0.3, vol: 1 });
     return true;
   }
   return false;
@@ -69,13 +69,13 @@ function witherAnim(e, P, now) {
   if (e.charge > 0) e.mesh.position.y += Math.sin(now / 50) * 0.05;
 }
 function witherHurt(e, dmg, attacker, src) {
-  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // its own blasts (and other unattributed damage) do not hurt it
+  if (e.charge > 0 || e.inv > 0 || (!attacker && !src)) return false; // not while it charges up; fire and other unattributed damage do not hurt it, explosions (TNT) do
   e.hp -= dmg; e.hurt = 10; e.inv = 10; e.smash = 1; play('hurt', { vol: 0.8, pitch: 0.6 });
   if (attacker === PL) { e.target = PL; e.plHit = true; }
   if (e.hp <= 0) {
     e.deathT = 20; bossBar(null);
     explode(e.x, e.y + 1.5, e.z, 4); // the blast first, so it does not destroy the star
-    dropItem(e.x, e.y + 1, e.z, IID.nether_star, 1); spawnXP(e.x, e.y + 1, e.z, 50); UI.advance && UI.advance('wither');
+    dropItem(e.x, e.y + 1, e.z, IID.nether_star, 1); spawnXP(e.x, e.y + 1, e.z, 50);
   }
   return true;
 }
@@ -106,7 +106,7 @@ function witherSkullTick(e) {
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
-  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { size: 0.12, vy: 0, grav: 0, life: 0.4 });
+  if (e.age % 2 === 0) R.simpleParticle(e.x, e.y, e.z, [0.2, 0.2, 0.2], { kind: 'smoke', size: 0.12, vy: 0, grav: 0, life: 0.4 });
 }
 function witherRose(mob) { // a mob killed by the wither leaves a wither rose
   const x = Math.floor(mob.x), y = Math.floor(mob.y), z = Math.floor(mob.z);

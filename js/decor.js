@@ -14,6 +14,8 @@ const PAINTINGS = [ // key, width, height (blocks), palette
 const paintTex = {};
 function paintingTexture(key) {
   if (paintTex[key]) return paintTex[key];
+  const pc = typeof entCanvas === 'function' && entCanvas('painting_' + key); // the game's own painting, when a jar or pack has it
+  if (pc) { const t = new THREE.CanvasTexture(pc); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return paintTex[key] = t; }
   const [, w, h, pal] = PAINTINGS.find(p => p[0] === key), c = document.createElement('canvas'); c.width = w * 16; c.height = h * 16;
   const g = c.getContext('2d'), r = trng(key.length * 131 + key.charCodeAt(1));
   g.fillStyle = pal[1]; g.fillRect(0, 0, c.width, c.height);
@@ -61,7 +63,21 @@ function placePainting(t) {
 // ---------- armor stands ----------
 const ARMOR_COL = { leather: 0xa06540, chainmail: 0x9a9a9a, iron: 0xdadada, golden: 0xf0d040, diamond: 0x4ae0d8, netherite: 0x4a4040, turtle: 0x4aa84a, elytra: 0x8a8aa0 };
 const ARMOR_BOX = [[0.56, 0.56, 0.56, 1.69], [0.6, 0.78, 0.36, 1.09], [0.5, 0.48, 0.34, 0.5], [0.52, 0.22, 0.34, 0.1]]; // helmet, chestplate, leggings, boots: w, h, d, centre y
+const STAND_ARMOR = [[1, 1, [['head', [0, 1, 0], [0, 0, -4, -8, -4, 8, 8, 8]]]], [1, 1, [['body', [0, 0, 0], [16, 16, -4, 0, -2, 8, 12, 4]], ['rarm', [-5, 2, 0], [40, 16, -3, -2, -2, 4, 12, 4], [-0.262, 0, 0.175]], ['larm', [5, 2, 0], [40, 16, -1, -2, -2, 4, 12, 4, 0, 1], [-0.175, 0, -0.175]]]],
+  [2, 0.5, [['body', [0, 0, 0], [16, 16, -4, 0, -2, 8, 12, 4]], ['rleg', [-1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4]], ['lleg', [1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4, 0, 1]]]], [1, 1, [['rleg', [-1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4]], ['lleg', [1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4, 0, 1]]]]];
+const STAND_TEX = { leather: 'leather', chainmail: 'chainmail', iron: 'iron', golden: 'gold', diamond: 'diamond', netherite: 'netherite', turtle: 'turtle' };
 function standMesh(e) {
+  const tex = packTexture('armorstand');
+  if (tex) { // ArmorStandEntityModel, wearing biped armour layers (inflated 1 and 0.5 px) from models/armor
+    const g = new THREE.Group(), m = buildMCModel('armor_stand', MCMODELS.armor_stand, tex); g.add(m); const mats = [m.userData.mat];
+    e.armor.forEach((st, i) => { if (!st) return; const a = ITEMS[st.id].armor;
+      if (!a) { const im = R.itemMesh(st.id); im.scale.setScalar(0.625); im.position.y = 1.75; g.add(im); im.userData.c = 0xffffff; return; }
+      const [layer, dil, parts] = STAND_ARMOR[i], tk = STAND_TEX[a.mat], at = tk && packTexture('armor_' + tk + '_' + layer); if (!at) return;
+      const spec = { tex: 'armor_' + tk + '_' + layer, tw: 64, th: 32, parts: parts.map(([n, o, b, r]) => { const bb = b.slice(); bb[8] = dil; return { n, o, r, b: [bb] }; }) };
+      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(0xa06540);
+      if (st.e) { const gl = buildMCModel('stand_armor_' + i, spec, at); gl.traverse(o => { if (o.isMesh) o.material = R.glintMaterial(true); }); g.add(gl); } });
+    g.userData.mats = mats; return g;
+  }
   const g = new THREE.Group(), wood = new THREE.MeshBasicMaterial({ color: 0xa8865a }), stone = new THREE.MeshBasicMaterial({ color: 0x9a9a9a });
   let box = (w, h, d, x, y, z, m) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m.clone()); me.position.set(x, y, z); g.add(me); return me; };
   const box0 = box; box = (w, h, d, x, y, z, m) => { const me = box0(w, h, d, x, y, z, m); me.userData.c = m.color.getHex(); return me; };
@@ -74,7 +90,9 @@ function spawnArmorStand(x, y, z, yaw, armor) {
   const e = Ent('armor_stand', x, y, z); e.kind = 'armor_stand'; e.hittable = true; e.w = 0.25; e.h = 1.975; e.yaw = yaw; e.armor = armor || [null, null, null, null];
   e.mesh = standMesh(e);
   e.tick = se => { se.vy -= 0.04; physMove(se, 0, se.vy, 0); if (se.onGround) se.vy = 0; if (se.y < -40) removeEnt(se); };
-  e.render = (se, rx, ry, rz, br) => { se.mesh.position.set(rx, ry, rz); se.mesh.rotation.y = se.yaw; se.mesh.traverse(o => { if (o.isMesh) o.material.color.setHex(o.userData.c).multiplyScalar(br); }); };
+  e.render = (se, rx, ry, rz, br) => { se.mesh.position.set(rx, ry, rz); se.mesh.rotation.y = se.yaw;
+    if (se.mesh.userData.mats) { for (const m of se.mesh.userData.mats) { m.color.setScalar(br); if (m.userData.col) m.color.multiply(m.userData.col); } return; }
+    se.mesh.traverse(o => { if (o.isMesh) o.material.color.setHex(o.userData.c).multiplyScalar(br); }); };
   e.onHit = se => { removeEnt(se); if (!creative()) { dropItem(se.x, se.y + 0.5, se.z, IID.armor_stand, 1); for (const st of se.armor) if (st) dropStack(se.x, se.y + 1, se.z, st); } play('break', { mat: 'wood' }); vibrate(se.x, se.y, se.z); };
   return addEnt(e);
 }
@@ -104,11 +122,20 @@ const BANNER_PATTERNS = {
   triangles_bottom: ['아래 톱니', (x, y) => BH - 1 - y < 4 - Math.abs((x % 5) - 2)], triangles_top: ['위 톱니', (x, y) => y < 4 - Math.abs((x % 5) - 2)],
   circle: ['원', (x, y) => Math.hypot(x - 9.5, y - 19.5) < 5.5], rhombus: ['마름모', (x, y) => Math.abs(x - 9.5) / 7 + Math.abs(y - 19.5) / 12 < 1], border: ['테두리', (x, y) => x < 2 || x >= 18 || y < 2 || y >= 38],
   gradient: ['그라데이션', (x, y) => 1 - y / BH], gradient_up: ['아래 그라데이션', (x, y) => y / BH],
+  // these need their banner pattern item in the loom
+  creeper: ['크리퍼', (x, y) => (y >= 13 && y < 17 && (x >= 5 && x < 8 || x >= 12 && x < 15)) || (y >= 17 && y < 20 && x >= 8 && x < 12) || (y >= 20 && y < 25 && (x >= 7 && x < 13) && !(y >= 23 && x >= 9 && x < 11)), 'creeper'],
+  skull: ['해골', (x, y) => (Math.hypot(x - 9.5, (y - 17) * 1.1) < 4.5 && !(y >= 16 && y < 18 && (Math.abs(x - 7.5) < 1 || Math.abs(x - 11.5) < 1))) || (y >= 22 && y < 30 && (Math.abs((x - 9.5) - (y - 26)) < 1 || Math.abs((x - 9.5) + (y - 26)) < 1)), 'skull'],
+  flower: ['꽃', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5), a = Math.atan2(y - 19.5, x - 9.5); return d < 2 || (d < 6 && Math.cos(a * 4) > 0.3 && d > 2.8); }, 'flower'],
+  mojang: ['모장', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5); return d < 7 && d > 4.5 && !(x > 9.5 && Math.abs(y - 19.5) < 2.5) || (Math.abs(x - 9.5) < 2.5 && Math.abs(y - 19.5) < 2.5); }, 'mojang'],
+  globe: ['지구본', (x, y) => { const d = Math.hypot(x - 9.5, y - 19.5); return d < 6.5 && ((Math.sin(x * 0.9) + Math.cos(y * 0.7)) > 0.4 || d > 5.8); }, 'globe'],
+  piglin: ['피글린', (x, y) => (y >= 18 && y < 24 && x >= 6 && x < 14 && !(y >= 20 && y < 22 && (x === 8 || x === 11))) || (y >= 24 && y < 27 && (x === 6 || x === 13)), 'piglin'],
 };
 const DYE_HEX = ['#f9fffe', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f', '#f38baa', '#474f52', '#9d9d97', '#169c9c', '#8932b8', '#3c44aa', '#835432', '#5e7c16', '#b02e26', '#1d1d21'];
 const bannerTex = {};
 function bannerTexture(base, pats) {
   const key = base + ':' + JSON.stringify(pats || []); if (bannerTex[key]) return bannerTex[key];
+  const cl = typeof bannerCloth === 'function' && bannerCloth(base, pats);
+  if (cl) { const c = document.createElement('canvas'); c.width = BW; c.height = BH; c.getContext('2d').putImageData(new ImageData(cl, BW, BH), 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return bannerTex[key] = t; }
   const c = document.createElement('canvas'); c.width = BW; c.height = BH; const g = c.getContext('2d'), img = g.createImageData(BW, BH), r = trng(9);
   const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const col = new Array(BW * BH).fill(0).map(() => hexRGB(DYE_HEX[base]));
@@ -158,13 +185,14 @@ function bannerItem(t) { const id = itemOfBlock(BID.banner, t.c || 0), it = { id
 const ominousBanner = () => ({ id: IID.white_banner, n: 1, name: '불길한 현수막', bp: [['rhombus', 9], ['stripe_bottom', 8], ['stripe_center', 7], ['border', 8], ['stripe_middle', 15], ['half_horizontal', 8], ['circle', 8], ['border', 15]] });
 // loom: banner + dye, pick a pattern
 function loomResult(ctx) {
-  const [b, dye] = ctx.items; if (!b || !dye || !ctx.pat) return null;
+  const [b, dye, pi] = ctx.items; if (!b || !dye || !ctx.pat) return null;
+  const need = BANNER_PATTERNS[ctx.pat] && BANNER_PATTERNS[ctx.pat][2]; if (need && !(pi && ITEMS[pi.id].pattern === need)) return null;
   const d = ITEMS[b.id]; if (!d.block || d.place !== BID.banner) return null;
   const ci = S.COLORS.indexOf(ITEMS[dye.id].key.replace('_dye', '')); if (ci < 0 || (b.bp || []).length >= 6) return null;
   return { ...b, n: 1, bp: [...(b.bp || []), [ctx.pat, ci]] };
 }
 function loomHtml() {
-  const c = GUI.ctx, list = Object.entries(BANNER_PATTERNS), base = c.items[0] ? ITEMS[c.items[0].id].vi || 0 : 0, dye = c.items[1] ? Math.max(0, S.COLORS.indexOf(ITEMS[c.items[1].id].key.replace('_dye', ''))) : 15;
+  const c = GUI.ctx, pat = c.items[2] && ITEMS[c.items[2].id].pattern, list = Object.entries(BANNER_PATTERNS).filter(([, p]) => !p[2] || p[2] === pat), base = c.items[0] ? ITEMS[c.items[0].id].vi || 0 : 0, dye = c.items[1] ? Math.max(0, S.COLORS.indexOf(ITEMS[c.items[1].id].key.replace('_dye', ''))) : 15;
   const btns = list.map(([k, [nm]]) => `<button class="lpat ${c.pat === k ? 'on' : ''}" data-loom="${k}" title="${nm}" style="background-image:url(${bannerTexture(base, [[k, dye]]).image.toDataURL()})"></button>`).join('');
-  return `<div class="panel"><div class="cap">베틀</div><div class="row top loom"><div class="col">${slotHtml(0)}${slotHtml(1)}</div><div class="lpats">${btns}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+  return `<div class="panel"><div class="cap">베틀</div><div class="row top loom"><div class="col">${slotHtml(0)}${slotHtml(1)}${slotHtml(3)}</div><div class="lpats">${btns}</div><div class="arrow"></div>${slotHtml(2, 'big')}</div><div class="cap">인벤토리</div>${invRows(4)}</div>`;
 }

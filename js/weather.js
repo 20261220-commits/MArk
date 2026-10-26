@@ -19,10 +19,10 @@ function rodNear(x, z) {
   }
   return best;
 }
-const rainsAt = (x, z) => { const b = biomeAt(x, z), t = S.BIOMES[b][4]; return t > 0.15 && t < 1 && b !== S.BIO.DESERT && b !== S.BIO.BADLANDS && b !== S.BIO.SAVANNA; };
+const rainsAt = (x, z) => { const b = biomeBase(x, z), t = S.BIOMES[biomeAt(x, z)][4]; return t > 0.15 && t < 1 && b !== S.BIO.DESERT && b !== S.BIO.BADLANDS && b !== S.BIO.SAVANNA; };
 
 function weatherTick() {
-  if (--W.thunderTimer <= 0) { W.thunderOn = !W.thunderOn; W.thunderTimer = W.thunderOn ? 3600 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+  if (gr('doWeatherCycle') && --W.thunderTimer <= 0) { W.thunderOn = !W.thunderOn; W.thunderTimer = W.thunderOn ? 3600 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
   const tgt = W.thunderOn && W.rainTarget > 0 ? 1 : 0;
   W.thunder += Math.sign(tgt - W.thunder) * Math.min(Math.abs(tgt - W.thunder), 0.01);
   if (W.flash > 0) W.flash = Math.max(0, W.flash - 0.12);
@@ -33,7 +33,7 @@ function weatherTick() {
   const cs = [...W.chunks.values()], c = cs[(Math.random() * cs.length) | 0];
   const x = c.cx * 16 + ((Math.random() * 16) | 0), z = c.cz * 16 + ((Math.random() * 16) | 0);
   const rod = rodNear(x, z);
-  if (rod) { strikeLightning(rod[0], rod[1] + 1, rod[2], true); return; }
+  if (rod) { strikeLightning(rod[0], rod[1] + 1, rod[2], true); if (ENT.some(e => e.type === 'villager' && !e.dead && Math.hypot(e.x - rod[0], e.y - rod[1], e.z - rod[2]) < 30)) advGrant('adventure/lightning_rod_with_villager_no_fire'); return; }
   if (!rainsAt(x, z)) return;
   strikeLightning(x, topY(x, z) + 1, z, false);
 }
@@ -72,9 +72,11 @@ function strikeLightning(x, y, z, viaRod) {
   for (const e of [...ENT]) {
     if (e.kind !== 'mob' || e.dead || !inBolt(e.x, e.y, e.z)) continue;
     if (e.type === 'pig') { removeEnt(e); spawnMob('zombified_piglin', e.x, e.y, e.z); continue; }
+    if (e.type === 'creeper') { chargeCreeper(e); continue; }
     if (e.type === 'villager' && PL.difficulty > 0) { removeEnt(e); spawnMob('witch', e.x, e.y, e.z).persistent = true; continue; } // struck villagers turn into witches
     e.fire = Math.max(e.fire || 0, 160); hurtMob(e, 5, null, 0, 0, 'lightning');
   }
+  if (!viaRod && typeof skeletonTrapCheck === 'function') skeletonTrapCheck(x, y, z);
   if (!PL.dead && inBolt(PL.x, PL.y, PL.z) && !creative()) { PL.fire = Math.max(PL.fire, 160); hurtPlayer(5, 'lightning'); }
   if (viaRod) { // the rod itself is at y - 1: it glows with redstone power for 8 ticks and cleans the copper it is mounted on
     const rx = x, ry = y - 1, rz = z, m = getMeta(rx, ry, rz), d = S.DIR6[m & 7];

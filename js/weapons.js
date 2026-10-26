@@ -10,7 +10,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
-  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 });
+  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
   if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // axes knock the shield away for 5 s
   return true;
 }
@@ -19,6 +19,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
 const crossbowCharge = st => Math.max(0, 25 - 5 * enchLv(st, 'quick_charge'));
 function crossbowRelease(h) { // let go of the button: load if fully drawn
   if (USE.t < crossbowCharge(h)) return;
+  const fw = offItem(); if (fw && fw.id === IID.firework_rocket) { h.ch = IID.firework_rocket; h.chFw = fw.fw || { flight: 1 }; if (!creative()) { fw.n--; if (!fw.n) INV.off = null; } play('click', { pitch: 0.6 }); UI.hudDirty = true; return; } // a rocket in the off hand loads instead of an arrow
   const ai = arrowSlot(); if (ai < 0 && !creative()) return;
   const ast = ai >= 0 ? INV.slots[ai] : { id: IID.arrow, n: 1 };
   h.ch = ast.id; play('click', { pitch: 0.6 });
@@ -30,13 +31,14 @@ function crossbowFire(h) {
   const angles = ms ? [0, -0.17, 0.17] : [0];
   for (const a of angles) {
     const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
+    if (h.ch === IID.firework_rocket) { launchRocket(PL.x + vx * 0.6, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.6, { fw: h.chFw }, false, [vx * 1.6, dy * 1.6, vz * 1.6]); continue; }
     const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2);
     if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
     if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
     e.crossbow = true;
   }
-  h.ch = null; play('bow'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
+  h.ch = null; h.chFw = null; play('bow'); if (typeof advGrant === 'function') advGrant('adventure/ol_betsy'); damageItem(INV.slots, INV.sel, ms ? 3 : 1); UI.hudDirty = true;
 }
 
 // ---------- trident ----------
@@ -62,7 +64,8 @@ function tridentHit(e, o) {
   const st = e.trident;
   let dmg = 8; if (st && AQUATIC.has(o.type)) dmg += 2.5 * enchLv(st, 'impaling');
   if (o === PL) { if (!creative()) hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e); }
-  else hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null);
+  else { HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e); hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); HURTPROJ = null; }
+  if (st && enchLv(st, 'channeling') && o.type === 'villager' && W.thunder > 0.5 && W.dim === 0 && e.owner === PL && typeof advGrant === 'function') advGrant('adventure/very_very_frightening');
   if (st && enchLv(st, 'channeling') && W.thunder > 0.5 && W.dim === 0 && (getLight(Math.floor(o.x), Math.floor(o.y + 1), Math.floor(o.z)) >> 4) === 15) strikeLightning(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z), false);
   e.vx *= -0.1; e.vy = 0.1; e.vz *= -0.1; e.hitDone = true;
 }

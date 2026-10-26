@@ -8,14 +8,17 @@ const EFF = {
   hunger: ['허기', '#587653'], weakness: ['나약함', '#484d48'], poison: ['독', '#4e9331'], wither: ['시듦', '#352a27'], absorption: ['흡수', '#2552a5'],
   saturation: ['포화', '#f82423'], levitation: ['공중 부양', '#ceffff'], slow_falling: ['느린 낙하', '#f7f8e0'], conduit_power: ['전달체의 힘', '#1dc2d1'],
   dolphins_grace: ['돌고래의 우아함', '#88a3be'], bad_omen: ['흉조', '#0b6138'], hero_of_the_village: ['마을의 영웅', '#44ff44'], glowing: ['발광', '#94a061'],
+  health_boost: ['생명력 강화', '#f87d23'], luck: ['행운', '#339900'], unluck: ['불운', '#c0a44d'],
 };
+// maximum health: 20, plus 4 for each level of health boost
+const plMaxHp = () => 20 + 4 * effLv(PL, 'health_boost');
 const UNDEAD = new Set(['zombie', 'skeleton', 'husk', 'drowned', 'stray', 'wither_skeleton', 'zombified_piglin', 'zoglin', 'phantom', 'skeleton_horse', 'zombie_horse']);
 const effLv = (t, k) => { const e = t && t.eff && t.eff[k]; return e ? e.lv + 1 : 0; }; // 0: none, 1: level I
 function addEffect(t, k, dur, lv = 0) {
   if (t === PL && (PL.dead || creative() && (k === 'poison' || k === 'wither' || k === 'instant_damage'))) return;
   if (k === 'instant_health' || k === 'instant_damage') { // undead are hurt by healing and healed by harm
     const heal = (k === 'instant_health') !== (t !== PL && UNDEAD.has(t.type));
-    if (heal) { if (t === PL) PL.health = Math.min(20, PL.health + (4 << lv)); else t.hp = Math.min(t.def.hp, t.hp + (4 << lv)); }
+    if (heal) { if (t === PL) PL.health = Math.min(plMaxHp(), PL.health + (4 << lv)); else t.hp = Math.min(t.def.hp, t.hp + (4 << lv)); }
     else if (t === PL) hurtPlayer(6 << lv, 'magic'); else { t.inv = 0; hurtMob(t, 6 << lv, null); }
     UI.hudDirty = true; return;
   }
@@ -34,11 +37,11 @@ function effectTick(t) {
   const me = t === PL;
   for (const k in t.eff) {
     const e = t.eff[k], lv = e.lv;
-    if (k === 'regeneration' && e.t % Math.max(1, 50 >> lv) === 0) { if (me) { if (PL.health < 20) { PL.health = Math.min(20, PL.health + 1); UI.hudDirty = true; } } else if (t.hp < t.def.hp) t.hp++; }
+    if (k === 'regeneration' && e.t % Math.max(1, 50 >> lv) === 0) { if (me) { if (PL.health < plMaxHp()) { PL.health = Math.min(plMaxHp(), PL.health + 1); UI.hudDirty = true; } } else if (t.hp < t.def.hp) t.hp++; }
     else if (k === 'poison' && e.t % Math.max(1, 25 >> lv) === 0) { if (me) { if (PL.health > 1) hurtPlayer(1, 'poison'); } else if (t.hp > 1) { t.inv = 0; hurtMob(t, 1, null); } }
     else if (k === 'wither' && e.t % Math.max(1, 40 >> lv) === 0) { if (me) hurtPlayer(1, 'wither'); else { t.inv = 0; hurtMob(t, 1, null); } }
     else if (k === 'hunger' && me) PL.exh += 0.005 * (lv + 1);
-    if (--e.t <= 0) { delete t.eff[k]; if (k === 'absorption' && me) PL.absorb = 0; if (me) UI.hudDirty = true; }
+    if (--e.t <= 0) { delete t.eff[k]; if (k === 'absorption' && me) PL.absorb = 0; if (k === 'health_boost' && me) PL.health = Math.min(PL.health, plMaxHp()); if (me) UI.hudDirty = true; }
   }
 }
 // player modifiers used by movement, combat and mining
@@ -47,10 +50,12 @@ const meleeBonus = () => 3 * effLv(PL, 'strength') - 4 * effLv(PL, 'weakness');
 const digMul = () => (1 + 0.2 * effLv(PL, 'haste') + 0.2 * effLv(PL, 'conduit_power')) * Math.pow(0.3, Math.min(4, effLv(PL, 'mining_fatigue')));
 // HUD: effects with their level and time left, top right
 const ROMAN_E = ['', '', ' II', ' III', ' IV', ' V'];
+const EFF_URL = {};
+const effIconCss = k => { if (EFF_URL[k] === undefined) { const c = typeof entCanvas === 'function' && entCanvas('effect_' + k); EFF_URL[k] = c ? c.toDataURL() : null; } return EFF_URL[k] ? `background:url(${EFF_URL[k]}) 0 0/100% 100%;image-rendering:pixelated;border:0` : `background:${EFF[k][1]}`; }; // the jar's mob_effect icon
 function renderEffects() {
   const el = document.getElementById('effects'); if (!el) return;
   const list = PL.eff ? Object.entries(PL.eff) : [];
-  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="background:${EFF[k][1]}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
+  el.innerHTML = list.map(([k, e]) => { const s = Math.ceil(e.t / 20), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0'); return `<div class="ef"><i style="${effIconCss(k)}"></i>${EFF[k][0]}${ROMAN_E[e.lv + 1] != null ? ROMAN_E[e.lv + 1] : ' ' + (e.lv + 1)} <b>${e.t > 32767 * 20 ? '**:**' : mm + ':' + ss}</b></div>`; }).join('');
 }
 // mending: picked-up experience repairs a damaged mending item first (2 durability per point)
 function mendWithXP(v) {

@@ -27,22 +27,34 @@ const lighter = (c, f) => { const a = hex(c); return (Math.min(255, a[0] * f) <<
 const HORSE_COL = [0xe8e4dc, 0xc8a060, 0x9a5a2a, 0x6a4024, 0x2e2622, 0x7a7470, 0x3e2a1a];
 const HARMOR = { leather_horse_armor: [3, 0x9a5a32], iron_horse_armor: [5, 0xc8c8c8], golden_horse_armor: [7, 0xe8c840], diamond_horse_armor: [11, 0x5ae0d8] };
 const HARMOR_KEYS = Object.keys(HARMOR);
+// horse variants: colour in the low 4 bits, markings above (0 none, 1 white socks and blaze, 2 white field, 3 white dots, 4 black dots)
+function horseMark(mk, c, part) {
+  if (!mk) return null;
+  return (k, x, y, w, h) => {
+    const n = ((x * 73856093) ^ (y * 19349663) ^ (k.length * 83492791)) >>> 0;
+    if (mk === 1) return part === 'leg' && y > 6 ? hex(0xf0ece4) : part === 'head' && k === 'front' && x >= 2 && x <= 3 ? hex(0xf0ece4) : hex(c);
+    if (mk === 2) return (n % 7) < 4 && part !== 'leg' ? hex(0xf0ece4) : hex(c);
+    if (mk === 3) return n % 11 === 0 ? hex(0xf8f6f0) : hex(c);
+    return n % 9 === 0 ? hex(0x1a1614) : hex(c);
+  };
+}
 function horseSpec(kind) {
   return v => {
+    const mk = kind === 'horse' ? (v >> 4) & 7 : 0; v &= 15;
     const c = kind === 'donkey' ? 0x8a7e72 : kind === 'mule' ? 0x5a3a24 : HORSE_COL[v] || HORSE_COL[2];
     const mane = kind === 'horse' ? lighter(c, v === 0 ? 0.8 : 0.6) : lighter(c, 0.7), belly = kind === 'donkey' ? 0xb8b0a4 : c;
     const ear = kind === 'horse' ? [1, 2, 1] : [2, 6, 1];
     const parts = [
-      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], (k) => k === 'bottom' ? hex(belly) : hex(c)],
-      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], c],
-      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
+      ['body', [0, 0, 0], [-5, 11, -11, 10, 10, 22], horseMark(mk, c, 'body') || ((k) => k === 'bottom' ? hex(belly) : hex(c))],
+      ['neck', [0, 0, 0], [-2, 18, -13, 4, 10, 6], horseMark(mk, c, 'neck') || c],
+      ['head', [0, 0, 0], [-3, 24, -19, 6, 6, 8], horseMark(mk, c, 'head') || c, 0, { front: (g, x, y) => { px(g, x + 1, y + 4, '#2a2220', 1, 1); px(g, x + 4, y + 4, '#2a2220', 1, 1); } , right: (g, x, y) => px(g, x + 6, y + 1, '#101010'), left: (g, x, y) => px(g, x + 1, y + 1, '#101010') }],
       ['ear1', [0, 0, 0], [-3, 30, -13, ...ear], c], ['ear2', [0, 0, 0], [3 - ear[0], 30, -13, ...ear], c],
       ['mane', [0, 0, 0], [-1, 19, -8, 2, 12, 2], mane],
       ['tail', [0, 20, 11], [-1.5, -10, 0, 3, 10, 3], mane],
-      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
-      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? 0x2a2420 : lighter(c, 0.6)) : hex(c)],
+      ['rleg', [3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg', [-3, 11, -8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['rleg2', [3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
+      ['lleg2', [-3, 11, 8], [-2, -11, -2, 4, 11, 4], (k, x, y) => y > 8 ? hex(kind === 'horse' ? (mk === 1 ? 0xf0ece4 : 0x2a2420) : lighter(c, 0.6)) : horseMark(mk, c, 'leg') ? horseMark(mk, c, 'leg')(k, x, y) : hex(c)],
       ['saddle', [0, 0, 0], [-5, 21, -5, 10, 1, 9], (k, x, y) => hex(x === 0 || y === 0 ? 0x4a2a14 : 0x7a4a24), 0.15],
       ['rchest', [0, 0, 0], [5, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)], ['lchest', [0, 0, 0], [-8, 13, 1, 3, 8, 8], (k, x, y) => hex(y === 2 ? 0x3a2410 : 0xa8743a)],
     ];
@@ -56,7 +68,7 @@ function horseInit(e, o) {
   e.temper = o.temper || 0; e.saddle = !!o.saddle; e.harmor = o.harmor || null; e.chest = !!o.chest;
   if (e.chest || k !== 'horse') e.items = o.items || (k !== 'horse' ? new Array(15).fill(null) : null);
   // stats: health 15-30, speed and jump vary per horse (donkeys and mules are slower, jump less)
-  e.hpMax = o.hpMax || (k === 'horse' ? 15 + Math.floor(Math.random() * 16) : 15 + Math.floor(Math.random() * 16));
+  e.hpMax = o.hpMax || (k === 'skeleton_horse' || k === 'zombie_horse' ? 15 : 15 + Math.floor(Math.random() * 16));
   // Java attribute ranges: speed 0.1125-0.3375 (about 42 m/s per unit), jump strength 0.4-1.0
   e.spd = o.spd || (k === 'horse' ? 0.1125 + Math.random() * 0.225 : 0.175);
   e.jumpS = o.jumpS || (k === 'horse' ? 0.4 + Math.random() * 0.6 : 0.5);
@@ -83,7 +95,7 @@ function horseRide(e) {
     if (++e.rideT > 30 + Math.random() * 30) {
       e.rideT = 0;
       if (Math.random() * 100 < e.temper) horseTame(e);
-      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { size: 0.15, vy: 1, grav: 0 }); }
+      else { dismount(); e.temper = Math.min(100, e.temper + 5); play('hurt', { vol: 0.4 }); for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); }
     }
     return;
   }
@@ -96,7 +108,7 @@ function horseRide(e) {
   walkPhysics(e, f || s ? mx / l : 0, f || s ? mz / l : 0, f || s ? sp : 0);
   e.fallY = null; PL.fallDist = 0;
 }
-function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); UI.advance && UI.advance('horse'); }
+function horseTame(e) { e.owner = 'player'; e.persistent = true; e.temper = 100; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + e.h, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); play('hmm', { pitch: 1.4 }); ADVT.tamed(e); }
 function horseInteract(e, h, d) {
   if (e.baby) { if (d && (h.id === IID.golden_apple || h.id === IID.golden_carrot || h.id === IID.apple || h.id === IID.wheat || h.id === IID.sugar)) { e.baby = Math.max(1, e.baby - 2400); consume(); swing(); return true; } return false; }
   const tame = e.owner === 'player';
@@ -132,7 +144,7 @@ function horseAnim(e, P) {
   for (const n of ['head', 'ah0', 'ah1', 'ah2', 'ah3', 'ear1', 'ear2']) { const p = P[n]; if (p) { p.rotation.x = hd; p.position.y = -hd * 0.3; p.position.z = -hd * 0.3; } }
 }
 const HORSE_DEF = (kind, name) => ({ hp: 20, w: 0.7, h: 1.6, speed: 0.08, xp: 2, snd: 'hmm', name, drops: [['leather', 0, 2]], parts: HORSE_M[kind].parts, tw: HORSE_M[kind].tw, th: HORSE_M[kind].th,
-  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
+  tex: () => HORSE_M[kind].tex(kind === 'horse' ? 2 : 0), ...(kind === 'horse' ? { vtex: v => HORSE_M.horse.tex(v), variant: () => ((Math.random() * 7) | 0) | (((Math.random() * 5) | 0) << 4) } : {}), food: ['golden_apple', 'golden_carrot'], tameFirst: 1, ride: horseRide, rideY: 1.0,
   init: horseInit, save: horseSave, onBred: horseOnBred, anim: horseAnim, interact: horseInteract, onDeathDrops: horseDrops, armorMul: horseArmorMul });
 
 // ---------- cats ----------
@@ -173,8 +185,8 @@ function catInteract(e, h, d) {
   }
   if (d && (h.id === IID.cod || h.id === IID.salmon)) {
     consume(); swing();
-    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { size: 0.12, vy: 1, grav: 0 }); }
-    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { size: 0.12, vy: 1, grav: 0 });
+    if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.sitting = 1; ADVT.tamed(e); for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + .6, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 }); }
+    else for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + .6, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.12, vy: 1, grav: 0 });
     return true;
   }
   return false;
@@ -184,7 +196,7 @@ function catAnim(e, P) {
   if (e.sitting) { e.mesh.position.y -= 0.15; for (const n of ['rleg2', 'lleg2']) if (P[n]) P[n].rotation.x = 1.4; if (P.body) P.body.rotation.x = -0.4; } else if (P.body) P.body.rotation.x = 0;
 }
 // creepers (and phantoms) keep away from cats
-const catNear = (e, r = 6) => ENT.some(o => o.type === 'cat' && !o.dead && !o.deathT && Math.hypot(o.x - e.x, o.z - e.z) < r && Math.abs(o.y - e.y) < 4);
+const catNear = (e, r = 6) => ENT.some(o => (o.type === 'cat' || o.type === 'ocelot') && !o.dead && !o.deathT && Math.hypot(o.x - e.x, o.z - e.z) < r && Math.abs(o.y - e.y) < 4);
 // waking up next to a tame cat: 70% chance of a morning gift
 const CAT_GIFTS = [['rabbit_hide', 16], ['rabbit_foot', 16], ['chicken', 16], ['feather', 16], ['rotten_flesh', 16], ['string', 10], ['phantom_membrane', 2]];
 function catGifts() {
@@ -210,7 +222,7 @@ const RABBIT_M = autoModel(v => {
     ['rleg2', [1.5, 2, 2.5], [-1, -2, -1.5, 2, 2, 3], c], ['lleg2', [-1.5, 2, 2.5], [-1, -2, -1.5, 2, 2, 3], c],
   ];
 });
-function rabbitVariant(e) { const b = biomeAt(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.DESERT ? 3 : b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA ? (Math.random() < 0.8 ? 1 : 5) : [0, 0, 2, 4][(Math.random() * 4) | 0]; }
+function rabbitVariant(e) { const b = biomeBase(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.DESERT ? 3 : b === S.BIO.TUNDRA || b === S.BIO.SNOWY_TAIGA ? (Math.random() < 0.8 ? 1 : 5) : [0, 0, 2, 4][(Math.random() * 4) | 0]; }
 function rabbitAI(e, dist) {
   let mx = 0, mz = 0, sp = 0.09;
   const held = PL.held(), tempt = held && isFood(e.def, held.id) && dist < 8 && !PL.dead;
@@ -270,9 +282,9 @@ function foxAI(e, dist) {
   walkPhysics(e, mx, mz, sp);
 }
 function foxMouth(e) { // show what the fox carries
-  const P = e.mesh.userData.parts; if (P.mouthItem) { P.snout.remove(P.mouthItem); P.mouthItem = null; }
-  if (!e.mouth) return;
-  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; P.snout.add(m); P.mouthItem = m;
+  const P = e.mesh.userData.parts, host = P.snout || P.head; if (P.mouthItem) { P.mouthItem.parent && P.mouthItem.parent.remove(P.mouthItem); P.mouthItem = null; }
+  if (!e.mouth || !host) return; // the Java model has no separate snout, so the item hangs from the head
+  const m = R.itemMesh(e.mouth.id); m.scale.setScalar(m.userData.isBlock ? 0.2 : 0.35); m.position.set(0, 0.3, -0.85); m.rotation.x = Math.PI / 2; host.add(m); P.mouthItem = m;
 }
 function foxAnim(e, P) {
   if (P.tail) P.tail.rotation.x = e.sleeping ? 0.2 : -0.3 + Math.sin(e.walk * 0.4) * 0.1;
@@ -287,22 +299,29 @@ Object.assign(MOBDEF, {
   rabbit: { hp: 3, w: 0.2, h: 0.5, speed: 0.09, xp: 2, snd: 'hmm', drops: [['rabbit', 0, 1], ['rabbit_hide', 0, 1]], extraDrop: [['rabbit_foot', 0.1]], parts: RABBIT_M.parts, tex: () => RABBIT_M.tex(0), vtex: v => RABBIT_M.tex(v),
     variant: () => 0, initVariant: rabbitVariant, food: ['carrot', 'golden_carrot', 'dandelion'], ai: rabbitAI },
   fox: { hp: 10, w: 0.35, h: 0.7, speed: 0.08, xp: 2, snd: 'hmm', drops: [], parts: FOX_M.parts, tex: () => FOX_M.tex(0), vtex: v => FOX_M.tex(v), variant: () => 0,
-    initVariant: e => { const b = biomeAt(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA ? 1 : 0; }, food: ['sweet_berries'], ai: foxAI, anim: foxAnim,
+    initVariant: e => { const b = biomeBase(Math.floor(e.x), Math.floor(e.z)); return b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA ? 1 : 0; }, food: ['sweet_berries'], ai: foxAI, anim: foxAnim,
     save: e => ({ mouth: e.mouth || null }), init: (e, o) => { if (o.mouth) { e.mouth = o.mouth; foxMouth(e); } }, onDeathDrops: e => { if (e.mouth) dropStack(e.x, e.y + .5, e.z, e.mouth); } },
 });
 MOBDEF.mule.drops = MOBDEF.horse.drops;
 
 // ---------- spawning ----------
 function spawnMoreForChunk(c) {
-  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 27)), b = c.biome[8 * 16 + 8];
-  const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 205 ? y + 1 : -1; };
+  const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 27)), b = S.BB[c.biome[8 * 16 + 8]];
+  const ground = (x, z) => { let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; return g === 2 || g === 3 || g === 9 || g === 50 || g === 51 || g === 203 || g === 204 || g === 205 ? y + 1 : -1; };
   const group = (t, n, opts) => { const v = opts && opts.variant != null ? opts.variant : null; for (let i = 0; i < n; i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = ground(x, z); if (y > 0) spawnMob(t, x + .5, y, z + .5, v != null ? { variant: v } : {}); } };
   const B = S.BIO;
-  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) }); else group('donkey', 1 + R0.int(2)); }
+  if ((b === B.PLAINS || b === B.SAVANNA) && R0() < 0.02) { if (R0() < 0.75) group('horse', 2 + R0.int(4), { variant: R0.int(7) | (R0.int(5) << 4) }); else group('donkey', 1 + R0.int(2)); }
   if ((b === B.DESERT || b === B.TUNDRA || b === B.SNOWY_TAIGA || b === B.FOREST || b === B.TAIGA) && R0() < 0.025) group('rabbit', 2 + R0.int(2));
   if ((b === B.TAIGA || b === B.SNOWY_TAIGA) && R0() < 0.03) group('fox', 2 + R0.int(2));
   if (b === B.BEACH && R0() < 0.12) group('turtle', 2 + R0.int(4));
-  if (b === B.OCEAN && R0() < 0.04) for (let i = 1 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 56 + R0.int(5); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === BID.water) spawnMob('dolphin', x + .5, y, z + .5); }
+  if ((b === B.OCEAN || b === B.WARM_OCEAN || b === B.LUKEWARM_OCEAN || b === B.COLD_OCEAN) && R0() < 0.04) for (let i = 1 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 56 + R0.int(5); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === BID.water) spawnMob('dolphin', x + .5, y, z + .5); }
   // stray cats in villages: one per chunk that got villagers
   if (c.hadVillagers && R0() < 0.4) group('cat', 1);
+  if (typeof MOBDEF.mooshroom !== 'object') return;
+  if (b === B.MUSHROOM && R0() < 0.3) group('mooshroom', 2 + R0.int(4));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < (b === B.BAMBOO_JUNGLE ? 0.12 : 0.02)) group('panda', 1 + R0.int(2));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < 0.05) group('parrot', 1 + R0.int(2));
+  if ((b === B.JUNGLE || b === B.BAMBOO_JUNGLE) && R0() < 0.03) group('ocelot', 1);
+  if ((b === B.ICE_SPIKES || b === B.TUNDRA) && R0() < 0.02) group('polar_bear', 1 + R0.int(2));
+  if ((b === B.MOUNTAINS || b === B.SAVANNA) && R0() < 0.025) group('llama', 2 + R0.int(3));
 }

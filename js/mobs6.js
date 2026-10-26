@@ -29,7 +29,7 @@ function phantomAI(e, dist) {
 function phantomAnim(e, P, now) { const f = Math.sin(now / 120 + e.id) * 0.5; if (P.rwing) { P.rwing.rotation.z = f; P.lwing.rotation.z = -f; } e.mesh.rotation.x = Math.max(-0.7, Math.min(0.7, e.vy * 2)); }
 // insomnia: three days without sleep and phantoms come at night, more the longer you stay up
 function trySpawnPhantoms() {
-  if (W.dim !== 0 || PL.difficulty === 0 || PL.dead || spectator() || dayFactor() > 0.3 || (PL.rest || 0) < 72000 || PL.y < S.SEA) return;
+  if (!gr('doInsomnia') || W.dim !== 0 || PL.difficulty === 0 || PL.dead || spectator() || dayFactor() > 0.3 || (PL.rest || 0) < 72000 || PL.y < S.SEA) return;
   if ((getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) < 15) return; // only under the open sky
   if (Math.random() > Math.min(0.9, ((PL.rest || 0) - 72000) / 72000 + 0.15)) return;
   const n = 1 + Math.floor(Math.random() * (PL.difficulty + 1));
@@ -149,7 +149,7 @@ function illagerAI(e, dist) {
   if (e.raidMove) { [mx, mz] = e.raidMove; e.raidMove = null; }
   // ravagers trample crops and tear through leaves
   if (d.ravager && e.hitH) { const fx = Math.floor(e.x + Math.sign(e.vx || mx) * 1.2), fz = Math.floor(e.z + Math.sign(e.vz || mz) * 1.2); for (let dy = 0; dy < 3; dy++) { const b = getBlock(fx, Math.floor(e.y) + dy, fz); if (S.LEAF[b] || RTYPE[b] === RT.CROP) { breakNaturally(fx, Math.floor(e.y) + dy, fz, b, getMeta(fx, Math.floor(e.y) + dy, fz)); } } }
-  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { size: 0.12, vy: 0.5, grav: 0 }); }
+  if (e.cast > 0) { e.cast--; mx = mz = 0; if (e.age % 2) R.simpleParticle(e.x, e.y + 2.2, e.z, [0.6, 0.5, 0.9], { kind: 'angry', size: 0.12, vy: 0.5, grav: 0 }); }
   walkPhysics(e, mx, mz, sp);
 }
 function illagerAnim(e, P) {
@@ -248,11 +248,12 @@ function raidBar() {
   raidEl.querySelector('.bn').textContent = R0.state === 'won' ? '습격 - 승리' : R0.state === 'lost' ? '습격 - 패배' : R0.state === 'wait' ? `습격 (${R0.wave}/${R0.waves})` : `습격 - 습격자 ${n}명 남음`;
   raidEl.querySelector('i').style.width = (R0.state === 'active' ? n / tot * 100 : R0.state === 'wait' ? Math.min(100, (300 - R0.t) / 3) : 0) + '%';
 }
-function villageCentre() { // the bell or the middle of the villagers near the player
-  const vs = ENT.filter(e => e.type === 'villager' && !e.dead && Math.hypot(e.x - PL.x, e.z - PL.z) < 48);
-  if (vs.length < 2) return null;
-  for (const k of TRACKED.get(BID.bell) || []) { const [x, y, z] = k.split(',').map(Number); if (Math.hypot(x - PL.x, z - PL.z) < 64) return [x + .5, y, z + .5]; }
-  return [vs.reduce((a, e) => a + e.x, 0) / vs.length, PL.y, vs.reduce((a, e) => a + e.z, 0) / vs.length];
+const VBEDS = trackBlocks(BID.red_bed), VBELLS = trackBlocks(BID.bell);
+function villageCentre() { // as in Java, a village is its points of interest: a bell (the meeting point) or beds near the player
+  const near = set => [...set].map(k => k.split(',').map(Number)).filter(([x, , z]) => Math.hypot(x - PL.x, z - PL.z) < 48);
+  const bells = near(VBELLS); if (bells.length) { const [x, y, z] = bells[0]; return [x + .5, y, z + .5]; }
+  const beds = near(VBEDS); if (!beds.length) return null;
+  return [beds.reduce((a, b) => a + b[0], 0) / beds.length + .5, beds.reduce((a, b) => a + b[1], 0) / beds.length, beds.reduce((a, b) => a + b[2], 0) / beds.length + .5];
 }
 function raidTick() {
   if (W.dim !== 0) return;
@@ -302,7 +303,13 @@ function villagerFlee(e) {
   if (r) { const dx = e.x - r.x, dz = e.z - r.z, l = Math.hypot(dx, dz) || 1; e.panic = 20; e.goal = [e.x + dx / l * 8, e.z + dz / l * 8]; }
 }
 // hero of the village: cheaper trades (30% plus 6.25% per level, at least one item)
-function tradePrice(o) { const h = PL.eff && PL.eff.hero_of_the_village; return h ? Math.max(1, Math.floor(o.an * (1 - 0.3 - 0.0625 * h.lv))) : o.an; }
+// Java's price: the base cost, less the villager's opinion of the player (gossip: curing, trading, being hit) times 0.05,
+// and less the hero of the village discount
+function tradePrice(o, v = GUI.ctx && GUI.ctx.e) {
+  const rep = v && v.rep ? v.rep : 0; let p = o.an - Math.floor(rep * 0.05 * (o.an >= 4 ? 1 : 0.5));
+  const h = PL.eff && PL.eff.hero_of_the_village; if (h) p = Math.floor(p * (1 - 0.3 - 0.0625 * h.lv));
+  return Math.max(1, Math.min(64, p));
+}
 
 const ILL = (m, o) => ({ tw: 128, th: 64, hp: 24, w: 0.3, h: 1.95, speed: 0.1, hostile: 1, xp: 5, snd: 'hmm', raider: 1, parts: m.parts, tex: () => m.tex(0), ai: illagerAI, anim: illagerAnim, onDeath: illagerDeath,
   init: (e, opts) => { if (opts.captain) e.captain = true; illagerGear(e); }, save: e => ({ captain: !!e.captain }), ...o });
@@ -311,7 +318,7 @@ Object.assign(MOBDEF, {
   cave_spider: { ...MOBDEF.spider, hp: 12, w: 0.35, h: 0.5, scale: 0.7, tex: CAVE_SPIDER_TEX, onHitPlayer: () => { if (PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 300 : 140, 0); } },
   witch: { tw: 128, th: 64, hp: 26, w: 0.3, h: 1.95, speed: 0.07, hostile: 1, xp: 5, snd: 'hmm', raider: 1, parts: WITCH_M.parts, tex: () => WITCH_M.tex(0), ai: witchAI, anim: illagerAnim, onDeath: illagerDeath,
     drops: [['glass_bottle', 0, 1], ['glowstone_dust', 0, 1], ['gunpowder', 0, 1], ['redstone', 0, 1], ['spider_eye', 0, 1], ['sugar', 0, 1], ['stick', 0, 1]] },
-  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [['arrow', 0, 2]], extraDrop: [['crossbow', 0.085]] }),
+  pillager: ILL(PILLAGER_M, { crossbow: 1, drops: [], extraDrop: [['crossbow', 0.085]] }),
   vindicator: ILL(VINDICATOR_M, { dmg: 13, speed: 0.1, axe: 1, drops: [['emerald', 0, 1]], extraDrop: [['iron_axe', 0.085]] }),
   evoker: ILL(EVOKER_M, { evoker: 1, xp: 10, drops: [['totem_of_undying', 1, 1], ['emerald', 0, 1]] }),
   ravager: { hp: 100, w: 0.98, h: 2.2, speed: 0.1, hostile: 1, xp: 20, snd: 'growl', raider: 1, ravager: 1, dmg: 12, kbRes: 1, drops: [['saddle', 1, 1]], parts: RAVAGER_M.parts, tw: 128, th: 128, tex: () => RAVAGER_M.tex(0), ai: illagerAI, onDeath: illagerDeath },
