@@ -450,7 +450,7 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
-  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }

@@ -1,6 +1,10 @@
 // Item frames and glow item frames (1.17): hang on any face, hold one item that turns in 45 degree steps
 // (a comparator behind reads the turn), glow frames show their item at full brightness.
 function frameCanvas(glow) {
+  const back = PACKPX.ent[glow ? 'blk_glow_item_frame' : 'blk_item_frame'], wood = PACKPX.ent.blk_birch_planks;
+  if (back && wood) { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'), img = g.createImageData(16, 16);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const edge = x < 2 || y < 2 || x > 13 || y > 13, e = edge ? wood : back, k = e.w / 16, si = (Math.floor(y * k) * e.w + Math.floor(x * k)) * 4; for (let q = 0; q < 4; q++) img.data[(y * 16 + x) * 4 + q] = e.px[si + q]; img.data[(y * 16 + x) * 4 + 3] = 255; }
+    g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; }
   const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'), r = trng(glow ? 33 : 31);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
     const edge = x < 2 || y < 2 || x > 13 || y > 13;

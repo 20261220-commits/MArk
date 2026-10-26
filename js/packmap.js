@@ -165,7 +165,11 @@ Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', env_sun
   env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
   pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
   banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
-  conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book' });
+  conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book', arrow_ent: 'entity/projectiles/arrow', spectral_arrow_ent: 'entity/projectiles/spectral_arrow',
+  minecart_ent: 'entity/minecart', armorstand: 'entity/armorstand/wood', fishing_hook: 'entity/fishing_hook', lead_knot: 'entity/lead_knot', evoker_fangs: 'entity/illager/evoker_fangs',
+  llama_spit: 'entity/llama/spit', trident_ent: 'entity/trident', dragon_fireball: 'entity/enderdragon/dragon_fireball', beacon_beam: 'entity/beacon_beam', wither_armor: 'entity/wither/wither_armor',
+  blk_item_frame: 'block/item_frame', blk_glow_item_frame: 'block/glow_item_frame', blk_birch_planks: 'block/birch_planks' });
+for (const w of ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) ENT['sign_' + w] = 'entity/signs/' + w;
 for (const n of ['kebab', 'aztec', 'alban', 'aztec2', 'bomb', 'plant', 'wasteland', 'pool', 'courbet', 'sea', 'sunset', 'creebet', 'wanderer', 'graham', 'match', 'bust', 'stage', 'void',
   'skull_and_roses', 'wither', 'fighters', 'skeleton', 'donkey_kong', 'pointer', 'pigscene', 'burning_skull', 'back']) ENT['painting_' + n] = 'painting/' + n;
 for (const n of ['base', 'border', 'bricks', 'circle', 'creeper', 'cross', 'curly_border', 'diagonal_left', 'diagonal_right', 'diagonal_up_left', 'diagonal_up_right', 'flower', 'globe', 'gradient',

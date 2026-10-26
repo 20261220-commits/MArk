@@ -822,7 +822,9 @@ function useRod() {
   }
   const [dx, dy, dz] = lookDir();
   const e = Ent('bobber', PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4); e.kind = 'bobber'; e.w = 0.12; e.h = 0.25; e.vx = dx * 0.6; e.vy = dy * 0.6 + 0.15; e.vz = dz * 0.6; e.bite = 0; e.wait = Math.max(20, 100 + Math.floor(Math.random() * 400) - 100 * enchLv(PL.held(), 'lure'));
-  e.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
+  const hook = PACKPX.ent.fishing_hook && entCanvas('fishing_hook');
+  if (hook) { const t = new THREE.CanvasTexture(hook); t.magFilter = t.minFilter = THREE.NearestFilter; e.mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.5 })); e.mesh.scale.setScalar(0.5); }
+  else e.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
   e.tick = bobberTick; e.render = (e, x, y, z) => e.mesh.position.set(x, y + 0.06, z);
   addEnt(e); play('bow', { vol: 0.3 });
 }

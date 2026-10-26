@@ -81,6 +81,12 @@ function cartTexture() {
   cartTex = new THREE.CanvasTexture(c); cartTex.magFilter = cartTex.minFilter = THREE.NearestFilter; cartTex.generateMipmaps = false; return cartTex;
 }
 function cartMesh(e) {
+  const tex = packTexture('minecart_ent');
+  if (tex) { // MinecartEntityModel with the jar's minecart.png
+    const g = new THREE.Group(), m = buildMCModel('minecart', MCMODELS.minecart, tex); m.rotation.y = Math.PI / 2; g.add(m);
+    const load = CART_LOAD[e.ctype]; if (load) { const im = R.itemMesh(load); im.scale.setScalar(0.75); im.position.y = 0.62; g.add(im); g.userData.load = im; }
+    g.userData.mats = [m.userData.mat, new THREE.MeshBasicMaterial()]; return g;
+  }
   const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ map: cartTexture() }), dark = new THREE.MeshBasicMaterial({ color: 0x2a2a2a });
   const box = (w, h, d, x, y, z, m) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); g.add(me); };
   // a tub 1 block long (local z) and 0.8 wide, floor 3 px up, walls 8 px high; wheels below

@@ -63,7 +63,21 @@ function placePainting(t) {
 // ---------- armor stands ----------
 const ARMOR_COL = { leather: 0xa06540, chainmail: 0x9a9a9a, iron: 0xdadada, golden: 0xf0d040, diamond: 0x4ae0d8, netherite: 0x4a4040, turtle: 0x4aa84a, elytra: 0x8a8aa0 };
 const ARMOR_BOX = [[0.56, 0.56, 0.56, 1.69], [0.6, 0.78, 0.36, 1.09], [0.5, 0.48, 0.34, 0.5], [0.52, 0.22, 0.34, 0.1]]; // helmet, chestplate, leggings, boots: w, h, d, centre y
+const STAND_ARMOR = [[1, 1, [['head', [0, 1, 0], [0, 0, -4, -8, -4, 8, 8, 8]]]], [1, 1, [['body', [0, 0, 0], [16, 16, -4, 0, -2, 8, 12, 4]], ['rarm', [-5, 2, 0], [40, 16, -3, -2, -2, 4, 12, 4], [-0.262, 0, 0.175]], ['larm', [5, 2, 0], [40, 16, -1, -2, -2, 4, 12, 4, 0, 1], [-0.175, 0, -0.175]]]],
+  [2, 0.5, [['body', [0, 0, 0], [16, 16, -4, 0, -2, 8, 12, 4]], ['rleg', [-1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4]], ['lleg', [1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4, 0, 1]]]], [1, 1, [['rleg', [-1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4]], ['lleg', [1.9, 12, 0], [0, 16, -2, 0, -2, 4, 12, 4, 0, 1]]]]];
+const STAND_TEX = { leather: 'leather', chainmail: 'chainmail', iron: 'iron', golden: 'gold', diamond: 'diamond', netherite: 'netherite', turtle: 'turtle' };
 function standMesh(e) {
+  const tex = packTexture('armorstand');
+  if (tex) { // ArmorStandEntityModel, wearing biped armour layers (inflated 1 and 0.5 px) from models/armor
+    const g = new THREE.Group(), m = buildMCModel('armor_stand', MCMODELS.armor_stand, tex); g.add(m); const mats = [m.userData.mat];
+    e.armor.forEach((st, i) => { if (!st) return; const a = ITEMS[st.id].armor;
+      if (!a) { const im = R.itemMesh(st.id); im.scale.setScalar(0.625); im.position.y = 1.75; g.add(im); im.userData.c = 0xffffff; return; }
+      const [layer, dil, parts] = STAND_ARMOR[i], tk = STAND_TEX[a.mat], at = tk && packTexture('armor_' + tk + '_' + layer); if (!at) return;
+      const spec = { tex: 'armor_' + tk + '_' + layer, tw: 64, th: 32, parts: parts.map(([n, o, b, r]) => { const bb = b.slice(); bb[8] = dil; return { n, o, r, b: [bb] }; }) };
+      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(0xa06540);
+      if (st.e) { const gl = buildMCModel('stand_armor_' + i, spec, at); gl.traverse(o => { if (o.isMesh) o.material = R.glintMaterial(true); }); g.add(gl); } });
+    g.userData.mats = mats; return g;
+  }
   const g = new THREE.Group(), wood = new THREE.MeshBasicMaterial({ color: 0xa8865a }), stone = new THREE.MeshBasicMaterial({ color: 0x9a9a9a });
   let box = (w, h, d, x, y, z, m) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m.clone()); me.position.set(x, y, z); g.add(me); return me; };
   const box0 = box; box = (w, h, d, x, y, z, m) => { const me = box0(w, h, d, x, y, z, m); me.userData.c = m.color.getHex(); return me; };
@@ -76,7 +90,9 @@ function spawnArmorStand(x, y, z, yaw, armor) {
   const e = Ent('armor_stand', x, y, z); e.kind = 'armor_stand'; e.hittable = true; e.w = 0.25; e.h = 1.975; e.yaw = yaw; e.armor = armor || [null, null, null, null];
   e.mesh = standMesh(e);
   e.tick = se => { se.vy -= 0.04; physMove(se, 0, se.vy, 0); if (se.onGround) se.vy = 0; if (se.y < -40) removeEnt(se); };
-  e.render = (se, rx, ry, rz, br) => { se.mesh.position.set(rx, ry, rz); se.mesh.rotation.y = se.yaw; se.mesh.traverse(o => { if (o.isMesh) o.material.color.setHex(o.userData.c).multiplyScalar(br); }); };
+  e.render = (se, rx, ry, rz, br) => { se.mesh.position.set(rx, ry, rz); se.mesh.rotation.y = se.yaw;
+    if (se.mesh.userData.mats) { for (const m of se.mesh.userData.mats) { m.color.setScalar(br); if (m.userData.col) m.color.multiply(m.userData.col); } return; }
+    se.mesh.traverse(o => { if (o.isMesh) o.material.color.setHex(o.userData.c).multiplyScalar(br); }); };
   e.onHit = se => { removeEnt(se); if (!creative()) { dropItem(se.x, se.y + 0.5, se.z, IID.armor_stand, 1); for (const st of se.armor) if (st) dropStack(se.x, se.y + 1, se.z, st); } play('break', { mat: 'wood' }); vibrate(se.x, se.y, se.z); };
   return addEnt(e);
 }

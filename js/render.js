@@ -327,7 +327,7 @@ function itemMesh(id) {
 // enchantment glint: an additive, scrolling layer over enchanted items and armour (misc/enchanted_item_glint.png once a jar/pack has it)
 const glintTex = pixelTex(64, 64, g => { const r = trng(77); for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const v = (Math.sin((x + y) * 0.2) * 0.5 + 0.5) * 0.6 + r() * 0.4; g.fillStyle = `rgba(${130 * v | 0},${60 * v | 0},${210 * v | 0},1)`; g.fillRect(x, y, 1, 1); } });
 glintTex.wrapS = glintTex.wrapT = THREE.RepeatWrapping; glintTex.repeat.set(0.5, 0.5); glintTex.rotation = 0.17;
-function glintMaterial(skinning) { return new THREE.MeshBasicMaterial({ map: glintTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, depthFunc: THREE.LessEqualDepth, skinning: !!skinning, fog: false, polygonOffset: true, polygonOffsetFactor: -2 }); }
+function glintMaterial(skinning) { return new THREE.MeshBasicMaterial({ map: glintTex, color: 0x8a64b4, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, depthFunc: THREE.LessEqualDepth, skinning: !!skinning, fog: false, polygonOffset: true, polygonOffsetFactor: -2 }); }
 function addGlint(mesh) { const g = new THREE.Mesh(mesh.geometry, glintMaterial()); g.userData.glint = true; g.renderOrder = 3; mesh.add(g); return mesh; }
 function applyPackGlint() { const c = entCanvas('glint'); if (c) { glintTex.image = c; glintTex.repeat.set(0.125, 0.125); glintTex.needsUpdate = true; const u = c.toDataURL(); document.documentElement.style.setProperty('--g-glint', `url(${u})`); document.body.classList.add('vglint'); } }
 R.addGlint = addGlint; R.glintMaterial = glintMaterial; R.applyPackGlint = applyPackGlint;

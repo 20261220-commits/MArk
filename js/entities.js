@@ -251,6 +251,18 @@ const MCMODELS = {
     { n: 'base', o: [0, 24, 0], b: [[0, 16, -6, 0, -6, 12, 4, 12]] },
     { n: 'glass', o: [0, 8, 0], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 }, { n: 'glass2', p: 'glass', o: [0, 0, 0], r: [0.785, 0, 0.615], b: [[0, 0, -4, -4, -4, 8, 8, 8]], tr: 1 },
     { n: 'core', p: 'glass', o: [0, 0, 0], r: [0.785, 0.785, 0], b: [[32, 0, -4, -4, -4, 8, 8, 8, -1.5]] }] },
+  minecart: { tex: 'minecart_ent', tw: 64, th: 32, parts: [ // MinecartEntityModel (drawn 18 px lower than a mob, like MinecartEntityRenderer)
+    { n: 'bottom', o: [0, 22, 0], r: [Math.PI / 2, 0, 0], b: [[0, 10, -10, -8, -1, 20, 16, 2]] },
+    { n: 'front', o: [-9, 22, 0], r: [0, Math.PI * 1.5, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }, { n: 'back', o: [9, 22, 0], r: [0, Math.PI / 2, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] },
+    { n: 'left', o: [0, 22, -7], r: [0, Math.PI, 0], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }, { n: 'right', o: [0, 22, 7], b: [[0, 0, -8, -9, -1, 16, 8, 2]] }] },
+  armor_stand: { tex: 'armorstand', tw: 64, th: 64, parts: [ // ArmorStandEntityModel in its default pose
+    { n: 'head', o: [0, 1, 0], b: [[0, 0, -1, -7, -1, 2, 7, 2]] }, { n: 'body', o: [0, 0, 0], b: [[0, 26, -6, 0, -1.5, 12, 3, 3]] },
+    { n: 'rarm', o: [-5, 2, 0], r: [-0.262, 0, 0.175], b: [[24, 0, -2, -2, -1, 2, 12, 2]] }, { n: 'larm', o: [5, 2, 0], r: [-0.175, 0, -0.175], b: [[32, 16, 0, -2, -1, 2, 12, 2, 0, 1]] },
+    { n: 'rleg', o: [-1.9, 12, 0], r: [0.017, 0, 0.017], b: [[8, 0, -1, 0, -1, 2, 11, 2]] }, { n: 'lleg', o: [1.9, 12, 0], r: [-0.017, 0, -0.017], b: [[40, 16, -1, 0, -1, 2, 11, 2, 0, 1]] },
+    { n: 'sticks', o: [0, 0, 0], b: [[16, 0, -3, 3, -1, 2, 7, 2], [48, 16, 1, 3, -1, 2, 7, 2], [0, 48, -4, 10, -1, 8, 2, 2]] },
+    { n: 'base', o: [0, 12, 0], b: [[0, 32, -6, 11, -6, 12, 1, 12]] }] },
+  sign: { tex: 'sign_oak', tw: 64, th: 32, parts: [ // SignBlockEntityRenderer: board and stick
+    { n: 'board', o: [0, 0, 0], b: [[0, 0, -12, -14, -1, 24, 12, 2]] }, { n: 'stick', o: [0, 0, 0], b: [[0, 14, -1, -2, -1, 2, 14, 2]] }] },
   boat: { tex: 'boat', tw: 128, th: 64, parts: [
     { n: 'bottom', o: [0, 21, 1], r: [Math.PI / 2, 0, 0], b: [[0, 0, -14, -9, -3, 28, 16, 3]] },
     { n: 'back', o: [-15, 20, 4], r: [0, Math.PI * 1.5, 0], b: [[0, 19, -13, -7, -1, 18, 6, 2]] }, { n: 'front', o: [15, 20, 0], r: [0, Math.PI / 2, 0], b: [[0, 27, -8, -7, -1, 16, 6, 2]] },
@@ -378,11 +390,19 @@ function dropStack(x, y, z, st, vel, delay) { if (st && st.n > 0) return dropIte
 W.onDrop = (x, y, z, items, xp) => { for (const [id, n] of items) dropItem(x + 0.5, y + 0.3, z + 0.5, id, n); if (xp) spawnXP(x + .5, y + .5, z + .5, xp); };
 const xpMat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.fillStyle = '#3a5a00'; g.fillRect(1, 1, 6, 6); g.fillStyle = '#c8ff3a'; g.fillRect(2, 2, 4, 4); g.fillStyle = '#ffff9a'; g.fillRect(2, 2, 2, 2); return c; })()), fog: true });
 xpMat.map.magFilter = THREE.NearestFilter;
+const XP_ORB_TEX = {};
+function xpOrbMat(v) {
+  const e = PACKPX.ent.xp_orb; if (!e) return xpMat;
+  const i = [2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3].findIndex(t => v >= t), idx = i < 0 ? 0 : 10 - i;
+  if (!XP_ORB_TEX[idx]) { const k = e.w / 64, c = document.createElement('canvas'); c.width = c.height = 16 * k; const src = entCanvas('xp_orb'); c.getContext('2d').drawImage(src, (idx % 4) * 16 * k, Math.floor(idx / 4) * 16 * k, 16 * k, 16 * k, 0, 0, 16 * k, 16 * k); const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; XP_ORB_TEX[idx] = t; }
+  return new THREE.SpriteMaterial({ map: XP_ORB_TEX[idx], transparent: true, alphaTest: 0.1 });
+}
 function spawnXP(x, y, z, amt) {
   while (amt > 0) {
     const v = amt >= 17 ? 17 : amt >= 7 ? 7 : amt >= 3 ? 3 : 1; amt -= v;
     const e = Ent('xp', x, y, z); e.kind = 'xp'; e.w = 0.125; e.h = 0.25; e.value = v; e.vx = (Math.random() - .5) * .2; e.vy = .2; e.vz = (Math.random() - .5) * .2;
-    const sp = new THREE.Sprite(xpMat); sp.scale.setScalar(0.18 + Math.min(v, 17) * 0.01); e.mesh = sp; addEnt(e);
+    const sp = new THREE.Sprite(xpOrbMat(v)); sp.scale.setScalar(PACKPX.ent.xp_orb ? 0.3 : 0.18 + Math.min(v, 17) * 0.01); e.mesh = sp; addEnt(e);
+    if (PACKPX.ent.xp_orb) { const t0 = Math.random() * 100; e.render = (se, x, y, z) => { se.mesh.position.set(x, y + 0.1, z); const a = (performance.now() / 50 + t0) / 2; se.mesh.material.color.setRGB((Math.sin(a) + 1) * 0.5, 1, (Math.sin(a + 4.1888) + 1) * 0.1); }; }
   }
 }
 // ---------- falling blocks & TNT ----------
@@ -395,8 +415,18 @@ function primeTNT(x, y, z, fuse = 80) {
   e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse');
 }
 // ---------- arrows ----------
-const arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
-const arrowMat = new THREE.MeshBasicMaterial({ color: 0x8a6a3b });
+let arrowGeo = (() => { const g = new THREE.BoxGeometry(0.04, 0.04, 0.6); return g; })();
+let arrowMat = new THREE.MeshBasicMaterial({ color: 0x8a6a3b });
+// ArrowEntityRenderer: two crossed 16x5 planes and a 5x5 cross at the back, 0.05625 blocks a pixel
+function arrowPackModel() {
+  const tex = packTexture('arrow_ent'); if (!tex) return;
+  const s = 0.05625, P = [], U = [], q = (a, b, c, d, u0, v0, u1, v1) => { P.push(...a, ...b, ...c, ...a, ...c, ...d); U.push(u0, v1, u1, v1, u1, v0, u0, v1, u1, v0, u0, v0); };
+  for (const r of [0, 1]) { const w = 2 * s, L = 8 * s, A = r ? [0, w, 0] : [w, 0, 0]; // shaft planes along z
+    q([-A[0], -A[1], -L], [-A[0], -A[1], L], [A[0], A[1], L], [A[0], A[1], -L], 0, 0, 16 / 32, 5 / 32); }
+  const b = 2 * s, z = -7 * s; q([-b, -b, z], [b, -b, z], [b, b, z], [-b, b, z], 0, 5 / 32, 5 / 32, 10 / 32);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  arrowGeo = g; arrowMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
+}
 let HURTPROJ = null; // the projectile behind the hurtMob call in progress (advancements)
 function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
   const e = Ent('arrow', x, y, z); e.from = [x, z]; e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;

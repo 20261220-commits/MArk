@@ -32,6 +32,7 @@ function signUse(t, h, dry) {
   return false;
 }
 const SIGN_TEXT_C = ['#f0f0f0', '#f9801d', '#c74ebd', '#3ab3da', '#fed83d', '#80c71f', '#f38baa', '#474f52', '#9d9d97', '#169c9c', '#8932b8', '#3c44aa', '#835432', '#5e7c16', '#b02e26', '#101010'];
+const SIGN_WOOD = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped'];
 const SIGNS = new Map(); // "x,y,z" -> { mesh, v }
 function signTexture(t) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
@@ -50,6 +51,10 @@ function signMesh(x, y, z, m, t) {
   const grp = new THREE.Group(), text = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false }));
   if (m & 16) { // on a wall: the board is drawn by the block mesh
     const f = m & 3, d = DIRS[f]; text.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135); text.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f]; grp.add(text);
+  } else if (packTexture('sign_' + SIGN_WOOD[(m >> 5) & 7])) { // standing, with the jar's sign entity texture: SignBlockEntityRenderer's model at 2/3 scale
+    const w = SIGN_WOOD[(m >> 5) & 7], md = buildMCModel('sign_' + w, { ...MCMODELS.sign, tex: 'sign_' + w }, packTexture('sign_' + w));
+    md.scale.setScalar(2 / 3); md.position.y = -0.5; text.position.set(0, 0.833, 0.045);
+    const pivot = new THREE.Group(); pivot.add(md, text); pivot.position.set(x + .5, y, z + .5); pivot.rotation.y = -(m & 15) * Math.PI / 8; grp.add(pivot);
   } else { // standing: board and post turned to any of 16 directions (0 faces south)
     const wood = S.tileFor(SIGN, m, 0), mat = new THREE.MeshBasicMaterial({ map: atlasTex });
     const board = new THREE.Mesh(atlasBox(1, 0.5, 0.083, wood), mat), post = new THREE.Mesh(atlasBox(0.083, 0.583, 0.083, wood), mat);
