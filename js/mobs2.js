@@ -230,12 +230,13 @@ function trySpawnDimension() {
     break;
   }
 }
+const MOON_SIZE = [1, 0.75, 0.5, 0.25, 0, 0.25, 0.5, 0.75], moonPhase = () => Math.floor(W.time / 24000) % 8; // 0 full moon, 4 new moon
 // overworld extras: endermen at night and slimes in swamps and slime chunks
-function overworldExtra(x, y, z) {
+function overworldExtra(x, y, z) { // swamp slimes follow the moon: most at full moon, none at new moon
   const b = biomeBase(x, z);
   if (Math.random() < 0.08) return 'enderman';
   const slimeChunk = S.hash32(W.seed, x >> 4, z >> 4, 99) % 10 === 0;
-  if ((b === S.BIO.SWAMP && y > 50 && y < 70 && Math.random() < 0.3) || (slimeChunk && y < 40 && Math.random() < 0.3)) return 'slime';
+  if ((b === S.BIO.SWAMP && y > 50 && y < 70 && Math.random() < 0.5 && Math.random() < MOON_SIZE[moonPhase()]) || (slimeChunk && y < 40 && Math.random() < 0.3)) return 'slime';
   return null;
 }
 // ---------- AI routines ----------

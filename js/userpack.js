@@ -1,7 +1,7 @@
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null };
+const UPACK = { name: null }, UPACK_VER = 2; // 2: HUD, sky, particles, paintings... and end city / mansion pieces
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -122,7 +122,7 @@ async function importPack(file, progress) {
   progress && progress('변환 중...');
   const items = ITEMS.filter(d => d).map(d => d.key); // block items too: doors, cauldrons, candles... are flat sprites in Java
   const { out, data } = PACKMAP.packBuild(f => imgs.get(f) || null, S.TILES, items);
-  const pack = { name: file.name, out, data, date: Date.now() };
+  const pack = { name: file.name, out, data, date: Date.now(), ver: UPACK_VER };
   await upPut(pack);
   return pack;
 }
@@ -133,7 +133,7 @@ async function applyUserPack() {
   const up = await upGet(); if (!up) return false;
   for (const k of Object.keys(PACKPX.ent)) if ((k.startsWith('r_') || k.endsWith('_e')) && !up.out.ent[k]) delete PACKPX.ent[k];
   applyPackData(up.out, up.data);
-  UPACK.name = up.name;
+  UPACK.name = up.name; UPACK.stale = (up.ver || 1) < UPACK_VER;
   return true;
 }
 

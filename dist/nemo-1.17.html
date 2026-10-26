@@ -4150,7 +4150,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null };
+const UPACK = { name: null }, UPACK_VER = 2; // 2: HUD, sky, particles, paintings... and end city / mansion pieces
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -4271,7 +4271,7 @@ async function importPack(file, progress) {
   progress && progress('변환 중...');
   const items = ITEMS.filter(d => d).map(d => d.key); // block items too: doors, cauldrons, candles... are flat sprites in Java
   const { out, data } = PACKMAP.packBuild(f => imgs.get(f) || null, S.TILES, items);
-  const pack = { name: file.name, out, data, date: Date.now() };
+  const pack = { name: file.name, out, data, date: Date.now(), ver: UPACK_VER };
   await upPut(pack);
   return pack;
 }
@@ -4282,7 +4282,7 @@ async function applyUserPack() {
   const up = await upGet(); if (!up) return false;
   for (const k of Object.keys(PACKPX.ent)) if ((k.startsWith('r_') || k.endsWith('_e')) && !up.out.ent[k]) delete PACKPX.ent[k];
   applyPackData(up.out, up.data);
-  UPACK.name = up.name;
+  UPACK.name = up.name; UPACK.stale = (up.ver || 1) < UPACK_VER;
   return true;
 }
 
@@ -8828,12 +8828,13 @@ function trySpawnDimension() {
     break;
   }
 }
+const MOON_SIZE = [1, 0.75, 0.5, 0.25, 0, 0.25, 0.5, 0.75], moonPhase = () => Math.floor(W.time / 24000) % 8; // 0 full moon, 4 new moon
 // overworld extras: endermen at night and slimes in swamps and slime chunks
-function overworldExtra(x, y, z) {
+function overworldExtra(x, y, z) { // swamp slimes follow the moon: most at full moon, none at new moon
   const b = biomeBase(x, z);
   if (Math.random() < 0.08) return 'enderman';
   const slimeChunk = S.hash32(W.seed, x >> 4, z >> 4, 99) % 10 === 0;
-  if ((b === S.BIO.SWAMP && y > 50 && y < 70 && Math.random() < 0.3) || (slimeChunk && y < 40 && Math.random() < 0.3)) return 'slime';
+  if ((b === S.BIO.SWAMP && y > 50 && y < 70 && Math.random() < 0.5 && Math.random() < MOON_SIZE[moonPhase()]) || (slimeChunk && y < 40 && Math.random() < 0.3)) return 'slime';
   return null;
 }
 // ---------- AI routines ----------
@@ -15342,7 +15343,7 @@ function showMenu(name, data) {
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
     h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
-    h = `<h2>리소스 팩</h2><p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
+    h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
     const K = t => t.split('+').map(k => `<kbd>${k}</kbd>`).join('+');
     const rows = [['이동', 'W A S D', 'W A S D'], ['달리기', 'Ctrl · W 두 번', 'Ctrl · W 두 번 · R'], ['점프 · 수영 · (크리에이티브) 두 번 눌러 비행', 'Space', 'Space'], ['웅크리기 · 비행 중 하강', 'Shift', 'Shift'],
@@ -16860,6 +16861,7 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  if (UPACK.stale) setTimeout(() => UI.flash('설정 → 리소스 팩에서 client.jar 를 다시 불러오면 원작 텍스처가 더 많이 적용됩니다'), 1500);
   try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
