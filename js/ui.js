@@ -273,7 +273,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -305,9 +305,11 @@ function showMenu(name, data) {
       <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
-    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
+    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명)' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
+  } else if (name.startsWith('mp_')) {
+    h = mpMenu(name, data);
   } else if (name === 'loading') {
     h = `<div class="loading"><h2>${data || '지형 생성 중'}</h2><div class="bar"><i id="loadbar"></i></div><p class="muted" id="loadtxt"></p></div>`;
   }
@@ -324,6 +326,7 @@ $('menu').addEventListener('click', async e => {
   audioInit(); play('click');
   const a = b.dataset.act;
   if (a === 'worlds' || a === 'title' || a === 'options' || a === 'create' || a === 'controls' || a === 'pause') { if (a === 'options') UI.optBack = UI.menu === 'pause' || UI.paused ? 'pause' : 'title'; showMenu(a); }
+  else if (a.startsWith('mp')) mpAction(a, b);
   else if (a === 'packs') showMenu('packs');
   else if (a === 'stats') showMenu('stats');
   else if (a.startsWith('stat_')) { STATUI.tab = a.slice(5); showMenu('stats'); }
@@ -355,7 +358,7 @@ function closeChat() { UI.chatOpen = false; $('chat').hidden = true; $('chatIn')
 $('chatIn').addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Escape') { closeChat(); e.preventDefault(); }
-  if (e.key === 'Enter') { const v = $('chatIn').value.trim(); closeChat(); if (v) { if (v[0] === '/') runCommand(v.slice(1)); else chatMsg('<플레이어> ' + v); } }
+  if (e.key === 'Enter') { const v = $('chatIn').value.trim(); closeChat(); if (v) { if (v[0] === '/') runCommand(v.slice(1)); else { chatMsg('<' + (MP.on ? MP.name : '플레이어') + '> ' + v); if (MP.on) mpSend({ t: 'chat', name: MP.name, text: v }); } } }
 });
 function runCommand(cmd) {
   const [c, ...a] = cmd.split(/\s+/);

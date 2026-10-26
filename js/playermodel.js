@@ -82,13 +82,13 @@ function rebuildPlayer() {
   R.setHandSkin && R.setHandSkin();
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
-function updateArmor(m, light) {
-  const ud = m.userData, key = INV.armor.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
+function updateArmor(m, light, list = INV.armor) { // list: another player's armour in multiplayer
+  const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
     for (const a of ud.armor) { a.parent.remove(a); a.material.dispose(); } ud.armor = [];
     let elytra = false;
-    INV.armor.forEach((st, slot) => {
+    list.forEach((st, slot) => {
       if (!st) return;
       const a = ITEMS[st.id].armor;
       if (a && a.mat === 'elytra') { elytra = true; return; }

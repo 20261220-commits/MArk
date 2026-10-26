@@ -143,6 +143,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
+  if (MP.on && MP.local && !MP.applying) mpBlockChanged(x, y, z, id, meta); // multiplayer: what a player did reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -629,7 +630,7 @@ saveWorker.onmessage = e => {
 const saveDone = k => savePending.has(k) ? new Promise(r => { const w = saveWaiters.get(k) || []; w.push(r); saveWaiters.set(k, w); }) : null;
 // unloading: the chunk's arrays are handed to the worker without copying; sync: encode here (page is closing)
 function saveChunk(c, unloading, sync) {
-  if (!c.modified || W.pano) return; c.modified = false;
+  if (!c.modified || W.pano || (W.meta && W.meta.remote)) return; c.modified = false; // a multiplayer guest keeps nothing: the host's world is the real one
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }

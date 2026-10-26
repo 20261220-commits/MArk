@@ -211,7 +211,7 @@ async function startWorld(id, meta) {
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.dead = false;
   W.active = true; UI.paused = true; loadingFrom = performance.now();
   UI.hudDirty = true; buildHud();
-  meta.last = Date.now(); putWorld(meta);
+  meta.last = Date.now(); if (!meta.remote) putWorld(meta);
 }
 function worldReady() {
   const pcx = Math.floor(PL.x) >> 4, pcz = Math.floor(PL.z) >> 4; let need = 0, have = 0;
@@ -243,7 +243,7 @@ function finishLoading() {
   showMenu(null); resumeGame();
 }
 function saveWorldMeta() {
-  if (!W.active || !W.meta) return;
+  if (!W.active || !W.meta || W.meta.remote) return;
   offUnswap();
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off };
@@ -260,6 +260,7 @@ function resumeGame() {
   if (isTouch) $('touch').hidden = false;
 }
 function quitToTitle() {
+  if (MP.on) mpStop();
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
   W.active = false; UI.paused = true; $('touch').hidden = true; showMenu('title'); startPanorama();
