@@ -6,6 +6,10 @@ renderer.sortObjects = true;
 renderer.autoClear = false;
 const scene = new THREE.Scene();
 const fog = new THREE.Fog(0x8ec5ff, 60, 100); scene.fog = fog;
+// fog by true distance from the eye (like Java), not view depth: with depth fog the loaded area's edge showed,
+// cut off, at the sides of the screen and when looking down from high up
+// (cylindrical: horizontal distance, or height difference, measured in world axes from the eye)
+THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n\tvec3 fogRel = vec3( dot( viewMatrix[0].xyz, mvPosition.xyz ), dot( viewMatrix[1].xyz, mvPosition.xyz ), dot( viewMatrix[2].xyz, mvPosition.xyz ) );\n\tfogDepth = max( length( fogRel.xz ), abs( fogRel.y ) );\n#endif';
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 1000); camera.rotation.order = 'YXZ';
 R.renderer = renderer; R.scene = scene; R.camera = camera;
 R.pixelScale = 1; R.basePR = Math.min(window.devicePixelRatio || 1, 1);
@@ -488,7 +492,7 @@ function renderFrame(dt, eye, under) {
   if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.3 + day * 0.7); fog.near = 1; fog.far = 32; }
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (under === 'snow') { fog.color.setRGB(0.85, 0.9, 0.95); fog.near = 0; fog.far = 2; }
-  else { fog.color.copy(fogCol); fog.near = rd * (W.rain > 0.5 ? 0.35 : 0.6); fog.far = rd * (W.rain > 0.5 ? 0.85 : 1.0); }
+  else { const end = rd - 12; fog.color.copy(fogCol); fog.near = end * (W.rain > 0.5 ? 0.35 : 0.75); fog.far = end * (W.rain > 0.5 ? 0.85 : 1.0); } // ends inside the loaded chunks, wherever the eye stands in its own chunk
   if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; } // blindness: thick black fog
   renderer.setClearColor(fog.color);
   sky.visible = !under; sky.position.copy(camera.position);
@@ -517,8 +521,8 @@ function renderOtherDim(dt, eye, under) {
   if (nether) { const b = biomeAt(Math.floor(camera.position.x), Math.floor(camera.position.z)); netherFog.lerp(NETHER_FOG[b] || NETHER_FOG[13], Math.min(1, dt * 2)); }
   if (under === 'water') { fog.color.copy(WATER_FOG).multiplyScalar(0.4); fog.near = 1; fog.far = 24; }
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
-  else if (nether) { fog.color.copy(netherFog); fog.near = Math.min(rd, 96) * 0.05; fog.far = Math.min(rd, 96) * 0.9; }
-  else { fog.color.copy(END_SKY); fog.near = rd * 0.5; fog.far = rd; stars.position.copy(camera.position); starMat.opacity = 0.35; }
+  else if (nether) { fog.color.copy(netherFog); fog.near = Math.min(rd - 12, 96) * 0.05; fog.far = Math.min(rd - 12, 96) * 0.9; }
+  else { fog.color.copy(END_SKY); fog.near = (rd - 12) * 0.5; fog.far = rd - 12; stars.position.copy(camera.position); starMat.opacity = 0.35; }
   renderer.setClearColor(fog.color);
   for (const m of [matOpaque, matCutout, matTrans]) {
     m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = nether ? 0.24 : 0.08;
