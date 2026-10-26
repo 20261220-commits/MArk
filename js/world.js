@@ -513,12 +513,28 @@ function handleWorker(m) {
     W.meshInbox.push([c, m, m.ver]);
   }
 }
+// a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
+function lootStack(key, n, x, wx, wz, seed) {
+  const sp = typeof lootSpecial === 'function' && lootSpecial(x && x.map ? { buried_treasure: 'buried_treasure_map', monument: 'ocean_explorer_map', mansion: 'woodland_explorer_map' }[x.map] || key : key, wx, wz); if (sp) return sp;
+  const id = IID[key]; if (id == null) return null;
+  const st = { id, n }; if (!x) return st;
+  const d = ITEMS[id];
+  if (x.dmg != null && d.dur) st.d = Math.min(d.dur - 1, Math.max(0, Math.round(d.dur * (1 - x.dmg))));
+  if (x.ench) {
+    const r = S.rng(seed);
+    if (x.ench > 1 && enchKinds(id).length) st.e = rollEnchant(id, x.ench, seed);
+    else { const ks = Object.keys(ENCH).filter(k => id === IID.enchanted_book || id === IID.book || ENCH[k][2].some(t => enchKinds(id).includes(t))); if (ks.length) { const k = ks[r.int(ks.length)]; st.e = { [k]: 1 + r.int(ENCH[k][1]) }; } }
+    if (id === IID.book && st.e) st.id = IID.enchanted_book;
+    if (st.e && !Object.keys(st.e).length) delete st.e;
+  }
+  return st;
+}
 function addChunk(cx, cz, d, tiles) {
   const c = new Chunk(cx, cz, d);
   W.chunks.set(c.key, c); W.lastKey = -1;
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
-    if (t.t === 'chest') { const items = new Array(27).fill(null); for (const [slot, key, n] of t.loot) { const sp = typeof lootSpecial === 'function' && lootSpecial(key, cx * 16 + (t.i & 15), cz * 16 + ((t.i >> 4) & 15)); if (sp) items[slot] = sp; else if (IID[key] != null) items[slot] = { id: IID[key], n }; } c.tiles.set(t.i, { type: 'chest', items }); }
+    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); c.tiles.set(t.i, { type: 'chest', items }); }
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });

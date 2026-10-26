@@ -975,6 +975,7 @@ function makeStamp(blocks, meta, x0, z0) {
   const st = (wx, y, wz, id, m) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return; const i = (y << 8) | (z << 4) | x; blocks[i] = id; meta[i] = m || 0; };
   st.get = (wx, y, wz) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return -1; return blocks[(y << 8) | (z << 4) | x]; };
   st.inside = (ax, az, bx, bz) => bx >= x0 && ax <= x0 + 15 && bz >= z0 && az <= z0 + 15;
+  st.x0 = x0; st.z0 = z0;
   return st;
 }
 // ---- templates: layers bottom-up, rows north (front) to south, authored with the door facing north ----
@@ -1130,8 +1131,12 @@ function villageAt(seed, G, rx, rz) {
   if (r() < 0.75) {
     const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
     const [h, b] = G.column(vx, vz);
-    const vt = b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : null;
-    if (vt && h > SEA && h < 110) {
+    const vt = b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
+    if (vt && STRUCTS && h > SEA && h < 110) { // Mojang's village pieces, grown by jigsaw (2% are zombie villages)
+      const jt = vt === 'snow' ? 'snowy' : vt, zombie = r() < 0.02, planks = { plains: 'oak', desert: 'smooth_sandstone_slab', savanna: 'acacia', snowy: 'spruce', taiga: 'spruce' }[jt];
+      const jig = assembleJigsaw(G, seed, 'village/' + jt + (zombie ? '/zombie' : '') + '/town_centers', 6, vx, vz, true, true).map(p => ({ ...p, beard: true, vtype: vt, planks: planks.endsWith('slab') ? 'birch' : planks, zombie }));
+      if (jig.length) { const bb = jig.reduce((a, p) => [Math.min(a[0], p.box[0]), Math.min(a[1], p.box[2]), Math.max(a[2], p.box[3]), Math.max(a[3], p.box[5])], [vx, vz, vx, vz]); v = { x: vx, z: vz, y: h, vt, jig, roads: [], pieces: [], core: bb, bb }; }
+    } else if (vt && h > SEA && h < 110) {
       v = { x: vx, z: vz, y: h, vt, sty: VSTYLE[vt], roads: [], pieces: [] };
       const occ = [[vx - 3, vz - 3, vx + 2, vz + 2]];
       const free = (a) => !occ.some(o => a[0] <= o[2] + 1 && a[2] >= o[0] - 1 && a[1] <= o[3] + 1 && a[3] >= o[1] - 1);
@@ -1295,7 +1300,14 @@ function outpostAt(seed, G, rx, rz) {
 function stampOutposts(seed, G, st, cx, cz, tiles) {
   const rx = Math.floor(cx / OREG), rz = Math.floor(cz / OREG);
   for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) {
-    const o = outpostAt(seed, G, i, j); if (!o || !st.inside(o.x - 5, o.z - 5, o.x + 13, o.z + 5)) continue;
+    const o = outpostAt(seed, G, i, j); if (!o) continue;
+    if (STRUCTS) { // Mojang's outpost: the base plate, the watchtower and its feature plates, grown by jigsaw; pillagers on the tower
+      const ps = assembleJigsaw(G, seed, 'pillager_outpost/base_plate', 7, o.x, o.z, true, true), r2 = rng(o.seed), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+      for (const p of ps) stampPiece(st, G, { ...p, beard: true }, tiles, null, r2, cx * 16, cz * 16);
+      const tw = ps.find(p => p.path.includes('watchtower')); if (tw) { const top = tw.box[4], mx = (tw.box[0] + tw.box[3]) >> 1, mz = (tw.box[2] + tw.box[5]) >> 1; for (const [dx, dy, dz] of [[0, -top + tw.box[1] + 1, -4], [2, -top + tw.box[1] + 1, 3], [0, -4, 0], [1, -4, 1]]) if (st.get(mx + dx, top + dy, mz + dz) >= 0) tiles.push({ t: 'mob', i: tl(mx + dx, top + dy, mz + dz), mob: 'pillager' }); }
+      continue;
+    }
+    if (!st.inside(o.x - 5, o.z - 5, o.x + 13, o.z + 5)) continue;
     const { x: ox, y: y0, z: oz } = o, r = rng(o.seed), LOG = BID.dark_oak_log, PLK = BID.dark_oak_planks, tile = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
     for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
       const x = ox + dx, z = oz + dz, edge = Math.abs(dx) === 3 || Math.abs(dz) === 3, corner = Math.abs(dx) === 3 && Math.abs(dz) === 3;
@@ -1395,6 +1407,15 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
   // shipwrecks (about 20 x 7 blocks, partly broken; supply, map and treasure chests)
   for (let rx = Math.floor((cx - 2) / OCREG); rx <= Math.floor((cx + 2) / OCREG); rx++) for (let rz = Math.floor((cz - 2) / OCREG); rz <= Math.floor((cz + 2) / OCREG); rz++) {
     const s = oceanSite(seed, G, 's', rx, rz); if (!s || !st.inside(s.x - 12, s.z - 12, s.x + 12, s.z + 12)) continue;
+    if (STRUCTS && STRUCTS.t['shipwreck/with_mast']) { // Mojang's shipwrecks: one of 20 hulls, resting on the sea floor (or half buried on a beach)
+      const r = rng(s.seed), BEACHED = ['with_mast', 'sideways_full', 'sideways_fronthalf', 'sideways_backhalf', 'rightsideup_full', 'rightsideup_fronthalf', 'rightsideup_backhalf', 'with_mast_degraded', 'rightsideup_full_degraded', 'rightsideup_fronthalf_degraded', 'rightsideup_backhalf_degraded'];
+      const ALL = Object.keys(STRUCTS.t).filter(k => k.startsWith('shipwreck/')).map(k => k.slice(10)), name = 'shipwreck/' + (s.beached ? BEACHED : ALL)[r.int((s.beached ? BEACHED : ALL).length)], t = STRUCTS.t[name]; if (!t) continue;
+      const ox = s.x - 4, oz = s.z - 15, rot = r.int(4); let sum = 0, mn = 999, n = 0;
+      for (let a = 0; a < t.s[0]; a += 3) for (let b = 0; b < t.s[2]; b += 3) { const [dx, dz] = tplXZp(a, b, rot, 4, 15), h = G.column(ox + dx, oz + dz)[0] + 1; sum += h; mn = Math.min(mn, h); n++; }
+      const y = s.beached ? mn - (t.s[1] >> 1) - r.int(3) : Math.round(sum / n);
+      stampSingle(st, name, ox, y, oz, rot, tiles, r, { pivot: [4, 15], ignoreAir: true });
+      continue;
+    }
     const r = rng(s.seed), L = 20, y0 = s.h, P = s.wood, LG = s.log;
     const at = (u, w) => { const uu = (u - L / 2) * s.dir; return s.ax ? [s.x + uu, s.z + w] : [s.x + w, s.z + uu]; };
     const hw = u => u < 2 ? 1 : u < 5 ? 2 : u > L - 3 ? 2 : 3, broken = (u, v) => { const k = hash32(s.seed, u, v, 7) % 100; return k < 12 || (u > L * 0.6 && v >= 3 && k < 45); };
@@ -1417,6 +1438,16 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
     const o = oceanSite(seed, G, 'r', rx, rz); if (!o || !st.inside(o.x - 24, o.z - 24, o.x + 24, o.z + 24)) continue;
     const r = rng(o.seed), ruins = [[o.x, o.z, o.big]];
     for (let k = 0; k < o.extra; k++) { const a = r() * Math.PI * 2, d = 9 + r() * 10; ruins.push([Math.round(o.x + Math.cos(a) * d), Math.round(o.z + Math.sin(a) * d), false]); }
+    if (STRUCTS && STRUCTS.t['underwater_ruin/brick_1']) { // Mojang's ruins: warm sandstone or cold stone brick sets, a big one with small ones around, 10% of blocks gone
+      const set = o.warm ? 'warm' : ['brick', 'cracked', 'mossy'][o.seed % 3];
+      ruins.forEach(([rx2, rz2, big], ri) => {
+        const rr = rng(hash32(o.seed, ri, 5, 9)), list = Object.keys(STRUCTS.t).filter(k => k.startsWith('underwater_ruin/' + (big ? 'big_' : '') + set + '_')); if (!list.length) return;
+        const name = list[rr.int(list.length)], t = STRUCTS.t[name], rot = rr.int(4);
+        let mn = 999; for (const [a, b] of [[0, 0], [t.s[0] - 1, 0], [0, t.s[2] - 1], [t.s[0] - 1, t.s[2] - 1]]) { const [dx, dz] = tplXZ(a, b, rot); mn = Math.min(mn, G.column(rx2 + dx, rz2 + dz)[0]); }
+        stampSingle(st, name, rx2, mn, rz2, rot, tiles, rr, { ignoreAir: true, loot: big ? 'chests/underwater_ruin_big' : 'chests/underwater_ruin_small', proc: (s2, x, y, z) => hash32(x, y, z, 991) % 10 === 0 && !/chest|structure/.test(s2) ? null : s2 });
+      });
+      continue;
+    }
     const mat = k => o.warm ? [26, 26, 200, 200][k] : [90, 171, 172, 90][k], matM = k => o.warm ? [0, 0, 4, 5][k] : 0;
     ruins.forEach(([rx2, rz2, big], ri) => {
       if (!st.inside(rx2 - 7, rz2 - 7, rx2 + 7, rz2 + 7)) return;
@@ -1620,6 +1651,10 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
         }
         put(-2, yH + 1, 4, B.crafting_table); put(2, yH + 1, 4, BID.cauldron); put(-2, yH + 1, -1, BID.flower_pot, 5);
         mob(X, yH + 1, Z + 1, 'witch'); mob(X + 1, yH + 1, Z + 2, 'cat', { variant: 10 });
+      } else if (kind === 'igloo' && STRUCTS && STRUCTS.t['igloo/top']) { // Mojang's igloo: the dome, and half the time a ladder shaft down to the basement
+        const rot = r.int(4), L = { pivot: null, loot: 'chests/igloo_chest' };
+        stampSingle(st, 'igloo/top', X, y0, Z, rot, tiles, r, { pivot: [3, 5], loot: L.loot });
+        if (o.basement) { const n = 4 + r.int(8); stampSingle(st, 'igloo/bottom', X, y0 - 3 - n * 3, Z - 2, rot, tiles, r, { pivot: [3, 7], loot: L.loot }); for (let j = 0; j < n - 1; j++) stampSingle(st, 'igloo/middle', X + 2, y0 - 3 - j * 3, Z + 4, rot, tiles, r, { pivot: [1, 1] }); }
       } else if (kind === 'igloo') {
         const put = (dx, y, dz, id, m = 0) => st(X + dx, y, Z + dz, id, m), sb = B.snow_block;
         for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 5; dz++) for (let y = y0 + 1; y <= y0 + 5; y++) {
@@ -1821,6 +1856,14 @@ function bastionAt(seed, rx, rz) {
 // obsidian frame (parts missing, some crying obsidian), netherrack and magma around it, a gold block and a chest
 function stampRuinedPortal(st, o, nether, tiles) {
   const r = rng(o.seed), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), y0 = o.y;
+  if (STRUCTS && STRUCTS.t['ruined_portal/portal_1']) { // Mojang's ruined portals: 10 small ones and 3 giant (5%), on a patch of netherrack and magma
+    const giant = r() < 0.05, list = Object.keys(STRUCTS.t).filter(k => k.startsWith('ruined_portal/' + (giant ? 'giant_portal_' : 'portal_'))), name = list[r.int(list.length)], t = STRUCTS.t[name], rot = r.int(4);
+    for (let dx = -5; dx <= 5; dx++) for (let dz = -5; dz <= 5; dz++) { const k = hash32(o.seed, dx, dz, 1) % 100; if (dx * dx + dz * dz > 25 || k > 60) continue; st(o.x + dx, y0 - 1, o.z + dz, k < 10 ? BID.magma_block : BID.netherrack); }
+    const BLACK = { cobblestone: 'blackstone', stone_bricks: 'polished_blackstone_bricks', cracked_stone_bricks: 'cracked_polished_blackstone_bricks', mossy_stone_bricks: 'polished_blackstone_bricks', stone: 'blackstone', stone_brick_stairs: 'polished_blackstone_brick_stairs', stone_brick_slab: 'polished_blackstone_brick_slab', iron_bars: 'chain' };
+    const proc = (s2, x, y, z) => { const nm = s2.split('[')[0], h = hash32(x, y, z, 993) % 100; if (nether && BLACK[nm]) return BLACK[nm] + s2.slice(nm.length); if (!nether && nm === 'stone_bricks' && h < 30) return 'mossy_stone_bricks'; if (nm === 'obsidian' && h < 12) return 'crying_obsidian'; return s2; };
+    stampSingle(st, name, o.x - (t.s[0] >> 1), y0 - (giant ? 3 : 1), o.z - (t.s[2] >> 1), rot, tiles, r, { ignoreAir: true, proc });
+    return;
+  }
   const at = (u, v) => o.flat ? [o.x + u - 1, y0, o.z + v - 2] : o.f ? [o.x + u - 1, y0 + v, o.z] : [o.x, y0 + v, o.z + u - 1];
   if (nether) for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) if (dx * dx + dz * dz <= 18) { st(o.x + dx, y0 - 1, o.z + dz, BID.blackstone); for (let y = y0; y <= y0 + 6; y++) st(o.x + dx, y, o.z + dz, 0); }
   for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) {
@@ -1912,6 +1955,12 @@ function bastionLayout(o) {
   const out = { BL, ML, extra }; BAS_CACHE.set(o.seed, out); return out;
 }
 function stampBastion(st, o, tiles) {
+  if (STRUCTS) { // Mojang's bastion remnant: one of the four start pieces, grown by jigsaw at y 33
+    const kind = BASTION_KIND[o.seed % 4], start = { bridge: 'bastion/bridge/starting_pieces/entrance_base', stables: 'bastion/hoglin_stable/air_base', treasure: 'bastion/treasure/big_air_full', housing: 'bastion/units/air_base' }[kind];
+    const ps = assembleJigsaw(null, o.seed, start, 6, o.x, o.z, false, false), r2 = rng(o.seed ^ 77);
+    for (const p of ps) stampPiece(st, null, p, tiles, bastionProc, r2, st.x0, st.z0);
+    return;
+  }
   const L = bastionLayout(o), tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15), ox = o.x - (BSX >> 1), oz = o.z - (BSX >> 1);
   for (let z = 0; z < BSX; z++) for (let x = 0; x < BSX; x++) {
     const wx = ox + x, wz = oz + z; if (st.get(wx, o.y, wz) < 0) continue;
@@ -2069,7 +2118,12 @@ function genNether(seed, cx, cz) {
     }
   }
   // nether fossils: arches of bone in soul sand valleys
-  if (R() < 0.3) { const fx = 3 + R.int(10), fz = 3 + R.int(10);
+  if (R() < 0.3 && STRUCTS && STRUCTS.t['nether_fossils/fossil_1']) { const fx = 3 + R.int(10), fz = 3 + R.int(10); // Mojang's nether fossils on the valley floor
+    if (biome[fz * 16 + fx] === NETHER_BIO.SOUL) for (let y = 33; y < 100; y++) {
+      const b = blocks[I(fx, y, fz)]; if (!(b === 138 || b === 139) || blocks[I(fx, y + 1, fz)] !== 0) continue;
+      const k = 1 + R.int(14), st0 = makeStamp(blocks, meta, x0, z0); stampSingle(st0, 'nether_fossils/fossil_' + k, x0 + Math.max(0, fx - 3), y + 1, z0 + Math.max(0, fz - 3), R.int(4), tiles, R, { ignoreAir: true }); break;
+    }
+  } else if (R() < 0.3) { const fx = 3 + R.int(10), fz = 3 + R.int(10);
     if (biome[fz * 16 + fx] === NETHER_BIO.SOUL) for (let y = 33; y < 100; y++) {
       const b = blocks[I(fx, y, fz)]; if (!(b === 138 || b === 139) || blocks[I(fx, y + 1, fz)] !== 0) continue;
       const ax = R() < 0.5, h = 3 + R.int(4), w = 2 + R.int(3), put = (a, yy, m) => { const x = ax ? fx + a : fx, z = ax ? fz : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15) return; const ii = I(x, yy, z); if (blocks[ii] === 0) { blocks[ii] = BID.bone_block; meta[ii] = m; } };
@@ -2374,7 +2428,13 @@ function genChunk(seed, cx, cz, dim, exp) {
   }
   // 5b. fossils: a spine with ribs of bone blocks buried deep (some bones are coal ore), more often under deserts and swamps
   { const cb = bpad[9 * 18 + 9];
-    if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64)) {
+    if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64) && STRUCTS && STRUCTS.t['fossil/spine_1']) { // Mojang's fossils: a spine or skull of bone blocks (10% missing) with a coal ore copy (90% missing)
+      const base = ['spine_1', 'spine_2', 'spine_3', 'spine_4', 'skull_1', 'skull_2', 'skull_3', 'skull_4'][R.int(8)], t = STRUCTS.t['fossil/' + base], rot = R.int(4), fy = 15 + R.int(30);
+      const c = [[0, 0], [t.s[0] - 1, t.s[2] - 1]].map(([a, b]) => tplXZ(a, b, rot)), mnx = Math.min(c[0][0], c[1][0]), mxx = Math.max(c[0][0], c[1][0]), mnz = Math.min(c[0][1], c[1][1]), mxz = Math.max(c[0][1], c[1][1]);
+      const ox = x0 + R.int(Math.max(1, 16 - (mxx - mnx))) - mnx, oz = z0 + R.int(Math.max(1, 16 - (mxz - mnz))) - mnz, st0 = makeStamp(blocks, meta, x0, z0); // inside this chunk
+      stampSingle(st0, 'fossil/' + base, ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 995) % 10 === 0 ? null : s2 });
+      stampSingle(st0, 'fossil/' + base + '_coal', ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 997) % 10 !== 0 ? null : s2 });
+    } else if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64)) {
       const fx = 4 + R.int(8), fz = 4 + R.int(8), fy = 15 + R.int(30), ax = R() < 0.5, len = 3 + R.int(3);
       const bone = (a, y, b, m) => { const x = ax ? fx + a : fx + b, z = ax ? fz + b : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 2) return; const i2 = I(x, y, z); if (!blocks[i2] || blocks[i2] === WATER || blocks[i2] === LAVA) return; blocks[i2] = R() < 0.1 ? (y < 8 ? BID.deepslate_coal_ore : 13) : BID.bone_block; meta[i2] = R() < 0.1 ? 0 : m; };
       for (let a = -len; a <= len; a++) { bone(a, fy, 0, ax ? 1 : 2); if ((a + len) % 2 === 0 && Math.abs(a) < len) for (const sd of [-1, 1]) { bone(a, fy + 1, sd, 0); bone(a, fy + 2, sd * 2, 0); bone(a, fy + 3, sd * 2, 0); bone(a, fy + 4, sd, ax ? 2 : 1); } }
@@ -2552,7 +2612,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   { const st2 = makeStamp(blocks, meta, x0, z0); for (let rx = Math.floor((cx - 1) / RPREG); rx <= Math.floor((cx + 1) / RPREG); rx++) for (let rz = Math.floor((cz - 1) / RPREG); rz <= Math.floor((cz + 1) / RPREG); rz++) { const o = ruinedPortalAt(seed, G, rx, rz, false); if (o && st2.inside(o.x - 5, o.z - 5, o.x + 5, o.z + 5)) stampRuinedPortal(st2, o, false, tiles); } }
   // structures: villages on the surface, strongholds underground
   const stamp = makeStamp(blocks, meta, x0, z0);
-  for (const v of vills) stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles);
+  for (const v of vills) { if (v.jig) { const vr = rng(hash32(seed, cx, cz, 33)), pr = villageProc(v.vt, v.jig[0] && v.jig[0].zombie); for (const p of v.jig) stampPiece(stamp, G, p, tiles, pr, vr, x0, z0); } else stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles); }
   stampMineshafts(seed, stamp, cx, cz, tiles);
   stampOutposts(seed, G, stamp, cx, cz, tiles);
   for (const [sx, sy, sz] of strongholdsOf(seed)) if (stamp.inside(sx - 44, sz - 44, sx + 44, sz + 44)) stampStronghold(seed, stamp, sx, sy, sz, R, tiles);
@@ -3093,8 +3153,329 @@ function meshChunk(B, M, L, bio, opts) {
   return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
 }
 
+// ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
+// STRUCTS.t: { "village/plains/houses/plains_small_house_1": { s, p, b, n, e } }, STRUCTS.loot: jar loot tables
+let STRUCTS = null;
+const NATURAL = (() => { const a = new Uint8Array(65536); for (const id of [1, 2, 3, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 26, 29, 30, 31, 32, 33, 34, 35, 36, 37, 50, 51, 53, 76, 91, 92, 93, 195, 196, 201, 203, 204, 205, 1110, 1111]) a[id] = 1; return a; })();
+const TPL_STATE = new Map(), JIG_CACHE = new Map();
+function setStructs(d) { STRUCTS = d && d.t ? d : null; villageCache.clear(); TPL_STATE.clear(); JIG_CACHE.clear(); POOL_CACHE.clear(); }
+const hasStructs = () => !!STRUCTS;
+// block / variant key -> [id, meta]
+const SKEY = (() => { const m = {}; for (const b of BLOCKS) if (b) { if (!(b.key in m)) m[b.key] = [b.id, 0]; if (b.vk) b.vk.forEach((k, i) => { if (k && !(k in m)) m[k] = [b.id, i << (VSH[b.id] || 0)]; }); } return m; })();
+const FACE4 = { north: 0, east: 1, south: 2, west: 3 }, DIR6N = { down: 0, up: 1, north: 2, south: 3, west: 4, east: 5 };
+const F4_6 = [2, 5, 3, 4]; // north east south west -> DIR6 index
+const ALIAS = { grass: 'short_grass', cave_air: 'air', void_air: 'air', grass_path: 'dirt_path', redstone_wall_torch: 'redstone_torch', soul_wall_torch: 'soul_torch', wall_torch: 'torch' };
+const POT_IDX = (() => { const m = {}; POT_PLANTS.forEach((p, i) => { if (p) m[p[0]] = i; }); return m; })();
+const RAIL_ROT = [[0, 1, 0, 1], [1, 0, 1, 0], [2, 5, 3, 4], [3, 4, 2, 5], [4, 2, 5, 3], [5, 3, 4, 2], [6, 7, 8, 9], [7, 8, 9, 6], [8, 9, 6, 7], [9, 6, 7, 8]]; // shape after quarter turns (Java's RailShape.rotate)
+// a vanilla block state ("oak_stairs[facing=east,half=bottom,shape=straight]") turned by rot quarter turns -> [id, meta], or null to leave the world block alone
+function vanillaState(str, rot) {
+  const key = str + '|' + rot; let r = TPL_STATE.get(key); if (r !== undefined) return r;
+  r = convertState(str, rot); TPL_STATE.set(key, r); return r;
+}
+function convertState(str, rot) {
+  const i = str.indexOf('['), props = {};
+  let name = i < 0 ? str : str.slice(0, i);
+  if (i >= 0) for (const kv of str.slice(i + 1, -1).split(',')) { const [k, v] = kv.split('='); props[k] = v; }
+  if (name === 'structure_void' || name === 'structure_block' || name === 'jigsaw') return null;
+  const wall = name.endsWith('_wall_torch') || name === 'wall_torch';
+  const rf = f => (f + rot) & 3, F = props.facing in FACE4 ? rf(FACE4[props.facing]) : 0;
+  const d6 = v => v in FACE4 ? F4_6[rf(FACE4[v])] : DIR6N[v];
+  // flower pots, stems, signs, heads, cauldrons: other names in this engine
+  if (name.startsWith('potted_')) { const p = POT_IDX[name.slice(7)]; return [BID.flower_pot, p || 0]; }
+  if (name === 'pumpkin_stem' || name === 'melon_stem') return [BID.stem, Math.min(7, +props.age || 0) | (name[0] === 'm' ? 8 : 0)];
+  if (name === 'attached_pumpkin_stem' || name === 'attached_melon_stem') return [BID.stem, 7 | (name[9] === 'm' ? 8 : 0) | 16 | (F << 5)];
+  if (name.endsWith('_wall_sign') || name.endsWith('_sign')) { const w = name.endsWith('_wall_sign'), k = SKEY[name.replace('_wall_sign', '_sign')] || SKEY.oak_sign; return w ? [k[0], (k[1] & ~31) | F | 16] : [k[0], (k[1] & ~31) | (((+props.rotation || 0) + rot * 4) & 15)]; }
+  if (name === 'water_cauldron') return [BID.cauldron, Math.min(3, +props.level || 3)];
+  if (name === 'lava_cauldron') return [BID.cauldron, 3 | 4];
+  if (name.endsWith('_wall_head') || name.endsWith('_wall_skull') || name.endsWith('_head') || name.endsWith('_skull')) {
+    const kind = { skeleton: 0, zombie: 1, creeper: 2, dragon: 3, player: 4 }[name.split('_')[0]], k = SKEY.mob_head; if (kind == null || !k) return null;
+    return [k[0], F | (kind << 2)];
+  }
+  if (name === 'carrots' || name === 'potatoes' || name === 'beetroots') { const a = +props.age || 0; return [BID.crops2, (name === 'beetroots' ? Math.min(7, a * 2 + (a ? 1 : 0)) : Math.min(7, a)) | (name === 'potatoes' ? 8 : name === 'beetroots' ? 16 : 0)]; }
+  if (name === 'farmland') return [BID.farmland, Math.min(7, +props.moisture || 0)];
+  if (ALIAS[name]) name = ALIAS[name];
+  const base = SKEY[name]; if (!base) return null;
+  let [id, meta] = base; const b = BLOCKS[id];
+  if (b.stairs || [113, 114, 115, 251, 1035, 1036, 1037, 1038, 1118, 1119].includes(id)) meta |= F | (props.half === 'top' ? 4 : 0);
+  else if (b.slab || b.slabv || [250, 1116, 1117].includes(id)) {
+    if (props.type === 'double') { const full = b.slab || (b.slabv && b.full && b.full[meta >> (VSH[id] || 1)]); const fk = typeof full === 'string' ? SKEY[full] : full ? [full, 0] : null; if (fk) return fk; }
+    meta |= props.type === 'top' ? 1 : 0;
+  } else if (LOGAX[id] && props.axis) { const a = props.axis === 'y' ? 0 : (props.axis === 'x') !== (rot & 1 ? true : false) ? 1 : 2; meta |= a; }
+  else if (DOOR[id]) meta |= ((F + 2) & 3) | (props.open === 'true' ? 4 : 0) | (props.half === 'upper' ? 8 : 0);
+  else if (b.trapdoor) meta |= F | (props.open === 'true' ? 4 : 0) | (props.half === 'top' ? 8 : 0);
+  else if (b.gate) meta |= (F & 1) | (props.open === 'true' ? 4 : 0) | (F >= 2 ? 2 : 0);
+  else if (id === BID.red_bed) meta |= F | (props.part === 'head' ? 4 : 0);
+  else if (id === BID.torch || id === BID.soul_torch || id === BID.redstone_torch) meta = wall ? ((F + 2) & 3) + 1 : 0;
+  else if (id === BID.ladder) meta = (F + 2) & 3;
+  else if (id === BID.lantern || id === BID.soul_lantern) meta = props.hanging === 'true' ? 1 : 0;
+  else if (id === BID.lever || id === BID.stone_button) { const sup = props.face === 'floor' ? 0 : props.face === 'ceiling' ? 1 : F4_6[(F + 2) & 3]; meta = (meta & ~15) | sup | (props.powered === 'true' ? 8 : 0); }
+  else if (id === BID.bell) meta = (props.attachment === 'floor' ? 0 : props.attachment === 'ceiling' ? 1 : 2) | (F << 2);
+  else if (id === BID.campfire || id === BID.soul_campfire) meta = F | (props.lit === 'false' ? 0 : 4);
+  else if (id === BID.end_rod || id === BID.observer || id === BID.dispenser || id === BID.dropper || id === BID.piston || id === BID.sticky_piston || id === BID.barrel) meta = (meta & ~7) | (d6(props.facing) || 0);
+  else if (id === BID.repeater || id === BID.comparator) meta = (F + 2) & 3;
+  else if (id === BID.wall_banner) meta = (meta & 15) | (F << 4);
+  else if (id === BID.banner) meta = (meta & 15) | ((((+props.rotation || 0) + rot * 4) & 15) << 4);
+  else if (b.rail || isRail(id)) { const sh = ['north_south', 'east_west', 'ascending_east', 'ascending_west', 'ascending_north', 'ascending_south', 'south_east', 'south_west', 'north_west', 'north_east'].indexOf(props.shape); if (sh >= 0) meta = (meta & ~15) | RAIL_ROT[sh][rot]; }
+  else if (id === BID.vine || id === BID.glow_lichen) { const faces = ['up', 'north', 'south', 'west', 'east'].filter(k => props[k] === 'true'); const f0 = faces[0]; meta = !f0 ? 0 : f0 === 'up' ? 1 : d6(f0); }
+  else if (id === BID.sea_pickle) meta = Math.max(0, (+props.pickles || 1) - 1) | (props.waterlogged === 'true' ? 16 : 0);
+  else if (id === BID.snow) meta = Math.max(0, (+props.layers || 1) - 1);
+  else if (props.age != null && b.plant) meta = (meta & ~7) | Math.min(7, +props.age);
+  else if (id === BID.composter) meta = +props.level || 0;
+  else if (id === BID.brewing_stand) meta = (props.has_bottle_0 === 'true' ? 1 : 0) | (props.has_bottle_1 === 'true' ? 2 : 0) | (props.has_bottle_2 === 'true' ? 4 : 0);
+  else if (b.leaves) meta |= 1;
+  else if (props.facing in FACE4 && (b.facing || id === BID.anvil || id === BID.glazed_terracotta || id === BID.chest || id === BID.trapped_chest || id === BID.ender_chest)) meta = (meta & ~3) | F;
+  return [id, meta];
+}
+// a template's bounding box after quarter turns about its origin (Java's StructureTemplate.transform with pivot 0)
+// with a pivot (igloos): Java's rotation formula about (px, pz)
+const tplXZp = (x, z, rot, px, pz) => rot === 0 ? [x, z] : rot === 1 ? [px + pz - z, pz - px + x] : rot === 2 ? [px + px - x, pz + pz - z] : [px - pz + z, px + pz - x];
+const tplXZ = (x, z, rot) => rot === 0 ? [x, z] : rot === 1 ? [-z, x] : rot === 2 ? [-x, -z] : [z, -x];
+function tplBox(t, rot, ox, oy, oz) {
+  const [ax, az] = tplXZ(0, 0, rot), [bx, bz] = tplXZ(t.s[0] - 1, t.s[2] - 1, rot);
+  return [ox + Math.min(ax, bx), oy, oz + Math.min(az, bz), ox + Math.max(ax, bx), oy + t.s[1] - 1, oz + Math.max(az, bz)];
+}
+const boxIn = (a, b) => a[0] >= b[0] && a[1] >= b[1] && a[2] >= b[2] && a[3] <= b[3] && a[4] <= b[4] && a[5] <= b[5];
+const boxHit = (a, b) => a[0] <= b[3] && a[3] >= b[0] && a[1] <= b[4] && a[4] >= b[1] && a[2] <= b[5] && a[5] >= b[2];
+// the jigsaw blocks of a template turned by rot: { x, y, z (local, turned), front (0-3 horizontal, 4 up, 5 down), top, name, target, pool, fin, joint }
+function tplJigsaws(t, rot) {
+  const key = '_jig' + rot; if (t[key]) return t[key];
+  const out = [];
+  for (const [bi, d] of Object.entries(t.n)) {
+    if (!d.j) continue; const k = +bi * 4, st = t.p[t.b[k + 3]], m = /orientation=([a-z]+)_([a-z]+)/.exec(st); if (!m) continue;
+    const dir = s => s === 'up' ? 4 : s === 'down' ? 5 : (FACE4[s] + rot) & 3;
+    const [x, z] = tplXZ(t.b[k], t.b[k + 2], rot);
+    out.push({ x, y: t.b[k + 1], z, front: dir(m[1]), top: dir(m[2]), ...d });
+  }
+  return t[key] = out;
+}
+const FRONT_V = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 1, 0], [0, -1, 0]], FRONT_OPP = [2, 3, 0, 1, 5, 4];
+const jigFits = (a, b) => FRONT_OPP[a.front] === b.front && a.target === b.name && (a.front < 4 || a.joint === 'rollable' || a.top === b.top);
+// pools: every template in the folder named by the pool (weights are equal; houses and decor also roll "empty")
+const POOL_CACHE = new Map();
+const POOL_ALIAS = {
+  'village/common/cats': ['village/common/animals/cat_'], 'village/common/sheep': ['village/common/animals/sheep_'], 'village/common/animals': ['village/common/animals/cows_', 'village/common/animals/pigs_', 'village/common/animals/sheep_', 'village/common/animals/horses_'],
+  'village/common/butcher_animals': ['village/common/animals/cows_', 'village/common/animals/pigs_', 'village/common/animals/sheep_'], 'village/common/well_bottoms': ['village/common/well_bottom'],
+  'bastion/mobs/piglin': ['bastion/mobs/melee_piglin', 'bastion/mobs/sword_piglin', 'bastion/mobs/crossbow_piglin', 'bastion/mobs/empty'], 'bastion/mobs/piglin_melee': ['bastion/mobs/melee_piglin_always', 'bastion/mobs/melee_piglin', 'bastion/mobs/sword_piglin'],
+  'bastion/mobs/hoglin': ['bastion/mobs/hoglin', 'bastion/mobs/empty'],
+  'bastion/hoglin_stable/mirrored_starting_pieces': ['bastion/hoglin_stable/starting_pieces/'], 'bastion/hoglin_stable/wall_bases': ['bastion/hoglin_stable/walls/wall_base'],
+  'bastion/units/walls/wall_bases': ['bastion/units/walls/wall_base', 'bastion/units/walls/connected_wall'], 'bastion/units/edge_wall_units': ['bastion/units/wall_units/edge_0_large'],
+  'bastion/units/large_ramparts': ['bastion/units/ramparts/'], 'bastion/treasure/extensions/houses': ['bastion/treasure/extensions/house_'],
+  'bastion/treasure/extensions/large_pool': ['bastion/treasure/extensions/empty', 'bastion/treasure/extensions/fire_room', 'bastion/treasure/extensions/large_bridge_', 'bastion/treasure/extensions/roofed_bridge'],
+  'bastion/treasure/extensions/small_pool': ['bastion/treasure/extensions/empty', 'bastion/treasure/extensions/fire_room', 'bastion/treasure/extensions/small_bridge_'],
+  'pillager_outpost/towers': ['pillager_outpost/watchtower', 'pillager_outpost/watchtower_overgrown'], 'pillager_outpost/feature_plates': ['pillager_outpost/feature_plate'],
+  'pillager_outpost/features': ['pillager_outpost/feature_cage1', 'pillager_outpost/feature_cage2', 'pillager_outpost/feature_logs', 'pillager_outpost/feature_tent1', 'pillager_outpost/feature_tent2', 'pillager_outpost/feature_targets'], 'bastion/blocks/gold': ['bastion/blocks/gold', 'bastion/blocks/air'],
+};
+function poolEls(pool) {
+  let r = POOL_CACHE.get(pool); if (r) return r;
+  const keys = Object.keys(STRUCTS.t), under = pre => keys.filter(k => k.startsWith(pre) && !k.slice(pre.length).includes('/'));
+  let els;
+  if (POOL_ALIAS[pool]) els = keys.filter(k => POOL_ALIAS[pool].some(p => k === p || ((p.endsWith('_') || p.endsWith('/')) && k.startsWith(p) && !k.slice(p.length).includes('/'))));
+  else { els = under(pool + '/'); if (!els.length && STRUCTS.t[pool]) els = [pool]; if (!els.length) els = keys.filter(k => k.startsWith(pool + '_') && !k.slice(pool.length).includes('/')); } // stage_0 -> stage_0_0, stage_0_1...
+  const dm = /^village\/([a-z]+)\/(?:zombie\/)?decor$/.exec(pool); if (dm && !els.length) els = under('village/' + dm[1] + '/'); // lamp posts and the like sit in the type's own folder
+  r = els.map(k => [k, 1]);
+  const fl = VILLAGE_FEATURES[pool.replace('/zombie/', '/')]; if (fl) for (const [f, w] of fl) r.push(['feature:' + f, w * Math.max(1, els.length >> 1)]); // trees, hay piles... (Java's feature elements)
+  if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
+  else if (/decor$/.test(pool)) r.push([null, els.length * 3]);
+  POOL_CACHE.set(pool, r); return r;
+}
+// the feature elements of the village decor / tree pools: [feature, weight relative to the pool's templates]
+const VILLAGE_FEATURES = {
+  'village/plains/trees': [['tree:0', 1]], 'village/savanna/trees': [['tree:5', 1]],
+  'village/plains/decor': [['tree:0', 1], ['flower', 1], ['hay', 1]], 'village/desert/decor': [['cactus', 2], ['hay', 2]],
+  'village/savanna/decor': [['tree:5', 2], ['hay', 2], ['melon', 1]], 'village/snowy/decor': [['tree:3', 2], ['snow', 2], ['ice', 1]],
+  'village/taiga/decor': [['tree:3', 2], ['pumpkin', 1], ['grass', 2], ['berry', 1]],
+};
+const poolFallback = pool => { const m = /^(village\/[a-z]+\/)(?:zombie\/)?(streets|houses)$/.exec(pool); if (!m) return null; const t = m[1] + 'terminators'; return Object.keys(STRUCTS.t).some(k => k.startsWith(t + '/')) ? t : 'village/plains/terminators'; };
+function weightedShuffle(R, els) { const l = []; for (const [k, w] of els) for (let i = 0; i < w; i++) l.push(k); for (let i = l.length - 1; i > 0; i--) { const j = R.int(i + 1); [l[i], l[j]] = [l[j], l[i]]; } return l; }
+const shuffled = (R, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = R.int(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const RIGID_POOL = p => !/streets|terminators/.test(p) || p.startsWith('bastion');
+// StructurePoolBasedGenerator: grow from a start piece through jigsaw blocks, breadth first, up to maxDepth;
+// a piece must fit inside its parent (when the connection is inside it) or inside 80 blocks of the start, without overlapping
+function assembleJigsaw(G, seed, start, maxDepth, x0, z0, useHeight, ignoreAir) {
+  const key = seed + ':' + start + ':' + x0 + ',' + z0; let res = JIG_CACHE.get(key); if (res) return res;
+  const R = rng(hash32(seed, x0, z0, 911)), H = (x, z) => Math.max(G.column(x, z)[0], SEA);
+  const sEls = STRUCTS.t[start] ? [[start, 1]] : poolEls(start).filter(e => e[0]); if (!sEls.length) { JIG_CACHE.set(key, []); return []; }
+  const sPath = weightedShuffle(R, sEls)[0], sT = STRUCTS.t[sPath], sRot = R.int(4);
+  let bx = tplBox(sT, sRot, 0, 0, 0); const cx = x0 - ((bx[0] + bx[3]) >> 1), cz = z0 - ((bx[2] + bx[5]) >> 1);
+  const y0 = useHeight ? H(x0, z0) : 33;
+  const startP = { path: sPath, t: sT, rot: sRot, ox: cx, oy: y0, oz: cz, rigid: true, box: tplBox(sT, sRot, cx, y0, cz), depth: 0 };
+  startP.box[4] += 16;
+  const pieces = [startP], globalReg = { box: [x0 - 80, 0, z0 - 80, x0 + 80, CH - 1, z0 + 80], used: [startP.box] };
+  startP.shape = globalReg; // each piece carries the free space it was placed in (Java's ShapedPoolStructurePiece)
+  const queue = [startP];
+  while (queue.length) {
+    const P = queue.shift(), pBox = P.box; let internal = null;
+    for (const J of shuffled(R, tplJigsaws(P.t, P.rot))) {
+      if (!J.pool || J.pool === 'empty') continue;
+      const jx = P.ox + J.x, jy = P.oy + J.y, jz = P.oz + J.z, fv = FRONT_V[J.front], tx = jx + fv[0], ty = jy + fv[1], tz = jz + fv[2];
+      const inside = tx >= pBox[0] && tx <= pBox[3] && ty >= pBox[1] && ty <= pBox[4] && tz >= pBox[2] && tz <= pBox[5];
+      const reg = inside ? (internal || (internal = { box: pBox, used: [] })) : P.shape, region = reg.box, used = reg.used;
+      const fb = poolFallback(J.pool), cands = [...(P.depth < maxDepth ? weightedShuffle(R, poolEls(J.pool)) : []), ...(fb ? weightedShuffle(R, poolEls(fb).filter(e => e[0])) : [])];
+      let placed = false;
+      for (const path of cands) {
+        if (!path) break; // an empty element: nothing goes here
+        if (path.startsWith('feature:')) { // a feature sits on the ground at the jigsaw's target, one block big
+          const gy = G.column(tx, tz)[0]; if (gy < SEA) continue;
+          const box = [tx, gy + 1, tz, tx, gy + 1, tz]; if (!boxIn(box, region) || used.some(u => boxHit(u, box))) continue;
+          used.push(box); pieces.push({ feature: path.slice(8), x: tx, y: gy + 1, z: tz, box, depth: P.depth + 1, vtype: P.vtype }); placed = true; break;
+        }
+        const T = STRUCTS.t[path]; if (!T) continue;
+        const rigid = RIGID_POOL(path.slice(0, path.lastIndexOf('/')));
+        for (const rot of shuffled(R, [0, 1, 2, 3])) {
+          for (const K of shuffled(R, tplJigsaws(T, rot))) {
+            if (!jigFits(J, K)) continue;
+            const ox = tx - K.x, oz = tz - K.z;
+            const oy = P.rigid && rigid ? ty - K.y : H(jx, jz) + 1 - K.y; // rigid on rigid: exact; otherwise from the ground height at the jigsaw (Java's heightOnGround)
+            const box = tplBox(T, rot, ox, oy, oz); if (!rigid) box[4] = box[1] + 40; // a terrain-matching piece claims the air above it: houses and decor are fitted inside it
+            if (!boxIn(box, region) || used.some(u => boxHit(u, box))) continue;
+            used.push(box);
+            const C = { path, t: T, rot, ox, oy, oz, rigid, box, depth: P.depth + 1, shape: reg }; pieces.push(C);
+            if (C.depth <= maxDepth) queue.push(C);
+            placed = true; break;
+          }
+          if (placed) break;
+        }
+        if (placed) break;
+      }
+    }
+  }
+  res = pieces.map(p => { const q = { ...p, ignoreAir }; delete q.shape; return q; }); JIG_CACHE.set(key, res); return res;
+}
+// stamp one piece into the chunk being generated; terrain-matching pieces follow the ground column by column
+function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
+  if (p.feature) return stampFeature(st, p, R, x0, z0);
+  const t = p.t, bl = t.b, n = bl.length, H = (x, z) => Math.max(G.column(x, z)[0], SEA), XZ = p.pivot ? (x, z) => tplXZp(x, z, p.rot, p.pivot[0], p.pivot[1]) : (x, z) => tplXZ(x, z, p.rot);
+  if (p.box[3] < x0 || p.box[0] > x0 + 15 || p.box[5] < z0 || p.box[2] > z0 + 15) return;
+  const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+  if (p.beard && p.rigid && t.s[0] * t.s[2] > 4) { // terrain adaptation (Java's beardifier): ground filled up to the piece, terrain inside it dug out
+    const top = p.oy + Math.min(t.s[1] - 1, 12);
+    const M = 4; // a slope around the piece instead of a sheer column
+    for (let wx = Math.max(x0, p.box[0] - M); wx <= Math.min(x0 + 15, p.box[3] + M); wx++) for (let wz = Math.max(z0, p.box[2] - M); wz <= Math.min(z0 + 15, p.box[5] + M); wz++) {
+      const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d * 2;
+      for (let y = ft; y > 1 && y >= p.oy - 14; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? 2 : 3, 0); }
+      if (!d) for (let y = p.oy; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) st(wx, y, wz, 0, 0); }
+    }
+  }
+  for (let k = 0; k < n; k += 4) {
+    const [dx, dz] = XZ(bl[k], bl[k + 2]), wx = p.ox + dx, wz = p.oz + dz;
+    if (wx < x0 || wx > x0 + 15 || wz < z0 || wz > z0 + 15) continue;
+    let s = t.p[bl[k + 3]]; const nd = t.n[k >> 2];
+    if (nd && nd.data) { dataMarker(nd.data, wx, p.rigid ? p.oy + bl[k + 1] : H(wx, wz) + bl[k + 1], wz, p, tiles, R, st); continue; }
+    if (nd && nd.j) s = nd.fin;
+    if (proc) s = proc(s, wx, bl[k + 1], wz, R, p); if (!s) continue;
+    let name = s.split('[')[0];
+    if (name === 'dirt_path' && !p.rigid && G.column(wx, wz)[0] < SEA) { s = (p.planks || 'oak') + '_planks'; name = s; } // streets cross water on planks
+    if (p.ignoreAir && (name === 'air' || name === 'cave_air')) continue;
+    const wy = p.rigid ? p.oy + bl[k + 1] : H(wx, wz) + bl[k + 1];
+    if (wy < 1 || wy >= CH) continue;
+    const v = vanillaState(s, p.rot); if (!v) continue;
+    st(wx, wy, wz, v[0], v[1]);
+    if (nd && nd.loot && st.get(wx, wy, wz) >= 0) tiles.push({ t: 'chest', i: tl(wx, wy, wz), loot: rollVanillaLoot(R, nd.loot) });
+    if (v[0] === BID.red_bed && (v[1] & 4) === 0) { /* beds: the foot claims a villager */ }
+  }
+  for (const [ex, ey, ez, id] of t.e) {
+    const [dx, dz] = XZ(Math.floor(ex), Math.floor(ez)), wx = p.ox + dx, wz = p.oz + dz;
+    if (wx < x0 || wx > x0 + 15 || wz < z0 || wz > z0 + 15) continue;
+    const wy = p.rigid ? p.oy + Math.floor(ey) : H(wx, wz) + Math.floor(ey);
+    const mob = id === 'villager' ? 'villager' : id;
+    const tt = { t: 'mob', i: tl(wx, wy, wz), mob };
+    if (mob === 'villager') { const nm = p.path.split('/').pop(); tt.vtype = p.vtype || 'plains'; tt.prof = nm === 'nitwit' ? 'nitwit' : 'none'; if (nm === 'baby') tt.baby = true; if (p.path.includes('/zombie/')) tt.mob = 'zombie_villager'; }
+    if (mob === 'cat' || mob.startsWith('cat')) tt.mob = 'cat';
+    tiles.push(tt);
+  }
+}
+function stampFeature(st, p, R, x0, z0) {
+  const { x, y, z } = p; if (x + 4 < x0 || x - 4 > x0 + 15 || z + 4 < z0 || z - 4 > z0 + 15) return;
+  const r = rng(hash32(x, y, z, 77)), put = (wx, wy, wz, name, force) => { const b = st.get(wx, wy, wz); if (b < 0 || !(force || b === 0 || REPL[b])) return; const v = vanillaState(name, 0); if (v) st(wx, wy, wz, v[0], v[1]); };
+  const ground = (wx, wz) => { for (let yy = y + 3; yy > y - 4; yy--) { const b = st.get(wx, yy, wz); if (b > 0 && !REPL[b] && !FLUID[b]) return yy + 1; } return -1; }; // only meaningful inside this chunk
+  const f = p.feature;
+  if (f.startsWith('tree:')) { const b = st.get(x, y - 1, z); if (b === BID.grass_block || b === 3 || b < 0) growTree((wx, wy, wz, id, m, force) => { const c = st.get(wx, wy, wz); if (c >= 0 && (force || c === 0 || REPL[c])) st(wx, wy, wz, id, m); }, x, y, z, +f.slice(5), r(), p.vtype === 'snow'); return; }
+  const block = { hay: 'hay_block', melon: 'melon', snow: 'snow_block', ice: 'packed_ice' }[f];
+  if (block) { // piles: a rough ellipsoid of blocks on the ground (Java's BlockPileFeature)
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) {
+      if (dx * dx + dz * dz + dy * dy * 2 > 4 + r() * 2) continue;
+      const gy = ground(x + dx, z + dz); if (gy < 0) continue;
+      put(x + dx, gy + dy, z + dz, f === 'ice' && r() < 0.25 ? 'blue_ice' : block);
+    }
+    return;
+  }
+  const plants = { flower: ['dandelion', 'poppy', 'oxeye_daisy', 'azure_bluet', 'cornflower'], grass: ['grass', 'fern', 'grass'], pumpkin: ['pumpkin'], berry: ['sweet_berry_bush[age=3]'], cactus: ['cactus'] }[f]; if (!plants) return;
+  for (let k = 0; k < (f === 'cactus' ? 6 : 24); k++) { // random patches around the spot
+    const wx = x + r.int(7) - 3, wz = z + r.int(7) - 3, gy = ground(wx, wz); if (gy < 0) continue;
+    const below = st.get(wx, gy - 1, wz);
+    if (f === 'cactus') { if (below !== 12 && below !== BID.sand) continue; const hh = 1 + r.int(3); for (let i = 0; i < hh; i++) put(wx, gy + i, wz, 'cactus'); }
+    else { if (below !== BID.grass_block && below !== 3) continue; put(wx, gy, wz, plants[r.int(plants.length)]); }
+  }
+}
+// a jar loot table rolled here: pools, weighted entries, counts, enchanting -> [slot, item key, count, extra]
+function rollVanillaLoot(R, name) {
+  const tbl = STRUCTS.loot && STRUCTS.loot[name]; if (!tbl) { const k = LOOT_FALLBACK(name); return k ? rollLoot(R, k, 4 + R.int(5)) : []; }
+  const out = [], free = shuffled(R, [...Array(27).keys()]);
+  const num = v => typeof v === 'number' ? v : v && v.min != null ? v.min + R() * (v.max - v.min) : 1;
+  for (const pool of tbl.pools || []) {
+    const rolls = Math.floor(num(pool.rolls) + 0.0001);
+    const ents = (pool.entries || []).filter(e => e.type === 'minecraft:item' || e.type === 'minecraft:empty' || e.type === 'item' || e.type === 'empty'), tot = ents.reduce((a, e) => a + (e.weight || 1), 0);
+    for (let r = 0; r < rolls; r++) {
+      let w = R() * tot, e = null; for (const x of ents) { w -= x.weight || 1; if (w < 0) { e = x; break; } }
+      if (!e || !e.name) continue;
+      let n = 1; const extra = {};
+      for (const f of e.functions || []) {
+        const fn = (f.function || '').replace('minecraft:', '');
+        if (fn === 'set_count') n = Math.max(0, Math.floor(num(f.count) + 0.0001));
+        else if (fn === 'set_damage') extra.dmg = num(f.damage);
+        else if (fn === 'enchant_randomly' || fn === 'enchant_with_levels') extra.ench = fn === 'enchant_with_levels' ? Math.floor(num(f.levels)) : 1;
+        else if (fn === 'exploration_map') extra.map = f.destination || 'buried_treasure';
+        else if (fn === 'set_stew_effect') extra.stew = 1;
+      }
+      if (!n || !free.length) continue;
+      out.push([free.pop(), e.name.replace('minecraft:', ''), n, extra]);
+    }
+  }
+  return out;
+}
+const LOOT_FALLBACK = name => /village/.test(name) ? (/smith|armorer|toolsmith|weaponsmith/.test(name) ? 'smith' : 'house') : /bastion_treasure/.test(name) ? 'bastion_treasure' : /bastion/.test(name) ? 'bastion' : /pillager_outpost/.test(name) ? 'outpost' : /igloo/.test(name) ? 'igloo' : /shipwreck_supply/.test(name) ? 'ship_supply' : /shipwreck_map/.test(name) ? 'ship_map' : /shipwreck_treasure/.test(name) ? 'ship_treasure' : /underwater_ruin_big/.test(name) ? 'ruin_big' : /underwater_ruin/.test(name) ? 'ruin_small' : /ruined_portal/.test(name) ? 'ruined_portal' : null;
+// processors: what Java's processor lists do to the real pieces (mossy stone, crop mixes, zombie village decay, bastion cracks)
+function villageProc(type, zombie) {
+  return (s, x, y, z, R, p) => {
+    const name = s.split('[')[0], path = p.path, h = hash32(x, y, z, 977) % 1000;
+    if (name === 'wheat' && /farm/.test(path)) return h < 300 ? (h < 100 ? 'carrots' : h < 200 ? 'potatoes' : 'beetroots') + '[age=' + (h % 4) + ']' : 'wheat[age=' + (h % 8) + ']';
+    if (zombie) {
+      if (name === 'cobblestone' && h < 300) return 'mossy_cobblestone';
+      if ((name === 'glass_pane' || name.endsWith('stained_glass_pane')) && h < 500) return 'air';
+      if ((name === 'torch' || name === 'wall_torch' || name === 'lantern') && h < 800) return 'air';
+      if (name.endsWith('_door') && h < 300) return 'air';
+    } else if (name === 'cobblestone' && h < 100 && !/streets/.test(path)) return 'mossy_cobblestone';
+    return s;
+  };
+}
+function bastionProc(s, x, y, z) {
+  const name = s.split('[')[0], h = hash32(x, y, z, 983) % 1000;
+  if (name === 'polished_blackstone_bricks' && h < 300) return 'cracked_polished_blackstone_bricks';
+  if (name === 'gold_block' && h < 300) return 'air';
+  if (name === 'blackstone' && h < 10) return 'gilded_blackstone';
+  return s;
+}
+
+// one whole template as a piece (igloos, shipwrecks, ruins, portals, fossils); rot about pivot when given
+function stampSingle(st, path, ox, oy, oz, rot, tiles, R, opts = {}) {
+  const t = STRUCTS && STRUCTS.t[path]; if (!t) return false;
+  const p = { path, t, rot, ox, oy, oz, rigid: true, ignoreAir: !!opts.ignoreAir, pivot: opts.pivot || null, markerLoot: opts.loot || null };
+  const [px, pz] = p.pivot || [0, 0], c = [[0, 0], [t.s[0] - 1, 0], [0, t.s[2] - 1], [t.s[0] - 1, t.s[2] - 1]].map(([x, z]) => p.pivot ? tplXZp(x, z, rot, px, pz) : tplXZ(x, z, rot));
+  p.box = [ox + Math.min(...c.map(v => v[0])), oy, oz + Math.min(...c.map(v => v[1])), ox + Math.max(...c.map(v => v[0])), oy + t.s[1] - 1, oz + Math.max(...c.map(v => v[1]))];
+  stampPiece(st, null, p, tiles, opts.proc || null, R, st.x0, st.z0);
+  return true;
+}
+// data markers in structure files: the chest sits under the marker; drowned / elder guardians spawn there
+function dataMarker(d, x, y, z, p, tiles, R, st) {
+  const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+  const LT = { chest: p.markerLoot || null, supply_chest: 'chests/shipwreck_supply', map_chest: 'chests/shipwreck_map', treasure_chest: 'chests/shipwreck_treasure' };
+  if (d in LT && LT[d]) { const cy = y - 1; if (st.get(x, cy, z) === BID.chest || st.get(x, cy, z) === BID.trapped_chest) tiles.push({ t: 'chest', i: tl(x, cy, z), loot: rollVanillaLoot(R, LT[d]) }); st(x, y, z, 0, 0); return; }
+  if (d === 'drowned') { st(x, y, z, 0, 0); tiles.push({ t: 'mob', i: tl(x, y, z), mob: 'drowned' }); return; }
+  st(x, y, z, 0, 0);
+}
+
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
@@ -3105,7 +3486,8 @@ function workerMain(S) {
     if (m.type === 'gen') {
       const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
-    } else if (m.type === 'mesh') {
+    } else if (m.type === 'structs') S.setStructs(m.data);
+    else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);
       const tr = [m.B.buffer, m.M.buffer, m.L.buffer];
       for (const k of ['o', 'c', 't']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);

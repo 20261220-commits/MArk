@@ -7,7 +7,11 @@ async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
   catch (e) { return null; }
 }
-async function upPut(v) { const db = await upDB(); await new Promise((res, rej) => { const t = db.transaction('p', 'readwrite'), s = t.objectStore('p'); if (v) s.put(v, 'pack'); else s.delete('pack'); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+async function upPut(v, key = 'pack') { const db = await upDB(); await new Promise((res, rej) => { const t = db.transaction('p', 'readwrite'), s = t.objectStore('p'); if (v) s.put(v, key); else s.delete(key); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+async function upGetKey(key) {
+  try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get(key); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
+  catch (e) { return null; }
+}
 // raw DEFLATE decoder (after zlib's puff): synchronous, so thousands of small files don't each wait on a stream
 const INF_LB = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258], INF_LE = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
 const INF_DB = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577], INF_DE = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
@@ -100,7 +104,12 @@ function decodePNG(buf) {
 // file -> stored pack { name, out, data }; progress(text) reports along the way
 async function importPack(file, progress) {
   const buf = new Uint8Array(await file.arrayBuffer()), files = unzipIndex(buf);
+  // a client.jar also carries the game's structure pieces and chest loot tables: kept apart, used by world generation
+  progress && progress('구조물 읽는 중...'); await new Promise(r => setTimeout(r));
+  const structs = typeof extractStructures === 'function' ? extractStructures(files) : null;
+  if (structs) { await upPut({ t: structs, loot: extractLoot(files), name: file.name }, 'structs'); UPACK.structs = true; }
   const key = Object.keys(files).find(k => k.includes('assets/minecraft/textures/'));
+  if (!key && structs) return { name: file.name, structsOnly: true };
   if (!key) throw new Error('assets/minecraft/textures 폴더가 없습니다 (리소스 팩이나 client.jar가 아님)');
   const root = key.slice(0, key.indexOf('assets/minecraft/')) + 'assets/minecraft/';
   const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && /^(textures\/(block|item|entity)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
@@ -139,4 +148,4 @@ function pickPackFile() {
   };
   inp.click();
 }
-async function resetPack() { await upPut(null); location.reload(); }
+async function resetPack() { await upPut(null); await upPut(null, 'structs'); location.reload(); }
