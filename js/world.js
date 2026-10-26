@@ -143,7 +143,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
-  if (MP.on && MP.local && !MP.applying) mpBlockChanged(x, y, z, id, meta); // multiplayer: what a player did reaches the others
+  if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta); // multiplayer: the host's world (and what a guest did) reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -159,7 +159,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta, true); markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
 // an observer facing (x,y,z) fires a short pulse whenever that block changes
 function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
@@ -683,9 +683,14 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
     if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
     if (!requestGen(cx, cz)) break;
   }
+  // other places that must stay loaded (a multiplayer host keeps its guests' surroundings running): generate, don't mesh
+  const keep = W.keepCenters || null;
+  if (keep) for (const [kx, kz, kr] of keep) { const kcx = Math.floor(kx) >> 4, kcz = Math.floor(kz) >> 4;
+    for (let dx = -kr; dx <= kr; dx++) for (let dz = -kr; dz <= kr; dz++) { const cx = kcx + dx, cz = kcz + dz, k = ckey(cx, cz);
+      if (W.chunks.has(k) || W.pending.has(k)) continue; if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; } if (!requestGen(cx, cz)) break; } }
   // unload far chunks
   const lim = r + 2;
-  for (const c of W.chunks.values()) if (Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) unloadChunk(c);
+  for (const c of W.chunks.values()) if ((Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) && !(keep && keep.some(([kx, kz, kr]) => Math.abs(c.cx - (Math.floor(kx) >> 4)) <= kr + 1 && Math.abs(c.cz - (Math.floor(kz) >> 4)) <= kr + 1))) unloadChunk(c);
 }
 // apply finished worker jobs within a time budget so frames stay smooth
 function processInbox(budgetMs, maxMeshes) {

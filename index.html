@@ -228,6 +228,12 @@ body.vwidgets #offslot{width:calc(29 * var(--px));height:calc(24 * var(--px));bo
 body.vwidgets #offslot.right{background-image:var(--g-offr);padding-left:calc(10 * var(--px));left:auto;right:calc(-30 * var(--px))}
 body.vglint .glint{background:var(--g-glint) 0 0/calc(32 * var(--px)) calc(32 * var(--px)) repeat;opacity:.8;animation:glint2 4s linear infinite}
 @keyframes glint2{to{background-position:calc(32 * var(--px)) calc(-32 * var(--px))}}
+body.vgui .panel{border:calc(4 * var(--px)) solid transparent;border-image:var(--g-panel) 4 / calc(4 * var(--px)) stretch;box-shadow:none;border-radius:0;background:#c6c6c6;background-clip:padding-box;image-rendering:pixelated;padding:calc(3 * var(--px)) calc(3 * var(--px)) calc(3 * var(--px))}
+body.vgui .sl{background:var(--g-slot) 0 0/100% 100%;box-shadow:none;image-rendering:pixelated}
+body.vfurn .arrow{width:calc(24 * var(--px));height:calc(17 * var(--px));clip-path:none;background:var(--g-arrow0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .arrow.prog::after{background:var(--g-arrow1) 0 0/calc(24 * var(--px)) 100% no-repeat;image-rendering:pixelated}
+body.vfurn .flame{clip-path:none;position:relative;background:var(--g-flame0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:calc(var(--p) * 100%);background:var(--g-flame1) bottom/100% calc(14 * var(--px)) no-repeat;image-rendering:pixelated}
 </style>
 </head>
 <body>

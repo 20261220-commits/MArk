@@ -54,6 +54,14 @@ function applyGuiPack() {
     css.setProperty('--g-offl', `url(${crop('gui_widgets', 24, 22, 29, 24, 256).toDataURL()})`); css.setProperty('--g-offr', `url(${crop('gui_widgets', 53, 22, 29, 24, 256).toDataURL()})`);
     document.body.classList.add('vwidgets');
   }
+  if (PACKPX.ent.gui_inv) { // container screens: the panel's rounded bevel and the slot frame from gui/container/inventory.png
+    css.setProperty('--g-panel', `url(${crop('gui_inv', 0, 0, 176, 166, 256).toDataURL()})`); css.setProperty('--g-slot', `url(${crop('gui_inv', 7, 83, 18, 18, 256).toDataURL()})`);
+    document.body.classList.add('vgui');
+  }
+  if (PACKPX.ent.gui_furnace) { // progress arrow and flame, empty and full
+    for (const [k, x, y, w, h] of [['arrow0', 79, 34, 24, 17], ['arrow1', 176, 14, 24, 17], ['flame0', 56, 36, 14, 14], ['flame1', 176, 0, 14, 14]]) css.setProperty('--g-' + k, `url(${crop('gui_furnace', x, y, w, h, 256).toDataURL()})`);
+    document.body.classList.add('vfurn');
+  }
 }
 function icon(id, n, d, e) {
   if (!id) return '';

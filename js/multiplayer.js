@@ -3,7 +3,7 @@
 // with no server at all, WebRTC with invite / answer codes copied between the players.
 // The host's world is the real one: guests generate the same terrain from the seed, fetch the chunks the host
 // has changed, and every block a player breaks or places is sent to everyone. Players see each other (skin,
-// held item, armour, pose), chat is shared, the host's clock and weather rule, and the host's mobs are mirrored
+// held item, armour, pose, custom skins), chat is shared, the host's clock and weather rule, and the host's mobs are mirrored
 // to guests (guests can hit them), container contents follow every click, the host's dropped items can be picked
 // up by guests, a guest's inventory is kept on their device per host world, and the host's mobs chase, hit and shoot
 // whichever player is nearest.
@@ -65,7 +65,18 @@ async function mpAnswerInvite(code) {
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
 }
 const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
-const mpSkin = () => { const s = skinChoice(); return { tex: s.tex === 'custom_skin' ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim }; };
+const mpSkin = () => { // a custom skin travels as a small PNG
+  const s = skinChoice(), out = { tex: s.tex === 'custom_skin' ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim };
+  if (s.tex === 'custom_skin') { const c = entCanvas('custom_skin'); if (c) out.data = c.toDataURL('image/png'); }
+  return out;
+};
+function mpSkinTex(p) { // another player's custom skin, decoded once into a pack texture of its own
+  const sk = p.skin || {}; if (!sk.data || p.skinKey || typeof sk.data !== 'string' || !/^data:image\/png;base64,/.test(sk.data) || sk.data.length > 150000) return;
+  p.skinKey = 'mp_skin_' + p.id + '_' + Date.now(); const img = new Image();
+  img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) return; const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    PACKPX.ent[p.skinKey] = { px: new Uint8Array(g.getImageData(0, 0, 64, 64).data.buffer), w: 64, h: 64 }; p.skinReady = true; mpDropAvatar(p); };
+  img.src = sk.data;
+}
 
 // ---------- starting and stopping ----------
 async function mpHostStart(kind) {
@@ -107,7 +118,8 @@ function mpHandle(m, from) {
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
     case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); if (host) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'set': mpApplySet(m, from); return;
+    case 'set': mpApplySet(m); return;
+    case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host) mpGotChunk(m); return;
     case 'time': if (host) return; W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
@@ -117,6 +129,7 @@ function mpHandle(m, from) {
     case 'eff': if (!host && EFF[m.k]) addEffect(PL, m.k, m.dur, m.lv); return;
     case 'tile': mpApplyTile(m, from); return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
+    case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
     case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) hurtMob(e, Math.min(30, +m.dmg || 0), null, +m.kx || 0, +m.kz || 0, 'player'); } return;
@@ -162,7 +175,7 @@ function mpMirrorItems(l) {
   const seen = new Set();
   for (const [id, st, x, y, z] of l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'item');
-    if (!e && st && ITEMS[st.id]) { e = dropItem(x, y, z, st.id, st.n, [0, 0, 0], 9999, st.d, st); if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
+    if (!e && st && ITEMS[st.id]) { MP.allowSpawn = true; try { e = dropItem(x, y, z, st.id, st.n, [0, 0, 0], 9999, st.d, st); } finally { MP.allowSpawn = false; } if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
     if (e) { e.tx = x; e.ty = y; e.tz = z; }
   }
   for (const e of ENT) if (e.remote && e.kind === 'item' && !e.dead && !seen.has(e.rid)) removeEnt(e);
@@ -172,17 +185,36 @@ function mpPuppetItem(e) {
   if (!e.asked && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.2 && Math.abs(PL.z - e.z) < 1.2 && e.y > PL.y - 0.6 && e.y < PL.y + 2) { e.asked = true; mpSend({ t: 'pick', e: e.rid }); setTimeout(() => { e.asked = false; }, 1500); }
 }
 // blocks: the player who did it sends it; the host applies guests' changes and passes them on
-function mpBlockChanged(x, y, z, id, m) {
-  const msg = { t: 'set', x, y, z, id, m, dim: W.dim, dk: dkey(x >> 4, z >> 4) };
-  mpSend(msg);
+// the host runs the whole world (fluids, crops, redstone, fire, mobs) and sends every change, batched once a tick;
+// a guest sends what its player did, the host applies it like a player action and the result comes back to everyone
+function mpBlockChanged(x, y, z, id, m, metaOnly) {
+  if (MP.role === 'host') { if (MP.peers.size) (MP.batch || (MP.batch = [])).push(metaOnly ? [x, y, z, id, m, 1] : [x, y, z, id, m]); return; }
+  mpSend({ t: 'set', x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
 }
-function mpApplySet(m, from) {
-  const host = MP.role === 'host';
-  if (m.dim === W.dim && isLoaded(m.x, m.z)) { MP.applying = true; try { setBlock(m.x, m.y, m.z, m.id, m.m); } finally { MP.applying = false; } }
-  else if (host) { // not loaded here: kept with the world and put in place when the host loads that chunk
+function mpApplySets(m) { // guests: the host's changes
+  if (m.dim !== W.dim) return;
+  MP.applying = true;
+  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; } if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); } }
+  finally { MP.applying = false; }
+}
+function mpApplySet(m) { // the host: a guest's action
+  if (MP.role !== 'host') return;
+  if (m.dim === W.dim && isLoaded(m.x, m.z)) {
+    MP.applying = true;
+    try {
+      if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) return; setMeta(m.x, m.y, m.z, m.m); }
+      else setBlock(m.x, m.y, m.z, m.id, m.m);
+      // what the player's own code would have set going: redstone, button release, fluids and falling blocks
+      const b = m.id; rsNotify(m.x, m.y, m.z);
+      if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
+      if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
+      if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
+      for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+    } finally { MP.applying = false; }
+  } else { // not loaded here: kept with the world and put in place when the host loads that chunk
     const E = W.meta.mpEdits || (W.meta.mpEdits = {}); (E[m.dk] || (E[m.dk] = [])).push([m.x, m.y, m.z, m.id, m.m]);
-  } else W.saved.add(m.dk); // a guest fetches that chunk from the host when it gets near
-  if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+    for (const id of MP.peers.keys()) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }, id);
+  }
 }
 // chunk requests: the host answers with its saved / loaded chunk, plus edits waiting for it
 async function mpServeChunk(m, from) {
@@ -226,6 +258,21 @@ function mpTick() {
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0,
     armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0) }); }
   if (MP.role !== 'host') { if (W.tickN % 200 === 0) mpGuestSave(); return; }
+  if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
+  // guests' surroundings stay loaded and alive on the host: chunks, random ticks (crops, fire, ice), mob spawning
+  const here = [...MP.peers.values()].filter(p => p.s && p.s.dim === W.dim && performance.now() - p.at < 5000);
+  W.keepCenters = here.length ? here.map(p => [p.s.x, p.s.z, 3]) : null;
+  for (const p of here) {
+    if (Math.abs(p.s.x - PL.x) < 48 && Math.abs(p.s.z - PL.z) < 48) continue; // already covered by the host's own area
+    randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
+    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
+  }
+  // containers that change by themselves (furnaces, brewing stands, campfires) near guests: sent when they change
+  if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
+    if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
+    for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; const j = JSON.stringify(t); if (t._mp === j.length + ':' + j.slice(-40)) continue; t._mp = j.length + ':' + j.slice(-40);
+      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
+  }
   if (W.tickN % 40 === 0) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 4 === 0) for (const p of MP.peers.values()) { // mobs near each guest, 5 times a second
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
@@ -282,7 +329,8 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
 // ---------- other players' figures ----------
 function mpAvatar(p) {
   if (p.m) return p.m;
-  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
+  mpSkinTex(p);
+  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
   const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = 'bold 28px sans-serif'; const w = Math.ceil(g.measureText(p.name).width) + 16; c.width = w; c.height = 40;
@@ -330,6 +378,10 @@ function mpInstall() {
   const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpSend({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' ? mpRequestChunk(cx, cz) : lc(cx, cz);
+  for (const n of ['tickScheduled', 'rsTick', 'randomTicks', 'furnaceTick', 'tileTick', 'spawnerTick']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { if (MP.role !== 'guest') return f.apply(this, arguments); }; } // a guest's world is the host's
+  const di = dropItem; dropItem = function (x, y, z, id, n, vel, delay, dur, extra) { // a guest's drops become the host's items, so everyone sees (and can take) them
+    if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (!n || ITEMS[id] == null) return null; const st = extra ? { ...extra, id, n } : { id, n }; if (dur != null) st.d = dur; mpSend({ t: 'drop', x, y, z, st, vel: vel || null, delay: delay == null ? 10 : delay }); return null; }
+    return di.apply(this, arguments); };
   const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z); };
   const ol = W.onChunkLoaded; W.onChunkLoaded = (c, fresh) => { if (ol) ol(c, fresh); if (MP.on) mpChunkLoaded(c); };
 }

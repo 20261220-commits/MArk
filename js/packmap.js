@@ -161,7 +161,7 @@ for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
 // the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
-Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
+Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', gui_inv: 'gui/container/inventory', gui_furnace: 'gui/container/furnace', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
   env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
   pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
   banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
