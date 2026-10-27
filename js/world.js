@@ -683,7 +683,11 @@ async function loadChunk(cx, cz) {
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
   const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
+  // a record that can't be read (damaged storage, an interrupted write) is generated again instead of leaving a hole the
+  // world waits on for ever
+  let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data'); }
+  catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
+  W.inbox.push(d);
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first

@@ -174,7 +174,7 @@ function mpStop() {
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
     setTimeout(() => { st.flush(); setTimeout(() => st.flush(), 500); }, 50); try { MP.relay.close(); } catch (e) {} MP.relay = null; MP.core = null; MP.store = null; MP.isHost = false; }
-  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; // the last stored chunks get through before the connection closes if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
+  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
   MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = [];
@@ -539,7 +539,7 @@ async function mpEnterServerWorld(m) {
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta, d = m.pdata;
   const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
-    dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off } : null, time: m.time, rain: m.rain, thunder: m.thunder };
+    dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off, pend: d.pend || null } : null, time: m.time, rain: m.rain, thunder: m.thunder };
   MP.rolePending = true; MP.role = 'guest';
   await startWorld(meta.id, meta);
   W.saved = new Set(m.stored); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
@@ -581,7 +581,8 @@ function mpStoreChunk(c) {
 }
 function mpPdata() {
   offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
+  const pend = [INV.cursor, ...INV.craft2, ...INV.craft3].filter(st => st && st.n > 0); // in your hands or a crafting grid: yours too
+  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }
 function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
 let mpSharedLast = '';

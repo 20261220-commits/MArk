@@ -7126,7 +7126,11 @@ async function loadChunk(cx, cz) {
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
   const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio, mobs: rec.mobs, fromSave: true, tileList: rec.t || [] });
+  // a record that can't be read (damaged storage, an interrupted write) is generated again instead of leaving a hole the
+  // world waits on for ever
+  let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data'); }
+  catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
+  W.inbox.push(d);
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
@@ -7612,7 +7616,7 @@ function renderBlockIcons() {
     const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
     rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
     mesh.geometry = blockGeometry(id);
-    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : /_button$/.test(ITEMS[id].key) ? 2.2 : 1; // buttons: Java's button_inventory model is drawn larger mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
+    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : /_button$/.test(ITEMS[id].key) ? 2.2 : 1; /* buttons: Java's button_inventory model is drawn larger */ mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
     renderer.setRenderTarget(rt); renderer.render(sc, cam);
   });
   const buf = new Uint8Array(Wd * Hd * 4);
@@ -14386,7 +14390,7 @@ function clickSlot(i, btn, shift) {
     const r = st; if (!r) return;
     if (sl.canTake && !sl.canTake()) return;
     if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
-    if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) INV.giveOrDrop({ id: rr.id, n: left }); sl.take(); break; } sl.take(); } }
+    if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) { INV.giveOrDrop({ ...rr, n: left }); sl.take(); } break; } sl.take(); } } // nothing fits: the ingredients stay
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
     else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
     play('click', { vol: 0.3 }); return afterClick();
@@ -14731,6 +14735,7 @@ const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', f
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
+  if (UI.screen) UI.closeScreen(); // what was on the cursor or in a crafting grid goes back first, then falls with the rest
   if (!W.keepInv && !gr('keepInventory')) {
     offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
     for (const s of all) if (s && !enchLv(s, 'vanishing_curse')) dropStack(PL.x, PL.y + 1, PL.z, s, [(Math.random() - .5) * .4, .2, (Math.random() - .5) * .4], 40);
@@ -16228,7 +16233,7 @@ const ADVM = {}; for (const a of ADV2) ADVM[a[0]] = { id: a[0], parent: a[1], ic
 for (const a of Object.values(ADVM)) if (a.parent) ADVM[a.parent].kids.push(a.id);
 
 // ---------- progress ----------
-const advState = () => { if (UI.menu === 'advview' && ADVUI.view) return ADVUI.view.adv2 || {}; /* a saved world's, looked at from the title screen */ if (!W.meta) return null; const s = W.meta.adv2 || (W.meta.adv2 = {}); if (W.meta.adv && !W.meta.advMigrated) { migrateOldAdv(s); W.meta.advMigrated = true; } return s; };
+const advState = () => { if (UI.menu === 'advview' && ADVUI.view) return ADVUI.view.adv2 || {}; /* a saved world's, looked at from the title screen */ if (!W.meta) return null; if (!W.meta.adv2 || typeof W.meta.adv2 !== 'object') W.meta.adv2 = {}; const s = W.meta.adv2; if (W.meta.adv && !W.meta.advMigrated) { migrateOldAdv(s); W.meta.advMigrated = true; } return s; };
 function migrateOldAdv(s) { // worlds from before the full set: carry the old (subset) advancements over
   const MAP = { root: 'story/root', stone: 'story/mine_stone', upgrade: 'story/upgrade_tools', iron: 'story/smelt_iron', armor: 'story/obtain_armor', lava: 'story/lava_bucket', ironpick: 'story/iron_tools', diamond: 'story/mine_diamond', obsidian: 'story/form_obsidian', enchant: 'story/enchant_item', portal: 'story/enter_the_nether', nether: 'nether/root', blaze: 'nether/obtain_blaze_rod', debris: 'nether/obtain_ancient_debris', netherite: 'nether/netherite_armor', end: 'end/root', dragon: 'end/kill_dragon', trade: 'adventure/trade', wolf: 'husbandry/tame_an_animal', elytra: 'end/elytra', breed: 'husbandry/breed_an_animal', hunter: 'adventure/kill_a_mob', sleep: 'adventure/sleep_in_bed', seed: 'husbandry/plant_seed', snow: 'adventure/walk_on_powder_snow_with_leather_boots', spyglass: 'adventure/spyglass_at_parrot', cure: 'story/cure_zombie_villager', raid: 'adventure/hero_of_the_village', wither: 'nether/summon_wither', eye: 'story/follow_ender_eye' };
   for (const [k, t] of Object.entries(W.meta.adv)) if (MAP[k] && ADVM[MAP[k]]) s[MAP[k]] = { done: t, c: {} };
@@ -16310,7 +16315,7 @@ function advNetherTravel(from, to) {
 const ADV_INV = { 'story/root': 'crafting_table', 'story/upgrade_tools': 'stone_pickaxe', 'story/smelt_iron': 'iron_ingot', 'story/lava_bucket': 'lava_bucket', 'story/iron_tools': 'iron_pickaxe', 'story/form_obsidian': 'obsidian', 'story/mine_diamond': 'diamond', 'nether/get_wither_skull': 'wither_skeleton_skull', 'nether/obtain_ancient_debris': 'ancient_debris', 'nether/obtain_blaze_rod': 'blaze_rod', 'nether/obtain_crying_obsidian': 'crying_obsidian', 'end/dragon_breath': 'dragon_breath', 'end/dragon_egg': 'dragon_egg', 'end/elytra': 'elytra', 'husbandry/obtain_netherite_hoe': 'netherite_hoe' };
 function advScan() {
   if (!W.meta || !W.active) return;
-  const have = new Set(); for (const s of [...INV.slots, ...INV.armor, INV.off, INV.cursor]) if (s) have.add(ITEMS[s.id].key);
+  const have = new Set(); for (const s of [...INV.slots, ...INV.armor, INV.off, INV.cursor]) if (s && ITEMS[s.id]) have.add(ITEMS[s.id].key);
   for (const [id, k] of Object.entries(ADV_INV)) if (have.has(k)) advGrant(id);
   if (have.has('cobblestone') || have.has('blackstone') || have.has('cobbled_deepslate')) advGrant('story/mine_stone');
   for (const p of ['helmet', 'chestplate', 'leggings', 'boots']) { if (have.has('iron_' + p)) advGrant('story/obtain_armor', 'iron_' + p); if (have.has('diamond_' + p)) advGrant('story/shiny_gear', 'diamond_' + p); }
@@ -16788,7 +16793,7 @@ function mpWorldCore(store, out) {
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
-        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
+        p.name = (typeof m.name === 'string' && m.name.trim() ? m.name.trim() : '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
         // a signed-in player is kept by account (the server checked it); others by name, which a signed-in player's name can't take
         p.key = p.account ? 'g:' + p.account : p.name;
         for (const q of players.values()) if (q !== p && q.joined && (q.name === p.name || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
@@ -17016,7 +17021,7 @@ function mpStop() {
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
     setTimeout(() => { st.flush(); setTimeout(() => st.flush(), 500); }, 50); try { MP.relay.close(); } catch (e) {} MP.relay = null; MP.core = null; MP.store = null; MP.isHost = false; }
-  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; // the last stored chunks get through before the connection closes if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
+  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
   MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = [];
@@ -17381,7 +17386,7 @@ async function mpEnterServerWorld(m) {
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta, d = m.pdata;
   const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
-    dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off } : null, time: m.time, rain: m.rain, thunder: m.thunder };
+    dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off, pend: d.pend || null } : null, time: m.time, rain: m.rain, thunder: m.thunder };
   MP.rolePending = true; MP.role = 'guest';
   await startWorld(meta.id, meta);
   W.saved = new Set(m.stored); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
@@ -17423,7 +17428,8 @@ function mpStoreChunk(c) {
 }
 function mpPdata() {
   offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
+  const pend = [INV.cursor, ...INV.craft2, ...INV.craft3].filter(st => st && st.n > 0); // in your hands or a crafting grid: yours too
+  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }
 function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
 let mpSharedLast = '';
@@ -18097,12 +18103,16 @@ async function startWorld(id, meta) {
   W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
-  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
+  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null; INV.craft2.fill(null); INV.craft3.fill(null); W.pendGive = [];
   Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
+    if (p.pend) W.pendGive = p.pend.filter(st => st && ITEMS[st.id]);
     Object.assign(PL, p.s);
+    { const D = { health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fire: 0, absorb: 0, rest: 0, yaw: 0, pitch: 0 }; // a damaged save: defaults for numbers that aren't
+      for (const k in D) if (typeof PL[k] !== 'number' || !isFinite(PL[k])) PL[k] = D[k];
+      if (![PL.x, PL.y, PL.z].every(v => typeof v === 'number' && isFinite(v))) { PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1]; PL.z = W.worldSpawn[2] + .5; } }
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
     if (p.ender) PL.ender = p.ender.map(s => s && ITEMS[s.id] ? s : null);
@@ -18145,12 +18155,15 @@ function finishLoading() {
     chatMsg('세계에 오신 것을 환영합니다! E: 인벤토리 · T: 채팅 · /help: 명령어', '#ffff55');
   }
   showMenu(null); resumeGame();
+  for (const st of W.pendGive || []) INV.giveOrDrop(st); W.pendGive = null;
 }
 function saveWorldMeta() {
   if (!W.active || !W.meta || W.meta.remote) return;
   offUnswap();
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off };
+  // what is in your hands or in a crafting / work grid at that moment is yours too: given back when the world loads
+  const pend = [INV.cursor, ...INV.craft2, ...INV.craft3, ...(UI.screen && GUI.ctx && Array.isArray(GUI.ctx.items) && !GUI.ctx.tile && GUI.ctx.x == null && !GUI.ctx.cart && !GUI.ctx.horse ? GUI.ctx.items : [])].filter(st => st && st.n > 0);
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null };
   (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
@@ -18248,7 +18261,7 @@ function frame(now) {
   if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
-  processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); // fewer GPU uploads per frame when the frame rate dips pf('inbox', t0); t0 = performance.now();
+  processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open

@@ -44,7 +44,7 @@ function mpWorldCore(store, out) {
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
-        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
+        p.name = (typeof m.name === 'string' && m.name.trim() ? m.name.trim() : '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
         // a signed-in player is kept by account (the server checked it); others by name, which a signed-in player's name can't take
         p.key = p.account ? 'g:' + p.account : p.name;
         for (const q of players.values()) if (q !== p && q.joined && (q.name === p.name || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }

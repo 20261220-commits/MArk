@@ -194,12 +194,16 @@ async function startWorld(id, meta) {
   W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
-  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
+  INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null; INV.craft2.fill(null); INV.craft3.fill(null); W.pendGive = [];
   Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
+    if (p.pend) W.pendGive = p.pend.filter(st => st && ITEMS[st.id]);
     Object.assign(PL, p.s);
+    { const D = { health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fire: 0, absorb: 0, rest: 0, yaw: 0, pitch: 0 }; // a damaged save: defaults for numbers that aren't
+      for (const k in D) if (typeof PL[k] !== 'number' || !isFinite(PL[k])) PL[k] = D[k];
+      if (![PL.x, PL.y, PL.z].every(v => typeof v === 'number' && isFinite(v))) { PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1]; PL.z = W.worldSpawn[2] + .5; } }
     INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
     INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
     if (p.ender) PL.ender = p.ender.map(s => s && ITEMS[s.id] ? s : null);
@@ -242,12 +246,15 @@ function finishLoading() {
     chatMsg('세계에 오신 것을 환영합니다! E: 인벤토리 · T: 채팅 · /help: 명령어', '#ffff55');
   }
   showMenu(null); resumeGame();
+  for (const st of W.pendGive || []) INV.giveOrDrop(st); W.pendGive = null;
 }
 function saveWorldMeta() {
   if (!W.active || !W.meta || W.meta.remote) return;
   offUnswap();
   const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off };
+  // what is in your hands or in a crafting / work grid at that moment is yours too: given back when the world loads
+  const pend = [INV.cursor, ...INV.craft2, ...INV.craft3, ...(UI.screen && GUI.ctx && Array.isArray(GUI.ctx.items) && !GUI.ctx.tile && GUI.ctx.x == null && !GUI.ctx.cart && !GUI.ctx.horse ? GUI.ctx.items : [])].filter(st => st && st.n > 0);
+  W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null };
   (W.meta.itables || (W.meta.itables = {}))[ITEM_TABLE] = ITEM_KEYS;
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
@@ -345,7 +352,7 @@ function frame(now) {
   if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
-  processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); // fewer GPU uploads per frame when the frame rate dips pf('inbox', t0); t0 = performance.now();
+  processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
