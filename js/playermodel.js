@@ -118,7 +118,7 @@ function heldTransform(id, left, isBlock) {
   const s = left ? -1 : 1, M = new THREE.Matrix4(), t = new THREE.Matrix4();
   M.copy(FLIP3).multiply(t.makeRotationX(-90 * DEG)).multiply(t.makeRotationY(180 * DEG)).multiply(t.makeTranslation(s / 16, 0.125, -0.625));
   // display: block [75,45,0] [0,2.5,0] 0.375 · handheld [0,-90,55] [0,4,0.5] 0.85 · generated [0,0,0] [0,3,1] 0.55
-  const [rot, tr, sc] = isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55];
+  const [rot, tr, sc] = id === IID.shield ? [[0, 90, 0], left ? [10, 6, 12] : [10, 6, -4], 1] : isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55]; // shield.json thirdperson_*hand
   M.multiply(t.makeTranslation(s * tr[0] / 16, tr[1] / 16, tr[2] / 16));
   M.multiply(t.makeRotationFromEuler(new THREE.Euler(rot[0] * DEG, s * rot[1] * DEG, s * rot[2] * DEG, 'XYZ')));
   M.multiply(t.makeScale(sc, sc, sc));
@@ -155,7 +155,7 @@ function setPart(b, pivot, pitch, yaw, roll, root) {
 // s: the pose inputs; returns nothing, poses m in place
 function posePlayer(m, s) {
   const P = m.userData.parts, slim = m.userData.slim, ay = slim ? 2.5 : 2, st = m.userData.st;
-  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = s.flying ? 0 : st.limbD, age = s.age;
+  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = st.limbD, age = s.age; // flying players swing their legs too, as in Java
   let A = { head: [headPitch, headYaw, 0], body: [0, 0, 0], rarm: [0, 0, 0], larm: [0, 0, 0], rleg: [0, 0, 0], lleg: [0, 0, 0] };
   const piv = { head: [0, 0, 0], body: [0, 0, 0], rarm: [-5, ay, 0], larm: [5, ay, 0], rleg: [-1.9, 12, 0], lleg: [1.9, 12, 0] };
   if (s.gliding || s.swim) A.head[0] = lerpA(s.gliding ? 1 : st.lean, headPitch, -Math.PI / 4);
@@ -230,8 +230,8 @@ function playerPoseInputs(dt) {
   if (two === 'xbow' || two === 'bow') { right = left = null; }
   const vx = PL.x - PL.px, vz = PL.z - PL.pz;
   return { headYaw: 0, headPitch: -PL.pitch, headPitchW: -PL.pitch, yaw: PL.yaw, right, left, two, charge: R.hand.bow || 0, swing: R.hand.swing > 0 ? 1 - R.hand.swing : 0, swingLeft: swapped === mainRight(),
-    sneak: PL.sneaking && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
-    swim: PL.sprinting && PL.eyeFluid === 1, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
+    sneak: (PL.sneaking || PL.pose === 'crouch') && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
+    swim: PL.pose === 'swim' && !PL.gliding, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
 }
 function tickBodyYaw(st, s, moveX, moveZ, dtT) {
   const d2 = moveX * moveX + moveZ * moveZ;
@@ -273,7 +273,7 @@ function dollRender(el, mx, my) {
   }
   if (D.cv.parentNode !== el) { el.innerHTML = ''; el.appendChild(D.cv); }
   const w = el.clientWidth || 104, h = el.clientHeight || 144;
-  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = 1.05; D.cam.updateProjectionMatrix(); }
+  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = el.classList.contains('titleDoll') ? 0.92 : 1.05; D.cam.updateProjectionMatrix(); }
   // InventoryScreen.drawEntity: the body turns toward the mouse by atan(dx/40)*20 degrees, the head by 40, pitch by atan(dy/40)*20
   const rc = el.getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height * 0.25;
   const fx = Math.atan((cx - mx) / 40 / (rc.width / 52)), fy = Math.atan((cy - my) / 40 / (rc.width / 52));
@@ -288,4 +288,6 @@ function dollRender(el, mx, my) {
 }
 const DOLL = { mx: innerWidth / 2, my: innerHeight / 2 };
 addEventListener('pointermove', e => { DOLL.mx = e.clientX; DOLL.my = e.clientY; });
+// the title screen shows your own skin on the right, turning to follow the mouse like the inventory figure
+(function titleDoll() { requestAnimationFrame(titleDoll); if (typeof UI === 'undefined' || UI.menu !== 'title' || !PLM.model) return; const el = document.querySelector('.titleDoll'); if (el) dollRender(el, DOLL.mx, DOLL.my); })();
 function dollTick() { const el = document.querySelector('.doll'); if (el && UI.screen) dollRender(el, DOLL.mx, DOLL.my); }

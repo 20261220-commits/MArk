@@ -1,7 +1,7 @@
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 2; // 2: HUD, sky, particles, paintings... and end city / mansion pieces
+const UPACK = { name: null }, UPACK_VER = 3; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -112,7 +112,7 @@ async function importPack(file, progress) {
   if (!key && structs) return { name: file.name, structsOnly: true };
   if (!key) throw new Error('assets/minecraft/textures 폴더가 없습니다 (리소스 팩이나 client.jar가 아님)');
   const root = key.slice(0, key.indexOf('assets/minecraft/')) + 'assets/minecraft/';
-  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
+  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png|container\/inventory\.png|container\/furnace\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
   const imgs = new Map();
   for (let i = 0; i < want.length; i++) {
     const rel = want[i].slice(root.length), path = rel.startsWith('textures/') ? rel.slice(9, -4) : '../' + rel.slice(0, -4);

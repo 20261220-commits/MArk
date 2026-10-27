@@ -29,7 +29,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -595,6 +595,22 @@ function rotBox(b, f) { const [x0, y0, z0, x1, y1, z1] = b; return f === 0 ? b :
 const DIR6_IDS = new Set([125, 126, 129, 130, 131]), fix6 = (id, m) => DIR6_IDS.has(id) && (m & 7) > 5 ? (m & ~7) | 5 : m;
 // blocks that take another block's shape (trapped chests, damaged anvils, the extra slab / stair / wall sets)
 const SHAPE_AS = { 1102: 44, 1116: 250, 1117: 250, 1118: 251, 1119: 251, 1120: 253 };
+// Java's model elements for blocks whose shapes plain boxes can't draw: [from, to, rotation [axis, degrees, origin] | null,
+// faces {e,w,u,d,s,n: [tile, u0, v0, u1, v1, uv rotation]}] (block/lectern.json, block/grindstone.json)
+const LECTERN_TOP = ['x', -22.5, [8, 8, 8]], FN = { e: 0, w: 1, u: 2, d: 3, s: 4, n: 5 }, NV = [0, 0, 0], PV = [0, 0, 0];
+const MODEL_ELS = {
+  242: meta => [
+    [[0, 0, 0], [16, 2, 16], null, { n: ['lectern_base', 0, 14, 16, 16], e: ['lectern_base', 0, 6, 16, 8], s: ['lectern_base', 0, 6, 16, 8], w: ['lectern_base', 0, 6, 16, 8], u: ['lectern_base', 0, 0, 16, 16, 180], d: ['oak_planks', 0, 0, 16, 16] }],
+    [[4, 2, 4], [12, 15, 12], null, { n: ['lectern_front', 0, 0, 8, 13], e: ['lectern_sides', 2, 16, 15, 8, 90], s: ['lectern_front', 8, 3, 16, 16], w: ['lectern_sides', 2, 8, 15, 16, 90] }],
+    [[0.0125, 12, 3], [15.9875, 16, 16], LECTERN_TOP, { n: ['lectern_sides', 0, 0, 16, 4], e: ['lectern_sides', 0, 4, 13, 8], s: ['lectern_sides', 0, 4, 16, 8], w: ['lectern_sides', 0, 4, 13, 8], u: ['lectern_top', 0, 1, 16, 14, 180], d: ['oak_planks', 0, 0, 16, 13] }],
+    ...(meta & 4 ? [[[1, 16, 4], [15, 17, 15], LECTERN_TOP, { u: ['lectern_book', 0, 0, 16, 16], n: ['lectern_book', 0, 15, 16, 16], s: ['lectern_book', 0, 15, 16, 16], e: ['lectern_book', 0, 15, 16, 16], w: ['lectern_book', 0, 15, 16, 16] }]] : [])],
+  241: () => [
+    [[12, 0, 6], [14, 7, 10], null, { n: ['dark_oak_log', 2, 9, 4, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 12, 9, 14, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 12, 6, 14, 10] }],
+    [[2, 0, 6], [4, 7, 10], null, { n: ['dark_oak_log', 12, 9, 14, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 2, 9, 4, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 2, 6, 4, 10] }],
+    [[12, 7, 5], [14, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], e: ['grindstone_pivot', 0, 0, 6, 6], s: ['grindstone_pivot', 6, 0, 8, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[2, 7, 5], [4, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], s: ['grindstone_pivot', 6, 0, 8, 6], w: ['grindstone_pivot', 0, 0, 6, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[4, 4, 2], [12, 16, 14], null, { n: ['grindstone_round', 0, 0, 8, 12], e: ['grindstone_side', 0, 0, 12, 12], s: ['grindstone_round', 0, 0, 8, 12], w: ['grindstone_side', 0, 0, 12, 12], u: ['grindstone_round', 0, 0, 8, 12], d: ['grindstone_round', 0, 0, 8, 12] }]],
+};
 function shapes(id, meta) {
   meta = fix6(id, meta); id = SHAPE_AS[id] || id;
   switch (id) {
@@ -830,12 +846,12 @@ function makeGen(seed) {
     let river = false;
     if (land > 0.6 && mount < 0.5 && rv < 0.05) { const k = 1 - rv / 0.05; h = h + (57 - h) * smooth(0, 0.65, k); river = rv < 0.03; }
     // mushroom fields: rare islands far out at sea
-    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.05 ? smooth(0.5, 0.62, mush) : 0;
+    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.08 ? smooth(0.8, 0.88, mush) : 0; // about 0.2% of the world, as in Java
     if (mk > 0) h = h + (SEA + 3 + hills * 4 - h) * mk;
     h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
     const hum = nH.fbm(wx / 900, wz / 900, 3) * 1.6;
     let b;
-    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.32 ? BIO.WARM_OCEAN : temp > 0.12 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
+    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.42 ? BIO.WARM_OCEAN : temp > 0.18 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
     else if (river && h <= SEA) b = BIO.RIVER;
     else if (h <= SEA + 2 && cont < 0.2 && mount < 0.2) b = temp > 0.5 && hum < -0.1 ? BIO.DESERT : BIO.BEACH;
     else if (mount > 0.45) b = BIO.MOUNTAINS;
@@ -845,7 +861,7 @@ function makeGen(seed) {
     else if (hum > 0.45 && temp > 0.1 && h <= SEA + 6) b = BIO.SWAMP;
     else if (temp > 0.3 && hum > 0.3) b = BIO.JUNGLE;
     else if (temp > 0.3 && hum < 0.2) b = BIO.SAVANNA;
-    else if (hum > 0.15) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.25 ? BIO.BIRCH : f < -0.35 ? BIO.DARK_FOREST : BIO.FOREST; }
+    else if (hum > -0.22) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.3 ? BIO.BIRCH : f < -0.4 ? BIO.DARK_FOREST : BIO.FOREST; } // forests are the commonest temperate land
     else b = BIO.PLAINS;
     if (mk > 0.5 && h >= SEA) b = BIO.MUSHROOM;
     else if (b === BIO.TUNDRA && nX.n2(wx / 420 + 31, wz / 420) > 0.35) b = BIO.ICE_SPIKES;
@@ -1124,14 +1140,16 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
 // ---- villages ----
 const VREG = 12;
 const villageCache = new Map();
+let VILLAGE_BIOMES = null;
 function villageAt(seed, G, rx, rz) {
   const key = seed + ':' + rx + ':' + rz; if (villageCache.has(key)) return villageCache.get(key);
   let v = null;
   const r = rng(hash32(seed, rx, rz, 31));
   if (r() < 0.75) {
     const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
-    const [h, b] = G.column(vx, vz);
-    const vt = b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
+    const [h, b, bv] = G.column(vx, vz);
+    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'desert', 'savanna', 'taiga', 'snowy_tundra', 'snowy_taiga'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
+    const vt = !VB.has(bv) ? null : b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
     if (vt && STRUCTS && h > SEA && h < 110) { // Mojang's village pieces, grown by jigsaw (2% are zombie villages)
       const jt = vt === 'snow' ? 'snowy' : vt, zombie = r() < 0.02, planks = { plains: 'oak', desert: 'smooth_sandstone_slab', savanna: 'acacia', snowy: 'spruce', taiga: 'spruce' }[jt];
       const jig = assembleJigsaw(G, seed, 'village/' + jt + (zombie ? '/zombie' : '') + '/town_centers', 6, vx, vz, true, true).map(p => ({ ...p, beard: true, vtype: vt, planks: planks.endsWith('slab') ? 'birch' : planks, zombie }));
@@ -2240,14 +2258,23 @@ function genEnd(seed, cx, cz) {
   lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome, tiles };
 }
+// what a fence (1), pane (2), nether brick fence (3) or wall (4) joins: its own kind, full solid blocks, glass for
+// panes, and a fence gate whose bars run that way (FenceBlock / WallBlock.connectsTo)
+function connectsTo(k, n, nm, dx) {
+  const nd = BLOCKS[n]; if (!nd) return false;
+  if (nd.connect) return nd.connect === k; // wooden and nether brick fences don't join each other
+  if (k === 2 && (n === 25 || /glass$/.test(nd.key))) return true;
+  if (nd.gate) return (k === 1 || k === 4) && ((nm & 1) === 0) === (dx !== 0);
+  return OPQ[n] && !nd.leaves;
+}
 // fences and panes generated by structures get their connection state here (inside the chunk)
 function fixConnections(blocks, meta) {
   const I = (x, y, z) => (y << 8) | (z << 4) | x;
   for (let i = 0; i < CVOL; i++) {
     const b = blocks[i], k = BLOCKS[b] && BLOCKS[b].connect; if (!k) continue;
     const x = i & 15, z = (i >> 4) & 15, y = i >> 8; let m = 0;
-    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const n = blocks[I(ax, y, az)], nd = BLOCKS[n]; if ((nd && nd.connect === k) || (OPQ[n] && !(nd && nd.leaves)) || (k === 2 && n === 25)) m |= 1 << d; });
-    meta[i] = m;
+    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const ni = I(ax, y, az); if (connectsTo(k, blocks[ni], meta[ni], dx)) m |= 1 << d; });
+    meta[i] = (meta[i] & 0xf0) | m; // (the neighbouring chunks' side is joined up when both are loaded: joinConnections)
   }
 }
 function genChunk(seed, cx, cz, dim, exp) {
@@ -2784,7 +2811,7 @@ Buf.prototype.out = function (flip) {
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
   // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
-  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), oFlip = [], cFlip = [], tFlip = [];
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = []; // Wt: water, drawn before the other translucent blocks
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -2824,7 +2851,10 @@ function meshChunk(B, M, L, bio, opts) {
   const isRS = b => b === 1062 || b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
-    QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
+    // texture coordinates in 1/16 pixels, pulled 1/16 pixel into the face so the edge never samples the next tile
+    // of the atlas (that showed as dark dashed lines across water and other surfaces at a distance)
+    const iu = u1 > u0 ? 1 : u1 < u0 ? -1 : 0, iv = v1 > v0 ? 1 : v1 < v0 ? -1 : 0, a0 = (tu + u0) * 16 + iu, a1 = (tu + u1) * 16 - iu, b0 = (tv + v0) * 16 + iv, b1 = (tv + v1) * 16 - iv;
+    QU[0] = a0; QU[1] = b1; QU[2] = a1; QU[3] = b1; QU[4] = a1; QU[5] = b0; QU[6] = a0; QU[7] = b0;
     if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
     const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
     for (let k = 0; k < 4; k++) {
@@ -2951,8 +2981,8 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
-      const boxes = shapes(id, meta);
-      boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
+      if (MODEL_ELS[id]) modelFaces(id, meta, x, y, z, MODEL_ELS[id](meta), meta & 3, Cu, cFlip);
+      else boxFaces(id, meta, x, y, z, shapes(id, meta), Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);
       if (id === 1086 && (meta & 3)) crossAt(x, y, z, (meta & 3) === 2 ? T.bamboo_leaves : T.bamboo_small_leaves, 0, 1, 0.05);
     } else if (rt === RT.TBOX) {
@@ -3032,6 +3062,28 @@ function meshChunk(B, M, L, bio, opts) {
     }
     quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false);
     if (up) { for (let k = 0; k < 4; k++) CS[k][1] -= 1 / 32; const t = CS[1]; CS[1] = CS[3]; CS[3] = t; quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false); } // underside of a slope
+  }
+  // blocks drawn from Java's own model elements (models/block/*.json): boxes with per-face uvs and uv rotation, an
+  // optional element rotation (the lectern's sloped top) and the blockstate's y rotation from the facing
+  function rotP(v, ax, a, o) { const c = Math.cos(a), s = Math.sin(a), i = ax === 'x' ? 1 : 0, j = ax === 'z' ? 1 : 2, p = v[i] - o[i], q = v[j] - o[j];
+    if (ax === 'y') { v[0] = o[0] + p * c + q * s; v[2] = o[2] - p * s + q * c; } else { v[i] = o[i] + p * c - q * s; v[j] = o[j] + p * s + q * c; } }
+  function modelFaces(id, meta, x, y, z, els, yRot, OUT, OFL) {
+    const ya = -yRot * Math.PI / 2, C8 = [8, 8, 8], Z3 = [0, 0, 0];
+    for (const [fr, to, er, faces] of els) for (const fk in faces) {
+      const f = FN[fk], F = FACES[f], [tn, u0, v0, u1, v1, ur] = faces[fk];
+      NV[0] = F.n[0]; NV[1] = F.n[1]; NV[2] = F.n[2];
+      if (er) rotP(NV, er[0], er[1] * Math.PI / 180, Z3); if (yRot) rotP(NV, 'y', ya, Z3);
+      const an = [Math.abs(NV[0]), Math.abs(NV[1]), Math.abs(NV[2])], axn = an[0] > an[1] && an[0] > an[2] ? 0 : an[1] > an[2] ? 1 : 2, sgn = NV[axn] > 0 ? 1 : -1;
+      const g = axn === 0 ? (sgn > 0 ? 0 : 1) : axn === 1 ? (sgn > 0 ? 2 : 3) : (sgn > 0 ? 4 : 5);
+      for (let k = 0; k < 4; k++) { const c = F.c[k]; PV[0] = c[0] ? to[0] : fr[0]; PV[1] = c[1] ? to[1] : fr[1]; PV[2] = c[2] ? to[2] : fr[2];
+        if (er) rotP(PV, er[0], er[1] * Math.PI / 180, er[2]); if (yRot) rotP(PV, 'y', ya, C8);
+        CS[k][0] = x + PV[0] / 16; CS[k][1] = y + PV[1] / 16; CS[k][2] = z + PV[2] / 16; }
+      const G = FACES[g], edge = !er && ((sgn > 0 ? Math.max(CS[0][axn], CS[2][axn]) : Math.min(CS[0][axn], CS[2][axn])) - [x, y, z][axn]) === (sgn > 0 ? 1 : 0);
+      if (edge && OPQ[blk(x + G.n[0], y + G.n[1], z + G.n[2])]) continue;
+      if (edge) flatLight(x + G.n[0], y + G.n[1], z + G.n[2]); else flatLight(x, y, z);
+      SH4[0] = SH4[1] = SH4[2] = SH4[3] = G.s;
+      quad(OUT, OFL, CS, T[tn] != null ? T[tn] : FT[id * 4], u0, v0, u1, v1, (4 - ((ur || 0) / 90)) & 3, L4, SH4, false);
+    }
   }
   function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {
@@ -3138,7 +3190,7 @@ function meshChunk(B, M, L, bio, opts) {
     return n ? s / n : 0.89;
   }
   function fluid(id, meta, x, y, z) {
-    const water = id === 27, buf = water ? Tr : O, fl = water ? tFlip : oFlip, tile = FT[id * 4];
+    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, tile = FT[id * 4];
     const top = bw(x, y + 1, z) === id;
     const h00 = top ? 1 : corner(x, y, z, id, -1, -1), h10 = top ? 1 : corner(x, y, z, id, 1, -1), h11 = top ? 1 : corner(x, y, z, id, 1, 1), h01 = top ? 1 : corner(x, y, z, id, -1, 1);
     const HH = (cx, cz) => cx ? (cz ? h11 : h10) : (cz ? h01 : h00);
@@ -3147,7 +3199,7 @@ function meshChunk(B, M, L, bio, opts) {
       if (nb === id) continue;
       if (f !== 2 && OPQ[nb]) continue;
       if (f === 2 && top) continue;
-      if (water && nb === 52 && f !== 2) continue;
+      if (water && nb === 52) continue; // under ice the water's surface is hidden (it doubled the blend in rows)
       flatLight(nx, ny, nz);
       const ownL = lightAt(x, y, z); if (f === 2 || ((ownL >> 4) > (lightAt(nx, ny, nz) >> 4))) { const s = (ownL >> 4) * 17, b = (ownL & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = Math.max(L4[k][0], s); L4[k][1] = Math.max(L4[k][1], b); } }
       SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
@@ -3156,7 +3208,10 @@ function meshChunk(B, M, L, bio, opts) {
       if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
-  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
+  // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
+  // water drawn over ice darkened whole rows of a frozen ocean
+  for (let i = 0; i < Tr.n; i++) { if (Wt.n * 3 + 3 >= Wt.pos.length) Wt.grow(); const n = Wt.n++; Wt.pos.set(Tr.pos.subarray(i * 3, i * 3 + 3), n * 3); Wt.uv.set(Tr.uv.subarray(i * 2, i * 2 + 2), n * 2); Wt.lt.set(Tr.lt.subarray(i * 4, i * 4 + 4), n * 4); Wt.col.set(Tr.col.subarray(i * 4, i * 4 + 4), n * 4); }
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)) };
 }
 
 // ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
@@ -3355,11 +3410,14 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
   const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
   if (p.beard && p.rigid && t.s[0] * t.s[2] > 4) { // terrain adaptation (Java's beardifier): ground filled up to the piece, terrain inside it dug out
     const top = p.oy + Math.min(t.s[1] - 1, 12);
-    const M = 4; // a slope around the piece instead of a sheer column
+    const M = 7; // an even slope around the piece instead of a sheer column: up to the piece below it, down to it above
     for (let wx = Math.max(x0, p.box[0] - M); wx <= Math.min(x0 + 15, p.box[3] + M); wx++) for (let wz = Math.max(z0, p.box[2] - M); wz <= Math.min(z0 + 15, p.box[5] + M); wz++) {
-      const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d * 2;
-      for (let y = ft; y > 1 && y >= p.oy - 14; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? 2 : 3, 0); }
-      if (!d) for (let y = p.oy; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) st(wx, y, wz, 0, 0); }
+      const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d;
+      const bio = BB[G.column(wx, wz)[2]], sandy = bio === BIO.DESERT || bio === BIO.BADLANDS || bio === BIO.BEACH, topB = sandy ? 12 : 2, fillB = sandy ? 12 : 3;
+      for (let y = ft; y > 1 && y >= p.oy - 20; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? topB : fillB, 0); }
+      const cut = d ? p.oy + d : p.oy; let lowest = -1;
+      for (let y = cut; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) { st(wx, y, wz, 0, 0); if (lowest < 0) lowest = y; } }
+      if (d && lowest > 0) { const b = st.get(wx, lowest - 1, wz); if (b === 3) st(wx, lowest - 1, wz, topB, 0); } // the cut slope gets its grass back
     }
   }
   let later = null;
@@ -3399,11 +3457,17 @@ function stampFeature(st, p, R, x0, z0) {
   const f = p.feature;
   if (f.startsWith('tree:')) { const b = st.get(x, y - 1, z); if (b === BID.grass_block || b === 3 || b < 0) growTree((wx, wy, wz, id, m, force) => { const c = st.get(wx, wy, wz); if (c >= 0 && (force || c === 0 || REPL[c])) st(wx, wy, wz, id, m); }, x, y, z, +f.slice(5), r(), p.vtype === 'snow'); return; }
   const block = { hay: 'hay_block', melon: 'melon', snow: 'snow_block', ice: 'packed_ice' }[f];
-  if (block) { // piles: a rough ellipsoid of blocks on the ground (Java's BlockPileFeature)
-    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) {
-      if (dx * dx + dz * dz + dy * dy * 2 > 4 + r() * 2) continue;
-      const gy = ground(x + dx, z + dz); if (gy < 0) continue;
-      put(x + dx, gy + dy, z + dz, f === 'ice' && r() < 0.25 ? 'blue_ice' : block);
+  if (block) { // piles (Java's BlockPileFeature): one or two layers around the spot, each block on a full solid one below;
+    // hay bales lie in random directions, melon piles have the odd pumpkin, ice piles are mostly packed ice
+    // every choice is made first from the spot's own random numbers, so a pile across a chunk border is the same pile
+    const a = 2 + r.int(2), c = 2 + r.int(2), picks = [];
+    for (let dz = -c; dz <= c; dz++) for (let dy = 0; dy <= 1; dy++) for (let dx = -a; dx <= a; dx++) {
+      const on = dx * dx + dz * dz <= r() * 10 - r() * 6 || r() < 0.031, k = r(), path = r() < 0.5; if (on) picks.push([dx, dy, dz, k, path]); }
+    for (const [dx, dy, dz, k, path] of picks) {
+      const wx = x + dx, wy = y + dy, wz = z + dz, below = st.get(wx, wy - 1, wz); if (below < 0 || (below === BID.dirt_path ? path : !OPQ[below])) continue;
+      const cur = st.get(wx, wy, wz); if (cur < 0 || !(cur === 0 || REPL[cur])) continue;
+      if (f === 'hay') st(wx, wy, wz, BID.hay_block, Math.floor(k * 3)); // axis y, x or z
+      else put(wx, wy, wz, f === 'ice' ? (k < 1 / 6 ? 'blue_ice' : 'packed_ice') : f === 'melon' && k < 0.05 ? 'pumpkin' : block);
     }
     return;
   }
@@ -3538,7 +3602,7 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

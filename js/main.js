@@ -191,6 +191,7 @@ async function startWorld(id, meta) {
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
   await loadSavedKeys(meta.id);
+  W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
@@ -347,7 +348,7 @@ function frame(now) {
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); // fewer GPU uploads per frame when the frame rate dips pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
-  if (!UI.paused) {
+  if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
     let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0);
     if (n >= 5) acc = 0;
@@ -357,7 +358,7 @@ function frame(now) {
   // selection & crack
   const t = !UI.paused && TARGET && TARGET.type === 'block' ? TARGET : null;
   if (t && view === 0 && !UI.hideHud) R.setSelection(t.x, t.y, t.z, selShape(t.id, t.m) || [[0, 0, 0, 16, 16, 16]]); else R.sel.visible = false;
-  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) { R.crack.visible = true; R.crack.position.set(t.x + .5, t.y + .5, t.z + .5); R.crack.material.map = R.crackTexs[Math.min(9, Math.floor(MINE.prog * 10))]; } else R.crack.visible = false;
+  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) R.setCrack(t.x, t.y, t.z, t.id, getMeta(t.x, t.y, t.z), Math.floor(MINE.prog * 10)); else R.crack.visible = false;
   // hand
   if (R.hand.swing > 0) R.hand.swing = Math.max(0, R.hand.swing - dt * 3.5);
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
@@ -444,6 +445,16 @@ function autoRes() {
   if (old !== R.pixelScale) R.resize();
 }
 
+// which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their
+// 3D block model even though a sprite-sized texture exists (end rods, trapdoors, the small dripleaf, spore blossoms)
+function javaItemModels() {
+  const flat = { glass_pane: 'glass', lilac: 'lilac_top', rose_bush: 'rose_bush_top', peony: 'peony_top', sunflower: 'sunflower_top', tall_grass: 'tall_grass_top', large_fern: 'large_fern_top', weeping_vines: 'weeping_vines_plant', twisting_vines: 'twisting_vines_plant' };
+  for (const c of S.COLORS) flat[c + '_stained_glass_pane'] = c + '_stained_glass';
+  for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const k of [c + '_coral', c + '_coral_fan', 'dead_' + c + '_coral', 'dead_' + c + '_coral_fan']) flat[k] = k;
+  for (const k in flat) { const id = IID[k]; if (id != null && S.T[flat[k]] != null && !PACKPX.items[k]) ITEMS[id].sprite = flat[k]; }
+  for (const k of ['end_rod', 'spore_blossom', 'small_dripleaf', ...['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'iron'].map(w => w + '_trapdoor')]) { const id = IID[k]; if (id != null) ITEMS[id].sprite = null; }
+}
+
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
@@ -451,8 +462,9 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  javaItemModels();
   if (UPACK.stale) setTimeout(() => UI.flash('설정 → 리소스 팩에서 client.jar 를 다시 불러오면 원작 텍스처가 더 많이 적용됩니다'), 1500);
-  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); R.applyPackCracks(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }

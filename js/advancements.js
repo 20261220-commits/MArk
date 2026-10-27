@@ -129,7 +129,7 @@ function advGrant(id, crit) {
 function advComplete(a, st) {
   st.done = Date.now();
   const verb = a.frame === 'c' ? ['도전 과제', '을(를) 완료했습니다', '#aa00aa'] : a.frame === 'g' ? ['목표', '에 도달했습니다', '#55ff55'] : ['발전 과제', '을(를) 달성했습니다', '#55ff55'];
-  if (gr('announceAdvancements')) chatMsg(`플레이어가 ${verb[0]} [${a.name}]${verb[1]}`, verb[2]);
+  if (gr('announceAdvancements')) { const who = typeof MP !== 'undefined' && MP.on ? MP.name + '님이' : '플레이어가', t = `${who} ${verb[0]} [${a.name}]${verb[1]}`; chatMsg(t, verb[2]); if (typeof MP !== 'undefined' && MP.on) mpSend({ t: 'sys', text: t, c: verb[2] }); } // everyone in the world hears about it
   if (a.xp) addXP(a.xp);
   advQueue.push(a); if (advQueue.length === 1) showAdv();
 }

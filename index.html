@@ -47,6 +47,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #heldName{position:fixed;left:50%;bottom:calc(60 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(74 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;opacity:0;transition:opacity .4s;white-space:nowrap;background:rgba(0,0,0,.35);padding:var(--px) calc(4 * var(--px))}
 #toast.show{opacity:1;transition:none}
+#plist{position:fixed;left:50%;top:calc(10 * var(--px));transform:translateX(-50%);min-width:calc(120 * var(--px));background:rgba(0,0,0,.45);padding:calc(2 * var(--px)) calc(4 * var(--px));z-index:30;font-size:calc(8 * var(--px));color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
+#plist div{padding:calc(1 * var(--px)) 0;border-bottom:1px solid rgba(255,255,255,.12)}
 #debug{position:fixed;left:calc(2 * var(--px));top:calc(2 * var(--px));white-space:pre;font-size:calc(7 * var(--px));line-height:1.35;color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #2a2a2a;background:transparent}
 #chatLog{position:fixed;left:calc(2 * var(--px));bottom:calc(48 * var(--px));width:min(calc(320 * var(--px)),70vw);font-size:calc(7 * var(--px));line-height:1.45}
 #chatLog div{background:rgba(0,0,0,.45);padding:0 calc(2 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow-wrap:anywhere}
@@ -154,6 +156,8 @@ body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgb
 body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
+.titleDoll{position:absolute;right:max(8px,3vw);top:50%;transform:translateY(-46%);width:min(30vw,380px);height:min(58vh,500px);cursor:pointer;pointer-events:auto}
+@media (max-aspect-ratio:1/1){.titleDoll{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb:hover,.mb:focus-visible{background-color:#7e88c8;color:#ffffa0;outline:none;box-shadow:inset var(--px) var(--px) 0 #c8d0ff,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #4a5288}
@@ -228,6 +232,12 @@ body.vwidgets #offslot{width:calc(29 * var(--px));height:calc(24 * var(--px));bo
 body.vwidgets #offslot.right{background-image:var(--g-offr);padding-left:calc(10 * var(--px));left:auto;right:calc(-30 * var(--px))}
 body.vglint .glint{background:var(--g-glint) 0 0/calc(32 * var(--px)) calc(32 * var(--px)) repeat;opacity:.8;animation:glint2 4s linear infinite}
 @keyframes glint2{to{background-position:calc(32 * var(--px)) calc(-32 * var(--px))}}
+body.vgui .panel{border:calc(4 * var(--px)) solid transparent;border-image:var(--g-panel) 4 / calc(4 * var(--px)) stretch;box-shadow:none;border-radius:0;background:#c6c6c6;background-clip:padding-box;image-rendering:pixelated;padding:calc(3 * var(--px)) calc(3 * var(--px)) calc(3 * var(--px))}
+body.vgui .sl{background:var(--g-slot) 0 0/100% 100%;box-shadow:none;image-rendering:pixelated}
+body.vfurn .arrow{width:calc(24 * var(--px));height:calc(17 * var(--px));clip-path:none;background:var(--g-arrow0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .arrow.prog::after{background:var(--g-arrow1) 0 0/calc(24 * var(--px)) 100% no-repeat;image-rendering:pixelated}
+body.vfurn .flame{clip-path:none;position:relative;background:var(--g-flame0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:calc(var(--p) * 100%);background:var(--g-flame1) bottom/100% calc(14 * var(--px)) no-repeat;image-rendering:pixelated}
 </style>
 </head>
 <body>
@@ -322,6 +332,7 @@ body.vglint .glint{background:var(--g-glint) 0 0/calc(32 * var(--px)) calc(32 * 
 <script src="js/ui.js"></script>
 <script src="js/advancements.js"></script>
 <script src="js/playermodel.js"></script>
+<script src="js/mpcore.js"></script>
 <script src="js/multiplayer.js"></script>
 <script src="js/main.js"></script>
 </body>

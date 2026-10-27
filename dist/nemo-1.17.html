@@ -47,6 +47,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #heldName{position:fixed;left:50%;bottom:calc(60 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(74 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;opacity:0;transition:opacity .4s;white-space:nowrap;background:rgba(0,0,0,.35);padding:var(--px) calc(4 * var(--px))}
 #toast.show{opacity:1;transition:none}
+#plist{position:fixed;left:50%;top:calc(10 * var(--px));transform:translateX(-50%);min-width:calc(120 * var(--px));background:rgba(0,0,0,.45);padding:calc(2 * var(--px)) calc(4 * var(--px));z-index:30;font-size:calc(8 * var(--px));color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
+#plist div{padding:calc(1 * var(--px)) 0;border-bottom:1px solid rgba(255,255,255,.12)}
 #debug{position:fixed;left:calc(2 * var(--px));top:calc(2 * var(--px));white-space:pre;font-size:calc(7 * var(--px));line-height:1.35;color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #2a2a2a;background:transparent}
 #chatLog{position:fixed;left:calc(2 * var(--px));bottom:calc(48 * var(--px));width:min(calc(320 * var(--px)),70vw);font-size:calc(7 * var(--px));line-height:1.45}
 #chatLog div{background:rgba(0,0,0,.45);padding:0 calc(2 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow-wrap:anywhere}
@@ -154,6 +156,8 @@ body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgb
 body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
+.titleDoll{position:absolute;right:max(8px,3vw);top:50%;transform:translateY(-46%);width:min(30vw,380px);height:min(58vh,500px);cursor:pointer;pointer-events:auto}
+@media (max-aspect-ratio:1/1){.titleDoll{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb:hover,.mb:focus-visible{background-color:#7e88c8;color:#ffffa0;outline:none;box-shadow:inset var(--px) var(--px) 0 #c8d0ff,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #4a5288}
@@ -228,6 +232,12 @@ body.vwidgets #offslot{width:calc(29 * var(--px));height:calc(24 * var(--px));bo
 body.vwidgets #offslot.right{background-image:var(--g-offr);padding-left:calc(10 * var(--px));left:auto;right:calc(-30 * var(--px))}
 body.vglint .glint{background:var(--g-glint) 0 0/calc(32 * var(--px)) calc(32 * var(--px)) repeat;opacity:.8;animation:glint2 4s linear infinite}
 @keyframes glint2{to{background-position:calc(32 * var(--px)) calc(-32 * var(--px))}}
+body.vgui .panel{border:calc(4 * var(--px)) solid transparent;border-image:var(--g-panel) 4 / calc(4 * var(--px)) stretch;box-shadow:none;border-radius:0;background:#c6c6c6;background-clip:padding-box;image-rendering:pixelated;padding:calc(3 * var(--px)) calc(3 * var(--px)) calc(3 * var(--px))}
+body.vgui .sl{background:var(--g-slot) 0 0/100% 100%;box-shadow:none;image-rendering:pixelated}
+body.vfurn .arrow{width:calc(24 * var(--px));height:calc(17 * var(--px));clip-path:none;background:var(--g-arrow0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .arrow.prog::after{background:var(--g-arrow1) 0 0/calc(24 * var(--px)) 100% no-repeat;image-rendering:pixelated}
+body.vfurn .flame{clip-path:none;position:relative;background:var(--g-flame0) 0 0/100% 100%;image-rendering:pixelated}
+body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;height:calc(var(--p) * 100%);background:var(--g-flame1) bottom/100% calc(14 * var(--px)) no-repeat;image-rendering:pixelated}
 </style>
 </head>
 <body>
@@ -311,7 +321,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -877,6 +887,22 @@ function rotBox(b, f) { const [x0, y0, z0, x1, y1, z1] = b; return f === 0 ? b :
 const DIR6_IDS = new Set([125, 126, 129, 130, 131]), fix6 = (id, m) => DIR6_IDS.has(id) && (m & 7) > 5 ? (m & ~7) | 5 : m;
 // blocks that take another block's shape (trapped chests, damaged anvils, the extra slab / stair / wall sets)
 const SHAPE_AS = { 1102: 44, 1116: 250, 1117: 250, 1118: 251, 1119: 251, 1120: 253 };
+// Java's model elements for blocks whose shapes plain boxes can't draw: [from, to, rotation [axis, degrees, origin] | null,
+// faces {e,w,u,d,s,n: [tile, u0, v0, u1, v1, uv rotation]}] (block/lectern.json, block/grindstone.json)
+const LECTERN_TOP = ['x', -22.5, [8, 8, 8]], FN = { e: 0, w: 1, u: 2, d: 3, s: 4, n: 5 }, NV = [0, 0, 0], PV = [0, 0, 0];
+const MODEL_ELS = {
+  242: meta => [
+    [[0, 0, 0], [16, 2, 16], null, { n: ['lectern_base', 0, 14, 16, 16], e: ['lectern_base', 0, 6, 16, 8], s: ['lectern_base', 0, 6, 16, 8], w: ['lectern_base', 0, 6, 16, 8], u: ['lectern_base', 0, 0, 16, 16, 180], d: ['oak_planks', 0, 0, 16, 16] }],
+    [[4, 2, 4], [12, 15, 12], null, { n: ['lectern_front', 0, 0, 8, 13], e: ['lectern_sides', 2, 16, 15, 8, 90], s: ['lectern_front', 8, 3, 16, 16], w: ['lectern_sides', 2, 8, 15, 16, 90] }],
+    [[0.0125, 12, 3], [15.9875, 16, 16], LECTERN_TOP, { n: ['lectern_sides', 0, 0, 16, 4], e: ['lectern_sides', 0, 4, 13, 8], s: ['lectern_sides', 0, 4, 16, 8], w: ['lectern_sides', 0, 4, 13, 8], u: ['lectern_top', 0, 1, 16, 14, 180], d: ['oak_planks', 0, 0, 16, 13] }],
+    ...(meta & 4 ? [[[1, 16, 4], [15, 17, 15], LECTERN_TOP, { u: ['lectern_book', 0, 0, 16, 16], n: ['lectern_book', 0, 15, 16, 16], s: ['lectern_book', 0, 15, 16, 16], e: ['lectern_book', 0, 15, 16, 16], w: ['lectern_book', 0, 15, 16, 16] }]] : [])],
+  241: () => [
+    [[12, 0, 6], [14, 7, 10], null, { n: ['dark_oak_log', 2, 9, 4, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 12, 9, 14, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 12, 6, 14, 10] }],
+    [[2, 0, 6], [4, 7, 10], null, { n: ['dark_oak_log', 12, 9, 14, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 2, 9, 4, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 2, 6, 4, 10] }],
+    [[12, 7, 5], [14, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], e: ['grindstone_pivot', 0, 0, 6, 6], s: ['grindstone_pivot', 6, 0, 8, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[2, 7, 5], [4, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], s: ['grindstone_pivot', 6, 0, 8, 6], w: ['grindstone_pivot', 0, 0, 6, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[4, 4, 2], [12, 16, 14], null, { n: ['grindstone_round', 0, 0, 8, 12], e: ['grindstone_side', 0, 0, 12, 12], s: ['grindstone_round', 0, 0, 8, 12], w: ['grindstone_side', 0, 0, 12, 12], u: ['grindstone_round', 0, 0, 8, 12], d: ['grindstone_round', 0, 0, 8, 12] }]],
+};
 function shapes(id, meta) {
   meta = fix6(id, meta); id = SHAPE_AS[id] || id;
   switch (id) {
@@ -1112,12 +1138,12 @@ function makeGen(seed) {
     let river = false;
     if (land > 0.6 && mount < 0.5 && rv < 0.05) { const k = 1 - rv / 0.05; h = h + (57 - h) * smooth(0, 0.65, k); river = rv < 0.03; }
     // mushroom fields: rare islands far out at sea
-    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.05 ? smooth(0.5, 0.62, mush) : 0;
+    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.08 ? smooth(0.8, 0.88, mush) : 0; // about 0.2% of the world, as in Java
     if (mk > 0) h = h + (SEA + 3 + hills * 4 - h) * mk;
     h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
     const hum = nH.fbm(wx / 900, wz / 900, 3) * 1.6;
     let b;
-    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.32 ? BIO.WARM_OCEAN : temp > 0.12 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
+    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.42 ? BIO.WARM_OCEAN : temp > 0.18 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
     else if (river && h <= SEA) b = BIO.RIVER;
     else if (h <= SEA + 2 && cont < 0.2 && mount < 0.2) b = temp > 0.5 && hum < -0.1 ? BIO.DESERT : BIO.BEACH;
     else if (mount > 0.45) b = BIO.MOUNTAINS;
@@ -1127,7 +1153,7 @@ function makeGen(seed) {
     else if (hum > 0.45 && temp > 0.1 && h <= SEA + 6) b = BIO.SWAMP;
     else if (temp > 0.3 && hum > 0.3) b = BIO.JUNGLE;
     else if (temp > 0.3 && hum < 0.2) b = BIO.SAVANNA;
-    else if (hum > 0.15) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.25 ? BIO.BIRCH : f < -0.35 ? BIO.DARK_FOREST : BIO.FOREST; }
+    else if (hum > -0.22) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.3 ? BIO.BIRCH : f < -0.4 ? BIO.DARK_FOREST : BIO.FOREST; } // forests are the commonest temperate land
     else b = BIO.PLAINS;
     if (mk > 0.5 && h >= SEA) b = BIO.MUSHROOM;
     else if (b === BIO.TUNDRA && nX.n2(wx / 420 + 31, wz / 420) > 0.35) b = BIO.ICE_SPIKES;
@@ -1406,14 +1432,16 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
 // ---- villages ----
 const VREG = 12;
 const villageCache = new Map();
+let VILLAGE_BIOMES = null;
 function villageAt(seed, G, rx, rz) {
   const key = seed + ':' + rx + ':' + rz; if (villageCache.has(key)) return villageCache.get(key);
   let v = null;
   const r = rng(hash32(seed, rx, rz, 31));
   if (r() < 0.75) {
     const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
-    const [h, b] = G.column(vx, vz);
-    const vt = b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
+    const [h, b, bv] = G.column(vx, vz);
+    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'desert', 'savanna', 'taiga', 'snowy_tundra', 'snowy_taiga'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
+    const vt = !VB.has(bv) ? null : b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
     if (vt && STRUCTS && h > SEA && h < 110) { // Mojang's village pieces, grown by jigsaw (2% are zombie villages)
       const jt = vt === 'snow' ? 'snowy' : vt, zombie = r() < 0.02, planks = { plains: 'oak', desert: 'smooth_sandstone_slab', savanna: 'acacia', snowy: 'spruce', taiga: 'spruce' }[jt];
       const jig = assembleJigsaw(G, seed, 'village/' + jt + (zombie ? '/zombie' : '') + '/town_centers', 6, vx, vz, true, true).map(p => ({ ...p, beard: true, vtype: vt, planks: planks.endsWith('slab') ? 'birch' : planks, zombie }));
@@ -2522,14 +2550,23 @@ function genEnd(seed, cx, cz) {
   lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome, tiles };
 }
+// what a fence (1), pane (2), nether brick fence (3) or wall (4) joins: its own kind, full solid blocks, glass for
+// panes, and a fence gate whose bars run that way (FenceBlock / WallBlock.connectsTo)
+function connectsTo(k, n, nm, dx) {
+  const nd = BLOCKS[n]; if (!nd) return false;
+  if (nd.connect) return nd.connect === k; // wooden and nether brick fences don't join each other
+  if (k === 2 && (n === 25 || /glass$/.test(nd.key))) return true;
+  if (nd.gate) return (k === 1 || k === 4) && ((nm & 1) === 0) === (dx !== 0);
+  return OPQ[n] && !nd.leaves;
+}
 // fences and panes generated by structures get their connection state here (inside the chunk)
 function fixConnections(blocks, meta) {
   const I = (x, y, z) => (y << 8) | (z << 4) | x;
   for (let i = 0; i < CVOL; i++) {
     const b = blocks[i], k = BLOCKS[b] && BLOCKS[b].connect; if (!k) continue;
     const x = i & 15, z = (i >> 4) & 15, y = i >> 8; let m = 0;
-    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const n = blocks[I(ax, y, az)], nd = BLOCKS[n]; if ((nd && nd.connect === k) || (OPQ[n] && !(nd && nd.leaves)) || (k === 2 && n === 25)) m |= 1 << d; });
-    meta[i] = m;
+    [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const ni = I(ax, y, az); if (connectsTo(k, blocks[ni], meta[ni], dx)) m |= 1 << d; });
+    meta[i] = (meta[i] & 0xf0) | m; // (the neighbouring chunks' side is joined up when both are loaded: joinConnections)
   }
 }
 function genChunk(seed, cx, cz, dim, exp) {
@@ -3066,7 +3103,7 @@ Buf.prototype.out = function (flip) {
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
   // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
-  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), oFlip = [], cFlip = [], tFlip = [];
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = []; // Wt: water, drawn before the other translucent blocks
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -3106,7 +3143,10 @@ function meshChunk(B, M, L, bio, opts) {
   const isRS = b => b === 1062 || b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
-    QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
+    // texture coordinates in 1/16 pixels, pulled 1/16 pixel into the face so the edge never samples the next tile
+    // of the atlas (that showed as dark dashed lines across water and other surfaces at a distance)
+    const iu = u1 > u0 ? 1 : u1 < u0 ? -1 : 0, iv = v1 > v0 ? 1 : v1 < v0 ? -1 : 0, a0 = (tu + u0) * 16 + iu, a1 = (tu + u1) * 16 - iu, b0 = (tv + v0) * 16 + iv, b1 = (tv + v1) * 16 - iv;
+    QU[0] = a0; QU[1] = b1; QU[2] = a1; QU[3] = b1; QU[4] = a1; QU[5] = b0; QU[6] = a0; QU[7] = b0;
     if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
     const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
     for (let k = 0; k < 4; k++) {
@@ -3233,8 +3273,8 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
-      const boxes = shapes(id, meta);
-      boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
+      if (MODEL_ELS[id]) modelFaces(id, meta, x, y, z, MODEL_ELS[id](meta), meta & 3, Cu, cFlip);
+      else boxFaces(id, meta, x, y, z, shapes(id, meta), Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);
       if (id === 1086 && (meta & 3)) crossAt(x, y, z, (meta & 3) === 2 ? T.bamboo_leaves : T.bamboo_small_leaves, 0, 1, 0.05);
     } else if (rt === RT.TBOX) {
@@ -3314,6 +3354,28 @@ function meshChunk(B, M, L, bio, opts) {
     }
     quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false);
     if (up) { for (let k = 0; k < 4; k++) CS[k][1] -= 1 / 32; const t = CS[1]; CS[1] = CS[3]; CS[3] = t; quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false); } // underside of a slope
+  }
+  // blocks drawn from Java's own model elements (models/block/*.json): boxes with per-face uvs and uv rotation, an
+  // optional element rotation (the lectern's sloped top) and the blockstate's y rotation from the facing
+  function rotP(v, ax, a, o) { const c = Math.cos(a), s = Math.sin(a), i = ax === 'x' ? 1 : 0, j = ax === 'z' ? 1 : 2, p = v[i] - o[i], q = v[j] - o[j];
+    if (ax === 'y') { v[0] = o[0] + p * c + q * s; v[2] = o[2] - p * s + q * c; } else { v[i] = o[i] + p * c - q * s; v[j] = o[j] + p * s + q * c; } }
+  function modelFaces(id, meta, x, y, z, els, yRot, OUT, OFL) {
+    const ya = -yRot * Math.PI / 2, C8 = [8, 8, 8], Z3 = [0, 0, 0];
+    for (const [fr, to, er, faces] of els) for (const fk in faces) {
+      const f = FN[fk], F = FACES[f], [tn, u0, v0, u1, v1, ur] = faces[fk];
+      NV[0] = F.n[0]; NV[1] = F.n[1]; NV[2] = F.n[2];
+      if (er) rotP(NV, er[0], er[1] * Math.PI / 180, Z3); if (yRot) rotP(NV, 'y', ya, Z3);
+      const an = [Math.abs(NV[0]), Math.abs(NV[1]), Math.abs(NV[2])], axn = an[0] > an[1] && an[0] > an[2] ? 0 : an[1] > an[2] ? 1 : 2, sgn = NV[axn] > 0 ? 1 : -1;
+      const g = axn === 0 ? (sgn > 0 ? 0 : 1) : axn === 1 ? (sgn > 0 ? 2 : 3) : (sgn > 0 ? 4 : 5);
+      for (let k = 0; k < 4; k++) { const c = F.c[k]; PV[0] = c[0] ? to[0] : fr[0]; PV[1] = c[1] ? to[1] : fr[1]; PV[2] = c[2] ? to[2] : fr[2];
+        if (er) rotP(PV, er[0], er[1] * Math.PI / 180, er[2]); if (yRot) rotP(PV, 'y', ya, C8);
+        CS[k][0] = x + PV[0] / 16; CS[k][1] = y + PV[1] / 16; CS[k][2] = z + PV[2] / 16; }
+      const G = FACES[g], edge = !er && ((sgn > 0 ? Math.max(CS[0][axn], CS[2][axn]) : Math.min(CS[0][axn], CS[2][axn])) - [x, y, z][axn]) === (sgn > 0 ? 1 : 0);
+      if (edge && OPQ[blk(x + G.n[0], y + G.n[1], z + G.n[2])]) continue;
+      if (edge) flatLight(x + G.n[0], y + G.n[1], z + G.n[2]); else flatLight(x, y, z);
+      SH4[0] = SH4[1] = SH4[2] = SH4[3] = G.s;
+      quad(OUT, OFL, CS, T[tn] != null ? T[tn] : FT[id * 4], u0, v0, u1, v1, (4 - ((ur || 0) / 90)) & 3, L4, SH4, false);
+    }
   }
   function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {
@@ -3420,7 +3482,7 @@ function meshChunk(B, M, L, bio, opts) {
     return n ? s / n : 0.89;
   }
   function fluid(id, meta, x, y, z) {
-    const water = id === 27, buf = water ? Tr : O, fl = water ? tFlip : oFlip, tile = FT[id * 4];
+    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, tile = FT[id * 4];
     const top = bw(x, y + 1, z) === id;
     const h00 = top ? 1 : corner(x, y, z, id, -1, -1), h10 = top ? 1 : corner(x, y, z, id, 1, -1), h11 = top ? 1 : corner(x, y, z, id, 1, 1), h01 = top ? 1 : corner(x, y, z, id, -1, 1);
     const HH = (cx, cz) => cx ? (cz ? h11 : h10) : (cz ? h01 : h00);
@@ -3429,7 +3491,7 @@ function meshChunk(B, M, L, bio, opts) {
       if (nb === id) continue;
       if (f !== 2 && OPQ[nb]) continue;
       if (f === 2 && top) continue;
-      if (water && nb === 52 && f !== 2) continue;
+      if (water && nb === 52) continue; // under ice the water's surface is hidden (it doubled the blend in rows)
       flatLight(nx, ny, nz);
       const ownL = lightAt(x, y, z); if (f === 2 || ((ownL >> 4) > (lightAt(nx, ny, nz) >> 4))) { const s = (ownL >> 4) * 17, b = (ownL & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = Math.max(L4[k][0], s); L4[k][1] = Math.max(L4[k][1], b); } }
       SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
@@ -3438,7 +3500,10 @@ function meshChunk(B, M, L, bio, opts) {
       if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
-  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
+  // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
+  // water drawn over ice darkened whole rows of a frozen ocean
+  for (let i = 0; i < Tr.n; i++) { if (Wt.n * 3 + 3 >= Wt.pos.length) Wt.grow(); const n = Wt.n++; Wt.pos.set(Tr.pos.subarray(i * 3, i * 3 + 3), n * 3); Wt.uv.set(Tr.uv.subarray(i * 2, i * 2 + 2), n * 2); Wt.lt.set(Tr.lt.subarray(i * 4, i * 4 + 4), n * 4); Wt.col.set(Tr.col.subarray(i * 4, i * 4 + 4), n * 4); }
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)) };
 }
 
 // ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
@@ -3637,11 +3702,14 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
   const tl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
   if (p.beard && p.rigid && t.s[0] * t.s[2] > 4) { // terrain adaptation (Java's beardifier): ground filled up to the piece, terrain inside it dug out
     const top = p.oy + Math.min(t.s[1] - 1, 12);
-    const M = 4; // a slope around the piece instead of a sheer column
+    const M = 7; // an even slope around the piece instead of a sheer column: up to the piece below it, down to it above
     for (let wx = Math.max(x0, p.box[0] - M); wx <= Math.min(x0 + 15, p.box[3] + M); wx++) for (let wz = Math.max(z0, p.box[2] - M); wz <= Math.min(z0 + 15, p.box[5] + M); wz++) {
-      const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d * 2;
-      for (let y = ft; y > 1 && y >= p.oy - 14; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? 2 : 3, 0); }
-      if (!d) for (let y = p.oy; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) st(wx, y, wz, 0, 0); }
+      const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d;
+      const bio = BB[G.column(wx, wz)[2]], sandy = bio === BIO.DESERT || bio === BIO.BADLANDS || bio === BIO.BEACH, topB = sandy ? 12 : 2, fillB = sandy ? 12 : 3;
+      for (let y = ft; y > 1 && y >= p.oy - 20; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? topB : fillB, 0); }
+      const cut = d ? p.oy + d : p.oy; let lowest = -1;
+      for (let y = cut; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) { st(wx, y, wz, 0, 0); if (lowest < 0) lowest = y; } }
+      if (d && lowest > 0) { const b = st.get(wx, lowest - 1, wz); if (b === 3) st(wx, lowest - 1, wz, topB, 0); } // the cut slope gets its grass back
     }
   }
   let later = null;
@@ -3681,11 +3749,17 @@ function stampFeature(st, p, R, x0, z0) {
   const f = p.feature;
   if (f.startsWith('tree:')) { const b = st.get(x, y - 1, z); if (b === BID.grass_block || b === 3 || b < 0) growTree((wx, wy, wz, id, m, force) => { const c = st.get(wx, wy, wz); if (c >= 0 && (force || c === 0 || REPL[c])) st(wx, wy, wz, id, m); }, x, y, z, +f.slice(5), r(), p.vtype === 'snow'); return; }
   const block = { hay: 'hay_block', melon: 'melon', snow: 'snow_block', ice: 'packed_ice' }[f];
-  if (block) { // piles: a rough ellipsoid of blocks on the ground (Java's BlockPileFeature)
-    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) {
-      if (dx * dx + dz * dz + dy * dy * 2 > 4 + r() * 2) continue;
-      const gy = ground(x + dx, z + dz); if (gy < 0) continue;
-      put(x + dx, gy + dy, z + dz, f === 'ice' && r() < 0.25 ? 'blue_ice' : block);
+  if (block) { // piles (Java's BlockPileFeature): one or two layers around the spot, each block on a full solid one below;
+    // hay bales lie in random directions, melon piles have the odd pumpkin, ice piles are mostly packed ice
+    // every choice is made first from the spot's own random numbers, so a pile across a chunk border is the same pile
+    const a = 2 + r.int(2), c = 2 + r.int(2), picks = [];
+    for (let dz = -c; dz <= c; dz++) for (let dy = 0; dy <= 1; dy++) for (let dx = -a; dx <= a; dx++) {
+      const on = dx * dx + dz * dz <= r() * 10 - r() * 6 || r() < 0.031, k = r(), path = r() < 0.5; if (on) picks.push([dx, dy, dz, k, path]); }
+    for (const [dx, dy, dz, k, path] of picks) {
+      const wx = x + dx, wy = y + dy, wz = z + dz, below = st.get(wx, wy - 1, wz); if (below < 0 || (below === BID.dirt_path ? path : !OPQ[below])) continue;
+      const cur = st.get(wx, wy, wz); if (cur < 0 || !(cur === 0 || REPL[cur])) continue;
+      if (f === 'hay') st(wx, wy, wz, BID.hay_block, Math.floor(k * 3)); // axis y, x or z
+      else put(wx, wy, wz, f === 'ice' ? (k < 1 / 6 ? 'blue_ice' : 'packed_ice') : f === 'melon' && k < 0.05 ? 'pumpkin' : block);
     }
     return;
   }
@@ -3820,7 +3894,7 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
@@ -3897,7 +3971,7 @@ const TILE = {
   slime_block: 'slime_block',
 };
 // expansion tiles share the pack's names
-for (const t of 'jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3'.split(' ')) TILE[t] = t;
+for (const t of 'lectern_base grindstone_pivot jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3'.split(' ')) TILE[t] = t;
 TILE.soul_fire = 'soul_fire_0';
 for (let i = 0; i < 8; i++) TILE['wheat' + i] = 'wheat_stage' + i;
 // newer tiles the full pack has under the same names (first animation frame where animated)
@@ -4012,10 +4086,11 @@ for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
 // the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
-Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
+Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', gui_inv: 'gui/container/inventory', gui_furnace: 'gui/container/furnace', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
   env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
   pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
   banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
+  ...Object.fromEntries([...Array(10).keys()].map(i => ['destroy_' + i, 'block/destroy_stage_' + i])), // the breaking overlay
   conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book', arrow_ent: 'entity/projectiles/arrow', spectral_arrow_ent: 'entity/projectiles/spectral_arrow',
   minecart_ent: 'entity/minecart', armorstand: 'entity/armorstand/wood', fishing_hook: 'entity/fishing_hook', lead_knot: 'entity/lead_knot', evoker_fangs: 'entity/illager/evoker_fangs',
   llama_spit: 'entity/llama/spit', trident_ent: 'entity/trident', dragon_fireball: 'entity/enderdragon/dragon_fireball', beacon_beam: 'entity/beacon_beam', wither_armor: 'entity/wither/wither_armor',
@@ -4150,7 +4225,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 2; // 2: HUD, sky, particles, paintings... and end city / mansion pieces
+const UPACK = { name: null }, UPACK_VER = 3; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -4261,7 +4336,7 @@ async function importPack(file, progress) {
   if (!key && structs) return { name: file.name, structsOnly: true };
   if (!key) throw new Error('assets/minecraft/textures 폴더가 없습니다 (리소스 팩이나 client.jar가 아님)');
   const root = key.slice(0, key.indexOf('assets/minecraft/')) + 'assets/minecraft/';
-  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
+  const want = Object.keys(files).filter(k => k.startsWith(root) && k.endsWith('.png') && !/^textures\/gui\/(?!icons\.png|widgets\.png|container\/inventory\.png|container\/furnace\.png)/.test(k.slice(root.length)) && /^(textures\/(block|item|entity|models|gui|environment|painting|mob_effect|particle|map|misc)\/|optifine\/(random|sky)\/)/.test(k.slice(root.length)));
   const imgs = new Map();
   for (let i = 0; i < want.length; i++) {
     const rel = want[i].slice(root.length), path = rel.startsWith('textures/') ? rel.slice(9, -4) : '../' + rel.slice(0, -4);
@@ -5585,6 +5660,8 @@ const SCAF_C = hex(0xd8b45a);
 PAINT.scaffolding_side = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || Math.abs(x - y) < 1.5) ? quant(shade(SCAF_C, (x < 2 || x > 13 ? 0.85 : 1) * (0.9 + r() * 0.15)), 3) : null);
 PAINT.scaffolding_top = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || (x + y) % 5 === 0) ? quant(shade(SCAF_C, 0.9 + r() * 0.15), 3) : null);
 PAINT.scaffolding_bottom = PAINT.scaffolding_top;
+PAINT.lectern_base = r => fill((x, y) => quant(shade(hex(0xa8865a), (y % 4 === 0 ? 0.8 : 1) * (0.92 + r() * 0.12)), 3));
+PAINT.grindstone_pivot = r => fill((x, y) => quant(shade(hex(0x8a8a8a), 0.9 + r() * 0.15), 3));
 PAINT.lectern_book = r => fill((x, y) => x < 1 || x > 14 ? hex(0x6a3a1a) : x === 7 || x === 8 ? hex(0xb8a888) : y % 3 === 1 && y > 1 && y < 14 && x > 1 && x < 14 ? hex(0x5a5a5a) : quant(shade(hex(0xf0e8d0), 0.95 + r() * 0.06), 3));
 // tiles with no painter borrow a similar one until a resource pack supplies the real texture (nothing new is drawn)
 const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate', polished_deepslate: 'deepslate', chiseled_deepslate: 'deepslate', cracked_deepslate_bricks: 'deepslate', cracked_deepslate_tiles: 'deepslate',
@@ -6093,7 +6170,7 @@ const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 var
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
-  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = true; };
+  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = c.urgent = true; }; // edits are remeshed first, on their own worker
   m(cx, cz);
   if (lx === 0) m(cx - 1, cz); else if (lx === 15) m(cx + 1, cz);
   if (lz === 0) m(cx, cz - 1); else if (lz === 15) m(cx, cz + 1);
@@ -6196,7 +6273,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
-  if (MP.on && MP.local && !MP.applying) mpBlockChanged(x, y, z, id, meta); // multiplayer: what a player did reaches the others
+  if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta); // multiplayer: the host's world (and what a guest did) reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -6212,7 +6289,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta, true); markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
 // an observer facing (x,y,z) fires a short pulse whenever that block changes
 function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
@@ -6313,14 +6390,34 @@ function neighborUpdate(x, y, z) {
   // any block change can reroute dust next to it
   for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === BID.redstone_wire) { rsMark(x + dx, y + dy, z + dz); break; }
 }
+// changes made while this world was open to others, kept beside chunks that weren't stored again (see mpcore.js)
+async function applyMpLog(c) {
+  const dk = dkey(c.cx, c.cz), key = 'mplog:' + W.id + ':' + dk, wid = W.id; W.mpLogs.delete(dk);
+  const lg = await dbReq('chunks', 'readonly', st => st.get(key)); if (!lg || typeof lg !== 'object' || wid !== W.id || W.chunks.get(c.key) !== c) return;
+  for (const [x, y, z, id, m, mo] of lg.edits || []) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); }
+  for (const i in lg.tiles || {}) c.tiles.set(+i, lg.tiles[i]);
+  c.modified = c.edited = true; saveChunk(c, false, true); dbReq('chunks', 'readwrite', st => st.delete(key));
+}
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
-  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
-    const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass || n === BID.stained_glass || (nd && nd.connect === 2)))) m |= 1 << i;
-  });
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => { if (S.connectsTo(kind, getBlock(x + dx, y, z + dz), getMeta(x + dx, y, z + dz), dx)) m |= 1 << i; });
   setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
+}
+// a chunk generated on its own can't see its neighbours: fences, walls and panes along its edges are joined to the
+// neighbouring chunk's once both are here (straight into the arrays: every player works out the same, nothing to save)
+function joinConnections(c) {
+  for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const n = chunkAt(c.cx + ox, c.cz + oz); if (!n) continue;
+    for (const [ch, edgeX, edgeZ, dx, dz] of [[c, ox < 0 ? 0 : ox > 0 ? 15 : -1, oz < 0 ? 0 : oz > 0 ? 15 : -1, ox, oz], [n, ox < 0 ? 15 : ox > 0 ? 0 : -1, oz < 0 ? 15 : oz > 0 ? 0 : -1, -ox, -oz]]) {
+      const top = Math.min(CH - 1, Math.max(ch.maxY || 0, 0) + 1); let touched = false;
+      for (let k = 0; k < 16; k++) { const lx = edgeX >= 0 ? edgeX : k, lz = edgeZ >= 0 ? edgeZ : k;
+        for (let y = 1; y <= top; y++) { const i = (y << 8) | (lz << 4) | lx, b = ch.blocks[i], kind = BLOCKS[b] && BLOCKS[b].connect; if (!kind) continue;
+          const wx = ch.cx * 16 + lx, wz = ch.cz * 16 + lz, bit = dz < 0 ? 1 : dx > 0 ? 2 : dz > 0 ? 4 : 8, on = S.connectsTo(kind, getBlock(wx + dx, y, wz + dz), getMeta(wx + dx, y, wz + dz), dx);
+          const m = ch.meta[i], nm = on ? m | bit : m & ~bit; if (nm !== m) { ch.meta[i] = nm; touched = true; } } }
+      if (touched) ch.dirty = true;
+    }
+  }
 }
 // ---------- fluids ----------
 // blocks that some system needs to find quickly (sculk sensors, beacons): block id -> Set of "x,y,z" in loaded chunks
@@ -6544,6 +6641,8 @@ const NWORK = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1))
 const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
+// one more worker only for chunks the player just changed: a broken or placed block never waits behind terrain generation
+const editWorker = new Worker(workerURL); editWorker.busy = 0; editWorker.onmessage = e => onWorker(editWorker, e.data);
 const bufPool = [];
 for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
@@ -6564,7 +6663,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m, m.ver]);
+    if (m.ver === c.urgentVer) W.meshInbox.unshift([c, m, m.ver]); else W.meshInbox.push([c, m, m.ver]);
   }
 }
 // a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
@@ -6600,6 +6699,8 @@ function addChunk(cx, cz, d, tiles) {
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
+  joinConnections(c);
+  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
@@ -6608,8 +6709,8 @@ function requestGen(cx, cz) {
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
-function requestMesh(c, opts) {
-  const w = idleWorker(3); if (!w) return false;
+function requestMesh(c, opts, urgent) {
+  const w = urgent && editWorker.busy < 2 ? editWorker : idleWorker(3); if (!w) return false;
   const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
@@ -6630,7 +6731,7 @@ function requestMesh(c, opts) {
       }
     }
   }
-  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; // unique across chunks, so a stale job can never match a reloaded chunk
+  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; if (urgent) { c.urgent = false; c.urgentVer = c.ver; } // unique across chunks, so a stale job can never match a reloaded chunk
   w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
@@ -6720,6 +6821,8 @@ function buildSpiral(r) { const a = []; for (let dx = -r; dx <= r; dx++) for (le
 function streamChunks(px, pz, rd, meshOpts, budget) {
   const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = rd + 1;
   if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; }
+  // chunks the player just changed come first, even while an older mesh of them is still on its way
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const c = chunkAt(pcx + dx, pcz + dz); if (c && c.urgent && c.dirty && meshable(c)) requestMesh(c, meshOpts, true); }
   // meshing first (nearest first): visible chunks beat far terrain generation
   let sent = 0;
   for (const [dx, dz] of spiral) {
@@ -6736,9 +6839,14 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
     if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
     if (!requestGen(cx, cz)) break;
   }
+  // other places that must stay loaded (a multiplayer host keeps its guests' surroundings running): generate, don't mesh
+  const keep = W.keepCenters || null;
+  if (keep) for (const [kx, kz, kr] of keep) { const kcx = Math.floor(kx) >> 4, kcz = Math.floor(kz) >> 4;
+    for (let dx = -kr; dx <= kr; dx++) for (let dz = -kr; dz <= kr; dz++) { const cx = kcx + dx, cz = kcz + dz, k = ckey(cx, cz);
+      if (W.chunks.has(k) || W.pending.has(k)) continue; if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; } if (!requestGen(cx, cz)) break; } }
   // unload far chunks
   const lim = r + 2;
-  for (const c of W.chunks.values()) if (Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) unloadChunk(c);
+  for (const c of W.chunks.values()) if ((Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) && !(keep && keep.some(([kx, kz, kr]) => Math.abs(c.cx - (Math.floor(kx) >> 4)) <= kr + 1 && Math.abs(c.cz - (Math.floor(kz) >> 4)) <= kr + 1))) unloadChunk(c);
 }
 // apply finished worker jobs within a time budget so frames stay smooth
 function processInbox(budgetMs, maxMeshes) {
@@ -6790,7 +6898,7 @@ varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 512.0;
+  vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
@@ -6853,6 +6961,7 @@ W.onMesh = (c, m) => {
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
     scene.add(mesh); c.mesh[k] = mesh;
   }
+  c.mesh.ver = c.ver;
 };
 W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
@@ -6907,8 +7016,30 @@ function setSelection(x, y, z, boxes) {
   selGeo.setDrawRange(0, n / 3); selGeo.attributes.position.needsUpdate = true; sel.visible = true;
 }
 const crackTexs = crackCanvases.map(c => { const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
-const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, fog: false }));
+// the breaking overlay covers the block's own model (a slab, a torch, a lectern), not a whole cube, and blends like
+// Java's crumbling layer: colour = 2 x texture x what is behind (grey keeps it, dark lines darken), clear pixels skipped
+const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4, fog: false, alphaTest: 0.1,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.DstColorFactor, blendDst: THREE.SrcColorFactor }));
 crack.visible = false; scene.add(crack);
+const crackGeos = new Map();
+function crackGeometry(id, meta) {
+  const key = id * 256 + (meta & 255); let g = crackGeos.get(key); if (g) return g;
+  let src = !BOX_ICON(id) ? meshedBlockGeometry(id, meta, true) : null, pos;
+  if (src) pos = src.attributes.position.array;
+  else { const a = []; for (const b of S.shapes(id, meta) || [[0, 0, 0, 16, 16, 16]]) { const bg = new THREE.BoxGeometry((b[3] - b[0]) / 16, (b[4] - b[1]) / 16, (b[5] - b[2]) / 16).toNonIndexed(); bg.translate((b[0] + b[3]) / 32 - .5, (b[1] + b[4]) / 32 - .5, (b[2] + b[5]) / 32 - .5); a.push(...bg.attributes.position.array); } pos = new Float32Array(a); }
+  const uv = new Float32Array(pos.length / 3 * 2), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  for (let t = 0; t < pos.length; t += 9) { // texture coordinates from the position on the face, as Java's sheeted decal does
+    A.fromArray(pos, t); B.fromArray(pos, t + 3); C.fromArray(pos, t + 6); const n = B.clone().sub(A).cross(C.clone().sub(A));
+    const ax = Math.abs(n.x) > Math.abs(n.y) && Math.abs(n.x) > Math.abs(n.z) ? 0 : Math.abs(n.y) > Math.abs(n.z) ? 1 : 2;
+    for (let k = 0; k < 3; k++) { const x = pos[t + k * 3] + .5, y = pos[t + k * 3 + 1] + .5, z = pos[t + k * 3 + 2] + .5, o = (t / 3 + k) * 2;
+      uv[o] = ax === 0 ? (n.x > 0 ? 1 - z : z) : x; uv[o + 1] = ax === 1 ? (n.y > 0 ? 1 - z : z) : y; } }
+  g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  crackGeos.set(key, g); return g;
+}
+R.setCrack = (x, y, z, id, meta, stage) => { if (stage < 0) { crack.visible = false; return; }
+  crack.geometry = crackGeometry(id, meta); crack.position.set(x + .5, y + .5, z + .5); crack.scale.setScalar(1.002); crack.material.map = crackTexs[Math.min(9, stage)]; crack.visible = true; };
+function applyPackCracks() { crackTexs.forEach((t, i) => { const c = entCanvas('destroy_' + i); if (c) { t.image = c; t.needsUpdate = true; } }); }
+R.applyPackCracks = applyPackCracks;
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
@@ -7045,9 +7176,38 @@ function itemGeometry(id) {
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
 const DEFAULT_META = { 116: 5, 117: 10, 99: 0, 252: 5, 254: 10, 253: 5, 165: 5, 173: 10, 215: 1 }; // fence/pane icons show their connected arms
+// block items as the world draws them: the block (both halves of a bed) meshed alone by the terrain mesher, so
+// lecterns, beds, grindstones, end rods, beacons and every other shaped block look the same in the hand and the
+// inventory as when placed. Fences, walls and panes keep their inventory shapes (arms out) from the boxes below.
+let iconVol = null;
+const BOX_ICON = id => DEFAULT_META[id] != null || /(_wall|_fence|_pane|iron_bars)$/.test(ITEMS[id] ? ITEMS[id].key : '');
+function meshedBlockGeometry(id, meta, single) {
+  const PA = S.PA, PW = S.PW;
+  if (!iconVol) iconVol = { B: new Uint16Array(PA * S.PH), M: new Uint8Array(PA * S.PH), L: new Uint8Array(PA * S.PH).fill(0xf0), bio: new Uint8Array(PA).fill(2) };
+  const { B, M, L, bio } = iconVol, put = [[8, 1, 8, meta]];
+  if (id === S.BID.red_bed && !single) { put[0][3] = (meta & 0xf0) | 0; put.push([8, 1, 7, (meta & 0xf0) | 4]); } // foot, and the head one block north (DIRS[0])
+  for (const [x, y, z, m] of put) { const i = S.pidx(x, y, z); B[i] = id; M[i] = m; }
+  let r; try { r = S.meshChunk(B, M, L, bio, { fancy: true, smooth: false, h: 4 }); } catch (e) { r = null; }
+  for (const [x, y, z] of put) { const i = S.pidx(x, y, z); B[i] = 0; M[i] = 0; }
+  if (!r) return null;
+  const pos = [], uv = [], shade = [], tintA = [], def = DEFAULT_TINT[S.TINT[id]];
+  for (const d of [r.o, r.c, r.t]) for (let k = 0; k < d.idx.length; k++) {
+    const v = d.idx[k];
+    pos.push(d.pos[v * 3] / 16 - 1 - 8.5, d.pos[v * 3 + 1] / 16 - 1.5, d.pos[v * 3 + 2] / 16 - 1 - (put.length > 1 ? 8 : 8.5));
+    uv.push(d.uv[v * 2] / 8192, d.uv[v * 2 + 1] / 8192); shade.push(d.lt[v * 4 + 2] / 255);
+    const c = [d.col[v * 4], d.col[v * 4 + 1], d.col[v * 4 + 2]], tinted = c[0] < 250 || c[1] < 250 || c[2] < 250;
+    tintA.push(...(tinted && def ? def : c).map(q => q / 255));
+  }
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
+  if (put.length > 1) geo.userData.long = true;
+  return geo;
+}
 function blockGeometry(iid) { // iid: an item id (variant items resolve to their block and meta)
   if (blockGeoCache[iid]) return blockGeoCache[iid];
   const it = ITEMS[iid], id = it && it.place != null && it.block ? it.place : iid, vmeta = it && it.vi ? it.vi << S.VSH[id] : 0;
+  if (!BOX_ICON(id) && id !== S.BID.oak_door) { const g = meshedBlockGeometry(id, vmeta); if (g) return blockGeoCache[iid] = g; }
   const pos = [], uv = [], shade = [], tintA = [];
   const boxes = S.shapes(id, (DEFAULT_META[id] || 0) | vmeta) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
@@ -7085,7 +7245,19 @@ const itemBlockMatBase = new THREE.ShaderMaterial({
 itemBlockMatBase.uniforms.map.value = atlasTex;
 const itemSpriteMatBase = new THREE.MeshBasicMaterial({ vertexColors: true });
 function blockMaterial() { const m = itemBlockMatBase.clone(); m.uniforms.map.value = atlasTex; return m; }
+// the shield is a 3D model in Java (ShieldEntityModel: a 12x22x1 plate and a handle, drawn by the builtin item renderer
+// with scale(1,-1,-1) from the item's corner), wearing entity/shield_base_nopattern
+let shieldGeo = null, shieldTex = null;
+function shieldMesh() {
+  if (!shieldGeo) { const g = mergeGeos([boxGeo(12, 22, 1, 0, 0, -6, -11, -2, 0, 64, 64), boxGeo(2, 6, 6, 26, 0, -1, -3, -1, 0, 64, 64)]);
+    g.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, -1)); g.applyMatrix4(new THREE.Matrix4().makeTranslation(-0.5, -0.5, -0.5)); g.deleteAttribute('skinIndex'); g.deleteAttribute('skinWeight'); shieldGeo = g; }
+  if (!shieldTex) shieldTex = packTexture('shield_nopattern') || pixelTex(64, 64, g => { g.fillStyle = '#9c7b47'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 14, 1); });
+  const m = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ map: shieldTex, alphaTest: 0.1, vertexColors: !!shieldGeo.attributes.color }));
+  m.userData.isBlock = false; m.userData.shield = true; return m;
+}
+R.shieldMesh = shieldMesh;
 function itemMesh(id) {
+  if (id === IID.shield && typeof boxGeo === 'function') return shieldMesh();
   const d = ITEMS[id];
   const isBlock = d && d.block && !d.sprite;
   const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), isBlock ? blockMaterial() : itemSpriteMatBase.clone());
@@ -7117,7 +7289,7 @@ function renderBlockIcons() {
     const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
     rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
     mesh.geometry = blockGeometry(id);
-    const s = id === S.BID.oak_door ? 0.55 : 1; mesh.scale.set(s, s, s);
+    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : 1; mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
     renderer.setRenderTarget(rt); renderer.render(sc, cam);
   });
   const buf = new Uint8Array(Wd * Hd * 4);
@@ -7211,7 +7383,8 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
         hY(f * (45 + Math.sin(p * p * PI) * -20)); const g = Math.sin(sp * PI); hZ(f * g * -20); hX(g * -80); hY(f * -45);
       }
       // the item model's first-person display transform, mirrored for the left hand like Transformation.apply(leftHanded)
-      if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
+      if (H.mesh.userData.shield) { const L = f < 0; hT(f * (L ? 10 : -10) / 16, (L ? 0 : 2) / 16, -10 / 16); hY(f * 180); hZ(f * 5); hmul(HT.makeScale(1.25, 1.25, 1.25)); } // shield.json firstperson_*hand
+      else if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
       else { hT(f * 1.13 / 16, 3.2 / 16, 1.13 / 16); hY(f * -90); hZ(f * 25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
       H.mesh.matrix.identity();
     }
@@ -8147,10 +8320,12 @@ function spawnerTick() {
   }
 }
 // persist passive mobs with their chunk
-R.onChunkUnloaded = c => {
+// what a chunk keeps of the entities standing in it: animals, persistent monsters, vehicles, frames, paintings, stands,
+// and (as Java does) items on the ground and experience orbs; remove: take them out of the world as well
+function chunkKeep(c, remove) {
   const keep = [];
   for (const e of ENT) {
-    if (e.dead) continue;
+    if (e.dead || e.remote) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
     if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
@@ -8158,10 +8333,17 @@ R.onChunkUnloaded = c => {
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
     else if (e.kind === 'painting') keep.push(['painting', e.ax, e.ay, e.az, 0, 0, { f: e.f, motif: e.motif }]);
     else if (e.kind === 'armor_stand') keep.push(['armor_stand', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, armor: e.armor }]);
-    if (e === PL.riding) continue;
-    removeEnt(e);
+    else if (e.kind === 'item' && e.stack && (e.life == null || e.life > 0)) keep.push(['item', e.x, e.y, e.z, 0, 0, { st: e.stack, age: e.age || 0 }]);
+    else if (e.kind === 'xp' && e.value) keep.push(['xp', e.x, e.y, e.z, 0, 0, { v: e.value }]);
+    if (remove && e !== PL.riding) removeEnt(e); // (arrows, falling blocks and the like just go)
   }
+  return keep;
+}
+R.onChunkUnloaded = c => {
+  const keep = chunkKeep(c, true);
+  for (const e of ENT) if (e.remote && !e.dead && Math.floor(e.x) >> 4 === c.cx && Math.floor(e.z) >> 4 === c.cz && e !== PL.riding) removeEnt(e); // another player's world: gone with the chunk
   if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; } // unloadChunk saves right after this
+  c.mobsFresh = true;
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
@@ -8171,7 +8353,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
 // ---------- render update (interpolated) ----------
@@ -10248,7 +10430,7 @@ function beaconHtml() {
 const shieldUp = () => USE.kind === 'shield' && USE.t >= 5 && !(PL.shieldCd > 0); // 5 ticks to raise it
 // called by hurtPlayer: true when the hit came from the front and the shield took it
 function shieldBlocks(dmg, cause, attacker, from) {
-  if (!shieldUp() || (cause !== 'mob' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
+  if (!shieldUp() || (cause !== 'mob' && cause !== 'player' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
   const src = from || attacker; if (!src) return false;
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
@@ -12878,6 +13060,12 @@ function signMesh(x, y, z, m, t) {
   const grp = new THREE.Group(), text = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false }));
   if (m & 16) { // on a wall: the board is drawn by the block mesh
     const f = m & 3, d = DIRS[f]; text.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135); text.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f]; grp.add(text);
+    const w = SIGN_WOOD[(m >> 5) & 7], tex = packTexture('sign_' + w);
+    if (tex) { // the jar's sign texture over the board (SignBlockEntityRenderer draws wall signs from it too); a hair larger, so it covers the block's own board
+      const md = buildMCModel('sign_board_' + w, { tex: 'sign_' + w, tw: 64, th: 32, parts: [MCMODELS.sign.parts[0]] }, tex), piv = new THREE.Group();
+      md.scale.setScalar(2 / 3 * 1.02); md.position.y = -(2 * 2 / 3 * 1.02) + 0; piv.add(md);
+      piv.position.set(text.position.x - d[0] * 0.045, y + 0.5, text.position.z - d[2] * 0.045); piv.rotation.y = text.rotation.y; grp.add(piv);
+    }
   } else if (packTexture('sign_' + SIGN_WOOD[(m >> 5) & 7])) { // standing, with the jar's sign entity texture: SignBlockEntityRenderer's model at 2/3 scale
     const w = SIGN_WOOD[(m >> 5) & 7], md = buildMCModel('sign_' + w, { ...MCMODELS.sign, tex: 'sign_' + w }, packTexture('sign_' + w));
     md.scale.setScalar(2 / 3); md.position.y = -0.5; text.position.set(0, 0.833, 0.045);
@@ -13852,8 +14040,8 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
-  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   return L;
 }
 function clickSlot(i, btn, shift) {
@@ -14167,7 +14355,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
-  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
+  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion' || cause === 'player') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
@@ -14191,7 +14379,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -14234,6 +14422,17 @@ function damageItem(arr, i, n = 1) {
 // ---------- movement ----------
 function blockUnder() { return getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.2), Math.floor(PL.z)); }
 function inBlock(f) { return boxBlocks(PL, f); }
+// poses (Java's EntityPose): standing 1.8 tall, crouching 1.5 (fits under a 1.5-block gap), swimming / crawling 0.6;
+// a pose the space can't hold is forced down to the next one, as when crawling out from under a trapdoor
+function roomFor(h, x = PL.x, y = PL.y, z = PL.z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y + 1e-4 && BX[i + 1] < y + h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
+const POSE_H = { stand: 1.8, crouch: 1.5, swim: 0.6 }, POSE_EYE = { stand: 1.62, crouch: 1.27, swim: 0.4 };
+function updatePose(inWater, eyeF, spec) {
+  PL.swimming = !spec && !PL.flying && PL.sprinting && inWater && eyeF === 1 || (PL.swimming && inWater && PL.sprinting); // sprinting under water: swim
+  let pose = PL.swimming || PL.gliding ? 'swim' : PL.sneaking ? 'crouch' : 'stand';
+  if (!spec && !PL.flying && !PL.sleeping) { if (pose === 'stand' && !roomFor(1.8)) pose = roomFor(1.5) ? 'crouch' : 'swim'; else if (pose === 'crouch' && !roomFor(1.5)) pose = 'swim'; }
+  PL.pose = pose; PL.h = POSE_H[pose];
+  return pose;
+}
 function noCollision(x, y, z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + PL.h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y && BX[i + 1] < y + PL.h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
 function playerTick() {
   advTick();
@@ -14241,7 +14440,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping = Math.min(101, PL.sleeping + 1); if (PL.sleeping > 100 && (typeof mpCanSkipNight !== 'function' || mpCanSkipNight())) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -14257,7 +14456,8 @@ function playerTick() {
   const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
   if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
-  if (PL.sneaking) { f *= 0.3; s *= 0.3; }
+  const pose = updatePose(inWater, eyeF, spec);
+  if (PL.sneaking || (pose === 'crouch') || (pose === 'swim' && !inWater && !PL.gliding)) { f *= 0.3; s *= 0.3; } // crouching or crawling: slow
   if (using) { f *= 0.2; s *= 0.2; }
   const canSprint = (PL.food > 6 || creative()) && !PL.sneaking && !using && f > 0.8 && !web;
   if ((IN.sprintKey || IN.wTap) && canSprint) PL.sprinting = true;
@@ -14277,6 +14477,7 @@ function playerTick() {
   } else if (inWater || inLava) {
     const ds = inWater ? enchLv(INV.armor[3], 'depth_strider') : 0;
     accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1) * (1 + ds * 0.6));
+    if (PL.swimming) { const d = Math.sin(PL.pitch); if (d <= 0 || IN.jump || fluidAt(PL.x, PL.y + 0.9, PL.z)) PL.vy += (d - PL.vy) * (d < -0.2 ? 0.085 : 0.06); } // swimming goes where you look (PlayerEntity.travel)
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
     const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
@@ -14286,7 +14487,7 @@ function playerTick() {
   } else {
     const slipB = blockUnder(), sl = BLOCKS[slipB] && BLOCKS[slipB].slip, slip = PL.onGround ? (sl === 2 ? 0.989 : sl ? 0.98 : 0.6) : 1;
     const fr = slip * 0.91;
-    accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
+    accel(PL.onGround ? sp * (0.21600002 / (slip * slip * slip)) : (PL.sprinting ? 0.026 : 0.02)); // LivingEntity.getMovementSpeed: the block's slipperiness cubed (not the friction): walking 4.317 m/s
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (scaf) { if (IN.jump) PL.vy = 0.2; else if (PL.sneaking) PL.vy = -0.15; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
@@ -14332,7 +14533,7 @@ function playerTick() {
   if (PL.onGround && !inWater) { PL.bob += moved; PL.stepDist += moved; if (PL.stepDist > 1.7) { PL.stepDist = 0; const b = blockUnder(); if (b) play('step', { mat: soundMat(b), vol: PL.sneaking ? 0.3 : 0.8 }); } }
   if (PL.sprinting && PL.onGround) PL.exh += moved * 0.1; else if (inWater) PL.exh += moved * 0.01;
   // eye height (sneak)
-  const targetEye = PL.sneaking ? 1.27 : 1.62; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
+  const targetEye = POSE_EYE[PL.pose || 'stand']; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();
@@ -15066,7 +15267,7 @@ function grindHtml() {
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, coords: true, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -15117,6 +15318,14 @@ function applyGuiPack() {
     css.setProperty('--g-hotbar', `url(${crop('gui_widgets', 0, 0, 182, 22, 256).toDataURL()})`); css.setProperty('--g-sel', `url(${crop('gui_widgets', 0, 22, 24, 22, 256).toDataURL()})`);
     css.setProperty('--g-offl', `url(${crop('gui_widgets', 24, 22, 29, 24, 256).toDataURL()})`); css.setProperty('--g-offr', `url(${crop('gui_widgets', 53, 22, 29, 24, 256).toDataURL()})`);
     document.body.classList.add('vwidgets');
+  }
+  if (PACKPX.ent.gui_inv) { // container screens: the panel's rounded bevel and the slot frame from gui/container/inventory.png
+    css.setProperty('--g-panel', `url(${crop('gui_inv', 0, 0, 176, 166, 256).toDataURL()})`); css.setProperty('--g-slot', `url(${crop('gui_inv', 7, 83, 18, 18, 256).toDataURL()})`);
+    document.body.classList.add('vgui');
+  }
+  if (PACKPX.ent.gui_furnace) { // progress arrow and flame, empty and full
+    for (const [k, x, y, w, h] of [['arrow0', 79, 34, 24, 17], ['arrow1', 176, 14, 24, 17], ['flame0', 56, 36, 14, 14], ['flame1', 176, 0, 14, 14]]) css.setProperty('--g-' + k, `url(${crop('gui_furnace', x, y, w, h, 256).toDataURL()})`);
+    document.body.classList.add('vfurn');
   }
 }
 function icon(id, n, d, e) {
@@ -15181,9 +15390,11 @@ function renderChat() {
 let dbgT = 0;
 function renderDebug(dt, fps) {
   const el = $('debug');
-  el.hidden = !UI.debug && !OPT.showFps;
-  if (el.hidden || (dbgT -= dt) > 0) return; dbgT = 0.25;
-  if (!UI.debug) { el.textContent = fps + ' fps'; return; }
+  el.hidden = !UI.debug && !OPT.showFps && !OPT.coords;
+  if (el.hidden || (dbgT -= dt) > 0) return; dbgT = 0.1;
+  if (!UI.debug) { // the short line: frame rate and where you are (Bedrock's "show coordinates")
+    const dir = ['북', '서', '남', '동'][((Math.round((((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)) % 4) + 4) % 4];
+    el.textContent = [OPT.showFps ? fps + ' fps' : '', OPT.coords ? `위치: ${Math.floor(PL.x)}, ${Math.floor(PL.y)}, ${Math.floor(PL.z)} · ${dir}쪽` : ''].filter(Boolean).join('\n'); return; }
   const bx = Math.floor(PL.x), by = Math.floor(PL.y), bz = Math.floor(PL.z), l = getLight(bx, by, bz);
   const facing = ['북쪽 (-Z)', '서쪽 (-X)', '남쪽 (+Z)', '동쪽 (+X)'][[0, 1, 2, 3][((Math.round((((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)) % 4) + 4) % 4]];
   let meshed = 0; for (const c of W.chunks.values()) if (c.mesh) meshed++;
@@ -15337,7 +15548,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleDoll" title="스킨 바꾸기" data-act="options"></div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -15352,7 +15563,7 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('coords', '좌표 표시')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
@@ -15675,7 +15886,7 @@ function advGrant(id, crit) {
 function advComplete(a, st) {
   st.done = Date.now();
   const verb = a.frame === 'c' ? ['도전 과제', '을(를) 완료했습니다', '#aa00aa'] : a.frame === 'g' ? ['목표', '에 도달했습니다', '#55ff55'] : ['발전 과제', '을(를) 달성했습니다', '#55ff55'];
-  if (gr('announceAdvancements')) chatMsg(`플레이어가 ${verb[0]} [${a.name}]${verb[1]}`, verb[2]);
+  if (gr('announceAdvancements')) { const who = typeof MP !== 'undefined' && MP.on ? MP.name + '님이' : '플레이어가', t = `${who} ${verb[0]} [${a.name}]${verb[1]}`; chatMsg(t, verb[2]); if (typeof MP !== 'undefined' && MP.on) mpSend({ t: 'sys', text: t, c: verb[2] }); } // everyone in the world hears about it
   if (a.xp) addXP(a.xp);
   advQueue.push(a); if (advQueue.length === 1) showAdv();
 }
@@ -15962,7 +16173,7 @@ function heldTransform(id, left, isBlock) {
   const s = left ? -1 : 1, M = new THREE.Matrix4(), t = new THREE.Matrix4();
   M.copy(FLIP3).multiply(t.makeRotationX(-90 * DEG)).multiply(t.makeRotationY(180 * DEG)).multiply(t.makeTranslation(s / 16, 0.125, -0.625));
   // display: block [75,45,0] [0,2.5,0] 0.375 · handheld [0,-90,55] [0,4,0.5] 0.85 · generated [0,0,0] [0,3,1] 0.55
-  const [rot, tr, sc] = isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55];
+  const [rot, tr, sc] = id === IID.shield ? [[0, 90, 0], left ? [10, 6, 12] : [10, 6, -4], 1] : isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55]; // shield.json thirdperson_*hand
   M.multiply(t.makeTranslation(s * tr[0] / 16, tr[1] / 16, tr[2] / 16));
   M.multiply(t.makeRotationFromEuler(new THREE.Euler(rot[0] * DEG, s * rot[1] * DEG, s * rot[2] * DEG, 'XYZ')));
   M.multiply(t.makeScale(sc, sc, sc));
@@ -15999,7 +16210,7 @@ function setPart(b, pivot, pitch, yaw, roll, root) {
 // s: the pose inputs; returns nothing, poses m in place
 function posePlayer(m, s) {
   const P = m.userData.parts, slim = m.userData.slim, ay = slim ? 2.5 : 2, st = m.userData.st;
-  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = s.flying ? 0 : st.limbD, age = s.age;
+  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = st.limbD, age = s.age; // flying players swing their legs too, as in Java
   let A = { head: [headPitch, headYaw, 0], body: [0, 0, 0], rarm: [0, 0, 0], larm: [0, 0, 0], rleg: [0, 0, 0], lleg: [0, 0, 0] };
   const piv = { head: [0, 0, 0], body: [0, 0, 0], rarm: [-5, ay, 0], larm: [5, ay, 0], rleg: [-1.9, 12, 0], lleg: [1.9, 12, 0] };
   if (s.gliding || s.swim) A.head[0] = lerpA(s.gliding ? 1 : st.lean, headPitch, -Math.PI / 4);
@@ -16074,8 +16285,8 @@ function playerPoseInputs(dt) {
   if (two === 'xbow' || two === 'bow') { right = left = null; }
   const vx = PL.x - PL.px, vz = PL.z - PL.pz;
   return { headYaw: 0, headPitch: -PL.pitch, headPitchW: -PL.pitch, yaw: PL.yaw, right, left, two, charge: R.hand.bow || 0, swing: R.hand.swing > 0 ? 1 - R.hand.swing : 0, swingLeft: swapped === mainRight(),
-    sneak: PL.sneaking && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
-    swim: PL.sprinting && PL.eyeFluid === 1, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
+    sneak: (PL.sneaking || PL.pose === 'crouch') && !PL.flying && !PL.gliding, riding: !!PL.riding, flying: PL.flying, gliding: !!PL.gliding, glideT: PSTATE.glideT, vel2: vx * vx + vz * vz, vy: PL.vy || 0,
+    swim: PL.pose === 'swim' && !PL.gliding, sleep: !!PL.sleeping, bedYaw: PSTATE.bedYaw || 0, age: performance.now() / 50 };
 }
 function tickBodyYaw(st, s, moveX, moveZ, dtT) {
   const d2 = moveX * moveX + moveZ * moveZ;
@@ -16117,7 +16328,7 @@ function dollRender(el, mx, my) {
   }
   if (D.cv.parentNode !== el) { el.innerHTML = ''; el.appendChild(D.cv); }
   const w = el.clientWidth || 104, h = el.clientHeight || 144;
-  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = 1.05; D.cam.updateProjectionMatrix(); }
+  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = el.classList.contains('titleDoll') ? 0.92 : 1.05; D.cam.updateProjectionMatrix(); }
   // InventoryScreen.drawEntity: the body turns toward the mouse by atan(dx/40)*20 degrees, the head by 40, pitch by atan(dy/40)*20
   const rc = el.getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height * 0.25;
   const fx = Math.atan((cx - mx) / 40 / (rc.width / 52)), fy = Math.atan((cy - my) / 40 / (rc.width / 52));
@@ -16132,7 +16343,103 @@ function dollRender(el, mx, my) {
 }
 const DOLL = { mx: innerWidth / 2, my: innerHeight / 2 };
 addEventListener('pointermove', e => { DOLL.mx = e.clientX; DOLL.my = e.clientY; });
+// the title screen shows your own skin on the right, turning to follow the mouse like the inventory figure
+(function titleDoll() { requestAnimationFrame(titleDoll); if (typeof UI === 'undefined' || UI.menu !== 'title' || !PLM.model) return; const el = document.querySelector('.titleDoll'); if (el) dollRender(el, DOLL.mx, DOLL.my); })();
 function dollTick() { const el = document.querySelector('.doll'); if (el && UI.screen) dollRender(el, DOLL.mx, DOLL.my); }
+
+</script>
+<script>/* js/mpcore.js */
+// The world's side of multiplayer, shared by the server (tools/server.js, files on disk) and a player who opens their own
+// world to others (this browser, IndexedDB): who is playing and where, who runs each dimension, the clock and the weather,
+// every chunk's stored state with the changes made since, containers, each player's saved inventory and place.
+// The first player in a dimension runs it (mobs, fluids, crops, redstone) and stores its chunks here; when that player
+// leaves or changes dimension, the next one there takes over with the stored mobs.
+//   store: { state: { meta, time, rain, thunder, weatherT, players }, keys: Set of chunk keys, load(dk) -> Promise of
+//            { rec, edits, tiles } | null, save(dk, entry), saveState(), log(text) }
+//   out(id, message): deliver a message to one player
+function mpWorldCore(store, out) {
+  const S = store.state, players = new Map(), auth = new Map(), cache = new Map();
+  const blank = () => ({ rec: null, edits: [], tiles: {} });
+  const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
+  const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
+  const prefix = dim => ({ '-1': 'n', 1: 'e' }[dim] || '');
+  const chunkKey = (dim, x, z) => prefix(dim) + (x >> 4) + ',' + (z >> 4);
+  const send = (p, o) => out(p.id, o);
+  const others = (p, o, sameDim) => { for (const q of players.values()) if (q !== p && q.joined && (!sameDim || q.dim === p.dim)) out(q.id, o); };
+  function pickAuth(dim) {
+    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim);
+    if (cur != null && here.some(q => q.id === cur)) return;
+    if (here.length) auth.set(dim, here[0].id); else auth.delete(dim);
+    const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
+  }
+  function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
+  function tick() { // once a second: 20 ticks of the clock and the weather while anyone plays
+    if (!players.size || !S.meta) return;
+    const g = S.meta.gamerules || {};
+    if (g.doDaylightCycle !== false) S.time += 20;
+    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - 20) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+    // the night passes once everyone in the Overworld has been in bed for a few seconds
+    const ow = [...players.values()].filter(q => q.joined && q.dim === 0 && q.s && q.s.mode !== 'spectator');
+    const asleep = ow.length && ow.every(q => q.s.sleep); S.sleepT = asleep ? (S.sleepT || 0) + 1 : 0;
+    if (S.sleepT >= 5) { S.time = Math.ceil(S.time / 24000) * 24000; S.rain = 0; S.thunder = false; S.sleepT = 0; for (const q of players.values()) if (q.joined) out(q.id, { t: 'wake' }); }
+    for (const q of players.values()) if (q.joined) out(q.id, { t: 'time', time: S.time, rain: S.rain, thunder: S.thunder });
+    if (S.time % 200 === 0) store.saveState();
+  }
+  function message(id, m) {
+    let p = players.get(id); if (!p) { p = { id, name: null, dim: null, joined: false, s: null }; players.set(id, p); }
+    const from = id; m.from = from;
+    switch (m.t) {
+      case 'create': // a new world, or the start of an upload of an existing one
+        if (S.meta) { send(p, { t: 'error', msg: '이 서버에는 이미 세계가 있습니다' }); return; }
+        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
+        S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
+      case 'join': {
+        if (!S.meta) { send(p, { t: 'noworld' }); return; }
+        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null;
+        for (const q of players.values()) if (q !== p && q.joined && q.name === p.name) { send(p, { t: 'error', msg: '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        p.joined = true;
+        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.name] || null, stored: [...store.keys],
+          players: [...players.values()].filter(q => q !== p && q.joined).map(q => ({ id: q.id, name: q.name, skin: q.skin })), auth: Object.fromEntries(auth) });
+        others(p, { t: 'peer', id: from, name: p.name, skin: p.skin }); store.log(`${p.name} 접속 (${[...players.values()].filter(q => q.joined).length}명)`); return;
+      }
+      case 'dim': setDim(p, +m.dim || 0); return;
+      case 'pl': p.s = m; if (m.dim !== p.dim && p.joined) setDim(p, m.dim); others(p, m); return;
+      case 'pdata': { const nm = p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; store.saveState(); } return; }
+      case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
+      case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
+      case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
+        entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null };
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+          send(p, o); }); return; }
+      case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
+      case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;
+      case 'mobsnap': // the runner's mobs, items and vehicles every few seconds: what the next runner starts from
+        if (auth.get(p.dim) !== from) return;
+        for (const [dk, list] of m.l || []) entry(dk).then(c => { if (c.rec) c.rec.mobs = list; else c.rec = { v: 2, it: m.it, mobs: list }; c.recChanged = true; touch(dk, c); });
+        return;
+      case 'sets': // the dimension's runner: every change, kept until that chunk is stored again
+        if (auth.get(p.dim) !== from) return;
+        for (const e of m.l || []) { const dk = chunkKey(m.dim, e[0], e[2]); entry(dk).then(c => { c.edits.push(e); if (c.edits.length > 20000) c.edits.splice(0, c.edits.length - 20000); touch(dk, c); }); }
+        others(p, m, true); return;
+      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15); entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
+      case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+    }
+    // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
+    const to = m.to; delete m.to;
+    if (typeof to === 'number') { if (players.has(to)) out(to, m); }
+    else if (to === 'auth') { const a = auth.get(m.dim != null ? m.dim : p.dim); if (a != null && a !== from) out(a, m); }
+    else if (to === 'dim') others(p, m, true);
+    else others(p, m);
+  }
+  function leave(id) {
+    const p = players.get(id); if (!p) return; players.delete(id); if (!p.joined) return;
+    others(p, { t: 'gone', id }); store.log(`${p.name} 나감 (${[...players.values()].filter(q => q.joined).length}명)`);
+    if (p.dim != null) pickAuth(p.dim);
+    store.saveState();
+  }
+  return { message, leave, tick, players, auth };
+}
+if (typeof module !== 'undefined') module.exports = { mpWorldCore };
 
 </script>
 <script>/* js/multiplayer.js */
@@ -16141,11 +16448,11 @@ function dollTick() { const el = document.querySelector('.doll'); if (el && UI.s
 // with no server at all, WebRTC with invite / answer codes copied between the players.
 // The host's world is the real one: guests generate the same terrain from the seed, fetch the chunks the host
 // has changed, and every block a player breaks or places is sent to everyone. Players see each other (skin,
-// held item, armour, pose), chat is shared, the host's clock and weather rule, and the host's mobs are mirrored
+// held item, armour, pose, custom skins), chat is shared, the host's clock and weather rule, and the host's mobs are mirrored
 // to guests (guests can hit them), container contents follow every click, the host's dropped items can be picked
 // up by guests, a guest's inventory is kept on their device per host world, and the host's mobs chase, hit and shoot
 // whichever player is nearest.
-const MP = { on: false, role: null, name: null, id: 0, link: null, peers: new Map(), local: false, applying: false, allowSpawn: false, nextId: 1, eid: 1, rtc: null, status: '' };
+const MP = { server: false, auth: {}, rolePending: false, queue: [], replaying: false, on: false, role: null, name: null, id: 0, link: null, peers: new Map(), local: false, applying: false, allowSpawn: false, nextId: 1, eid: 1, rtc: null, status: '' };
 const MP_NAME_KEY = 'nemo-mp-name', MP_ADDR_KEY = 'nemo-mp-addr';
 try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
 if (!MP.name) MP.name = '플레이어' + (100 + Math.floor(Math.random() * 900));
@@ -16166,9 +16473,11 @@ function mpWebSocket(url, role) {
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
-      if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; res(link); } else if (m.t === 'error') { rej(new Error(m.msg)); ws.close(); } return; }
+      if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { rej(new Error(m.msg)); ws.close(); } return; }
+      if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
-      mpHandle(m, MP.role === 'host' ? m.from : 0); };
+      if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
+      mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
     ws.onerror = () => { if (!ok) rej(new Error('서버에 연결하지 못했습니다')); };
     ws.onclose = () => { if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
   });
@@ -16189,7 +16498,7 @@ async function mpMakeInvite() {
   const pc = new RTCPeerConnection(RTC_CFG), dc = pc.createDataChannel('mp', { ordered: true });
   await pc.setLocalDescription(await pc.createOffer()); await iceDone(pc);
   MP.rtc = { pc, dc, code: await mpPack(pc.localDescription.sdp) };
-  dc.onopen = () => { const id = MP.nextId++, send = rtcWire(dc, m => mpHandle(m, id), () => mpPeerGone(id)); MP.rtcLinks.set(id, send); MP.status = '새 참가자 연결됨'; if (UI.menu === 'mp_host') showMenu('mp_host'); };
+  dc.onopen = () => { const id = MP.nextId++, send = rtcWire(dc, m => MP.core ? MP.core.message(id, m) : mpHandle(m, id), () => MP.core ? MP.core.leave(id) : mpPeerGone(id)); MP.rtcLinks.set(id, send); MP.status = '새 참가자 연결됨'; if (UI.menu === 'mp_host') showMenu('mp_host'); };
   return MP.rtc.code;
 }
 async function mpAcceptAnswer(code) { if (!MP.rtc) throw new Error('먼저 초대 코드를 만드세요'); await MP.rtc.pc.setRemoteDescription({ type: 'answer', sdp: await mpUnpack(code) }); MP.rtc = null; }
@@ -16197,67 +16506,161 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
 }
 const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
-const mpSkin = () => { const s = skinChoice(); return { tex: s.tex === 'custom_skin' ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim }; };
+// a guest's request to whoever runs its dimension (the host, or in a server world the dimension's runner)
+const mpToAuth = o => mpSend({ ...o, dim: o.dim != null ? o.dim : W.dim }, MP.server ? 'auth' : undefined);
+const mpRelay = () => MP.role === 'host' && !MP.server; // a host passes guests' messages on; a server does that itself
+const mpSkin = () => { // a custom skin travels as a small PNG
+  const s = skinChoice(), out = { tex: s.tex === 'custom_skin' ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim };
+  if (s.tex === 'custom_skin') { const c = entCanvas('custom_skin'); if (c) out.data = c.toDataURL('image/png'); }
+  return out;
+};
+function mpSkinTex(p) { // another player's custom skin, decoded once into a pack texture of its own
+  const sk = p.skin || {}; if (!sk.data || p.skinKey || typeof sk.data !== 'string' || !/^data:image\/png;base64,/.test(sk.data) || sk.data.length > 150000) return;
+  p.skinKey = 'mp_skin_' + p.id + '_' + Date.now(); const img = new Image();
+  img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) return; const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    PACKPX.ent[p.skinKey] = { px: new Uint8Array(g.getImageData(0, 0, 64, 64).data.buffer), w: 64, h: 64 }; p.skinReady = true; mpDropAvatar(p); };
+  img.src = sk.data;
+}
 
 // ---------- starting and stopping ----------
+// your own world opened to others: this browser runs the world core (js/mpcore.js) on this world's IndexedDB, and
+// you are its player 0; friends reach it through the relay server or WebRTC. Same rules as a server world: each
+// dimension is run by a player there, so everyone can go anywhere.
 async function mpHostStart(kind) {
   if (!W.active || W.meta.remote) throw new Error('먼저 세계에 들어가세요');
-  MP.role = 'host'; MP.on = true; MP.eid = 1; MP.peers.clear();
-  MP.link = kind === 'ws' ? await mpWebSocket($('mpAddr').value.trim(), 'host') : mpRtcHostLink();
-  mpInstall(); chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
+  const relay = kind === 'ws' ? await mpWebSocket($('mpAddr').value.trim(), 'host') : mpRtcHostLink();
+  saveAll(true); await new Promise(r => setTimeout(r, 300));
+  W.mpLogs = await mpLogKeys(W.id);
+  Object.assign(MP, { on: true, server: true, isHost: true, role: 'guest', rolePending: true, id: 0, eid: 1, auth: {}, queue: [], relay, inbox: [] }); MP.peers.clear();
+  MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
+  MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
+  MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
+  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
+  chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
-async function mpJoinWs(url) { MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.link = await mpWebSocket(url, 'guest'); mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }
+// the core's messages: to you (in order, after the current one), or out to a guest
+function mpCoreOut(id, o) {
+  if (id !== 0) { if (MP.relay) MP.relay.send(o, id); return; }
+  MP.inbox.push(o); if (MP.inbox.length === 1) Promise.resolve().then(() => { const l = MP.inbox; MP.inbox = []; for (const m of l) mpHandle(m, m.from); });
+}
+const mpLogKeys = async id => new Set(((await dbReq('chunks', 'readonly', st => st.getAllKeys(IDBKeyRange.bound('mplog:' + id + ':', 'mplog:' + id + ':￿')))) || []).map(k => k.slice(('mplog:' + id + ':').length)));
+// the world core's storage in this browser: the world's own chunk records, plus the changes made since each was stored
+function mpHostStore() {
+  const id = W.id, logKey = dk => 'mplog:' + id + ':' + dk, dirty = new Map(), sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
+  const state = { meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
+    time: W.time, rain: W.rainTarget, thunder: W.thunderOn, weatherT: 24000, players: W.meta.mpPlayers || (W.meta.mpPlayers = {}) };
+  const toNet = r => { if (!r || typeof r !== 'object') return null; // (dbReq gives true for a missing key) if (!r.b) return { v: 2, it: r.it, mobs: r.mobs || null };
+    let b = r.b, m = r.m, l = r.l; const h = r.ch || 128; if (r.v < 3) { const n = 256 * h, dec = a => r.v >= 2 ? rleDec(a, n, Uint8Array) : a; b = rleEnc(Uint16Array.from(dec(b))); m = rleEnc(dec(m)); l = rleEnc(dec(l)); } // older saves: 8-bit ids
+    return { v: 3, it: r.it, ch: h, b: mpB64(b), m: mpB64(m), l: mpB64(l), bio: Array.from(r.bio), t: r.t || [], mobs: r.mobs || null }; };
+  const fromNet = r => r.b ? { v: 3, it: r.it, ch: r.ch, b: mpUnB64(r.b, Uint16Array), m: mpUnB64(r.m, Uint8Array), l: mpUnB64(r.l, Uint8Array), bio: Uint8Array.from(r.bio), t: r.t || [], mobs: r.mobs || null } : { v: 2, it: r.it, mobs: r.mobs || null };
+  return { state, keys: new Set([...W.saved, ...(W.mpLogs || [])]),
+    async load(dk) { const rec = await dbReq('chunks', 'readonly', st => st.get(id + ':' + dk)), lg = await dbReq('chunks', 'readonly', st => st.get(logKey(dk))); const ok = lg && typeof lg === 'object'; return { rec: toNet(rec), edits: ok && lg.edits || [], tiles: ok && lg.tiles || {} }; },
+    save(dk, c) { dirty.set(dk, c); },
+    saveState() { W.meta.mpPlayers = state.players; for (const k in state.meta.shared) W.meta[k] = state.meta.shared[k]; if (state.meta.gamerules) W.meta.gamerules = state.meta.gamerules; },
+    log(t) { if (/접속|나감/.test(t)) return; chatMsg(t, '#aaaaaa'); },
+    async flush() { const l = [...dirty]; dirty.clear();
+      for (const [dk, c] of l) {
+        if (c.recChanged && c.rec) { c.recChanged = false; const rec = fromNet(c.rec); await dbReq('chunks', 'readwrite', st => st.put(rec, id + ':' + dk)); W.saved.add(dk); }
+        if (c.edits.length || Object.keys(c.tiles).length) { await dbReq('chunks', 'readwrite', st => st.put({ edits: c.edits, tiles: c.tiles }, logKey(dk))); (W.mpLogs || (W.mpLogs = new Set())).add(dk); }
+        else { await dbReq('chunks', 'readwrite', st => st.delete(logKey(dk))); if (W.mpLogs) W.mpLogs.delete(dk); }
+      } } };
+}
+function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
+async function mpJoinWs(url) {
+  MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
+  try { MP.link = await mpWebSocket(url, 'join'); } catch (e) { MP.on = false; MP.role = null; throw e; }
+  mpInstall();
+  MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
+  if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
+  mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
+}
 function mpStop() {
   if (!MP.on) return;
-  if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
-  if (MP.link) MP.link.close(); MP.link = null; if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
+  const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
+  if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
+  if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
+    setTimeout(() => { st.flush(); setTimeout(() => st.flush(), 500); }, 50); try { MP.relay.close(); } catch (e) {} MP.relay = null; MP.core = null; MP.store = null; MP.isHost = false; }
+  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; // the last stored chunks get through before the connection closes if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
-  MP.on = false; MP.role = null; MP.rtc = null;
+  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.auth = {}; MP.rolePending = false; MP.queue = [];
+  if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (MP.role === 'host') mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
   const host = MP.role === 'host';
   switch (m.t) {
-    case 'join': if (!host) return; { // a new guest: hand over the world's seed, clock and what has been edited
+    case 'join': if (!host || MP.server) return; { // a new guest: hand over the world's seed, clock and what has been edited
       const p = { id: from, name: String(m.name || '손님').slice(0, 16), skin: m.skin || { tex: 'steve', slim: false }, s: null }; MP.peers.set(from, p);
       const edited = [...W.saved]; for (const c of W.chunks.values()) if (c.edited) edited.push(dkey(c.cx, c.cz));
       mpSend({ t: 'welcome', you: from, seed: W.seed, exp: W.exp, mode: PL.mode === 'hardcore' ? 'survival' : PL.mode, diff: PL.difficulty, time: W.time, rain: W.rain, thunder: W.thunderOn, dim: W.dim,
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
-    case 'welcome': if (host) return; mpEnterHostWorld(m); return;
+    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
+    case 'noworld': showMenu('mp_create'); return;
+    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); return;
+    case 'auth': mpGotAuth(m.dim, m.id); return;
+    case 'stored': W.saved.add(m.dk); return;
+    case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
     case 'gone': mpPeerGone(m.id); return;
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
-    case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); if (host) mpSend({ ...m, id }); return; }
-    case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'set': mpApplySet(m, from); return;
-    case 'chunk': if (host) mpServeChunk(m, from); return;
-    case 'chunkdata': if (!host) mpGotChunk(m); return;
-    case 'time': if (host) return; W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
+    case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
+    case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
+    case 'set': mpApplySet(m); return;
+    case 'sets': if (!host) mpApplySets(m); return;
+    case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
+    case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
+    case 'time': if (host && !MP.server) return; if (Math.abs(W.time - m.time) > 30) W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
     case 'mobs': if (!host) mpMirrorMobs(m.l); return;
     case 'hurt': if (!host) hurtPlayer(+m.dmg || 0, m.cause || 'mob'); return; // the host's mobs hit this guest
     case 'kb': if (!host) { PL.vx += +m.vx || 0; PL.vy += +m.vy || 0; PL.vz += +m.vz || 0; } return;
     case 'eff': if (!host && EFF[m.k]) addEffect(PL, m.k, m.dur, m.lv); return;
     case 'tile': mpApplyTile(m, from); return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
+    case 'xps': if (!host) mpMirrorXP(m.l); return;
+    case 'xp': if (host) spawnXP(+m.x, +m.y, +m.z, Math.min(2000, +m.v || 0)); return;
+    case 'pickxp': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'xp'); if (e) { removeEnt(e); mpSend({ t: 'givexp', v: e.value }, from); } } return;
+    case 'givexp': if (!host) { addXP(Math.min(2000, +m.v || 0)); play('xp', { vol: 0.3 }); } return;
+    case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) hurtMob(e, Math.min(30, +m.dmg || 0), null, +m.kx || 0, +m.kz || 0, 'player'); } return;
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player');
+      if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
+    case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
+    case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
+    case 'use': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from); if (e && p && p.s) mpRemoteUse(p, e, m.st && ITEMS[m.st.id] ? m.st : null, m.sneak); } return;
+    case 'trades': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && (e.type === 'villager' || e.type === 'wandering_trader')) { if (e.type === 'wandering_trader') e.prof = 'wandering'; mpSend({ t: 'tradelist', e: m.e, l: villagerOffers(e).map(o => ({ ...o, made: null })) }, from); } } return;
+    case 'tradelist': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead); if (e && Array.isArray(m.l)) { e.trades = m.l; if (UI.screen && GUI.type === 'trade' && GUI.ctx && GUI.ctx.e === e) UI.renderScreen(); } } return;
+    case 'traded': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'), o = e && e.trades && e.trades[+m.i]; if (o && o.uses < o.max) { o.uses++; o.e = null; o.made = null; e.traded = true; e.rep = Math.min(150, (e.rep || 0) + 2); } } return;
+    case 'cartinv': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { if (typeof cartFillLoot === 'function') cartFillLoot(e); mpSend({ t: 'cartitems', e: m.e, items: e.items }, from); } } return;
+    case 'cartitems': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead && q.kind === 'minecart'); if (e && e.items && Array.isArray(m.items)) { for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } e.loot = null; if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
+    case 'cartset': if (host && Array.isArray(m.items)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { e.loot = null; for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
+    case 'gear': if (host && Array.isArray(m.gear)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseGearChanged === 'function') { e.gear = [0, 1].map(i => m.gear[i] && ITEMS[m.gear[i].id] ? m.gear[i] : null); horseGearChanged(e); } } return;
+    case 'summon': if (host && MOBDEF[m.type] && m.type !== 'player' && isFinite(m.x) && isFinite(m.y) && isFinite(m.z)) spawnMob(m.type, +m.x, +m.y, +m.z); return;
+    case 'killall': if (host) for (const e of [...ENT]) if (e.kind === 'mob' && !e.dead && !e.remote && (!m.type || e.type === m.type)) removeEnt(e); return;
+    case 'held': if (!host) { const h = INV.slots[INV.sel]; if ((h ? h.id : 0) === m.was) { INV.slots[INV.sel] = m.st && ITEMS[m.st.id] ? m.st : null; UI.hudDirty = true; } } return;
+    case 'vehs': if (!host) mpMirrorVehicles(m.l); return;
+    case 'veh': if (host) { MP.allowSpawn = true; try { if (m.kind === 'boat') placeBoat(+m.x, +m.y, +m.z, +m.yaw || 0, String(m.sub || 'oak')); else if (m.kind === 'minecart') spawnMinecart(+m.x, +m.y, +m.z, String(m.sub || 'minecart'), { yaw: +m.yaw || 0 }); } finally { MP.allowSpawn = false; } } return;
+    case 'vhit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.onHit), p = MP.peers.get(from); if (e) { if (p && p.s) mpProxy(p, () => e.onHit(e)); else e.onHit(e); } } return;
+    case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e && e.rider !== PL) mpRidden(e, m, from); } return;
+    case 'tame': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseTame === 'function' && e.owner !== 'player') horseTame(e); } return;
+    case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
+    case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.sleeping = 0; PL.rest = 0; UI.flash('좋은 아침이에요!'); } return;
   }
 }
 // a guest becomes a visitor in the host's world: same seed, nothing saved locally
@@ -16292,35 +16695,67 @@ function mpApplyTile(m, from) {
   const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15);
   if (c) { const old = c.tiles.get(i); if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k]; Object.assign(old, m.tile); } else c.tiles.set(i, m.tile); c.modified = c.edited = true;
     if (UI.screen && GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) UI.renderScreen(); }
-  else if (host) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
-  if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+  else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
 }
 // the host's dropped items, mirrored to guests: a guest walking over one asks the host for it
 function mpMirrorItems(l) {
   const seen = new Set();
   for (const [id, st, x, y, z] of l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'item');
-    if (!e && st && ITEMS[st.id]) { e = dropItem(x, y, z, st.id, st.n, [0, 0, 0], 9999, st.d, st); if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
+    if (!e && st && ITEMS[st.id]) { MP.allowSpawn = true; try { e = dropItem(x, y, z, st.id, st.n, [0, 0, 0], 9999, st.d, st); } finally { MP.allowSpawn = false; } if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
     if (e) { e.tx = x; e.ty = y; e.tz = z; }
   }
   for (const e of ENT) if (e.remote && e.kind === 'item' && !e.dead && !seen.has(e.rid)) removeEnt(e);
 }
+function mpMirrorXP(l) { // the host's experience orbs; walking into one asks the host for its points
+  const seen = new Set();
+  for (const [id, v, x, y, z] of l) {
+    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'xp');
+    if (!e) { const n0 = ENT.length; MP.allowSpawn = true; try { spawnXP(x, y, z, v); } finally { MP.allowSpawn = false; } e = ENT.slice(n0).find(q => q.kind === 'xp'); if (!e) continue; e.remote = true; e.rid = id; e.tick = mpPuppetItem; }
+    e.tx = x; e.ty = y; e.tz = z;
+  }
+  for (const e of ENT) if (e.remote && e.kind === 'xp' && !e.dead && !seen.has(e.rid)) removeEnt(e);
+}
 function mpPuppetItem(e) {
   if (e.tx == null) return; e.x += (e.tx - e.x) * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += (e.tz - e.z) * 0.5;
-  if (!e.asked && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.2 && Math.abs(PL.z - e.z) < 1.2 && e.y > PL.y - 0.6 && e.y < PL.y + 2) { e.asked = true; mpSend({ t: 'pick', e: e.rid }); setTimeout(() => { e.asked = false; }, 1500); }
+  if (!e.asked && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.2 && Math.abs(PL.z - e.z) < 1.2 && e.y > PL.y - 0.6 && e.y < PL.y + 2) { e.asked = true; mpToAuth({ t: e.kind === 'xp' ? 'pickxp' : 'pick', e: e.rid }); setTimeout(() => { e.asked = false; }, 1500); }
 }
 // blocks: the player who did it sends it; the host applies guests' changes and passes them on
-function mpBlockChanged(x, y, z, id, m) {
-  const msg = { t: 'set', x, y, z, id, m, dim: W.dim, dk: dkey(x >> 4, z >> 4) };
-  mpSend(msg);
+// the host runs the whole world (fluids, crops, redstone, fire, mobs) and sends every change, batched once a tick;
+// a guest sends what its player did, the host applies it like a player action and the result comes back to everyone
+function mpBlockChanged(x, y, z, id, m, metaOnly) {
+  if (MP.replaying) return; // changes already in the server's record, being put back as a chunk loads
+  const e = metaOnly ? [x, y, z, id, m, 1] : [x, y, z, id, m];
+  if (MP.rolePending) { MP.queue.push(e); return; } // just arrived in a dimension: sent once it is known who runs it
+  if (MP.role === 'host') { if (MP.peers.size || MP.server) (MP.batch || (MP.batch = [])).push(e); return; } // a server world keeps every change
+  mpToAuth({ t: 'set', x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
 }
-function mpApplySet(m, from) {
-  const host = MP.role === 'host';
-  if (m.dim === W.dim && isLoaded(m.x, m.z)) { MP.applying = true; try { setBlock(m.x, m.y, m.z, m.id, m.m); } finally { MP.applying = false; } }
-  else if (host) { // not loaded here: kept with the world and put in place when the host loads that chunk
+function mpApplySets(m) { // guests: the host's changes
+  if (m.dim !== W.dim) return;
+  MP.applying = true;
+  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; } if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); } }
+  finally { MP.applying = false; }
+}
+function mpApplySet(m) { // the host: a guest's action
+  if (MP.role !== 'host') return;
+  if (m.dim === W.dim && isLoaded(m.x, m.z)) {
+    MP.applying = true;
+    try {
+      if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) return; setMeta(m.x, m.y, m.z, m.m); }
+      else setBlock(m.x, m.y, m.z, m.id, m.m);
+      // what the player's own code would have set going: redstone, button release, fluids and falling blocks
+      const b = m.id; rsNotify(m.x, m.y, m.z);
+      if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
+      if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
+      if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
+      for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+    } finally { MP.applying = false; }
+  } else if (MP.server) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }); // a server world keeps it until someone loads that chunk
+  else { // not loaded here: kept with the world and put in place when the host loads that chunk
     const E = W.meta.mpEdits || (W.meta.mpEdits = {}); (E[m.dk] || (E[m.dk] = [])).push([m.x, m.y, m.z, m.id, m.m]);
-  } else W.saved.add(m.dk); // a guest fetches that chunk from the host when it gets near
-  if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+    for (const id of MP.peers.keys()) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }, id);
+  }
 }
 // chunk requests: the host answers with its saved / loaded chunk, plus edits waiting for it
 async function mpServeChunk(m, from) {
@@ -16343,52 +16778,214 @@ function mpGotChunk(m) {
   if (m.dim !== W.dim) return; const key = ckey(m.cx, m.cz);
   if (W.pending.get(key) !== 'load') return; W.pending.delete(key);
   if (m.edits) mpEdits.set(key, m.edits); if (m.tiles) mpTileWait.set(key, m.tiles);
-  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); return; } // the host has the plain terrain: generate it here
+  const rm = m.it && typeof itemRemapFor === 'function' ? itemRemapFor(m.it) : null; if (rm) { remapItems(m.tl, rm); remapItems(m.mobs, rm); remapItems(m.tiles, rm); }
+  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs) W.pendingMobs.set(key, m.mobs); return; } // plain terrain (with its animals): generated here
   const n = 256 * m.ch, dec = (s, T, fill) => { const a = rleDec(mpUnB64(s, T), n, T), out = new T(CVOL); out.set(a.subarray(0, Math.min(n, CVOL))); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: null, fromSave: true, tileList: m.tl || [] });
+  W.inbox.push({ cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] });
 }
 function mpChunkLoaded(c) {
   const host = MP.role === 'host', dk = dkey(c.cx, c.cz);
-  if (host && W.meta.mpTiles && W.meta.mpTiles[dk]) { for (const [i, t] of Object.entries(W.meta.mpTiles[dk])) c.tiles.set(+i, t); delete W.meta.mpTiles[dk]; c.modified = c.edited = true; }
-  if (!host && mpTileWait.has(c.key)) { for (const [i, t] of Object.entries(mpTileWait.get(c.key))) c.tiles.set(+i, t); mpTileWait.delete(c.key); }
-  const list = host ? W.meta.mpEdits && W.meta.mpEdits[dk] : mpEdits.get(c.key);
+  const own = host && !MP.server;
+  if (own && W.meta.mpTiles && W.meta.mpTiles[dk]) { for (const [i, t] of Object.entries(W.meta.mpTiles[dk])) c.tiles.set(+i, t); delete W.meta.mpTiles[dk]; c.modified = c.edited = true; }
+  if (!own && mpTileWait.has(c.key)) { for (const [i, t] of Object.entries(mpTileWait.get(c.key))) c.tiles.set(+i, t); mpTileWait.delete(c.key); }
+  const list = own ? W.meta.mpEdits && W.meta.mpEdits[dk] : mpEdits.get(c.key);
   if (!list) return;
-  MP.applying = true; try { for (const [x, y, z, id, m] of list) setBlock(x, y, z, id, m); } finally { MP.applying = false; }
-  if (host) delete W.meta.mpEdits[dk]; else mpEdits.delete(c.key);
+  MP.applying = true; MP.replaying = MP.server; try { for (const [x, y, z, id, m, mo] of list) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); } } finally { MP.applying = false; MP.replaying = false; }
+  if (own) delete W.meta.mpEdits[dk]; else mpEdits.delete(c.key);
+  if (MP.server && host) c.modified = c.edited = true; // stored again with the changes in it
 }
 
 // ---------- every tick: your state out; the host also sends the clock and nearby mobs ----------
 function mpTick() {
   if (!MP.on || !W.active) return;
-  if (W.tickN % 2 === 0) { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
-    sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0,
+  if (W.tickN % 2 === 0) { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
+    sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0) }); }
-  if (MP.role !== 'host') { if (W.tickN % 200 === 0) mpGuestSave(); return; }
-  if (W.tickN % 40 === 0) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
+  if (MP.server && W.tickN % 200 === 0) mpSendPdata();
+  if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
+  if (MP.server && W.tickN % 600 === 0) mpSendShared();
+  if (MP.server && W.tickN % 200 === 100) mpMobSnapshot();
+  if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
+  // guests' surroundings stay loaded and alive on the host: chunks, random ticks (crops, fire, ice), mob spawning
+  const here = [...MP.peers.values()].filter(p => p.s && p.s.dim === W.dim && performance.now() - p.at < 5000);
+  W.keepCenters = here.length ? here.map(p => [p.s.x, p.s.z, 3]) : null;
+  for (const p of here) {
+    if (Math.abs(p.s.x - PL.x) < 48 && Math.abs(p.s.z - PL.z) < 48) continue; // already covered by the host's own area
+    randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
+    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
+  }
+  // experience orbs fly to the nearest player, guests included, and a guest gets the points on touching one
+  if (here.length) for (const e of ENT) {
+    if (e.dead || e.kind !== 'xp' || e.remote) continue;
+    const dh = Math.hypot(PL.x - e.x, PL.y + 0.8 - e.y, PL.z - e.z); let g = null, gd = 8;
+    for (const p of here) { const d = Math.hypot(p.s.x - e.x, p.s.y + 0.8 - e.y, p.s.z - e.z); if (d < gd && d < dh) { gd = d; g = p; } }
+    if (!g) continue;
+    if (gd < 1) { removeEnt(e); mpSend({ t: 'givexp', v: e.value }, g.id); continue; }
+    const f = (1 - gd / 8) ** 2 * 0.1; e.vx += (g.s.x - e.x) / gd * f; e.vy += (g.s.y + 0.8 - e.y) / gd * f; e.vz += (g.s.z - e.z) / gd * f;
+  }
+  // containers that change by themselves (furnaces, brewing stands, campfires) near guests: sent when they change
+  if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
+    if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
+    for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; const j = JSON.stringify(t); if (t._mp === j.length + ':' + j.slice(-40)) continue; t._mp = j.length + ':' + j.slice(-40);
+      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
+  }
+  if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 4 === 0) for (const p of MP.peers.values()) { // mobs near each guest, 5 times a second
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
-    for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = MP.eid++;
-      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0]); }
+    for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
+      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null]); }
     mpSend({ t: 'mobs', l }, p.id);
-    const it = []; for (const e of ENT) { if (e.dead || e.kind !== 'item' || e.remote || Math.abs(e.x - p.s.x) > 32 || Math.abs(e.z - p.s.z) > 32) continue; if (!e.mpid) e.mpid = MP.eid++; it.push([e.mpid, { id: e.stack.id, n: e.stack.n, d: e.stack.d, e: e.stack.e }, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
+    mpSendVehicles(p);
+    const it = []; for (const e of ENT) { if (e.dead || e.kind !== 'item' || e.remote || Math.abs(e.x - p.s.x) > 32 || Math.abs(e.z - p.s.z) > 32) continue; if (!e.mpid) e.mpid = mpNewId(); it.push([e.mpid, { id: e.stack.id, n: e.stack.n, d: e.stack.d, e: e.stack.e }, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
     mpSend({ t: 'items', l: it }, p.id);
+    const xo = []; for (const e of ENT) { if (e.dead || e.kind !== 'xp' || e.remote || Math.abs(e.x - p.s.x) > 24 || Math.abs(e.z - p.s.z) > 24) continue; if (!e.mpid) e.mpid = mpNewId(); xo.push([e.mpid, e.value, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
+    mpSend({ t: 'xps', l: xo }, p.id);
   }
 }
+function mpNewId() { return MP.server ? MP.id * 1000000 + MP.eid++ : MP.eid++; } // unique even when another player takes over a dimension
 // guests: the host's mobs as puppets that move where the host says
 function mpMirrorMobs(l) {
   const seen = new Set();
-  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying] of l) {
-    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead);
+  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor] of l) {
+    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob');
     if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared }); } finally { MP.allowSpawn = false; } e.remote = true; e.rid = id; e.persistent = true; e.yaw = yaw; }
     if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) e.hurt = 10; if (dying && !e.deathT) e.deathT = 1;
+    // what riding needs: saddle, tame, chest and the horse's own speed and jump
+    if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
+    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
   }
-  for (const e of ENT) if (e.remote && !e.dead && !seen.has(e.rid)) removeEnt(e);
+  for (const e of ENT) if (e.remote && e.kind === 'mob' && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
 function mpPuppetTick(e) {
+  if (e.rider === PL) { if (e.def.ride) e.def.ride(e, 0); mpRideSend(e); return; } // you ride it: it goes where you steer, and the runner follows
+  if (e.mpWas) mpRideOff(e);
   if (e.tx == null) return; const dx = e.tx - e.x, dz = e.tz - e.z;
   e.x += dx * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += dz * 0.5; e.yaw += wrapA(e.tyaw - e.yaw) * 0.5;
   const sp = Math.hypot(dx, dz); e.walkAmt = Math.min(1, sp * 6); e.walk = (e.walk || 0) + sp * 3; if (e.hurt > 0) e.hurt--; if (e.deathT) e.deathT++;
 }
+
+// ---------- a saved server world (node tools/server.js) ----------
+// The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
+// back to the server; the others follow as guests. When the runner leaves, the server names the next one.
+const MP_SHARED = ['dragonKilled', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
+async function mpEnterServerWorld(m) {
+  MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
+  for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
+  const sm = m.meta, d = m.pdata;
+  const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
+    dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off } : null, time: m.time, rain: m.rain, thunder: m.thunder };
+  MP.rolePending = true; MP.role = 'guest';
+  await startWorld(meta.id, meta);
+  W.saved = new Set(m.stored); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
+  if (d && d.adv) W.meta.adv = d.adv; if (d && d.stats) W.meta.stats = d.stats;
+  if (!sm.spawn) mpSend({ t: 'meta', shared: {}, spawn: W.worldSpawn });
+  mpSend({ t: 'dim', dim: W.dim });
+  chatMsg(sm.name + ' 서버 세계에 들어왔습니다', '#ffff55');
+}
+function mpGotAuth(dim, id) {
+  if (id == null) delete MP.auth[dim]; else MP.auth[dim] = id;
+  if (!MP.server || !W.active || dim !== W.dim || id == null) return;
+  const was = MP.role, now = id === MP.id ? 'host' : 'guest'; MP.role = now;
+  if (now === 'guest' && MP.lastAuth !== id) for (const e of [...ENT]) if (e.remote) { if (PL.riding === e) dismount(); removeEnt(e); } // the new runner's mobs replace the old one's
+  MP.lastAuth = id;
+  const q = MP.queue; MP.queue = []; MP.rolePending = false;
+  if (now === 'host' && was !== 'host') mpBecomeRunner();
+  if (q.length) { if (now === 'host') mpSend({ t: 'sets', dim: W.dim, l: q }); else for (const e of q) mpToAuth({ t: 'set', x: e[0], y: e[1], z: e[2], id: e[3], m: e[4], mo: e[5] ? 1 : 0, dk: dkey(e[0] >> 4, e[2] >> 4) }); }
+}
+// taking over a dimension: the previous runner's figures go, its stored mobs come back to life here
+function mpBecomeRunner() {
+  for (const e of [...ENT]) if (e.remote) removeEnt(e);
+  const dks = [...W.chunks.values()].map(c => dkey(c.cx, c.cz)); if (dks.length) mpSend({ t: 'chunkmobs', dks });
+  chatMsg('이 차원의 계산을 맡았습니다', '#aaaaaa');
+}
+function mpRestoreMobs(l) {
+  const keep = new Set(['frame', 'painting', 'armor_stand']); // already here from the chunk itself
+  for (const [dk, mobs] of l) { const m = /(-?\d+),(-?\d+)$/.exec(dk); if (!m) continue; const c = chunkAt(+m[1], +m[2]); if (!c) continue;
+    const near = ENT.some(e => e.kind === 'mob' && !e.dead && Math.floor(e.x) >> 4 === c.cx && Math.floor(e.z) >> 4 === c.cz); // already has its own mobs
+    const list = (mobs || []).filter(e => !keep.has(e[0]) && (!near || e[0] === 'boat' || e[0] === 'minecart')); if (!list.length) continue;
+    W.onChunkLoaded({ cx: c.cx, cz: c.cz, key: 'restore', mobs: list, spawns: null }, false); }
+}
+// a dimension's runner stores its chunks on the server instead of this browser
+function mpStoreChunk(c) {
+  if (!c.modified) return; c.modified = false;
+  const dk = dkey(c.cx, c.cz); W.saved.add(dk);
+  const mobs = c.mobsFresh || W.chunks.get(c.key) !== c ? c.mobs || null : chunkKeep(c, false); c.mobsFresh = false; // a chunk still here: what stands in it now
+  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
+  mpSend({ t: 'store', dk, rec });
+}
+function mpPdata() {
+  offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, adv: W.meta.adv || null, stats: W.meta.stats || null };
+}
+function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
+let mpSharedLast = '';
+function mpSendShared() { const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k]; const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
+function mpServerLeave(stay) { // keep everything in the world's store before going (stay: the host closes multiplayer and plays on)
+  if (!W.active) return;
+  mpSendPdata();
+  if (MP.role === 'host') { mpSendShared(); if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
+    for (const c of W.chunks.values()) { if (stay) { c.mobs = chunkKeep(c, false); c.mobsFresh = true; c.modified = true; } else R.onChunkUnloaded(c); mpStoreChunk(c); } }
+}
+// every ten seconds the runner sends what lives in its chunks, so whoever takes over starts from the world as it was
+function mpMobSnapshot() {
+  const l = []; for (const c of W.chunks.values()) { const k = chunkKeep(c, false); if (k.length || c.mobs) l.push([dkey(c.cx, c.cz), k]); }
+  if (l.length) mpSend({ t: 'mobsnap', dim: W.dim, it: ITEM_TABLE, l });
+}
+// after closing a world you didn't run: its chunks come back from the save, with their mobs
+function mpDropChunks() { for (const c of [...W.chunks.values()]) { c.modified = false; if (W.onChunkUnloaded) W.onChunkUnloaded(c); W.chunks.delete(c.key); } W.lastKey = -1; }
+// your own world, sent to a server so others can play it without you: chunks, world data and your player
+async function mpUpload(url) {
+  if (!W.active || W.meta.remote) throw new Error('먼저 올릴 세계에 들어가세요');
+  saveAll(true); await new Promise(r => setTimeout(r, 400));
+  const link = await mpWebSocket(url, 'world'); if (link.hello.kind !== 'world') { link.close(); throw new Error('이 주소는 서버 세계를 받지 않습니다'); }
+  if (link.hello.world) { link.close(); throw new Error('서버에 이미 세계가 있습니다 (' + link.hello.world.name + ')'); }
+  const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
+  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
+  const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys()); const mine = (keys || []).filter(k => typeof k === 'string' && k.startsWith(W.id + ':'));
+  let n = 0;
+  for (const k of mine) { const rec = await dbReq('chunks', 'readonly', st => st.get(k)); if (!rec) continue; const dk = k.slice(W.id.length + 1);
+    const out = rec.b ? { v: 3, it: rec.it, ch: rec.ch || 128, b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), t: rec.t || [], mobs: rec.mobs || null } : { v: 2, it: rec.it, mobs: rec.mobs || null };
+    if (rec.b && rec.v < 3) continue; // very old saves stay local
+    link.send({ t: 'store', dk, rec: out }); if (++n % 50 === 0) { MP.status = `올리는 중... ${n}/${mine.length}`; const el = $('mpStatus'); if (el) el.textContent = MP.status; await new Promise(r => setTimeout(r, 0)); } }
+  link.send({ t: 'pdata', name: MP.name, d: mpPdata() }); // you carry on where you were, with what you had
+  await new Promise(r => setTimeout(r, 600)); link.close();
+  return n;
+}
+
+// ---------- riding and vehicles ----------
+// Boats and minecarts belong to the dimension's runner like mobs and are mirrored to everyone. Whoever rides a boat,
+// a minecart, a horse, a pig or a strider steers it on their own screen and the runner follows them.
+function mpSendVehicles(p) {
+  const l = [];
+  for (const e of ENT) { if (e.dead || (e.kind !== 'boat' && e.kind !== 'minecart') || e.remote || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
+    l.push([e.mpid, e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(3), e.kind === 'boat' ? e.wood : e.ctype, e.rider === PL ? -1 : e.mpRider || 0]); }
+  mpSend({ t: 'vehs', l }, p.id);
+}
+function mpMirrorVehicles(l) {
+  const seen = new Set();
+  for (const [id, kind, x, y, z, yaw, sub, rider] of l) {
+    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === kind);
+    if (!e) { MP.allowSpawn = true; try { e = kind === 'boat' ? placeBoat(x, y, z, yaw, sub) : spawnMinecart(x, y, z, sub, { yaw }); } finally { MP.allowSpawn = false; } if (!e) continue;
+      e.remote = true; e.rid = id; e.vTick = e.tick; e.tick = mpVehTick; e.onHit = () => mpToAuth({ t: 'vhit', e: id }); }
+    e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw;
+    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+  }
+  for (const e of ENT) if (e.remote && (e.kind === 'boat' || e.kind === 'minecart') && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
+}
+function mpVehTick(e) {
+  if (e.rider === PL) { e.vTick(e); mpRideSend(e); return; }
+  if (e.mpWas) mpRideOff(e);
+  if (e.tx == null) return; e.x += (e.tx - e.x) * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += (e.tz - e.z) * 0.5; e.yaw += wrapA(e.tyaw - e.yaw) * 0.5;
+}
+function mpRideSend(e) { e.mpWas = true; if (W.tickN % 2) return; mpToAuth({ t: 'ride', e: e.rid, x: +e.x.toFixed(3), y: +e.y.toFixed(3), z: +e.z.toFixed(3), yaw: +e.yaw.toFixed(3), vx: +(e.vx || 0).toFixed(3), vz: +(e.vz || 0).toFixed(3) }); }
+function mpRideOff(e) { e.mpWas = false; mpToAuth({ t: 'ride', e: e.rid, off: 1 }); }
+// the runner: someone else is steering this one
+function mpRidden(e, m, from) {
+  if (m.off) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } return; }
+  e.mpRider = from; e.mpRideAt = performance.now(); e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null;
+  if (e.kind !== 'mob' && !e.mpTick0) { e.mpTick0 = e.tick; e.tick = mpRiddenTick; }
+}
+function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; } }
 
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
@@ -16420,31 +17017,52 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
 // ---------- other players' figures ----------
 function mpAvatar(p) {
   if (p.m) return p.m;
-  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
+  mpSkinTex(p);
+  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
-  const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = 'bold 28px sans-serif'; const w = Math.ceil(g.measureText(p.name).width) + 16; c.width = w; c.height = 40;
-  g.font = 'bold 28px sans-serif'; g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, w, 40); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 8, 21);
-  const t = new THREE.CanvasTexture(c), tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); tag.scale.set(w / 40 * 0.3, 0.3, 1); tag.renderOrder = 5;
-  p.tag = tag; p.m = m; p.pos = null; scene.add(m, tag); return m;
+  // the name above the head as Java draws it: white text on a faint dark plate, bright where it can be seen and dim
+  // through walls (the dim one is hidden while the player sneaks)
+  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif';
+  const draw = () => { g.font = F; const w = Math.ceil(g.measureText(p.name).width) + 24; c.width = w; c.height = 60; g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 12, 32); if (p.tags) for (const t of p.tags) t.userData.w = w / 60; };
+  draw(); if (document.fonts) document.fonts.load(F).then(() => { draw(); t.needsUpdate = true; }).catch(() => {}); // the game's pixel font, once it has loaded
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; const w = c.width;
+  const mk = (through) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, opacity: through ? 0.3 : 1, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData.w = w / 60; return sp; };
+  p.tags = [mk(true), mk(false)]; p.m = m; p.pos = null; scene.add(m, ...p.tags); return m;
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); scene.remove(p.tag); p.m = null; } }
+const MP_HURT = new THREE.Color(1, 0.6, 0.6);
+function mpPlaceTag(p, s, ps) {
+  const y = p.pos[1] + (ps.sleep ? 0.6 : ps.swim || ps.gliding ? 0.9 : ps.sneak ? 1.85 : 2.05) + 0.25, d = Math.hypot(camera.position.x - p.pos[0], camera.position.y - y, camera.position.z - p.pos[2]);
+  const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
+  p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
+}
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } }
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) p.m.visible = p.tag.visible = false; continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
-    const last = p.pos || [s.x, s.y, s.z]; p.pos = [last[0] + (s.x - last[0]) * k, last[1] + (s.y - last[1]) * k, last[2] + (s.z - last[2]) * k];
-    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20;
+    // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
+    // (updates come 10 times a second); the legs swing with the speed between updates, as Java's limbDistance does
+    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 130; let a = H[H.length - 1], b = a;
+    for (let i = H.length - 1; i > 0; i--) if (H[i - 1][0] <= rt) { a = H[i - 1]; b = H[i]; break; }
+    const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
+    p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
+    if (Math.hypot(p.pos[0] - last[0], p.pos[2] - last[2]) > 8) p.hist = [[performance.now(), s.x, s.y, s.z]]; // a teleport: no sliding across the world
+    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20, segT = a && b && b[0] > a[0] ? (b[0] - a[0]) / 50 : 0;
+    p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
+    const glide = !!s.glide, swim = s.pose === 'swim' && !glide; p.glideT = glide ? (p.glideT || 0) + dtT : 0;
     const ps = { headYaw: 0, headPitch: -s.pitch, headPitchW: -s.pitch, yaw: s.yaw, right: s.held ? 'item' : null, left: s.off ? 'item' : null, two: null, charge: 0, swing: s.swing, swingLeft: false,
-      sneak: !!s.sneak, riding: false, flying: !!s.fly, gliding: false, glideT: 0, vel2: mvx * mvx + mvz * mvz, vy: 0, swim: false, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
+      sneak: (!!s.sneak || s.pose === 'crouch') && !s.fly && !glide, riding: !!s.ride, flying: !!s.fly, gliding: glide, glideT: p.glideT, vel2: mvx * mvx + mvz * mvz, vy: (s.y - last[1]) || 0, swim, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
     tickBodyYaw(st, ps, mvx, mvz, dtT);
-    const spd = Math.min(1, Math.hypot(mvx, mvz) / Math.max(dt, 1e-3) / 20 * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
-    ps.headYaw = -wrapA(s.yaw - st.bodyYaw);
-    m.visible = p.tag.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
-    p.tag.position.set(p.pos[0], p.pos[1] + (s.sneak ? 1.95 : 2.15), p.pos[2]);
-    const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]); for (const mt of m.userData.mats) mt.color.setScalar(light);
+    const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
+    st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
+    ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
+    m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
+    mpPlaceTag(p, s, ps);
+    const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light);
   }
@@ -16458,27 +17076,123 @@ function mpInstall() {
   playerTick = wrapLocal(playerTick); onUsePress = wrapLocal(onUsePress); onUseRelease = wrapLocal(onUseRelease);
   const gt = gameTick; gameTick = function () { gt(); mpTick(); };
   const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
-  const g0 = gr; gr = k => MP.role === 'guest' && (k === 'doDaylightCycle' || k === 'doWeatherCycle' || k === 'doMobSpawning') ? false : g0(k); // the host's world decides
-  const sm = spawnMob; spawnMob = function () { const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) removeEnt(e); return e; }; // guests only show the host's mobs
-  const mt = mobTick; mobTick = e => { if (e.remote) return mpPuppetTick(e); if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
+  const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
+  const sm = spawnMob; spawnMob = function () { if (MP.role === 'guest' && !MP.allowSpawn && MP.cmd) { const [type, x, y, z] = arguments; mpToAuth({ t: 'summon', type, x, y, z }); } const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) removeEnt(e); return e; }; // guests only show the host's mobs
+  const mt = mobTick; mobTick = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
   const hp = hurtPlayer; hurtPlayer = function (dmg, cause) { if (MP.proxy) { mpSend({ t: 'hurt', dmg, cause }, MP.proxy.id); return true; } return hp.apply(this, arguments); };
   const ae = addEffect; addEffect = function (t, k, dur, lv) { if (MP.proxy && t === PL) { mpSend({ t: 'eff', k, dur, lv: lv || 0 }, MP.proxy.id); return; } return ae.apply(this, arguments); };
   const pl = play; play = function () { if (!MP.proxy) return pl.apply(this, arguments); }; // a guest's fight isn't heard at the host's ears
   const at = arrowTick; arrowTick = function (e) { if (MP.role === 'host' && MP.peers.size && mpArrowAtGuest(e)) return; return at.apply(this, arguments); };
-  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpSend({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
+  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
-  const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' ? mpRequestChunk(cx, cz) : lc(cx, cz);
-  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z); };
-  const ol = W.onChunkLoaded; W.onChunkLoaded = (c, fresh) => { if (ol) ol(c, fresh); if (MP.on) mpChunkLoaded(c); };
+  const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
+  const sc = saveChunk; saveChunk = function (c) { if (MP.server) { if (MP.role === 'host' && !MP.rolePending) mpStoreChunk(c); return; } return sc.apply(this, arguments); };
+  const sw = switchDim; switchDim = function () { // a server world: each dimension has its own runner
+    const srv = MP.server; if (srv) { mpSendPdata(); if (MP.role === 'host') { mpSendShared(); if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; } } }
+    const r = sw.apply(this, arguments);
+    if (srv) { MP.role = 'guest'; MP.rolePending = true; MP.queue = []; mpSend({ t: 'dim', dim: W.dim }); }
+    return r; };
+  const rcmd = runCommand; runCommand = function (cmd) { const t0 = W.time, r0 = W.rainTarget;
+    // a guest's /summon and /kill @e act on the runner's mobs
+    if (MP.role === 'guest') { const k = String(cmd || '').trim().replace(/^\//, '').match(/^kill\s+(@e\S*)/); if (k) { const m = k[1].match(/type=(?:minecraft:)?([a-z_]+)/); mpToAuth({ t: 'killall', type: m ? m[1] : null }); } }
+    MP.cmd = true; let r; try { r = rcmd.apply(this, arguments); } finally { MP.cmd = false; } if (MP.server && (Math.abs(W.time - t0) > 40 || W.rainTarget !== r0)) mpSend({ t: 'timeset', time: W.time, rain: W.rainTarget, thunder: W.thunderOn }); return r; };
+  addEventListener('pagehide', () => { if (MP.on && MP.server) mpServerLeave(); });
+  for (const n of ['tickScheduled', 'rsTick', 'randomTicks', 'furnaceTick', 'tileTick', 'spawnerTick']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { if (MP.role !== 'guest') return f.apply(this, arguments); }; } // a guest's world is the host's
+  const di = dropItem; dropItem = function (x, y, z, id, n, vel, delay, dur, extra) { // a guest's drops become the host's items, so everyone sees (and can take) them
+    if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (!n || ITEMS[id] == null) return null; const st = extra ? { ...extra, id, n } : { id, n }; if (dur != null) st.d = dur; mpToAuth({ t: 'drop', x, y, z, st, vel: vel || null, delay: delay == null ? 10 : delay }); return null; }
+    return di.apply(this, arguments); };
+  const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpToAuth({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
+  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z);
+    // a guest changes what is in the runner's chest or hopper minecart, or the gear of the runner's horse
+    if (MP.role === 'guest' && c && c.cart && c.cart.remote) mpToAuth({ t: 'cartset', e: c.cart.rid, items: c.cart.items });
+    if (MP.role === 'guest' && c && c.horse && c.horse.remote) mpToAuth({ t: 'gear', e: c.horse.rid, gear: c.horse.gear }); };
+  const ol = W.onChunkLoaded; W.onChunkLoaded = (c, fresh) => { MP.loading = true; try { if (ol) ol(c, fresh); } finally { MP.loading = false; } if (MP.on) mpChunkLoaded(c); };
+  const ui0 = useItem; useItem = function (first) { const t = TARGET; if (MP.role === 'guest' && first && t && t.type === 'ent' && t.e.remote && t.e.kind === 'mob' && mpRemoteUsable(t.e)) { const h = PL.held(); mpToAuth({ t: 'use', e: t.e.rid, st: h ? { ...h } : null, sneak: PL.sneaking ? 1 : 0 }); swing(); USE.placeCd = 4; return; } return ui0.apply(this, arguments); };
+  const ia = INV.add; INV.add = st => { if (MP.useFor) { mpSend({ t: 'give', st }, MP.useFor.id); return 0; } return ia(st); }; // milk, a bowl of stew... go to the guest
+  const os = UI.openScreen; UI.openScreen = (a, b) => { if (!MP.useFor) os(a, b); };
+  // a guest trades with the runner's villager: its offers come from the runner, the guest pays with its own items and the runner counts the trade
+  const os2 = UI.openScreen; UI.openScreen = (a, b) => { if (MP.role === 'guest' && b && b.cart && b.cart.remote) mpToAuth({ t: 'cartinv', e: b.cart.rid }); if (a === 'trade' && MP.role === 'guest' && b && b.e && b.e.remote) { b.e.trades = b.e.trades || []; mpToAuth({ t: 'trades', e: b.e.rid }); } os2(a, b); };
+  const tt = tradeTake; tradeTake = function (c) { const r = tt.apply(this, arguments); if (MP.role === 'guest' && c.e && c.e.remote) mpToAuth({ t: 'traded', e: c.e.rid, i: c.sel }); return r; };
+  const pb = placeBoat; placeBoat = function (x, y, z, yaw, wood) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'boat', x, y, z, yaw, sub: wood || 'oak' }); return null; } return pb.apply(this, arguments); };
+  const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
+  if (typeof horseTame === 'function') { const ht = horseTame; horseTame = function (e) { ht.apply(this, arguments); if (e.remote) mpToAuth({ t: 'tame', e: e.rid }); }; } // tamed by riding it, on a guest's screen
+  const rc = raycast; raycast = function () { const r = rc.apply(this, arguments); if (!MP.on) return r; const h = mpRayPeer(); return h && (!r || h.t < r.t) ? h : r; };
+  const ae0 = attackEntity; attackEntity = e => e.kind === 'peer' ? mpAttackPeer(e.peer) : ae0(e);
+  const sd = UI.showDeath; UI.showDeath = msg => { if (MP.on) { msg = PL.lastHurtBy === 'player' && MP.lastHitBy ? MP.name + '님이 ' + MP.lastHitBy + '님에게 살해당했습니다' : msg.replace(/^플레이어가 /, MP.name + '님이 '); mpSend({ t: 'sys', text: msg }); } return sd(msg); };
 }
+
+// ---------- players hitting each other ----------
+// another player in the crosshair is a target like a mob; the damage is worked out by the attacker (weapon, charge,
+// critical hit) and the one hit takes it through their own armour, shield and enchantments
+function mpRayPeer() {
+  if (!MP.on || PL.mode === 'spectator') return null;
+  const [dx, dy, dz] = lookDir(), ox = PL.x, oy = PL.y + PL.eyeH, oz = PL.z, lim = creative() ? 5 : 3; let best = null;
+  for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'spectator' || !p.pos || performance.now() - p.at > 5000) continue;
+    const [x, y, z] = p.pos, hg = s.h || 1.8, h = rayBox(ox, oy, oz, dx, dy, dz, [x - .35, y, z - .35, x + .35, y + hg, z + .35]);
+    if (h && h[0] <= lim && (!best || h[0] < best.t)) { const e = p.hit || (p.hit = { kind: 'peer', peer: p, w: .3 }); e.x = x; e.y = y; e.z = z; e.h = hg; best = { type: 'ent', e, t: h[0] }; } }
+  return best;
+}
+function mpAttackPeer(p) {
+  const s = p.s; if (!s || s.dead || s.mode === 'creative' || s.mode === 'spectator' || MP.pvp === false) { PL.attackT = 0; return; }
+  const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool, sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4;
+  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + meleeBonus()) * (0.2 + q * q * 0.8);
+  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
+  PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
+  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
+  if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
+  PL.exh += 0.1; p.hurtFx = 10; play('hit');
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+}
+function mpGotHit(m, att) {
+  if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
+  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer' };
+  MP.lastHitBy = att ? att.name : null;
+  if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
+  mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });
+  if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
+  // LivingEntity.takeKnockback: 0.4 away from the attacker, and the knockback level along the attacker's look
+  const kn = (str, x, z) => { const l = Math.hypot(x, z) || 1; PL.vx = PL.vx / 2 - x / l * str; PL.vz = PL.vz / 2 - z / l * str; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + str); };
+  kn(0.4, src.x - PL.x, src.z - PL.z); if (m.kb > 0) kn(Math.min(5, m.kb) * 0.5, Math.sin(m.yaw), Math.cos(m.yaw));
+}
+// a guest's right click on one of the host's mobs (feeding, shearing, milking, dyeing, taming, naming...) happens on the
+// host, holding the guest's item; what the item becomes and anything handed over goes back to the guest
+function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return h.id !== IID.lead; }
+function mpRemoteUse(p, e, st, sneak) {
+  const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
+  INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); }
+  finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
+}
+// the night passes when everyone in the world is asleep (the host decides, and wakes the guests)
+function mpCanSkipNight() {
+  if (!MP.on) return true; if (MP.role !== 'host' || MP.server) return false; // a server world's night passes on the server
+  const here = [...MP.peers.values()].filter(p => p.s && p.s.dim === W.dim && p.s.mode !== 'spectator' && performance.now() - p.at < 5000);
+  const asleep = here.filter(p => p.s.sleep).length;
+  if (asleep < here.length) { if (W.tickN % 20 === 0) UI.flash(`잠자는 플레이어 ${asleep + 1}/${here.length + 1}`); return false; }
+  mpSend({ t: 'wake' }); return true;
+}
+// Tab: who is playing
+let mpListEl = null;
+function mpShowList(on) {
+  if (!mpListEl) { mpListEl = document.createElement('div'); mpListEl.id = 'plist'; document.body.appendChild(mpListEl); }
+  if (!on || !W.active) { mpListEl.hidden = true; return; }
+  const me = MP.on ? MP.name : '플레이어', rows = [me + (MP.role === 'host' ? ' (호스트)' : '')];
+  for (const p of MP.peers.values()) rows.push(p.name + (p.id === 0 ? ' (호스트)' : '') + (p.s && p.s.dim !== W.dim ? ' · ' + ({ '-1': '네더', 1: '디 엔드', 0: '오버월드' })[p.s.dim] : p.s && p.pos ? ' · ' + Math.round(Math.hypot(p.pos[0] - PL.x, p.pos[2] - PL.z)) + 'm' : ''));
+  mpListEl.innerHTML = rows.map(r => `<div>${esc(r)}</div>`).join(''); mpListEl.hidden = false;
+}
+addEventListener('keydown', e => { if (e.code === 'Tab' && W.active && !UI.menu && !UI.screen && !UI.chatOpen) mpShowList(true); });
+addEventListener('keyup', e => { if (e.code === 'Tab') mpShowList(false); });
+addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
   const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
+  if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') return `<h2>멀티플레이</h2><div class="form">${nameRow}${addr}${btn('서버에 접속', 'mp_joinws')}<p class="muted">서버 없이: 호스트가 보낸 초대 코드를 붙여 넣으세요.</p><textarea id="mpCode" rows="3" placeholder="초대 코드"></textarea>${btn('초대 코드로 참가', 'mp_answer')}<textarea id="mpOut" rows="3" readonly placeholder="여기 나오는 답장 코드를 호스트에게 보내세요"></textarea>${st}</div><div class="btncol">${btn('뒤로', 'title')}</div>`;
   if (name === 'mp_host') {
-    if (!MP.on) return `<h2>멀티플레이 열기</h2><div class="form">${nameRow}${addr}${btn('서버로 열기', 'mp_hostws')}${btn('서버 없이 열기 (초대 코드)', 'mp_hostrtc')}<p class="muted">같은 서버 주소로 친구가 참가하거나, 초대 코드를 주고받아 연결합니다. 세계는 이 컴퓨터에 저장됩니다.</p>${st}</div><div class="btncol">${btn('뒤로', 'pause')}</div>`;
+    if (!MP.on) return `<h2>멀티플레이 열기</h2><div class="form">${nameRow}${addr}${btn('서버로 열기', 'mp_hostws')}${btn('서버 없이 열기 (초대 코드)', 'mp_hostrtc')}${btn('서버 세계로 올리기 (내가 없어도 플레이)', 'mp_upload')}<p class="muted">같은 서버 주소로 친구가 참가하거나, 초대 코드를 주고받아 연결합니다. 세계는 이 컴퓨터에 저장됩니다.</p>${st}</div><div class="btncol">${btn('뒤로', 'pause')}</div>`;
     const list = [...MP.peers.values()].map(p => esc(p.name)).join(', ') || '아직 없음';
     const rtc = MP.link && MP.link.kind === 'rtc' ? `${btn('초대 코드 만들기', 'mp_invite')}<textarea id="mpOut" rows="3" readonly placeholder="초대 코드: 참가할 친구에게 보내세요">${MP.rtc ? MP.rtc.code : ''}</textarea><textarea id="mpCode" rows="3" placeholder="친구가 보낸 답장 코드"></textarea>${btn('답장 코드 넣기', 'mp_accept')}` : '';
     return `<h2>멀티플레이 (${MP.role === 'host' ? '호스트' : '참가 중'})</h2><div class="form"><p>참가자: ${list}</p>${MP.role === 'host' ? rtc : ''}${st}</div><div class="btncol">${btn(MP.role === 'host' ? '멀티플레이 닫기' : '나가기', 'mp_stop')}${btn('뒤로', 'pause')}</div>`;
@@ -16492,7 +17206,10 @@ async function mpAction(a) {
   const codeIn = $('mpCode') ? $('mpCode').value : '';
   try {
     if (a === 'mp_join' || a === 'mp_host') { MP.status = ''; showMenu(a); }
-    else if (a === 'mp_joinws') { say('접속하는 중...'); await mpJoinWs(ad.value.trim()); say('접속했습니다. 세계를 받는 중...'); }
+    else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
+    else if (a === 'mp_upload') { say('서버에 올리는 중...'); const n = await mpUpload(ad.value.trim()); say(`올렸습니다 (청크 ${n}개). 이제 타이틀 → 멀티플레이 → 서버에 접속으로 누구나 들어올 수 있습니다.`); }
     else if (a === 'mp_answer') { say('답장 코드를 만드는 중...'); MP.role = 'guest'; MP.on = true; mpInstall(); const code = await mpAnswerInvite(codeIn); $('mpOut').value = code; $('mpOut').select(); say('답장 코드를 호스트에게 보내세요. 호스트가 넣으면 연결됩니다.'); }
     else if (a === 'mp_hostws') { say('서버에 여는 중...'); await mpHostStart('ws'); MP.status = '서버에 열렸습니다'; showMenu('mp_host'); }
     else if (a === 'mp_hostrtc') { await mpHostStart('rtc'); MP.status = '초대 코드를 만들어 친구에게 보내세요'; showMenu('mp_host'); }
@@ -16697,6 +17414,7 @@ async function startWorld(id, meta) {
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
   await loadSavedKeys(meta.id);
+  W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;
@@ -16853,7 +17571,7 @@ function frame(now) {
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); // fewer GPU uploads per frame when the frame rate dips pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
-  if (!UI.paused) {
+  if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
     let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0);
     if (n >= 5) acc = 0;
@@ -16863,7 +17581,7 @@ function frame(now) {
   // selection & crack
   const t = !UI.paused && TARGET && TARGET.type === 'block' ? TARGET : null;
   if (t && view === 0 && !UI.hideHud) R.setSelection(t.x, t.y, t.z, selShape(t.id, t.m) || [[0, 0, 0, 16, 16, 16]]); else R.sel.visible = false;
-  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) { R.crack.visible = true; R.crack.position.set(t.x + .5, t.y + .5, t.z + .5); R.crack.material.map = R.crackTexs[Math.min(9, Math.floor(MINE.prog * 10))]; } else R.crack.visible = false;
+  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) R.setCrack(t.x, t.y, t.z, t.id, getMeta(t.x, t.y, t.z), Math.floor(MINE.prog * 10)); else R.crack.visible = false;
   // hand
   if (R.hand.swing > 0) R.hand.swing = Math.max(0, R.hand.swing - dt * 3.5);
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
@@ -16950,6 +17668,16 @@ function autoRes() {
   if (old !== R.pixelScale) R.resize();
 }
 
+// which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their
+// 3D block model even though a sprite-sized texture exists (end rods, trapdoors, the small dripleaf, spore blossoms)
+function javaItemModels() {
+  const flat = { glass_pane: 'glass', lilac: 'lilac_top', rose_bush: 'rose_bush_top', peony: 'peony_top', sunflower: 'sunflower_top', tall_grass: 'tall_grass_top', large_fern: 'large_fern_top', weeping_vines: 'weeping_vines_plant', twisting_vines: 'twisting_vines_plant' };
+  for (const c of S.COLORS) flat[c + '_stained_glass_pane'] = c + '_stained_glass';
+  for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const k of [c + '_coral', c + '_coral_fan', 'dead_' + c + '_coral', 'dead_' + c + '_coral_fan']) flat[k] = k;
+  for (const k in flat) { const id = IID[k]; if (id != null && S.T[flat[k]] != null && !PACKPX.items[k]) ITEMS[id].sprite = flat[k]; }
+  for (const k of ['end_rod', 'spore_blossom', 'small_dripleaf', ...['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'iron'].map(w => w + '_trapdoor')]) { const id = IID[k]; if (id != null) ITEMS[id].sprite = null; }
+}
+
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
@@ -16957,8 +17685,9 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  javaItemModels();
   if (UPACK.stale) setTimeout(() => UI.flash('설정 → 리소스 팩에서 client.jar 를 다시 불러오면 원작 텍스처가 더 많이 적용됩니다'), 1500);
-  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); R.applyPackCracks(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }

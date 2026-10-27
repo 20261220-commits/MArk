@@ -51,6 +51,12 @@ function signMesh(x, y, z, m, t) {
   const grp = new THREE.Group(), text = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.475), new THREE.MeshBasicMaterial({ map: signTexture(t), transparent: true, depthWrite: false }));
   if (m & 16) { // on a wall: the board is drawn by the block mesh
     const f = m & 3, d = DIRS[f]; text.position.set(x + .5 - d[0] * 0.5 + d[0] * 0.135, y + 0.5, z + .5 - d[2] * 0.5 + d[2] * 0.135); text.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][f]; grp.add(text);
+    const w = SIGN_WOOD[(m >> 5) & 7], tex = packTexture('sign_' + w);
+    if (tex) { // the jar's sign texture over the board (SignBlockEntityRenderer draws wall signs from it too); a hair larger, so it covers the block's own board
+      const md = buildMCModel('sign_board_' + w, { tex: 'sign_' + w, tw: 64, th: 32, parts: [MCMODELS.sign.parts[0]] }, tex), piv = new THREE.Group();
+      md.scale.setScalar(2 / 3 * 1.02); md.position.y = -(2 * 2 / 3 * 1.02) + 0; piv.add(md);
+      piv.position.set(text.position.x - d[0] * 0.045, y + 0.5, text.position.z - d[2] * 0.045); piv.rotation.y = text.rotation.y; grp.add(piv);
+    }
   } else if (packTexture('sign_' + SIGN_WOOD[(m >> 5) & 7])) { // standing, with the jar's sign entity texture: SignBlockEntityRenderer's model at 2/3 scale
     const w = SIGN_WOOD[(m >> 5) & 7], md = buildMCModel('sign_' + w, { ...MCMODELS.sign, tex: 'sign_' + w }, packTexture('sign_' + w));
     md.scale.setScalar(2 / 3); md.position.y = -0.5; text.position.set(0, 0.833, 0.045);

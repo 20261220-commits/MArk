@@ -422,6 +422,8 @@ const SCAF_C = hex(0xd8b45a);
 PAINT.scaffolding_side = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || Math.abs(x - y) < 1.5) ? quant(shade(SCAF_C, (x < 2 || x > 13 ? 0.85 : 1) * (0.9 + r() * 0.15)), 3) : null);
 PAINT.scaffolding_top = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || (x + y) % 5 === 0) ? quant(shade(SCAF_C, 0.9 + r() * 0.15), 3) : null);
 PAINT.scaffolding_bottom = PAINT.scaffolding_top;
+PAINT.lectern_base = r => fill((x, y) => quant(shade(hex(0xa8865a), (y % 4 === 0 ? 0.8 : 1) * (0.92 + r() * 0.12)), 3));
+PAINT.grindstone_pivot = r => fill((x, y) => quant(shade(hex(0x8a8a8a), 0.9 + r() * 0.15), 3));
 PAINT.lectern_book = r => fill((x, y) => x < 1 || x > 14 ? hex(0x6a3a1a) : x === 7 || x === 8 ? hex(0xb8a888) : y % 3 === 1 && y > 1 && y < 14 && x > 1 && x < 14 ? hex(0x5a5a5a) : quant(shade(hex(0xf0e8d0), 0.95 + r() * 0.06), 3));
 // tiles with no painter borrow a similar one until a resource pack supplies the real texture (nothing new is drawn)
 const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate', polished_deepslate: 'deepslate', chiseled_deepslate: 'deepslate', cracked_deepslate_bricks: 'deepslate', cracked_deepslate_tiles: 'deepslate',

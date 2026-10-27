@@ -1,15 +1,20 @@
-// Serves the game and relays multiplayer messages on your network, with no dependencies:
-//   node tools/server.js [port]        then open http://<this computer's address>:<port> on every device
-// One player opens their world to multiplayer ("서버로 열기", address ws://<address>:<port>/mp), the others
-// join with the same address. Guests' messages go to the host; the host's go to one guest or all of them.
+// Serves the game and runs multiplayer on your network, with no dependencies:
+//   node tools/server.js [port] [--world name]      then open http://<this computer's address>:<port> on every device
+// Two kinds of multiplayer:
+//  - a saved server world (worlds/<name>/ next to the game): it stays on this computer and anyone can join at any time,
+//    whoever made it doesn't need to be there. The players who are on share the work: in each dimension the first one
+//    there runs it (mobs, water, crops, redstone) and the others follow; when that player leaves, the next one takes
+//    over. With nobody on, the world waits. Players join with "멀티플레이 → 서버에 접속" at ws://<address>:<port>/mp.
+//  - one player's own world opened to others ("서버로 열기"), as before: guests' messages go to that host.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
-const root = path.join(__dirname, '..'), port = +process.argv[2] || 8080;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8' };
+const root = path.join(__dirname, '..'), args = process.argv.slice(2);
+const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a) && i !== wi + 1) || 8080), worldName = (wi >= 0 && args[wi + 1] ? args[wi + 1] : 'world').replace(/[^\w\-가-힣]/g, '_');
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
 
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   const f = path.join(root, path.normalize(u));
-  if (!f.startsWith(root + path.sep)) { res.writeHead(403); res.end(); return; }
+  if (!f.startsWith(root + path.sep) || f.startsWith(path.join(root, 'worlds') + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); res.end(d); });
 });
 
@@ -43,24 +48,49 @@ function wsAccept(req, sock, onText, onClose) {
   return c;
 }
 
-// ---------- rooms: one host, any number of guests ----------
+// ---------- the saved server world (js/mpcore.js does the work; the files are here) ----------
+const { mpWorldCore } = require(path.join(root, 'js', 'mpcore.js'));
+const WDIR = path.join(root, 'worlds', worldName), CDIR = path.join(WDIR, 'chunks');
+const state = { meta: null, time: 1000, rain: 0, thunder: false, players: {}, weatherT: 12000 + Math.random() * 168000 };
+const keys = new Set(), dirty = new Map(); let stateDirty = false;
+const fileOf = dk => path.join(CDIR, encodeURIComponent(dk) + '.json');
+try { Object.assign(state, JSON.parse(fs.readFileSync(path.join(WDIR, 'world.json'), 'utf8'))); for (const f of fs.readdirSync(CDIR)) if (f.endsWith('.json')) keys.add(decodeURIComponent(f.slice(0, -5))); console.log(`세계 "${worldName}" 불러옴 (시드 ${state.meta.seed}, 청크 ${keys.size}개)`); } catch (e) { state.meta = null; }
+function saveWorld() {
+  if (!state.meta) return; fs.mkdirSync(CDIR, { recursive: true });
+  if (stateDirty) { fs.writeFileSync(path.join(WDIR, 'world.json'), JSON.stringify(state)); stateDirty = false; }
+  for (const [dk, c] of dirty) fs.writeFileSync(fileOf(dk), JSON.stringify({ rec: c.rec, edits: c.edits, tiles: c.tiles }));
+  dirty.clear();
+}
+const store = { state, keys, load: dk => { try { return JSON.parse(fs.readFileSync(fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => dirty.set(dk, c), saveState: () => { stateDirty = true; }, log: t => console.log(t) };
+const conns = new Map(); // id -> socket of a player in the server world
+const core = mpWorldCore(store, (id, o) => { const c = conns.get(id); if (c) c.send(JSON.stringify(o)); });
+setInterval(() => { core.tick(); }, 1000);
+setInterval(() => { stateDirty = true; saveWorld(); }, 5000);
+for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stateDirty = true; saveWorld(); process.exit(0); });
+
+// ---------- rooms of a player's own world: one host, any number of guests ----------
 const rooms = new Map(); let nextId = 1;
 server.on('upgrade', (req, sock) => {
   const url = new URL(req.url, 'http://x'); if (!url.pathname.startsWith('/mp')) { sock.destroy(); return; }
   const roomName = url.searchParams.get('room') || 'main', room = rooms.get(roomName) || { host: null, guests: new Map() }; rooms.set(roomName, room);
-  const id = nextId++; let role = null;
+  const id = nextId++; let role = null, wp = false;
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (wp) { core.message(id, m); return; }
     if (!role) { // the first message says who this is
       if (m.t !== 'hello') return;
+      // "join": a player's open world if someone hosts one here, otherwise the saved server world
+      if (m.role === 'join') m.role = room.host ? 'guest' : 'world';
+      if (m.role === 'world') { role = 'world'; wp = true; conns.set(id, c); c.send(JSON.stringify({ t: 'hello', id, world: state.meta ? { name: state.meta.name, seed: state.meta.seed } : null, kind: 'world' })); return; }
       if (m.role === 'host') { if (room.host) { c.send(JSON.stringify({ t: 'error', msg: '이 서버에는 이미 호스트가 있습니다' })); c.close(); return; } room.host = c; role = 'host'; }
       else { if (!room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
-      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
+      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id })); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s); } else for (const g of room.guests.values()) g.send(s);
   }, () => {
+    if (wp) { conns.delete(id); core.leave(id); if (!conns.size) { stateDirty = true; saveWorld(); } return; }
     if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
     else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); }
     if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
@@ -70,4 +100,5 @@ server.listen(port, () => {
   const addrs = Object.values(os.networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal).map(a => a.address);
   console.log(`네모 대륙 서버: http://localhost:${port}` + addrs.map(a => `  ·  http://${a}:${port}`).join(''));
   console.log(`멀티플레이 주소: ws://${addrs[0] || 'localhost'}:${port}/mp`);
+  console.log(state.meta ? `서버 세계: ${state.meta.name} — 아무 때나 접속해 플레이할 수 있습니다` : `서버 세계 "${worldName}" 없음 — 처음 접속한 플레이어가 새로 만들거나 자기 세계를 올릴 수 있습니다`);
 });

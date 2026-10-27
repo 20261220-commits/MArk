@@ -26,7 +26,7 @@ varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 512.0;
+  vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
@@ -89,6 +89,7 @@ W.onMesh = (c, m) => {
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
     scene.add(mesh); c.mesh[k] = mesh;
   }
+  c.mesh.ver = c.ver;
 };
 W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
@@ -143,8 +144,30 @@ function setSelection(x, y, z, boxes) {
   selGeo.setDrawRange(0, n / 3); selGeo.attributes.position.needsUpdate = true; sel.visible = true;
 }
 const crackTexs = crackCanvases.map(c => { const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
-const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, fog: false }));
+// the breaking overlay covers the block's own model (a slab, a torch, a lectern), not a whole cube, and blends like
+// Java's crumbling layer: colour = 2 x texture x what is behind (grey keeps it, dark lines darken), clear pixels skipped
+const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4, fog: false, alphaTest: 0.1,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.DstColorFactor, blendDst: THREE.SrcColorFactor }));
 crack.visible = false; scene.add(crack);
+const crackGeos = new Map();
+function crackGeometry(id, meta) {
+  const key = id * 256 + (meta & 255); let g = crackGeos.get(key); if (g) return g;
+  let src = !BOX_ICON(id) ? meshedBlockGeometry(id, meta, true) : null, pos;
+  if (src) pos = src.attributes.position.array;
+  else { const a = []; for (const b of S.shapes(id, meta) || [[0, 0, 0, 16, 16, 16]]) { const bg = new THREE.BoxGeometry((b[3] - b[0]) / 16, (b[4] - b[1]) / 16, (b[5] - b[2]) / 16).toNonIndexed(); bg.translate((b[0] + b[3]) / 32 - .5, (b[1] + b[4]) / 32 - .5, (b[2] + b[5]) / 32 - .5); a.push(...bg.attributes.position.array); } pos = new Float32Array(a); }
+  const uv = new Float32Array(pos.length / 3 * 2), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  for (let t = 0; t < pos.length; t += 9) { // texture coordinates from the position on the face, as Java's sheeted decal does
+    A.fromArray(pos, t); B.fromArray(pos, t + 3); C.fromArray(pos, t + 6); const n = B.clone().sub(A).cross(C.clone().sub(A));
+    const ax = Math.abs(n.x) > Math.abs(n.y) && Math.abs(n.x) > Math.abs(n.z) ? 0 : Math.abs(n.y) > Math.abs(n.z) ? 1 : 2;
+    for (let k = 0; k < 3; k++) { const x = pos[t + k * 3] + .5, y = pos[t + k * 3 + 1] + .5, z = pos[t + k * 3 + 2] + .5, o = (t / 3 + k) * 2;
+      uv[o] = ax === 0 ? (n.x > 0 ? 1 - z : z) : x; uv[o + 1] = ax === 1 ? (n.y > 0 ? 1 - z : z) : y; } }
+  g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  crackGeos.set(key, g); return g;
+}
+R.setCrack = (x, y, z, id, meta, stage) => { if (stage < 0) { crack.visible = false; return; }
+  crack.geometry = crackGeometry(id, meta); crack.position.set(x + .5, y + .5, z + .5); crack.scale.setScalar(1.002); crack.material.map = crackTexs[Math.min(9, stage)]; crack.visible = true; };
+function applyPackCracks() { crackTexs.forEach((t, i) => { const c = entCanvas('destroy_' + i); if (c) { t.image = c; t.needsUpdate = true; } }); }
+R.applyPackCracks = applyPackCracks;
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
@@ -281,9 +304,38 @@ function itemGeometry(id) {
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
 const DEFAULT_META = { 116: 5, 117: 10, 99: 0, 252: 5, 254: 10, 253: 5, 165: 5, 173: 10, 215: 1 }; // fence/pane icons show their connected arms
+// block items as the world draws them: the block (both halves of a bed) meshed alone by the terrain mesher, so
+// lecterns, beds, grindstones, end rods, beacons and every other shaped block look the same in the hand and the
+// inventory as when placed. Fences, walls and panes keep their inventory shapes (arms out) from the boxes below.
+let iconVol = null;
+const BOX_ICON = id => DEFAULT_META[id] != null || /(_wall|_fence|_pane|iron_bars)$/.test(ITEMS[id] ? ITEMS[id].key : '');
+function meshedBlockGeometry(id, meta, single) {
+  const PA = S.PA, PW = S.PW;
+  if (!iconVol) iconVol = { B: new Uint16Array(PA * S.PH), M: new Uint8Array(PA * S.PH), L: new Uint8Array(PA * S.PH).fill(0xf0), bio: new Uint8Array(PA).fill(2) };
+  const { B, M, L, bio } = iconVol, put = [[8, 1, 8, meta]];
+  if (id === S.BID.red_bed && !single) { put[0][3] = (meta & 0xf0) | 0; put.push([8, 1, 7, (meta & 0xf0) | 4]); } // foot, and the head one block north (DIRS[0])
+  for (const [x, y, z, m] of put) { const i = S.pidx(x, y, z); B[i] = id; M[i] = m; }
+  let r; try { r = S.meshChunk(B, M, L, bio, { fancy: true, smooth: false, h: 4 }); } catch (e) { r = null; }
+  for (const [x, y, z] of put) { const i = S.pidx(x, y, z); B[i] = 0; M[i] = 0; }
+  if (!r) return null;
+  const pos = [], uv = [], shade = [], tintA = [], def = DEFAULT_TINT[S.TINT[id]];
+  for (const d of [r.o, r.c, r.t]) for (let k = 0; k < d.idx.length; k++) {
+    const v = d.idx[k];
+    pos.push(d.pos[v * 3] / 16 - 1 - 8.5, d.pos[v * 3 + 1] / 16 - 1.5, d.pos[v * 3 + 2] / 16 - 1 - (put.length > 1 ? 8 : 8.5));
+    uv.push(d.uv[v * 2] / 8192, d.uv[v * 2 + 1] / 8192); shade.push(d.lt[v * 4 + 2] / 255);
+    const c = [d.col[v * 4], d.col[v * 4 + 1], d.col[v * 4 + 2]], tinted = c[0] < 250 || c[1] < 250 || c[2] < 250;
+    tintA.push(...(tinted && def ? def : c).map(q => q / 255));
+  }
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
+  if (put.length > 1) geo.userData.long = true;
+  return geo;
+}
 function blockGeometry(iid) { // iid: an item id (variant items resolve to their block and meta)
   if (blockGeoCache[iid]) return blockGeoCache[iid];
   const it = ITEMS[iid], id = it && it.place != null && it.block ? it.place : iid, vmeta = it && it.vi ? it.vi << S.VSH[id] : 0;
+  if (!BOX_ICON(id) && id !== S.BID.oak_door) { const g = meshedBlockGeometry(id, vmeta); if (g) return blockGeoCache[iid] = g; }
   const pos = [], uv = [], shade = [], tintA = [];
   const boxes = S.shapes(id, (DEFAULT_META[id] || 0) | vmeta) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
@@ -321,7 +373,19 @@ const itemBlockMatBase = new THREE.ShaderMaterial({
 itemBlockMatBase.uniforms.map.value = atlasTex;
 const itemSpriteMatBase = new THREE.MeshBasicMaterial({ vertexColors: true });
 function blockMaterial() { const m = itemBlockMatBase.clone(); m.uniforms.map.value = atlasTex; return m; }
+// the shield is a 3D model in Java (ShieldEntityModel: a 12x22x1 plate and a handle, drawn by the builtin item renderer
+// with scale(1,-1,-1) from the item's corner), wearing entity/shield_base_nopattern
+let shieldGeo = null, shieldTex = null;
+function shieldMesh() {
+  if (!shieldGeo) { const g = mergeGeos([boxGeo(12, 22, 1, 0, 0, -6, -11, -2, 0, 64, 64), boxGeo(2, 6, 6, 26, 0, -1, -3, -1, 0, 64, 64)]);
+    g.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, -1)); g.applyMatrix4(new THREE.Matrix4().makeTranslation(-0.5, -0.5, -0.5)); g.deleteAttribute('skinIndex'); g.deleteAttribute('skinWeight'); shieldGeo = g; }
+  if (!shieldTex) shieldTex = packTexture('shield_nopattern') || pixelTex(64, 64, g => { g.fillStyle = '#9c7b47'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#7a7a7a'; g.fillRect(0, 0, 14, 1); });
+  const m = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ map: shieldTex, alphaTest: 0.1, vertexColors: !!shieldGeo.attributes.color }));
+  m.userData.isBlock = false; m.userData.shield = true; return m;
+}
+R.shieldMesh = shieldMesh;
 function itemMesh(id) {
+  if (id === IID.shield && typeof boxGeo === 'function') return shieldMesh();
   const d = ITEMS[id];
   const isBlock = d && d.block && !d.sprite;
   const m = new THREE.Mesh(isBlock ? blockGeometry(id) : itemGeometry(id), isBlock ? blockMaterial() : itemSpriteMatBase.clone());
@@ -353,7 +417,7 @@ function renderBlockIcons() {
     const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
     rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
     mesh.geometry = blockGeometry(id);
-    const s = id === S.BID.oak_door ? 0.55 : 1; mesh.scale.set(s, s, s);
+    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : 1; mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
     renderer.setRenderTarget(rt); renderer.render(sc, cam);
   });
   const buf = new Uint8Array(Wd * Hd * 4);
@@ -447,7 +511,8 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
         hY(f * (45 + Math.sin(p * p * PI) * -20)); const g = Math.sin(sp * PI); hZ(f * g * -20); hX(g * -80); hY(f * -45);
       }
       // the item model's first-person display transform, mirrored for the left hand like Transformation.apply(leftHanded)
-      if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
+      if (H.mesh.userData.shield) { const L = f < 0; hT(f * (L ? 10 : -10) / 16, (L ? 0 : 2) / 16, -10 / 16); hY(f * 180); hZ(f * 5); hmul(HT.makeScale(1.25, 1.25, 1.25)); } // shield.json firstperson_*hand
+      else if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
       else { hT(f * 1.13 / 16, 3.2 / 16, 1.13 / 16); hY(f * -90); hZ(f * 25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
       H.mesh.matrix.identity();
     }

@@ -40,7 +40,7 @@ const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 var
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
-  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = true; };
+  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = c.urgent = true; }; // edits are remeshed first, on their own worker
   m(cx, cz);
   if (lx === 0) m(cx - 1, cz); else if (lx === 15) m(cx + 1, cz);
   if (lz === 0) m(cx, cz - 1); else if (lz === 15) m(cx, cz + 1);
@@ -143,7 +143,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
-  if (MP.on && MP.local && !MP.applying) mpBlockChanged(x, y, z, id, meta); // multiplayer: what a player did reaches the others
+  if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta); // multiplayer: the host's world (and what a guest did) reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -159,7 +159,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta, true); markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
 // an observer facing (x,y,z) fires a short pulse whenever that block changes
 function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
@@ -260,14 +260,34 @@ function neighborUpdate(x, y, z) {
   // any block change can reroute dust next to it
   for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === BID.redstone_wire) { rsMark(x + dx, y + dy, z + dz); break; }
 }
+// changes made while this world was open to others, kept beside chunks that weren't stored again (see mpcore.js)
+async function applyMpLog(c) {
+  const dk = dkey(c.cx, c.cz), key = 'mplog:' + W.id + ':' + dk, wid = W.id; W.mpLogs.delete(dk);
+  const lg = await dbReq('chunks', 'readonly', st => st.get(key)); if (!lg || typeof lg !== 'object' || wid !== W.id || W.chunks.get(c.key) !== c) return;
+  for (const [x, y, z, id, m, mo] of lg.edits || []) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); }
+  for (const i in lg.tiles || {}) c.tiles.set(+i, lg.tiles[i]);
+  c.modified = c.edited = true; saveChunk(c, false, true); dbReq('chunks', 'readwrite', st => st.delete(key));
+}
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
-  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
-    const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass || n === BID.stained_glass || (nd && nd.connect === 2)))) m |= 1 << i;
-  });
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => { if (S.connectsTo(kind, getBlock(x + dx, y, z + dz), getMeta(x + dx, y, z + dz), dx)) m |= 1 << i; });
   setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
+}
+// a chunk generated on its own can't see its neighbours: fences, walls and panes along its edges are joined to the
+// neighbouring chunk's once both are here (straight into the arrays: every player works out the same, nothing to save)
+function joinConnections(c) {
+  for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const n = chunkAt(c.cx + ox, c.cz + oz); if (!n) continue;
+    for (const [ch, edgeX, edgeZ, dx, dz] of [[c, ox < 0 ? 0 : ox > 0 ? 15 : -1, oz < 0 ? 0 : oz > 0 ? 15 : -1, ox, oz], [n, ox < 0 ? 15 : ox > 0 ? 0 : -1, oz < 0 ? 15 : oz > 0 ? 0 : -1, -ox, -oz]]) {
+      const top = Math.min(CH - 1, Math.max(ch.maxY || 0, 0) + 1); let touched = false;
+      for (let k = 0; k < 16; k++) { const lx = edgeX >= 0 ? edgeX : k, lz = edgeZ >= 0 ? edgeZ : k;
+        for (let y = 1; y <= top; y++) { const i = (y << 8) | (lz << 4) | lx, b = ch.blocks[i], kind = BLOCKS[b] && BLOCKS[b].connect; if (!kind) continue;
+          const wx = ch.cx * 16 + lx, wz = ch.cz * 16 + lz, bit = dz < 0 ? 1 : dx > 0 ? 2 : dz > 0 ? 4 : 8, on = S.connectsTo(kind, getBlock(wx + dx, y, wz + dz), getMeta(wx + dx, y, wz + dz), dx);
+          const m = ch.meta[i], nm = on ? m | bit : m & ~bit; if (nm !== m) { ch.meta[i] = nm; touched = true; } } }
+      if (touched) ch.dirty = true;
+    }
+  }
 }
 // ---------- fluids ----------
 // blocks that some system needs to find quickly (sculk sensors, beacons): block id -> Set of "x,y,z" in loaded chunks
@@ -491,6 +511,8 @@ const NWORK = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1))
 const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
+// one more worker only for chunks the player just changed: a broken or placed block never waits behind terrain generation
+const editWorker = new Worker(workerURL); editWorker.busy = 0; editWorker.onmessage = e => onWorker(editWorker, e.data);
 const bufPool = [];
 for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
@@ -511,7 +533,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m, m.ver]);
+    if (m.ver === c.urgentVer) W.meshInbox.unshift([c, m, m.ver]); else W.meshInbox.push([c, m, m.ver]);
   }
 }
 // a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
@@ -547,6 +569,8 @@ function addChunk(cx, cz, d, tiles) {
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
+  joinConnections(c);
+  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
@@ -555,8 +579,8 @@ function requestGen(cx, cz) {
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
-function requestMesh(c, opts) {
-  const w = idleWorker(3); if (!w) return false;
+function requestMesh(c, opts, urgent) {
+  const w = urgent && editWorker.busy < 2 ? editWorker : idleWorker(3); if (!w) return false;
   const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
@@ -577,7 +601,7 @@ function requestMesh(c, opts) {
       }
     }
   }
-  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; // unique across chunks, so a stale job can never match a reloaded chunk
+  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; if (urgent) { c.urgent = false; c.urgentVer = c.ver; } // unique across chunks, so a stale job can never match a reloaded chunk
   w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
@@ -667,6 +691,8 @@ function buildSpiral(r) { const a = []; for (let dx = -r; dx <= r; dx++) for (le
 function streamChunks(px, pz, rd, meshOpts, budget) {
   const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = rd + 1;
   if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; }
+  // chunks the player just changed come first, even while an older mesh of them is still on its way
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const c = chunkAt(pcx + dx, pcz + dz); if (c && c.urgent && c.dirty && meshable(c)) requestMesh(c, meshOpts, true); }
   // meshing first (nearest first): visible chunks beat far terrain generation
   let sent = 0;
   for (const [dx, dz] of spiral) {
@@ -683,9 +709,14 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
     if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
     if (!requestGen(cx, cz)) break;
   }
+  // other places that must stay loaded (a multiplayer host keeps its guests' surroundings running): generate, don't mesh
+  const keep = W.keepCenters || null;
+  if (keep) for (const [kx, kz, kr] of keep) { const kcx = Math.floor(kx) >> 4, kcz = Math.floor(kz) >> 4;
+    for (let dx = -kr; dx <= kr; dx++) for (let dz = -kr; dz <= kr; dz++) { const cx = kcx + dx, cz = kcz + dz, k = ckey(cx, cz);
+      if (W.chunks.has(k) || W.pending.has(k)) continue; if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; } if (!requestGen(cx, cz)) break; } }
   // unload far chunks
   const lim = r + 2;
-  for (const c of W.chunks.values()) if (Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) unloadChunk(c);
+  for (const c of W.chunks.values()) if ((Math.abs(c.cx - pcx) > lim || Math.abs(c.cz - pcz) > lim) && !(keep && keep.some(([kx, kz, kr]) => Math.abs(c.cx - (Math.floor(kx) >> 4)) <= kr + 1 && Math.abs(c.cz - (Math.floor(kz) >> 4)) <= kr + 1))) unloadChunk(c);
 }
 // apply finished worker jobs within a time budget so frames stay smooth
 function processInbox(budgetMs, maxMeshes) {

@@ -87,7 +87,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
-  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
+  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion' || cause === 'player') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
@@ -111,7 +111,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -154,6 +154,17 @@ function damageItem(arr, i, n = 1) {
 // ---------- movement ----------
 function blockUnder() { return getBlock(Math.floor(PL.x), Math.floor(PL.y - 0.2), Math.floor(PL.z)); }
 function inBlock(f) { return boxBlocks(PL, f); }
+// poses (Java's EntityPose): standing 1.8 tall, crouching 1.5 (fits under a 1.5-block gap), swimming / crawling 0.6;
+// a pose the space can't hold is forced down to the next one, as when crawling out from under a trapdoor
+function roomFor(h, x = PL.x, y = PL.y, z = PL.z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y + 1e-4 && BX[i + 1] < y + h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
+const POSE_H = { stand: 1.8, crouch: 1.5, swim: 0.6 }, POSE_EYE = { stand: 1.62, crouch: 1.27, swim: 0.4 };
+function updatePose(inWater, eyeF, spec) {
+  PL.swimming = !spec && !PL.flying && PL.sprinting && inWater && eyeF === 1 || (PL.swimming && inWater && PL.sprinting); // sprinting under water: swim
+  let pose = PL.swimming || PL.gliding ? 'swim' : PL.sneaking ? 'crouch' : 'stand';
+  if (!spec && !PL.flying && !PL.sleeping) { if (pose === 'stand' && !roomFor(1.8)) pose = roomFor(1.5) ? 'crouch' : 'swim'; else if (pose === 'crouch' && !roomFor(1.5)) pose = 'swim'; }
+  PL.pose = pose; PL.h = POSE_H[pose];
+  return pose;
+}
 function noCollision(x, y, z) { const n = gatherBoxes(x - PL.w, y, z - PL.w, x + PL.w, y + PL.h, z + PL.w); for (let i = 0; i < n * 6; i += 6) if (BX[i + 3] > x - PL.w && BX[i] < x + PL.w && BX[i + 4] > y && BX[i + 1] < y + PL.h && BX[i + 5] > z - PL.w && BX[i + 2] < z + PL.w) return false; return true; }
 function playerTick() {
   advTick();
@@ -161,7 +172,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping = Math.min(101, PL.sleeping + 1); if (PL.sleeping > 100 && (typeof mpCanSkipNight !== 'function' || mpCanSkipNight())) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -177,7 +188,8 @@ function playerTick() {
   const using = USE.kind === 'eat' || USE.kind === 'bow' || USE.kind === 'shield' || USE.kind === 'crossbow' || USE.kind === 'trident';
   if (PL.shieldCd > 0) PL.shieldCd--;
   PL.sneaking = IN.sneak && !PL.flying && !spec;
-  if (PL.sneaking) { f *= 0.3; s *= 0.3; }
+  const pose = updatePose(inWater, eyeF, spec);
+  if (PL.sneaking || (pose === 'crouch') || (pose === 'swim' && !inWater && !PL.gliding)) { f *= 0.3; s *= 0.3; } // crouching or crawling: slow
   if (using) { f *= 0.2; s *= 0.2; }
   const canSprint = (PL.food > 6 || creative()) && !PL.sneaking && !using && f > 0.8 && !web;
   if ((IN.sprintKey || IN.wTap) && canSprint) PL.sprinting = true;
@@ -197,6 +209,7 @@ function playerTick() {
   } else if (inWater || inLava) {
     const ds = inWater ? enchLv(INV.armor[3], 'depth_strider') : 0;
     accel(0.02 * (inWater && PL.sprinting ? 2 : 1) * (inWater && effLv(PL, 'dolphins_grace') ? 2.5 : 1) * (1 + ds * 0.6));
+    if (PL.swimming) { const d = Math.sin(PL.pitch); if (d <= 0 || IN.jump || fluidAt(PL.x, PL.y + 0.9, PL.z)) PL.vy += (d - PL.vy) * (d < -0.2 ? 0.085 : 0.06); } // swimming goes where you look (PlayerEntity.travel)
     if (IN.jump) PL.vy += 0.04;
     physMove(PL, PL.vx, PL.vy, PL.vz, 0.6);
     const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
@@ -206,7 +219,7 @@ function playerTick() {
   } else {
     const slipB = blockUnder(), sl = BLOCKS[slipB] && BLOCKS[slipB].slip, slip = PL.onGround ? (sl === 2 ? 0.989 : sl ? 0.98 : 0.6) : 1;
     const fr = slip * 0.91;
-    accel(PL.onGround ? sp * (0.21600002 / (fr * fr * fr)) : (PL.sprinting ? 0.026 : 0.02));
+    accel(PL.onGround ? sp * (0.21600002 / (slip * slip * slip)) : (PL.sprinting ? 0.026 : 0.02)); // LivingEntity.getMovementSpeed: the block's slipperiness cubed (not the friction): walking 4.317 m/s
     if (ladder) { PL.vx = Math.max(-0.15, Math.min(0.15, PL.vx)); PL.vz = Math.max(-0.15, Math.min(0.15, PL.vz)); PL.vy = Math.max(PL.vy, PL.sneaking ? 0 : -0.15); PL.fallDist = 0; }
     if (scaf) { if (IN.jump) PL.vy = 0.2; else if (PL.sneaking) PL.vy = -0.15; }
     if (IN.jump && PL.onGround && USE.jumpCd <= 0) {
@@ -252,7 +265,7 @@ function playerTick() {
   if (PL.onGround && !inWater) { PL.bob += moved; PL.stepDist += moved; if (PL.stepDist > 1.7) { PL.stepDist = 0; const b = blockUnder(); if (b) play('step', { mat: soundMat(b), vol: PL.sneaking ? 0.3 : 0.8 }); } }
   if (PL.sprinting && PL.onGround) PL.exh += moved * 0.1; else if (inWater) PL.exh += moved * 0.01;
   // eye height (sneak)
-  const targetEye = PL.sneaking ? 1.27 : 1.62; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
+  const targetEye = POSE_EYE[PL.pose || 'stand']; PL.eyeH += (targetEye - PL.eyeH) * 0.5;
   if (!spec) survivalTick(inWater, inLava, eyeF);
   if (PL.onGround && !spec) plateCheck(PL);
   portalTick();
