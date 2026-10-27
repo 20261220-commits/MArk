@@ -591,12 +591,12 @@ function useItem(first) {
     if (d) {
       // candles: stack up to four of the same colour, or light one with flint and steel
       const cdT = S.candleOf(id, t.m);
-      if (d.candle != null && cdT && cdT.c === d.candle && cdT.n < 4) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n + 1, cdT.lit)); consume(); play('place', { mat: 'wool' }); swing(); advGrant('husbandry/wax_on'); return; }
+      if (d.candle != null && cdT && cdT.c === d.candle && cdT.n < 4) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n + 1, cdT.lit)); consume(); play('place', { mat: 'wool' }); swing(); return; }
       if (d.candle != null && id === BID.cake && t.m === 0 && t.ny === 1) { setBlock(x, y, z, BID.candle_cake, d.candle + 1); consume(); play('place', { mat: 'wool' }); swing(); return; } // a candle on an uneaten cake
       if (d.candle != null) { placeCandle(t, d.candle); return; }
       if (cdT && !cdT.lit && (h.id === IID.flint_and_steel || h.id === IID.fire_charge) && !FLUID[getBlock(x, y + 1, z)]) { setBlock(x, y, z, ...S.candleBlock(cdT.c, cdT.n, 1)); play('ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return; }
       // copper (1.17): honeycomb waxes it (no more oxidation), an axe scrapes the wax off before any oxidation
-      if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); play('place', { mat: 'wool' }); swing(); return; }
+      if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); advGrant('husbandry/wax_on'); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); advGrant('husbandry/wax_off'); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
