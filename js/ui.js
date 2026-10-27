@@ -320,7 +320,7 @@ function showMenu(name, data) {
       <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
-    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명)' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
+    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
   } else if (name.startsWith('mp_')) {

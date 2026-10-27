@@ -19,6 +19,8 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const CFG = { server: process.env.SERVER_URL || '', googleClientId: process.env.GOOGLE_CLIENT_ID || '' }, REQUIRE_LOGIN = /^(1|true|yes)$/i.test(process.env.REQUIRE_LOGIN || '');
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
+  // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
+  if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
   if (u === '/js/config.js' && (CFG.server || CFG.googleClientId)) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
   const f = path.join(root, path.normalize(u));
   if (!f.startsWith(root + path.sep) || f.startsWith(WORLDS + path.sep)) { res.writeHead(403); res.end(); return; }
@@ -84,11 +86,18 @@ async function verifyGoogle(tok) {
     if (c.aud !== CFG.googleClientId || +c.exp * 1000 < Date.now() || !c.sub) return null; return { sub: c.sub, name: c.name || c.given_name || String(c.email || '').split('@')[0], email: c.email || '' }; }
   catch (e) { return null; }
 }
-// ---------- rooms of a player's own world: one host, any number of guests ----------
+// ---------- rooms of a player's own world: one host, any number of guests, found by a short code ----------
 const rooms = new Map(); let nextId = 1;
+const CODE_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
+function newCode() { for (;;) { let c = ''; for (let i = 0; i < 4; i++) c += CODE_CH[Math.floor(Math.random() * CODE_CH.length)]; if (!rooms.has(c)) return c; } }
+function roomList() {
+  const n = [...core.players.values()].filter(q => q.joined).length;
+  return { world: state.meta ? { name: state.meta.name, mode: state.meta.mode, players: n } : null,
+    rooms: [...rooms].filter(([, r]) => r.host).map(([code, r]) => ({ code, host: r.hostName, world: r.worldName, mode: r.mode, players: r.guests.size + 1 })) };
+}
 server.on('upgrade', (req, sock) => {
   const url = new URL(req.url, 'http://x'); if (!url.pathname.startsWith('/mp')) { sock.destroy(); return; }
-  const roomName = url.searchParams.get('room') || 'main', room = rooms.get(roomName) || { host: null, guests: new Map() }; rooms.set(roomName, room);
+  let roomName = null, room = null;
   const id = nextId++; let role = null, wp = false;
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
@@ -107,12 +116,17 @@ server.on('upgrade', (req, sock) => {
     }
     if (!role) { // the first message says who this is
       if (m.t !== 'hello') return;
-      // "join": a player's open world if someone hosts one here, otherwise the saved server world
-      if (m.role === 'join') m.role = room.host ? 'guest' : 'world';
+      // "join" with a room code: that player's open world; without one, the saved server world (or the one open world
+      // of an older game that hosted without a code)
+      let code = String(m.room || url.searchParams.get('room') || '').trim().toUpperCase().slice(0, 12);
+      if (m.role === 'join' && !code && !state.meta) { const open = [...rooms].filter(([, r]) => r.host); if (open.length === 1) code = open[0][0]; } // no server world and one open world: that one
+      if (m.role === 'join') { const r = rooms.get(code || 'main'); m.role = r && r.host ? 'guest' : code ? 'none' : 'world'; }
+      if (m.role === 'none') { c.send(JSON.stringify({ t: 'error', msg: `방 코드 ${code}로 열린 세계가 없습니다 (닫혔거나 코드가 틀렸어요)` })); c.close(); return; }
       if (m.role === 'world') { role = 'world'; wp = true; conns.set(id, c); c.send(JSON.stringify({ t: 'hello', id, world: state.meta ? { name: state.meta.name, seed: state.meta.seed } : null, kind: 'world' })); return; }
-      if (m.role === 'host') { if (room.host) { c.send(JSON.stringify({ t: 'error', msg: '이 서버에는 이미 호스트가 있습니다' })); c.close(); return; } room.host = c; role = 'host'; }
-      else { if (!room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
-      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
+      if (m.role === 'host') { roomName = code && !(rooms.get(code) || {}).host ? code : newCode();
+        room = { host: c, guests: new Map(), hostName: String(m.name || '플레이어').slice(0, 16), worldName: String(m.world || '').slice(0, 40), mode: m.mode === 'creative' ? 'creative' : 'survival' }; rooms.set(roomName, room); role = 'host'; }
+      else { roomName = code || 'main'; room = rooms.get(roomName); if (!room || !room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
+      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id })); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
@@ -120,7 +134,7 @@ server.on('upgrade', (req, sock) => {
   }, () => {
     if (wp) { conns.delete(id); core.leave(id); if (!conns.size) { stateDirty = true; saveWorld(); } return; }
     if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
-    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); }
+    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
     if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
   });
 });
