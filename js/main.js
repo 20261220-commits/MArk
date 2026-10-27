@@ -470,6 +470,8 @@ function javaItemModels() {
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
   ICON_URL = iconCanvas.toDataURL(); document.documentElement.style.setProperty('--icons', `url(${ICON_URL})`); // one copy of the sheet for every icon
   document.documentElement.style.setProperty('--dirt', `url(${tileCanvas(S.T.dirt, null, 4).toDataURL()})`);
+  // the advancement tabs' backgrounds (Minecraft: stone, Nether: netherrack, The End: end stone, Adventure: dirt, Husbandry: hay bale side)
+  for (const [k, t] of [['story', 'stone'], ['nether', 'netherrack'], ['end', 'end_stone'], ['adventure', 'dirt'], ['husbandry', 'hay_side']]) if (S.T[t] != null) document.documentElement.style.setProperty('--advbg-' + k, `url(${tileCanvas(S.T[t], null, 4).toDataURL()})`);
   document.documentElement.style.setProperty('--stoneTex', `url(${tileCanvas(S.T.stone, null, 4).toDataURL()})`);
   await dbOpen();
   if (isTouch) document.body.classList.add('touch');

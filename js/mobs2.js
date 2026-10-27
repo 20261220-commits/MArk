@@ -162,17 +162,22 @@ function placeBoat(x, y, z, yaw, wood) {
   e.mesh = tex ? buildMCModel('boat', MCMODELS.boat, tex) : buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
 }
 function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
-function mount(e) { if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) return; // someone else on it (multiplayer)
+const seat2Busy = e => !!(e.mob || e.rider2 || e.seat2Other || (e.mpRider2 && performance.now() - e.mpRider2At < 1500));
+function mount(e) {
+  if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) { // someone is driving (multiplayer): a boat has a back seat
+    if (e.kind !== 'boat' || seat2Busy(e)) return;
+    PL.riding = e; e.rider2 = PL; PL.flying = false; PL.sneaking = false; play('boat'); return;
+  }
   PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
 function dismount() {
-  const e = PL.riding; PL.riding = null; if (!e) return; e.rider = null;
+  const e = PL.riding; PL.riding = null; if (!e) return; if (e.rider2 === PL) e.rider2 = null; else e.rider = null;
   for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0, 0]]) { const x = e.x + dx, z = e.z + dz; if (!SOLID[getBlock(Math.floor(x), Math.floor(e.y + 0.6), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(e.y + 1.6), Math.floor(z))]) { PL.x = x; PL.y = e.y + 0.6; PL.z = z; break; } }
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0;
 }
 function boatTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1, deep = fluidAt(e.x, e.y + 0.45, e.z) === 1, under = getBlock(Math.floor(e.x), Math.floor(e.y - 0.1), Math.floor(e.z));
   if (e.hurt > 0) e.hurt--;
-  if (e.rider) {
+  if (e.rider === PL) {
     e.yaw -= IN.s * 0.055; // A/D steer
     const th = IN.f > 0 ? 0.04 : IN.f < 0 ? -0.005 : 0;
     e.vx += -Math.sin(e.yaw) * th; e.vz += -Math.cos(e.yaw) * th;
@@ -182,7 +187,7 @@ function boatTick(e) {
   physMove(e, e.vx, e.vy, e.vz, 0);
   const fr = inW || deep ? 0.9 : under === BID.ice ? 0.98 : 0.5;
   e.vx *= fr; e.vz *= fr; e.vy *= 0.98;
-  if (e.rider) { PL.x = e.x; PL.y = e.y + 0.18; PL.z = e.z; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; }
+  if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y + 0.18; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
   if (e.y < -40) removeEnt(e);
 }
 function boatRender(e, x, y, z, br) {
@@ -195,7 +200,12 @@ function rideTick() {
   const e = PL.riding;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
   if (!e || e.dead) { PL.riding = null; return; }
-  PL.x = e.x; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
+  if (e.rider2 === PL) { // the back seat of a boat: rides along, can't steer; takes the front when the driver gets off
+    if (!e.rider && !(e.mpRider && performance.now() - e.mpRideAt < 1500)) { e.rider2 = null; e.rider = PL; }
+    else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y + 0.18; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }
+  }
+  const f = e.kind === 'boat' && seat2Busy(e) ? 0.2 : 0;
+  PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
 function mobsForDimension(x, y, z, b, below) {

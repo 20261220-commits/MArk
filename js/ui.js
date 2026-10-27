@@ -323,6 +323,8 @@ function showMenu(name, data) {
     h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
+  } else if (name === 'advworlds') { ADVUI.view = null; h = advWorldsHtml();
+  } else if (name === 'advview') { h = `<div class="advmenu">${advScreenHtml()}</div><div class="btncol">${btn('완료', 'advworlds')}</div>`;
   } else if (name.startsWith('mp_')) {
     h = mpMenu(name, data);
   } else if (name === 'loading') {
@@ -345,7 +347,9 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'packs') showMenu('packs');
   else if (a === 'stats') showMenu('stats');
   else if (a.startsWith('stat_')) { STATUI.tab = a.slice(5); showMenu('stats'); }
-  else if (a === 'advs') { resumeGame(); UI.openScreen('adv'); }
+  else if (a === 'advs') showMenu('advworlds');
+  else if (a === 'advworlds') showMenu('advworlds');
+  else if (a.startsWith('advw_')) { const w = (UI.advWorlds || []).find(q => String(q.id) === a.slice(5)); if (w) { ADVUI.view = w; ADVUI.tab = 'story'; ADVUI.px = ADVUI.py = 0; showMenu('advview'); } }
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
   else if (a === 'skins') showMenu('skins');

@@ -544,9 +544,9 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
-      if (typeof ADVT !== 'undefined') ADVT.kill(e, HURTPROJ);
       stat('mob_kills'); statOf('killed', e.type);
     }
+    if ((attacker === PL || src === 'player') && typeof ADVT !== 'undefined') ADVT.kill(e, HURTPROJ); // counts with doMobLoot off too
   }
   return true;
 }

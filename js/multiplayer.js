@@ -211,6 +211,7 @@ function mpHandle(m, from) {
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'proj': mpGotProj(m, from); return;
+    case 'adv': if (!host || MP.server) { if (typeof m.id === 'string' && ADVM[m.id]) advGrant(m.id, m.crit == null ? undefined : String(m.crit)); } return;
     case 'boom': mpGotBoom(m, from); return;
     case 'primed': mpGotPrimed(m, from); return;
     case 'prime': if (host && [m.x, m.y, m.z].every(isFinite)) { primeTNT(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), Math.max(1, Math.min(200, +m.fuse || 80))); } return;
@@ -227,7 +228,10 @@ function mpHandle(m, from) {
     case 'tile': mpApplyTile(m, from); return;
     case 'tslots': if (host) mpTileSlots(m, from); return;
     case 'tilefix': if (!host) mpTileFix(m); return;
-    case 'unride': if (!host && PL.riding && PL.riding.remote && PL.riding.rid === m.e) { dismount(); UI.flash('다른 플레이어가 이미 타고 있습니다'); } return;
+    case 'unride': if (!host && PL.riding && PL.riding.remote && PL.riding.rid === m.e) { const e = PL.riding;
+      if (m.seat !== 2 && e.rider2 === PL) return; // an older refusal of the front seat: already in the back
+      if (m.seat !== 2 && e.kind === 'boat' && e.rider === PL && !e.seat2Other && !e.mob) { e.rider = 'other'; e.rider2 = PL; e.mpWas = false; UI.flash('뒷자리에 탔습니다'); } // both got on at once: the back seat
+      else { dismount(); UI.flash('다른 플레이어가 이미 타고 있습니다'); } } return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
     case 'xps': if (!host) mpMirrorXP(m.l); return;
     case 'xp': if (host) spawnXP(+m.x, +m.y, +m.z, Math.min(2000, +m.v || 0)); return;
@@ -254,6 +258,7 @@ function mpHandle(m, from) {
     case 'vehs': if (!host) mpMirrorVehicles(m.l); return;
     case 'veh': if (host) { MP.allowSpawn = true; try { if (m.kind === 'boat') placeBoat(+m.x, +m.y, +m.z, +m.yaw || 0, String(m.sub || 'oak')); else if (m.kind === 'minecart') spawnMinecart(+m.x, +m.y, +m.z, String(m.sub || 'minecart'), { yaw: +m.yaw || 0 }); } finally { MP.allowSpawn = false; } } return;
     case 'vhit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.onHit), p = MP.peers.get(from); if (e) { if (p && p.s) mpProxy(p, () => e.onHit(e)); else e.onHit(e); } } return;
+    case 'ride2': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) mpRidden2(e, m, from); } return;
     case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) mpRidden(e, m, from); } return;
     case 'tame': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseTame === 'function' && e.owner !== 'player') horseTame(e); } return;
     case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
@@ -458,7 +463,7 @@ function mpChunkLoaded(c) {
 // ---------- every tick: your state out; the host also sends the clock and nearby mobs ----------
 function mpTick() {
   if (!MP.on || !W.active) return;
-  if (W.tickN % 2 === 0) { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
+  { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0) }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
@@ -490,12 +495,13 @@ function mpTick() {
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
   }
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
-  if (W.tickN % 4 === 0) for (const p of MP.peers.values()) { // mobs near each guest, 5 times a second
+  if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
     for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
       l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null]); }
     mpSend({ t: 'mobs', l }, p.id);
     mpSendVehicles(p);
+    if (W.tickN % 4) continue;
     const it = []; for (const e of ENT) { if (e.dead || e.kind !== 'item' || e.remote || Math.abs(e.x - p.s.x) > 32 || Math.abs(e.z - p.s.z) > 32) continue; if (!e.mpid) e.mpid = mpNewId(); it.push([e.mpid, { id: e.stack.id, n: e.stack.n, d: e.stack.d, e: e.stack.e }, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
     mpSend({ t: 'items', l: it }, p.id);
     const xo = []; for (const e of ENT) { if (e.dead || e.kind !== 'xp' || e.remote || Math.abs(e.x - p.s.x) > 24 || Math.abs(e.z - p.s.z) > 24) continue; if (!e.mpid) e.mpid = mpNewId(); xo.push([e.mpid, e.value, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
@@ -537,7 +543,7 @@ async function mpEnterServerWorld(m) {
   MP.rolePending = true; MP.role = 'guest';
   await startWorld(meta.id, meta);
   W.saved = new Set(m.stored); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
-  if (d && d.adv) W.meta.adv = d.adv; if (d && d.stats) W.meta.stats = d.stats;
+  if (d && d.adv) W.meta.adv = d.adv; if (d && d.adv2) { W.meta.adv2 = d.adv2; W.meta.advMigrated = true; } if (d && d.stats) W.meta.stats = d.stats;
   if (!sm.spawn) mpSend({ t: 'meta', shared: {}, spawn: W.worldSpawn });
   mpSend({ t: 'dim', dim: W.dim });
   chatMsg(sm.name + ' 서버 세계에 들어왔습니다', '#ffff55');
@@ -575,7 +581,7 @@ function mpStoreChunk(c) {
 }
 function mpPdata() {
   offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
-  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, adv: W.meta.adv || null, stats: W.meta.stats || null };
+  return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }
 function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
 let mpSharedLast = '';
@@ -618,33 +624,41 @@ async function mpUpload(url) {
 function mpSendVehicles(p) {
   const l = [];
   for (const e of ENT) { if (e.dead || (e.kind !== 'boat' && e.kind !== 'minecart') || e.remote || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
-    l.push([e.mpid, e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(3), e.kind === 'boat' ? e.wood : e.ctype, e.rider === PL ? -1 : e.mpRider || 0]); }
+    l.push([e.mpid, e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(3), e.kind === 'boat' ? e.wood : e.ctype, e.rider === PL ? -1 : e.mpRider || 0, e.rider2 === PL ? -1 : e.mpRider2 && performance.now() - e.mpRider2At < 1500 ? e.mpRider2 : e.mob ? -2 : 0]); }
   mpSend({ t: 'vehs', l }, p.id);
 }
 function mpMirrorVehicles(l) {
   const seen = new Set();
-  for (const [id, kind, x, y, z, yaw, sub, rider] of l) {
+  for (const [id, kind, x, y, z, yaw, sub, rider, rider2] of l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === kind);
     if (!e) { MP.allowSpawn = true; try { e = kind === 'boat' ? placeBoat(x, y, z, yaw, sub) : spawnMinecart(x, y, z, sub, { yaw }); } finally { MP.allowSpawn = false; } if (!e) continue;
       e.remote = true; e.rid = id; e.vTick = e.tick; e.tick = mpVehTick; e.onHit = () => mpToAuth({ t: 'vhit', e: id }); }
     e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw;
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+    e.seat2Other = !!(rider2 && rider2 !== MP.id);
   }
   for (const e of ENT) if (e.remote && (e.kind === 'boat' || e.kind === 'minecart') && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
 function mpVehTick(e) {
-  if (e.rider === PL) { e.vTick(e); mpRideSend(e); return; }
+  if (e.rider === PL) { if (e.mpWas2) { e.mpWas2 = false; mpToAuth({ t: 'ride2', e: e.rid, off: 1 }); } e.vTick(e); mpRideSend(e); return; }
   if (e.mpWas) mpRideOff(e);
+  if (e.rider2 === PL) { e.mpWas2 = true; if (W.tickN % 10 === 0) mpToAuth({ t: 'ride2', e: e.rid }); } else if (e.mpWas2) { e.mpWas2 = false; mpToAuth({ t: 'ride2', e: e.rid, off: 1 }); }
   if (e.tx == null) return; e.x += (e.tx - e.x) * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += (e.tz - e.z) * 0.5; e.yaw += wrapA(e.tyaw - e.yaw) * 0.5;
 }
-function mpRideSend(e) { e.mpWas = true; if (W.tickN % 2) return; mpToAuth({ t: 'ride', e: e.rid, x: +e.x.toFixed(3), y: +e.y.toFixed(3), z: +e.z.toFixed(3), yaw: +e.yaw.toFixed(3), vx: +(e.vx || 0).toFixed(3), vz: +(e.vz || 0).toFixed(3) }); }
+function mpRideSend(e) { e.mpWas = true; mpToAuth({ t: 'ride', e: e.rid, x: +e.x.toFixed(3), y: +e.y.toFixed(3), z: +e.z.toFixed(3), yaw: +e.yaw.toFixed(3), vx: +(e.vx || 0).toFixed(3), vz: +(e.vz || 0).toFixed(3) }); }
 function mpRideOff(e) { e.mpWas = false; mpToAuth({ t: 'ride', e: e.rid, off: 1 }); }
 // the runner: someone else is steering this one
 function mpRidden(e, m, from) {
   if (m.off) { if (e.mpRider === from) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } } return; }
-  if (e.rider === PL || (e.mpRider && e.mpRider !== from && performance.now() - e.mpRideAt < 1500)) { mpSend({ t: 'unride', e: m.e }, from); return; } // one rider: whoever got on first
+  if (e.rider === PL || (e.mpRider && e.mpRider !== from && performance.now() - e.mpRideAt < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 1 }, from); return; } // one driver: whoever got on first
+  if (e.mpRider2 === from) e.mpRider2 = 0;
   e.mpRider = from; e.mpRideAt = performance.now(); e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null;
   if (e.kind !== 'mob' && !e.mpTick0) { e.mpTick0 = e.tick; e.tick = mpRiddenTick; }
+}
+function mpRidden2(e, m, from) { // a boat's back seat
+  if (m.off) { if (e.mpRider2 === from) e.mpRider2 = 0; return; }
+  if (e.kind !== 'boat' || e.mob || e.rider2 === PL || (e.mpRider2 && e.mpRider2 !== from && performance.now() - e.mpRider2At < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 2 }, from); return; }
+  e.mpRider2 = from; e.mpRider2At = performance.now();
 }
 function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; } }
 
@@ -750,8 +764,8 @@ function mpRender(dt) {
     const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
-    // (updates come 10 times a second); the legs swing with the speed between updates, as Java's limbDistance does
-    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 130; let a = H[H.length - 1], b = a;
+    // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
+    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 80; let a = H[H.length - 1], b = a;
     for (let i = H.length - 1; i > 0; i--) if (H[i - 1][0] <= rt) { a = H[i - 1]; b = H[i]; break; }
     const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
     p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
@@ -785,7 +799,13 @@ function mpInstall() {
   const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
   const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
   const sm = spawnMob; spawnMob = function () { if (MP.role === 'guest' && !MP.allowSpawn && MP.cmd) { const [type, x, y, z] = arguments; mpToAuth({ t: 'summon', type, x, y, z }); } const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) removeEnt(e); return e; }; // guests only show the host's mobs
-  const mt = mobTick; mobTick = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
+  const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
+  mobTick = e => { MP.tickMob = e; if (!(e.love > 0)) e.loveBy = undefined; try { return mt2(e); } finally { MP.tickMob = null; } };
+  // whatever a guest did through the runner (a kill, taming, breeding, a trade...) counts for that guest, not the runner
+  const ag = advGrant; advGrant = function (id, crit) {
+    const lb = (id === 'husbandry/breed_an_animal' || id === 'husbandry/bred_all_animals') && MP.tickMob ? MP.tickMob.loveBy : undefined; // a baby: whoever fed the parent
+    if (lb != null) { if (lb !== MP.id) mpSend({ t: 'adv', id, crit: crit == null ? null : crit }, lb); return; }
+    if (MP.proxy && !(id === 'husbandry/breed_an_animal' || id === 'husbandry/bred_all_animals')) { mpSend({ t: 'adv', id, crit: crit == null ? null : crit }, MP.proxy.id); return; } return ag.apply(this, arguments); };
   const hp = hurtPlayer; hurtPlayer = function (dmg, cause) { if (MP.proxy) { mpSend({ t: 'hurt', dmg, cause }, MP.proxy.id); return true; } return hp.apply(this, arguments); };
   const ae = addEffect; addEffect = function (t, k, dur, lv) { if (MP.proxy && t === PL) { mpSend({ t: 'eff', k, dur, lv: lv || 0 }, MP.proxy.id); return; } return ae.apply(this, arguments); };
   const pl = play; play = function () { if (!MP.proxy) return pl.apply(this, arguments); }; // a guest's fight isn't heard at the host's ears
@@ -880,7 +900,8 @@ function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e
 function mpRemoteUse(p, e, st, sneak) {
   const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
   INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
-  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); }
+  const love0 = e.love;
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; }
   finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
 }
 // the night passes when everyone in the world is asleep (the host decides, and wakes the guests)

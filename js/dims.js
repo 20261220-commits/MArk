@@ -77,7 +77,7 @@ function portalTick() {
   inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z]; else inEnd = true; } });
   if (gate && !PL.portalLock) { // end gateway: main island <-> outer islands
     const d = Math.hypot(gate[0], gate[1]) || 1, far = d > 500, k = far ? 100 / d : 1000 / d;
-    switchDim(1, gate[0] * k + 0.5, 90, gate[1] * k + 0.5, far ? 'gatehome' : 'gateway'); return;
+    if (typeof advGrant === 'function') advGrant('end/enter_end_gateway'); switchDim(1, gate[0] * k + 0.5, 90, gate[1] * k + 0.5, far ? 'gatehome' : 'gateway'); return;
   }
   if (!inNether && !inEnd) PL.portalLock = false; // arriving in a portal: step out before it works again
   if (inEnd && !PL.portalLock) {

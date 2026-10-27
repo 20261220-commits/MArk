@@ -34,6 +34,7 @@ function frame(op, payload) {
 }
 function wsAccept(req, sock, onText, onClose) {
   const key = req.headers['sec-websocket-key']; if (!key) { sock.destroy(); return null; }
+  try { sock.setNoDelay(true); } catch (e) {} // small game messages go out at once, not batched
   const acc = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + '\r\n\r\n');
   let buf = Buffer.alloc(0), parts = [], closed = false;
