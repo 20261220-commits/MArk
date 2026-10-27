@@ -263,11 +263,23 @@ function neighborUpdate(x, y, z) {
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
-  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => {
-    const n = getBlock(x + dx, y, z + dz), nd = BLOCKS[n];
-    if ((nd && nd.connect === kind) || (OPQ[n] && !nd.leaves) || (kind === 2 && (n === BID.glass || n === BID.tinted_glass || n === BID.stained_glass || (nd && nd.connect === 2)))) m |= 1 << i;
-  });
+  [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], i) => { if (S.connectsTo(kind, getBlock(x + dx, y, z + dz), getMeta(x + dx, y, z + dz), dx)) m |= 1 << i; });
   setMeta(x, y, z, (getMeta(x, y, z) & 0xf0) | m); // material bits above the connections stay
+}
+// a chunk generated on its own can't see its neighbours: fences, walls and panes along its edges are joined to the
+// neighbouring chunk's once both are here (straight into the arrays: every player works out the same, nothing to save)
+function joinConnections(c) {
+  for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const n = chunkAt(c.cx + ox, c.cz + oz); if (!n) continue;
+    for (const [ch, edgeX, edgeZ, dx, dz] of [[c, ox < 0 ? 0 : ox > 0 ? 15 : -1, oz < 0 ? 0 : oz > 0 ? 15 : -1, ox, oz], [n, ox < 0 ? 15 : ox > 0 ? 0 : -1, oz < 0 ? 15 : oz > 0 ? 0 : -1, -ox, -oz]]) {
+      const top = Math.min(CH - 1, Math.max(ch.maxY || 0, 0) + 1); let touched = false;
+      for (let k = 0; k < 16; k++) { const lx = edgeX >= 0 ? edgeX : k, lz = edgeZ >= 0 ? edgeZ : k;
+        for (let y = 1; y <= top; y++) { const i = (y << 8) | (lz << 4) | lx, b = ch.blocks[i], kind = BLOCKS[b] && BLOCKS[b].connect; if (!kind) continue;
+          const wx = ch.cx * 16 + lx, wz = ch.cz * 16 + lz, bit = dz < 0 ? 1 : dx > 0 ? 2 : dz > 0 ? 4 : 8, on = S.connectsTo(kind, getBlock(wx + dx, y, wz + dz), getMeta(wx + dx, y, wz + dz), dx);
+          const m = ch.meta[i], nm = on ? m | bit : m & ~bit; if (nm !== m) { ch.meta[i] = nm; touched = true; } } }
+      if (touched) ch.dirty = true;
+    }
+  }
 }
 // ---------- fluids ----------
 // blocks that some system needs to find quickly (sculk sensors, beacons): block id -> Set of "x,y,z" in loaded chunks
@@ -549,6 +561,7 @@ function addChunk(cx, cz, d, tiles) {
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
+  joinConnections(c);
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
