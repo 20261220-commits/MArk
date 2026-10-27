@@ -199,6 +199,26 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 .form label{display:flex;flex-direction:column;gap:var(--px);font-size:calc(7 * var(--px));color:#a0a0a0;width:min(calc(200 * var(--px)),90vw)}
 .form input{font:inherit;font-size:calc(8 * var(--px));background:#000;color:#fff;border:var(--px) solid #a0a0a0;padding:calc(3 * var(--px));outline:none;-webkit-user-select:text;user-select:text}
 .form input:focus{border-color:#fff}
+.mb.sm{width:auto;min-width:calc(44 * var(--px));padding:0 calc(6 * var(--px));flex:none}
+.mpsrv{display:flex;align-items:center;gap:calc(4 * var(--px));width:min(calc(270 * var(--px)),94vw);justify-content:space-between;font-size:calc(7 * var(--px));color:#ddd}
+.dot{display:inline-block;width:calc(5 * var(--px));height:calc(5 * var(--px));margin-right:calc(3 * var(--px));background:#888;border:var(--px) solid #000;vertical-align:middle}
+.dot.on{background:#5f5}.dot.off{background:#f55}.dot.wait{background:#fc5;animation:dotb 1s steps(2) infinite}
+@keyframes dotb{50%{opacity:.3}}
+.mpl{height:auto;min-height:calc(40 * var(--px));max-height:min(calc(140 * var(--px)),42vh);display:flex;flex-direction:column;gap:calc(2 * var(--px))}
+.mpi{display:flex;align-items:center;gap:calc(4 * var(--px));padding:calc(3 * var(--px)) calc(4 * var(--px));background:rgba(255,255,255,.05);border:var(--px) solid #0008}
+.mpi>div{flex:1;display:flex;flex-direction:column;gap:var(--px);min-width:0}
+.mpi b{font-weight:400;font-size:calc(8 * var(--px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mpi span{font-size:calc(6 * var(--px));color:#9a9a9a}
+.mpempty{padding:calc(10 * var(--px)) 0}
+.mprow{display:flex;gap:calc(4 * var(--px));width:min(calc(270 * var(--px)),94vw)}
+.mprow input{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.15em}
+.mprow .mb{width:auto;padding:0 calc(6 * var(--px))}
+.mpadv{width:min(calc(270 * var(--px)),94vw);font-size:calc(7 * var(--px));color:#a0a0a0;display:flex;flex-direction:column;align-items:center;gap:calc(4 * var(--px))}
+.mpadv summary{cursor:pointer;text-align:center;margin-bottom:calc(3 * var(--px))}
+.mpadv[open]{display:flex}.mpadv textarea{width:100%}
+.mpcodebox{display:flex;flex-direction:column;align-items:center;font-size:calc(7 * var(--px));color:#a0a0a0}
+.mpcodebox b{font-weight:400;font-size:calc(20 * var(--px));color:#ffff55;letter-spacing:.25em;text-shadow:calc(2*var(--px)) calc(2*var(--px)) 0 #3f3f00;-webkit-user-select:text;user-select:text}
+#plist .ph{color:#ffff55;text-align:center}
+#menu .form>.muted,#menu .mpadv .muted{color:#d0d0d0;text-shadow:var(--px) var(--px) 0 #000}
 .optgrid{display:grid;grid-template-columns:repeat(2,minmax(0,calc(150 * var(--px))));gap:calc(4 * var(--px));width:min(calc(304 * var(--px)),94vw)}
 .optgrid .mb{width:100%}
 .slider{position:relative;height:calc(20 * var(--px));display:block;background:#000;border:var(--px) solid #000;box-shadow:inset 0 0 0 var(--px) #555}
@@ -15904,7 +15924,7 @@ function showMenu(name, data) {
       <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
-    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명)' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
+    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
   } else if (name.startsWith('mp_')) {
@@ -16831,13 +16851,13 @@ function mpWsUrl(a) {
 }
 // a hosted server (Render's free plan and the like) sleeps when nobody uses it and takes up to a minute to wake:
 // knock on its web page, then keep trying for a while instead of failing at once
-async function mpWebSocket(url, role) {
+async function mpWebSocket(url, role, extra) {
   if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.onrender.com)');
   if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. Render 서버 주소(이름.onrender.com)를 넣어 주세요');
   url = mpWsUrl(url); const local = /^wss?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url), t0 = Date.now();
   const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
   for (let k = 0; ; k++) {
-    try { return await mpWsOnce(url, role); }
+    try { return await mpWsOnce(url, role, extra); }
     catch (e) {
       if (local || e.fromServer || Date.now() - t0 > 75000) throw e;
       if (k === 0) { say('서버를 깨우는 중... (잠들어 있던 서버는 1분쯤 걸릴 수 있어요)'); try { fetch(url.replace(/^ws/, 'http').replace(/\/mp.*$/, '/'), { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (er) {} }
@@ -16846,12 +16866,12 @@ async function mpWebSocket(url, role) {
     }
   }
 }
-function mpWsOnce(url, role) {
+function mpWsOnce(url, role, extra) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
     const link = { kind: 'ws', send(o, to) { if (ws.readyState === 1) ws.send(JSON.stringify(to != null ? { ...o, to } : o)); }, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
       if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { const er = new Error(m.msg); er.fromServer = true; rej(er); ws.close(); } return; }
       if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
@@ -16914,7 +16934,8 @@ function mpSkinTex(p) { // another player's custom skin, decoded once into a pac
 // dimension is run by a player there, so everyone can go anywhere.
 async function mpHostStart(kind) {
   if (!W.active || W.meta.remote) throw new Error('먼저 세계에 들어가세요');
-  const relay = kind === 'ws' ? await mpWebSocket($('mpAddr').value.trim(), 'host') : mpRtcHostLink();
+  const relay = kind === 'ws' ? await mpWebSocket($('mpAddr') ? $('mpAddr').value.trim() : mpDefaultAddr(), 'host', { name: MP.name, world: W.meta.name, mode: PL.mode }) : mpRtcHostLink();
+  MP.roomCode = relay.hello && relay.hello.room || null; MP.addr = kind === 'ws' ? ($('mpAddr') ? $('mpAddr').value.trim() : mpDefaultAddr()) : null;
   saveAll(true); await new Promise(r => setTimeout(r, 300));
   W.mpLogs = await mpLogKeys(W.id);
   Object.assign(MP, { on: true, server: true, isHost: true, role: 'guest', rolePending: true, id: 0, eid: 1, auth: {}, queue: [], relay, inbox: [] }); MP.peers.clear();
@@ -16922,7 +16943,7 @@ async function mpHostStart(kind) {
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
   mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
-  chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
+  chatMsg(MP.roomCode ? `멀티플레이가 열렸습니다 · 방 코드 ${MP.roomCode} — 친구는 타이틀 → 멀티플레이 목록에서 "${MP.name}님의 세계"를 누르면 들어와요` : '멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
 function mpCoreOut(id, o) {
@@ -16952,10 +16973,11 @@ function mpHostStore() {
       } } };
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
-async function mpJoinWs(url) {
+async function mpJoinWs(url, room) {
   if (typeof accFresh === 'function') await accFresh(); // a signed-in player's sign-in, renewed if it ran out
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
-  try { MP.link = await mpWebSocket(url, 'join'); } catch (e) { MP.on = false; MP.role = null; throw e; }
+  try { MP.link = await mpWebSocket(url, 'join', room ? { room } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
+  MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
@@ -16970,7 +16992,7 @@ function mpStop() {
   if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; // the last stored chunks get through before the connection closes if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
-  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.auth = {}; MP.rolePending = false; MP.queue = [];
+  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = [];
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
@@ -17003,6 +17025,12 @@ function mpHandle(m, from) {
     case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
+    case 'proj': mpGotProj(m, from); return;
+    case 'boom': mpGotBoom(m, from); return;
+    case 'primed': mpGotPrimed(m, from); return;
+    case 'prime': if (host && [m.x, m.y, m.z].every(isFinite)) { primeTNT(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), Math.max(1, Math.min(200, +m.fuse || 80))); } return;
+    case 'blast': if (host && [m.x, m.y, m.z, m.p].every(isFinite)) explode(+m.x, +m.y, +m.z, Math.max(0.5, Math.min(6, +m.p)), !!m.fire); return;
+    case 'setl': if (Array.isArray(m.l)) mpApplyGuestSets(m.l.slice(0, 4096).filter(e => e && e.dim === m.dim)); return;
     case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
@@ -17076,13 +17104,14 @@ function mpGuestLoad(dim) {
 // containers: whoever changes a chest / furnace / hopper... sends its contents; the host keeps them
 function mpTileChanged(x, y, z) { const t = getTile(x, y, z); if (t) mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(x >> 4, z >> 4), tile: JSON.parse(JSON.stringify(t)) }); }
 function mpApplyTile(m, from) {
+  if (m.tile && m.tile._mp) delete m.tile._mp;
   const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15);
   if (c) { const old = c.tiles.get(i);
     if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k];
       // arrays are filled in place: an open screen's slots point at them
       for (const k of Object.keys(m.tile)) { const a = old[k], b = m.tile[k]; if (Array.isArray(a) && Array.isArray(b)) { a.length = b.length; for (let j = 0; j < b.length; j++) a[j] = b[j]; } else old[k] = b; } }
     else c.tiles.set(i, m.tile);
-    c.modified = c.edited = true;
+    c.modified = c.edited = true; if (/^(furnace|brewing|campfire)$/.test(m.tile.type)) c.hasFurnace = true; // so it keeps working here
     if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); } }
   else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
@@ -17090,6 +17119,7 @@ function mpApplyTile(m, from) {
 // a guest's clicks in a container go to the dimension's runner as slot changes ("slot k was A, is now B"); the runner
 // takes them only if every slot still holds what the guest saw, so two players can't both take the same stack. A
 // refused change comes back with the real contents and the guest's inventory is put back as it was
+const MP_TSENT = new WeakMap(); // what a runner last sent of each working furnace / brewing stand
 const mpJ = v => v == null ? null : JSON.parse(JSON.stringify(v));
 const mpCanon = v => JSON.stringify(v == null ? null : v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(q => [q, x[q]])) : x);
 const mpStEq = (a, b) => mpCanon(a || null) === mpCanon(b || null);
@@ -17159,32 +17189,47 @@ function mpBlockChanged(x, y, z, id, m, metaOnly) {
   const e = metaOnly ? [x, y, z, id, m, 1] : [x, y, z, id, m];
   if (MP.rolePending) { MP.queue.push(e); return; } // just arrived in a dimension: sent once it is known who runs it
   if (MP.role === 'host') { if (MP.peers.size || MP.server) (MP.batch || (MP.batch = [])).push(e); return; } // a server world keeps every change
-  mpToAuth({ t: 'set', x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
+  // everything one action changes goes together (both halves of a door or bed): the runner applies them all before
+  // any block checks its neighbours, or the first half would find no partner and break
+  (MP.gsets || (MP.gsets = [])).push({ x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
+  if (MP.gsets.length === 1) queueMicrotask(mpFlushSets);
 }
+function mpFlushSets() { const l = MP.gsets; MP.gsets = null; if (!l || !MP.on) return; if (l.length === 1) mpToAuth({ t: 'set', ...l[0] }); else mpToAuth({ t: 'setl', dim: l[0].dim, l }); }
 function mpApplySets(m) { // guests: the host's changes
   if (m.dim !== W.dim) return;
   MP.applying = true;
   try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; } if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); } }
   finally { MP.applying = false; }
 }
-function mpApplySet(m) { // the host: a guest's action
+function mpApplySet(m) { mpApplyGuestSets([m]); } // the host: a guest's action
+function mpApplyGuestSets(l) {
   if (MP.role !== 'host') return;
-  if (m.dim === W.dim && isLoaded(m.x, m.z)) {
+  const here = l.filter(m => m.dim === W.dim && isLoaded(m.x, m.z)), away = l.filter(m => !here.includes(m));
+  if (here.length) {
     MP.applying = true;
     try {
-      if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) return; setMeta(m.x, m.y, m.z, m.m); }
-      else setBlock(m.x, m.y, m.z, m.id, m.m);
-      // what the player's own code would have set going: redstone, button release, fluids and falling blocks
-      const b = m.id; rsNotify(m.x, m.y, m.z);
-      if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
-      if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
-      if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
-      for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+      const done = [];
+      for (const m of here) { if (!BLOCKS[m.id] && m.id) continue; if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) continue; setMeta(m.x, m.y, m.z, m.m); }
+        else { if (getBlock(m.x, m.y, m.z) !== m.id) { const c = chunkAt(m.x >> 4, m.z >> 4); c.tiles.delete((m.y << 8) | ((m.z & 15) << 4) | (m.x & 15)); } // what was in it the guest already dropped
+          setBlock(m.x, m.y, m.z, m.id, m.m, { noUpdate: true }); }
+        done.push(m); }
+      for (const m of done) {
+        if (!m.mo) { neighborUpdate(m.x, m.y, m.z); for (const [dx, dy, dz] of N6) neighborUpdate(m.x + dx, m.y + dy, m.z + dz); observerCheck(m.x, m.y, m.z); }
+        // what the player's own code would have set going: redstone, button release, fluids and falling blocks
+        const b = m.id; rsNotify(m.x, m.y, m.z);
+        if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
+        if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
+        if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
+        for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+      }
     } finally { MP.applying = false; }
-  } else if (MP.server) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }); // a server world keeps it until someone loads that chunk
-  else { // not loaded here: kept with the world and put in place when the host loads that chunk
-    const E = W.meta.mpEdits || (W.meta.mpEdits = {}); (E[m.dk] || (E[m.dk] = [])).push([m.x, m.y, m.z, m.id, m.m]);
-    for (const id of MP.peers.keys()) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }, id);
+  }
+  for (const m of away) {
+    if (MP.server) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }); // a server world keeps it until someone loads that chunk
+    else { // not loaded here: kept with the world and put in place when the host loads that chunk
+      const E = W.meta.mpEdits || (W.meta.mpEdits = {}); (E[m.dk] || (E[m.dk] = [])).push([m.x, m.y, m.z, m.id, m.m]);
+      for (const id of MP.peers.keys()) mpSend({ t: 'sets', dim: m.dim, l: [[m.x, m.y, m.z, m.id, m.m]] }, id);
+    }
   }
 }
 // chunk requests: the host answers with its saved / loaded chunk, plus edits waiting for it
@@ -17256,7 +17301,7 @@ function mpTick() {
   // containers that change by themselves (furnaces, brewing stands, campfires) near guests: sent when they change
   if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
     if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
-    for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; const j = JSON.stringify(t); if (t._mp === j.length + ':' + j.slice(-40)) continue; t._mp = j.length + ':' + j.slice(-40);
+    for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; if (t._mp) delete t._mp; /* an older version kept this inside the tile */ const j = JSON.stringify(t); if (MP_TSENT.get(t) === j) continue; MP_TSENT.set(t, j);
       const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
   }
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
@@ -17437,6 +17482,52 @@ function mpProxy(p, fn) {
     if (kb[0] || kb[1] || kb[2]) mpSend({ t: 'kb', vx: kb[0], vy: kb[1], vz: kb[2] }, p.id);
   }
 }
+// your own arrow reaching another player: they take it like a hit from you (their armour, shield, enchantments)
+function mpArrowAtPeer(e) {
+  if (e.stuck || e.thrown || e.visual || e.hitDone || MP.pvp === false) return false;
+  const steps = Math.max(1, Math.ceil(Math.hypot(e.vx, e.vy, e.vz) / 0.25));
+  for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative' || s.mode === 'spectator' || !p.pos || performance.now() - p.at > 5000) continue;
+    const [px, py, pz] = p.pos, hg = s.h || 1.8;
+    for (let k = 1; k <= steps; k++) { const x = e.x + e.vx * k / steps, y = e.y + e.vy * k / steps, z = e.z + e.vz * k / steps;
+      if (x > px - 0.4 && x < px + 0.4 && z > pz - 0.4 && z < pz + 0.4 && y > py && y < py + hg) {
+        const dmg = e.trident ? 8 : Math.ceil(Math.hypot(e.vx, e.vy, e.vz) * e.dmgMul);
+        mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg, kb: e.punch || 0, yaw: +Math.atan2(-e.vx, -e.vz).toFixed(3), ax: e.x - e.vx * 4, az: e.z - e.vz * 4, fire: e.flame ? 100 : 0 }, MP.role === 'host' || MP.server ? p.id : undefined);
+        p.hurtFx = 10; play('hit', { vol: 0.5 });
+        if (e.trident) { e.vx *= -0.1; e.vz *= -0.1; e.vy = 0.1; e.hitDone = true; return false; } // drops, to be picked up or called back
+        removeEnt(e); return true; } } }
+  return false;
+}
+// someone else's arrow: just flies and sticks
+function mpVisualArrow(e) {
+  if (!e.stuck) { const nx = e.x + e.vx, ny = e.y + e.vy, nz = e.z + e.vz;
+    if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) e.stuck = true;
+    else { e.x = nx; e.y = ny; e.z = nz; e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99; } }
+  if (e.age > (e.stuck ? 200 : 300) || e.y < -20) removeEnt(e);
+}
+// Explosion.explode's damage to a player (the same as for the one in whose world it went off)
+function mpBlastSelf(x, y, z, power) {
+  if (PL.dead || PL.mode === 'creative' || PL.mode === 'spectator') return;
+  const rad = power * 2, cx = PL.x, cy = PL.y + (PL.h || 1.8) / 2, cz = PL.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
+  const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1), kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
+  hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
+}
+function mpGotBoom(m, from) {
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+  if (m.dim !== W.dim || MP.role === 'host' || ![m.x, m.y, m.z, m.p].every(isFinite)) return;
+  const x = +m.x, y = +m.y, z = +m.z, power = Math.min(10, +m.p);
+  play('explode'); vibrate(x, y, z);
+  for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.4 });
+  if (m.px !== MP.id) mpBlastSelf(x, y, z, power);
+}
+function mpGotPrimed(m, from) { // the runner's lit TNT, flashing here until it goes off there
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+  if (m.dim !== W.dim || MP.role === 'host' || ![m.x, m.y, m.z].every(isFinite)) return;
+  MP.allowSpawn = true; try { const e = Ent('tnt', +m.x + .5, +m.y, +m.z + .5); e.kind = 'tnt'; e.fuse = 100000; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = e.vz = 0; e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse'); setTimeout(() => { if (!e.dead) removeEnt(e); }, Math.min(200, +m.fuse || 80) * 50); } finally { MP.allowSpawn = false; }
+}
+function mpGotProj(m, from) {
+  if (m.dim === W.dim && [m.x, m.y, m.z, m.vx, m.vy, m.vz].every(isFinite)) { const e = shootArrow(+m.x, +m.y, +m.z, +m.vx, +m.vy, +m.vz, null, 0); if (e) { e.visual = true; e.noPickup = true; if (m.k) { scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh); } } }
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
 function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stand
   if (e.stuck || e.thrown || e.owner === PL) return false;
   for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative') continue;
@@ -17513,7 +17604,17 @@ function mpInstall() {
   const hp = hurtPlayer; hurtPlayer = function (dmg, cause) { if (MP.proxy) { mpSend({ t: 'hurt', dmg, cause }, MP.proxy.id); return true; } return hp.apply(this, arguments); };
   const ae = addEffect; addEffect = function (t, k, dur, lv) { if (MP.proxy && t === PL) { mpSend({ t: 'eff', k, dur, lv: lv || 0 }, MP.proxy.id); return; } return ae.apply(this, arguments); };
   const pl = play; play = function () { if (!MP.proxy) return pl.apply(this, arguments); }; // a guest's fight isn't heard at the host's ears
-  const at = arrowTick; arrowTick = function (e) { if (MP.role === 'host' && MP.peers.size && mpArrowAtGuest(e)) return; return at.apply(this, arguments); };
+  const at = arrowTick; arrowTick = function (e) { if (e.visual) return mpVisualArrow(e); if (MP.peers.size && e.owner === PL && mpArrowAtPeer(e)) return; if (MP.role === 'host' && MP.peers.size && mpArrowAtGuest(e)) return; return at.apply(this, arguments); };
+  // your arrows and tridents fly on the others' screens too (only for looks: hits are worked out by whoever shot)
+  // explosions happen in the runner's world: a guest's TNT, bed or anchor asks for one there; everyone else gets the bang,
+  // the smoke and their own share of the damage
+  const pt = primeTNT; primeTNT = function (x, y, z, fuse = 80) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'prime', x, y, z, fuse }); return; } const r = pt.apply(this, arguments); if (MP.on && MP.role === 'host') mpSend({ t: 'primed', dim: W.dim, x, y, z, fuse }); return r; };
+  const ex = explode; explode = function (x, y, z, power, fire) {
+    if (MP.on && MP.role === 'guest') { if (W.active && !MP.loading) mpToAuth({ t: 'blast', x, y, z, p: power, fire: fire ? 1 : 0 }); return; }
+    const pr = MP.proxy, r = ex.apply(this, arguments);
+    if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
+    return r; };
+  const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.thrown && !e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0 }); }); return e; };
   const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
@@ -17533,6 +17634,8 @@ function mpInstall() {
     if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (!n || ITEMS[id] == null) return null; const st = extra ? { ...extra, id, n } : { id, n }; if (dur != null) st.d = dur; mpToAuth({ t: 'drop', x, y, z, st, vel: vel || null, delay: delay == null ? 10 : delay }); return null; }
     return di.apply(this, arguments); };
   const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpToAuth({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
+  // a block entity made by a player's own action (a placed furnace, chest, sign...) reaches the others right after the block
+  const st0 = setTile; setTile = function (x, y, z, t) { st0.apply(this, arguments); if (MP.on && MP.local && !MP.applying && t) queueMicrotask(() => mpTileChanged(x, y, z)); };
   const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); }
     // a guest changes what is in the runner's chest or hopper minecart, or the gear of the runner's horse
     if (MP.role === 'guest' && c && c.cart && c.cart.remote) mpToAuth({ t: 'cartset', e: c.cart.rid, items: c.cart.items });
@@ -17608,9 +17711,9 @@ let mpListEl = null;
 function mpShowList(on) {
   if (!mpListEl) { mpListEl = document.createElement('div'); mpListEl.id = 'plist'; document.body.appendChild(mpListEl); }
   if (!on || !W.active) { mpListEl.hidden = true; return; }
-  const me = MP.on ? MP.name : '플레이어', rows = [me + (MP.role === 'host' ? ' (호스트)' : '')];
+  const me = MP.on ? MP.name : '플레이어', rows = [me + (MP.isHost ? ' (호스트)' : '')];
   for (const p of MP.peers.values()) rows.push(p.name + (p.id === 0 ? ' (호스트)' : '') + (p.s && p.s.dim !== W.dim ? ' · ' + ({ '-1': '네더', 1: '디 엔드', 0: '오버월드' })[p.s.dim] : p.s && p.pos ? ' · ' + Math.round(Math.hypot(p.pos[0] - PL.x, p.pos[2] - PL.z)) + 'm' : ''));
-  mpListEl.innerHTML = rows.map(r => `<div>${esc(r)}</div>`).join(''); mpListEl.hidden = false;
+  mpListEl.innerHTML = (MP.on ? `<div class="ph">${MP.roomCode ? '방 코드 ' + esc(MP.roomCode) + ' · ' : MP.server && !MP.isHost ? '서버 세계 · ' : ''}${rows.length}명</div>` : '') + rows.map(r => `<div>${esc(r)}</div>`).join(''); mpListEl.hidden = false;
 }
 addEventListener('keydown', e => { if (e.code === 'Tab' && W.active && !UI.menu && !UI.screen && !UI.chatOpen) mpShowList(true); });
 addEventListener('keyup', e => { if (e.code === 'Tab') mpShowList(false); });
@@ -17621,14 +17724,63 @@ function mpMenu(name) {
   const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
-  if (name === 'mp_join') return `<h2>멀티플레이</h2><div class="form">${nameRow}${addr}${btn('서버에 접속', 'mp_joinws')}<p class="muted">서버 없이: 호스트가 보낸 초대 코드를 붙여 넣으세요.</p><textarea id="mpCode" rows="3" placeholder="초대 코드"></textarea>${btn('초대 코드로 참가', 'mp_answer')}<textarea id="mpOut" rows="3" readonly placeholder="여기 나오는 답장 코드를 호스트에게 보내세요"></textarea>${st}</div><div class="btncol">${btn('뒤로', 'title')}</div>`;
+  if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}
+    <div class="mpsrv"><span id="mpSrv">${mpSrvLine()}</span>${btn('새로고침', 'mp_refresh', 'sm')}</div>
+    <div class="wlist mpl" id="mpList">${mpListHtml()}</div>
+    <div class="mprow"><input id="mpRoom" maxlength="8" placeholder="방 코드 (예: K7QF)" autocomplete="off" spellcheck="false">${btn('방 코드로 참가', 'mp_code')}</div>
+    ${st}<p class="muted">같이 하는 방법: ① 한 명이 자기 세계에서 Esc → <b>멀티플레이 열기</b> → <b>서버로 열기</b> ② 다른 사람은 여기 목록에서 그 세계의 <b>참가</b>를 누르거나 방 코드를 넣기 · 서버 세계는 누구나 언제든 들어갈 수 있어요</p>
+    <details class="mpadv"><summary>다른 서버 · 서버 없이 연결</summary>${addr}${btn('이 주소로 목록 보기', 'mp_refresh')}<p class="muted">서버 없이: 호스트가 보낸 초대 코드를 붙여 넣으세요.</p><textarea id="mpCode" rows="3" placeholder="초대 코드"></textarea>${btn('초대 코드로 참가', 'mp_answer')}<textarea id="mpOut" rows="3" readonly placeholder="여기 나오는 답장 코드를 호스트에게 보내세요"></textarea></details></div><div class="btncol">${btn('뒤로', 'title')}</div>`; }
   if (name === 'mp_host') {
-    if (!MP.on) return `<h2>멀티플레이 열기</h2><div class="form">${nameRow}${addr}${btn('서버로 열기', 'mp_hostws')}${btn('서버 없이 열기 (초대 코드)', 'mp_hostrtc')}${btn('서버 세계로 올리기 (내가 없어도 플레이)', 'mp_upload')}<p class="muted">같은 서버 주소로 친구가 참가하거나, 초대 코드를 주고받아 연결합니다. 세계는 이 컴퓨터에 저장됩니다.</p>${st}</div><div class="btncol">${btn('뒤로', 'pause')}</div>`;
+    if (!MP.on) return `<h2>멀티플레이 열기</h2><div class="form">${nameRow}${btn('서버로 열기 (추천)', 'mp_hostws')}<p class="muted">지금 이 세계를 서버(${esc(mpShortAddr(mpDefaultAddr()))})에 엽니다. 방 코드가 생기고, 친구의 멀티플레이 목록에 "${esc(MP.name)}님의 세계"로 나타납니다. 세계는 이 컴퓨터에 저장되며, 내가 나가면 닫힙니다.</p>
+      ${btn('서버 세계로 올리기', 'mp_upload')}<p class="muted">이 세계를 서버에 통째로 올려 서버 세계로 만듭니다. 내가 없어도 누구나 언제든 들어갈 수 있어요 (서버에 세계가 없을 때만).</p>
+      <details class="mpadv"><summary>다른 서버 · 서버 없이 열기</summary>${addr}${btn('서버 없이 열기 (초대 코드)', 'mp_hostrtc')}</details>${st}</div><div class="btncol">${btn('뒤로', 'pause')}</div>`;
     const list = [...MP.peers.values()].map(p => esc(p.name)).join(', ') || '아직 없음';
     const rtc = MP.link && MP.link.kind === 'rtc' ? `${btn('초대 코드 만들기', 'mp_invite')}<textarea id="mpOut" rows="3" readonly placeholder="초대 코드: 참가할 친구에게 보내세요">${MP.rtc ? MP.rtc.code : ''}</textarea><textarea id="mpCode" rows="3" placeholder="친구가 보낸 답장 코드"></textarea>${btn('답장 코드 넣기', 'mp_accept')}` : '';
-    return `<h2>멀티플레이 (${MP.role === 'host' ? '호스트' : '참가 중'})</h2><div class="form"><p>참가자: ${list}</p>${MP.role === 'host' ? rtc : ''}${st}</div><div class="btncol">${btn(MP.role === 'host' ? '멀티플레이 닫기' : '나가기', 'mp_stop')}${btn('뒤로', 'pause')}</div>`;
+    const code = MP.roomCode ? `<div class="mpcodebox">방 코드<b>${esc(MP.roomCode)}</b></div><p class="muted">${MP.isHost ? `친구는 타이틀 → 멀티플레이에서 "${esc(MP.name)}님의 세계"의 <b>참가</b>를 누르거나 이 방 코드를 넣으면 들어와요` : '이 방 코드를 친구에게 알려 주면 같은 세계로 들어올 수 있어요'}${MP.addr ? ' · 서버: ' + esc(mpShortAddr(MP.addr)) : ''}</p>` : MP.server && !MP.isHost ? '<p class="muted">서버 세계 — 누구나 멀티플레이 목록에서 들어올 수 있어요</p>' : '';
+    return `<h2>멀티플레이 (${MP.isHost ? '호스트' : MP.role === 'host' ? '참가 중 · 이 차원 계산 담당' : '참가 중'})</h2><div class="form">${code}<p>참가자: ${esc(MP.name)}${MP.peers.size ? ', ' + list : ''}</p>${MP.role === 'host' || MP.isHost ? rtc : ''}${st}</div><div class="btncol">${btn(MP.isHost || (MP.role === 'host' && !MP.server) ? '멀티플레이 닫기' : '나가기', 'mp_stop')}${btn('뒤로', 'pause')}</div>`;
   }
   return '';
+}
+// ---------- the join screen's list: what the server has open ----------
+const mpShortAddr = a => { try { return new URL(mpWsUrl(a)).host; } catch (e) { return String(a || ''); } };
+function mpRoomsUrl(a) { const u = new URL(mpWsUrl(a)); u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'; u.pathname = '/rooms'; u.search = ''; return u.href; }
+const MPL = { state: 'idle', data: null, msg: '', addr: '', gen: 0 };
+function mpSrvLine() {
+  const a = MPL.addr || mpDefaultAddr(); if (!a) return '서버 주소가 없습니다 — 아래 "다른 서버"에 넣어 주세요';
+  const dot = { ok: '<i class="dot on"></i>', err: '<i class="dot off"></i>' }[MPL.state] || '<i class="dot wait"></i>';
+  return `${dot}서버 ${esc(mpShortAddr(a))}${MPL.state === 'ok' ? '' : MPL.msg ? ' · ' + esc(MPL.msg) : ''}`;
+}
+function mpListHtml() {
+  const d = MPL.data, rows = [];
+  if (d && d.world) rows.push(`<div class="mpi"><div><b>🌍 ${esc(d.world.name)}</b><span>서버 세계 · ${MODE_NAME[d.world.mode] || '서바이벌'} · ${d.world.players ? d.world.players + '명 접속 중' : '지금은 아무도 없어요'} · 언제든 들어갈 수 있어요</span></div>${btn('참가', 'mp_go:', 'sm')}</div>`);
+  if (d) for (const r of d.rooms || []) rows.push(`<div class="mpi"><div><b>🏠 ${esc(r.host)}님의 세계${r.world ? ' "' + esc(r.world) + '"' : ''}</b><span>방 코드 ${esc(r.code)} · ${MODE_NAME[r.mode] || '서바이벌'} · ${r.players}명</span></div>${btn('참가', 'mp_go:' + esc(r.code), 'sm')}</div>`);
+  if (d && !d.world) rows.push(`<div class="mpi"><div><b>🌱 새 서버 세계 만들기</b><span>이 서버에는 아직 서버 세계가 없어요. 만들면 누구나 언제든 들어올 수 있습니다</span></div>${btn('만들기', 'mp_go:', 'sm')}</div>`);
+  if (rows.length) return rows.join('');
+  return `<p class="muted mpempty">${MPL.state === 'err' ? esc(MPL.msg || '서버에 연결하지 못했습니다') : MPL.state === 'ok' ? '열린 세계가 없습니다' : esc(MPL.msg || '서버 목록을 불러오는 중...')}</p>`;
+}
+function mpListPaint() { const l = $('mpList'), s = $('mpSrv'); if (l) l.innerHTML = mpListHtml(); if (s) s.innerHTML = mpSrvLine(); }
+// a sleeping hosted server takes up to a minute to answer: keep knocking while the list is on screen
+async function mpRefreshList(addr) {
+  const a = (addr || mpDefaultAddr() || '').trim(), gen = ++MPL.gen; MPL.addr = a;
+  if (!a) { MPL.state = 'err'; MPL.msg = '서버 주소가 없습니다'; mpListPaint(); return; }
+  if (mpStaticHost(a)) { MPL.state = 'err'; MPL.msg = '이 주소는 멀티플레이 서버가 아닙니다 (Render 서버 주소를 넣어 주세요)'; mpListPaint(); return; }
+  MPL.state = 'loading'; MPL.msg = '목록을 불러오는 중...'; if (!MPL.data || MPL.dataAddr !== a) MPL.data = null; mpListPaint();
+  const t0 = Date.now();
+  while (gen === MPL.gen && UI.menu === 'mp_join') {
+    try {
+      const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+      const r = await fetch(mpRoomsUrl(a), { cache: 'no-store', signal: ac.signal }); clearTimeout(to);
+      if (!r.ok) throw new Error(r.status === 404 ? '이 서버는 목록을 보여 주지 않아요 (예전 서버) — 방 코드로 참가하세요' : '서버 오류 ' + r.status);
+      const d = await r.json(); if (gen !== MPL.gen) return;
+      MPL.data = d; MPL.dataAddr = a; MPL.state = 'ok'; MPL.msg = ''; mpListPaint(); return;
+    } catch (e) {
+      if (gen !== MPL.gen) return;
+      const s = Math.round((Date.now() - t0) / 1000);
+      if (/예전 서버|서버 오류/.test(e.message) || s > 90) { MPL.state = 'err'; MPL.msg = /예전 서버|서버 오류/.test(e.message) ? e.message : '서버에 연결하지 못했습니다 — 주소를 확인하거나 새로고침을 눌러 보세요'; mpListPaint(); return; }
+      MPL.state = 'loading'; MPL.msg = s < 5 ? '연결하는 중...' : `서버를 깨우는 중... ${s}초 (잠들어 있던 서버는 1분쯤 걸려요)`; mpListPaint();
+      await new Promise(r => setTimeout(r, 4000));
+    }
+  }
 }
 async function mpAction(a) {
   const nm = $('mpName'); if (nm && nm.value.trim()) { MP.name = nm.value.trim().slice(0, 16); try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {} }
@@ -17637,6 +17789,12 @@ async function mpAction(a) {
   const codeIn = $('mpCode') ? $('mpCode').value : '';
   try {
     if (a === 'mp_join' || a === 'mp_host') { MP.status = ''; showMenu(a); }
+    else if (a === 'mp_refresh') { const v = ad && ad.value.trim(); mpRefreshList(v || undefined); }
+    else if (a.startsWith('mp_go:') || a === 'mp_code') {
+      const room = a === 'mp_code' ? ($('mpRoom').value || '').trim().toUpperCase() : a.slice(6);
+      if (a === 'mp_code' && !room) { say('방 코드를 넣어 주세요'); return; }
+      const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
+      say('접속하는 중...'); const r = await mpJoinWs(where, room || null); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 2, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
@@ -17646,8 +17804,8 @@ async function mpAction(a) {
     else if (a === 'mp_hostrtc') { await mpHostStart('rtc'); MP.status = '초대 코드를 만들어 친구에게 보내세요'; showMenu('mp_host'); }
     else if (a === 'mp_invite') { say('초대 코드를 만드는 중...'); await mpMakeInvite(); MP.status = '초대 코드를 보내고, 친구의 답장 코드를 넣으세요'; showMenu('mp_host'); }
     else if (a === 'mp_accept') { await mpAcceptAnswer(codeIn); say('연결하는 중...'); }
-    else if (a === 'mp_stop') { const guest = MP.role === 'guest'; mpStop(); if (guest) quitToTitle(); else showMenu('pause'); }
-  } catch (e) { if (a === 'mp_joinws' || a === 'mp_hostws') { MP.on = false; MP.role = null; MP.link = null; } say('실패: ' + (e.message || e)); }
+    else if (a === 'mp_stop') { const guest = !MP.isHost && !(MP.role === 'host' && !MP.server); mpStop(); if (guest) quitToTitle(); else showMenu('pause'); }
+  } catch (e) { if (a === 'mp_joinws' || a === 'mp_hostws' || a === 'mp_code' || a.startsWith('mp_go:')) { MP.on = false; MP.role = null; MP.link = null; } say('실패: ' + (e.message || e)); }
 }
 
 </script>
