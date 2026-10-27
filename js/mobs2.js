@@ -162,7 +162,8 @@ function placeBoat(x, y, z, yaw, wood) {
   e.mesh = tex ? buildMCModel('boat', MCMODELS.boat, tex) : buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
 }
 function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
-function mount(e) { if (e.rider) return; PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
+function mount(e) { if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) return; // someone else on it (multiplayer)
+  PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
 function dismount() {
   const e = PL.riding; PL.riding = null; if (!e) return; e.rider = null;
   for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0, 0]]) { const x = e.x + dx, z = e.z + dz; if (!SOLID[getBlock(Math.floor(x), Math.floor(e.y + 0.6), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(e.y + 1.6), Math.floor(z))]) { PL.x = x; PL.y = e.y + 0.6; PL.z = z; break; } }

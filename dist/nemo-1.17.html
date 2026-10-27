@@ -9255,7 +9255,8 @@ function placeBoat(x, y, z, yaw, wood) {
   e.mesh = tex ? buildMCModel('boat', MCMODELS.boat, tex) : buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
 }
 function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
-function mount(e) { if (e.rider) return; PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
+function mount(e) { if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) return; // someone else on it (multiplayer)
+  PL.riding = e; e.rider = PL; PL.flying = false; PL.sneaking = false; play('boat'); }
 function dismount() {
   const e = PL.riding; PL.riding = null; if (!e) return; e.rider = null;
   for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0, 0]]) { const x = e.x + dx, z = e.z + dz; if (!SOLID[getBlock(Math.floor(x), Math.floor(e.y + 0.6), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(e.y + 1.6), Math.floor(z))]) { PL.x = x; PL.y = e.y + 0.6; PL.z = z; break; } }
@@ -17011,6 +17012,9 @@ function mpHandle(m, from) {
     case 'kb': if (!host) { PL.vx += +m.vx || 0; PL.vy += +m.vy || 0; PL.vz += +m.vz || 0; } return;
     case 'eff': if (!host && EFF[m.k]) addEffect(PL, m.k, m.dur, m.lv); return;
     case 'tile': mpApplyTile(m, from); return;
+    case 'tslots': if (host) mpTileSlots(m, from); return;
+    case 'tilefix': if (!host) mpTileFix(m); return;
+    case 'unride': if (!host && PL.riding && PL.riding.remote && PL.riding.rid === m.e) { dismount(); UI.flash('다른 플레이어가 이미 타고 있습니다'); } return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
     case 'xps': if (!host) mpMirrorXP(m.l); return;
     case 'xp': if (host) spawnXP(+m.x, +m.y, +m.z, Math.min(2000, +m.v || 0)); return;
@@ -17037,7 +17041,7 @@ function mpHandle(m, from) {
     case 'vehs': if (!host) mpMirrorVehicles(m.l); return;
     case 'veh': if (host) { MP.allowSpawn = true; try { if (m.kind === 'boat') placeBoat(+m.x, +m.y, +m.z, +m.yaw || 0, String(m.sub || 'oak')); else if (m.kind === 'minecart') spawnMinecart(+m.x, +m.y, +m.z, String(m.sub || 'minecart'), { yaw: +m.yaw || 0 }); } finally { MP.allowSpawn = false; } } return;
     case 'vhit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.onHit), p = MP.peers.get(from); if (e) { if (p && p.s) mpProxy(p, () => e.onHit(e)); else e.onHit(e); } } return;
-    case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e && e.rider !== PL) mpRidden(e, m, from); } return;
+    case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) mpRidden(e, m, from); } return;
     case 'tame': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseTame === 'function' && e.owner !== 'player') horseTame(e); } return;
     case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.sleeping = 0; PL.rest = 0; UI.flash('좋은 아침이에요!'); } return;
@@ -17073,10 +17077,56 @@ function mpGuestLoad(dim) {
 function mpTileChanged(x, y, z) { const t = getTile(x, y, z); if (t) mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(x >> 4, z >> 4), tile: JSON.parse(JSON.stringify(t)) }); }
 function mpApplyTile(m, from) {
   const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15);
-  if (c) { const old = c.tiles.get(i); if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k]; Object.assign(old, m.tile); } else c.tiles.set(i, m.tile); c.modified = c.edited = true;
-    if (UI.screen && GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) UI.renderScreen(); }
+  if (c) { const old = c.tiles.get(i);
+    if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k];
+      // arrays are filled in place: an open screen's slots point at them
+      for (const k of Object.keys(m.tile)) { const a = old[k], b = m.tile[k]; if (Array.isArray(a) && Array.isArray(b)) { a.length = b.length; for (let j = 0; j < b.length; j++) a[j] = b[j]; } else old[k] = b; } }
+    else c.tiles.set(i, m.tile);
+    c.modified = c.edited = true;
+    if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); } }
   else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+// a guest's clicks in a container go to the dimension's runner as slot changes ("slot k was A, is now B"); the runner
+// takes them only if every slot still holds what the guest saw, so two players can't both take the same stack. A
+// refused change comes back with the real contents and the guest's inventory is put back as it was
+const mpJ = v => v == null ? null : JSON.parse(JSON.stringify(v));
+const mpCanon = v => JSON.stringify(v == null ? null : v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(q => [q, x[q]])) : x);
+const mpStEq = (a, b) => mpCanon(a || null) === mpCanon(b || null);
+function mpTileEdit(c) {
+  const t = getTile(c.x, c.y, c.z); if (!t) return;
+  const base = c.mpBase;
+  if (!base || !Array.isArray(t.items) || !Array.isArray(base.items) || base.items.length !== t.items.length) { mpTileChanged(c.x, c.y, c.z); c.mpBase = mpJ(t); return; }
+  const ch = [], rest = {};
+  t.items.forEach((st, k) => { if (!mpStEq(st, base.items[k])) ch.push([k, mpJ(base.items[k]), mpJ(st)]); });
+  for (const k of Object.keys(t)) if (k !== 'items' && mpCanon(t[k]) !== mpCanon(base[k])) rest[k] = mpJ(t[k]);
+  c.mpBase = mpJ(t);
+  if (ch.length || Object.keys(rest).length) mpToAuth({ t: 'tslots', x: c.x, y: c.y, z: c.z, dk: dkey(c.x >> 4, c.z >> 4), ch, rest, tile: mpJ(t) });
+}
+function mpTileSlots(m, from) {
+  if (!Array.isArray(m.ch)) return;
+  const c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15), t = c && c.tiles.get(i);
+  const msg = tile => ({ t: 'tile', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile });
+  if (!t || !Array.isArray(t.items)) { if (m.tile) { if (c) mpApplyTile(msg(m.tile), from); if (MP.server || !c) mpSend(msg(m.tile)); } return; } // not here to check: the guest's copy
+  if (m.ch.some(([k, before]) => k < 0 || k >= t.items.length || !mpStEq(t.items[k], before))) { mpSend({ t: 'tilefix', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile: mpJ(t), ch: m.ch }, from); return; }
+  for (const [k, , after] of m.ch) t.items[k] = after && ITEMS[after.id] ? after : null;
+  if (m.rest) for (const k of Object.keys(m.rest)) if (k !== 'type') t[k] = m.rest[k];
+  c.modified = c.edited = true;
+  if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(t); if (UI.screen) UI.renderScreen(); }
+  if (typeof rsNotify === 'function') rsNotify(m.x, m.y, m.z);
+  mpSend(msg(mpJ(t))); // everyone (the guest too) gets what the chest now holds
+}
+function mpTileFix(m) {
+  // undo what the refused clicks moved: whatever left the chest went to this player, whatever went in came from them
+  const net = new Map();
+  for (const [, b, a] of m.ch) for (const [st, sg] of [[b, 1], [a, -1]]) if (st) { const k = mpCanon({ ...st, n: 0 }), o = net.get(k) || { st, n: 0 }; o.n += sg * st.n; net.set(k, o); }
+  for (const { st, n } of net.values()) {
+    if (n < 0) { INV.giveOrDrop({ ...mpJ(st), n: -n }); continue; }
+    let left = n; const take = (arr, j) => { const s = arr[j]; if (left <= 0 || !s || !mpStEq({ ...s, n: 0 }, { ...st, n: 0 })) return; const q = Math.min(left, s.n); s.n -= q; left -= q; if (!s.n) arr[j] = null; };
+    const cur = [INV.cursor]; take(cur, 0); INV.cursor = cur[0];
+    for (let j = 0; j < INV.slots.length && left > 0; j++) take(INV.slots, j);
+  }
+  mpApplyTile({ ...m, t: 'tile' }, null); UI.hudDirty = true;
 }
 // the host's dropped items, mirrored to guests: a guest walking over one asks the host for it
 function mpMirrorItems(l) {
@@ -17361,7 +17411,8 @@ function mpRideSend(e) { e.mpWas = true; if (W.tickN % 2) return; mpToAuth({ t: 
 function mpRideOff(e) { e.mpWas = false; mpToAuth({ t: 'ride', e: e.rid, off: 1 }); }
 // the runner: someone else is steering this one
 function mpRidden(e, m, from) {
-  if (m.off) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } return; }
+  if (m.off) { if (e.mpRider === from) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } } return; }
+  if (e.rider === PL || (e.mpRider && e.mpRider !== from && performance.now() - e.mpRideAt < 1500)) { mpSend({ t: 'unride', e: m.e }, from); return; } // one rider: whoever got on first
   e.mpRider = from; e.mpRideAt = performance.now(); e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null;
   if (e.kind !== 'mob' && !e.mpTick0) { e.mpTick0 = e.tick; e.tick = mpRiddenTick; }
 }
@@ -17482,7 +17533,7 @@ function mpInstall() {
     if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (!n || ITEMS[id] == null) return null; const st = extra ? { ...extra, id, n } : { id, n }; if (dur != null) st.d = dur; mpToAuth({ t: 'drop', x, y, z, st, vel: vel || null, delay: delay == null ? 10 : delay }); return null; }
     return di.apply(this, arguments); };
   const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpToAuth({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
-  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z);
+  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); }
     // a guest changes what is in the runner's chest or hopper minecart, or the gear of the runner's horse
     if (MP.role === 'guest' && c && c.cart && c.cart.remote) mpToAuth({ t: 'cartset', e: c.cart.rid, items: c.cart.items });
     if (MP.role === 'guest' && c && c.horse && c.horse.remote) mpToAuth({ t: 'gear', e: c.horse.rid, gear: c.horse.gear }); };
@@ -17491,7 +17542,7 @@ function mpInstall() {
   const ia = INV.add; INV.add = st => { if (MP.useFor) { mpSend({ t: 'give', st }, MP.useFor.id); return 0; } return ia(st); }; // milk, a bowl of stew... go to the guest
   const os = UI.openScreen; UI.openScreen = (a, b) => { if (!MP.useFor) os(a, b); };
   // a guest trades with the runner's villager: its offers come from the runner, the guest pays with its own items and the runner counts the trade
-  const os2 = UI.openScreen; UI.openScreen = (a, b) => { if (MP.role === 'guest' && b && b.cart && b.cart.remote) mpToAuth({ t: 'cartinv', e: b.cart.rid }); if (a === 'trade' && MP.role === 'guest' && b && b.e && b.e.remote) { b.e.trades = b.e.trades || []; mpToAuth({ t: 'trades', e: b.e.rid }); } os2(a, b); };
+  const os2 = UI.openScreen; UI.openScreen = (a, b) => { if (MP.role === 'guest' && b && b.cart && b.cart.remote) mpToAuth({ t: 'cartinv', e: b.cart.rid }); if (a === 'trade' && MP.role === 'guest' && b && b.e && b.e.remote) { b.e.trades = b.e.trades || []; mpToAuth({ t: 'trades', e: b.e.rid }); } os2(a, b); if (MP.on && b && b.x != null) { const t = getTile(b.x, b.y, b.z); if (t) b.mpBase = mpJ(t); } };
   const tt = tradeTake; tradeTake = function (c) { const r = tt.apply(this, arguments); if (MP.role === 'guest' && c.e && c.e.remote) mpToAuth({ t: 'traded', e: c.e.rid, i: c.sel }); return r; };
   const pb = placeBoat; placeBoat = function (x, y, z, yaw, wood) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'boat', x, y, z, yaw, sub: wood || 'oak' }); return null; } return pb.apply(this, arguments); };
   const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
