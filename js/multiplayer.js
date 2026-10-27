@@ -138,7 +138,7 @@ const mpLogKeys = async id => new Set(((await dbReq('chunks', 'readonly', st => 
 // the world core's storage in this browser: the world's own chunk records, plus the changes made since each was stored
 function mpHostStore() {
   const id = W.id, logKey = dk => 'mplog:' + id + ':' + dk, dirty = new Map(), sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
-  const state = { meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
+  const state = { meta: { name: W.meta.name, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
     time: W.time, rain: W.rainTarget, thunder: W.thunderOn, weatherT: 24000, players: W.meta.mpPlayers || (W.meta.mpPlayers = {}) };
   const toNet = r => { if (!r || typeof r !== 'object') return null; // (dbReq gives true for a missing key) if (!r.b) return { v: 2, it: r.it, mobs: r.mobs || null };
     let b = r.b, m = r.m, l = r.l; const h = r.ch || 128; if (r.v < 3) { const n = 256 * h, dec = a => r.v >= 2 ? rleDec(a, n, Uint8Array) : a; b = rleEnc(Uint16Array.from(dec(b))); m = rleEnc(dec(m)); l = rleEnc(dec(l)); } // older saves: 8-bit ids
@@ -191,7 +191,7 @@ function mpHandle(m, from) {
     case 'join': if (!host || MP.server) return; { // a new guest: hand over the world's seed, clock and what has been edited
       const p = { id: from, name: String(m.name || '손님').slice(0, 16), skin: m.skin || { tex: 'steve', slim: false }, s: null }; MP.peers.set(from, p);
       const edited = [...W.saved]; for (const c of W.chunks.values()) if (c.edited) edited.push(dkey(c.cx, c.cz));
-      mpSend({ t: 'welcome', you: from, seed: W.seed, exp: W.exp, mode: PL.mode === 'hardcore' ? 'survival' : PL.mode, diff: PL.difficulty, time: W.time, rain: W.rain, thunder: W.thunderOn, dim: W.dim,
+      mpSend({ t: 'welcome', you: from, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: PL.mode === 'hardcore' ? 'survival' : PL.mode, diff: PL.difficulty, time: W.time, rain: W.rain, thunder: W.thunderOn, dim: W.dim,
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
@@ -254,7 +254,7 @@ async function mpEnterHostWorld(m) {
   MP.id = m.you;
   MP.peers.set(0, { id: 0, name: m.host.name, skin: m.host.skin, s: null });
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
-  const meta = { id: 'mp-' + Date.now(), name: m.host.name + '의 세계', seed: m.seed, mode: m.mode, diff: m.diff, cheats: false, exp: m.exp, spawn: m.spawn, remote: true, gamerules: m.gr, dim: 0 };
+  const meta = { id: 'mp-' + Date.now(), name: m.host.name + '의 세계', seed: m.seed, gen: m.gen || 1, mode: m.mode, diff: m.diff, cheats: false, exp: m.exp, spawn: m.spawn, remote: true, gamerules: m.gr, dim: 0 };
   await startWorld(meta.id, meta);
   if (m.dim !== W.dim && typeof switchDim === 'function') { /* guests start where the host's world spawns */ }
   W.saved = new Set(m.edited); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
@@ -458,7 +458,7 @@ async function mpEnterServerWorld(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta, d = m.pdata;
-  const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
+  const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
     dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off } : null, time: m.time, rain: m.rain, thunder: m.thunder };
   MP.rolePending = true; MP.role = 'guest';
   await startWorld(meta.id, meta);
@@ -526,7 +526,7 @@ async function mpUpload(url) {
   const link = await mpWebSocket(url, 'world'); if (link.hello.kind !== 'world') { link.close(); throw new Error('이 주소는 서버 세계를 받지 않습니다'); }
   if (link.hello.world) { link.close(); throw new Error('서버에 이미 세계가 있습니다 (' + link.hello.world.name + ')'); }
   const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
-  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
+  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
   const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys()); const mine = (keys || []).filter(k => typeof k === 'string' && k.startsWith(W.id + ':'));
   let n = 0;
   for (const k of mine) { const rec = await dbReq('chunks', 'readonly', st => st.get(k)); if (!rec) continue; const dk = k.slice(W.id.length + 1);
@@ -728,7 +728,7 @@ function mpAttackPeer(p) {
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2);
 }
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
@@ -793,7 +793,7 @@ async function mpAction(a) {
   try {
     if (a === 'mp_join' || a === 'mp_host') { MP.status = ''; showMenu(a); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 2, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const n = await mpUpload(ad.value.trim()); say(`올렸습니다 (청크 ${n}개). 이제 타이틀 → 멀티플레이 → 서버에 접속으로 누구나 들어올 수 있습니다.`); }
     else if (a === 'mp_answer') { say('답장 코드를 만드는 중...'); MP.role = 'guest'; MP.on = true; mpInstall(); const code = await mpAnswerInvite(codeIn); $('mpOut').value = code; $('mpOut').select(); say('답장 코드를 호스트에게 보내세요. 호스트가 넣으면 연결됩니다.'); }

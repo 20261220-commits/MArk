@@ -581,7 +581,7 @@ function addChunk(cx, cz, d, tiles) {
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
   w.busy++; const id = jobId++; W.pending.set(ckey(cx, cz), id);
-  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim, exp: W.exp });
+  w.postMessage({ type: 'gen', id, seed: W.seed, gen: W.gen || 1, cx, cz, dim: W.dim, exp: W.exp });
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }

@@ -825,12 +825,275 @@ const isDripstoneCaves = (seed, x, z) => caveNoise(seed, 0).n2(x / 420, z / 420)
 const isLushCaves = (seed, x, z) => caveNoise(seed, 1).n2(x / 380, z / 380) > 0.55;
 // the cave biome at a spot well below the surface, or -1 (lush caves only with the experimental option, as in 1.17)
 function caveBiomeAt(seed, x, y, z, surface, exp) { if (y > Math.min(56, surface - 10)) return -1; if (exp && isLushCaves(seed, x, z)) return BIOK.lush_caves; return isDripstoneCaves(seed, x, z) ? BIOK.dripstone_caves : -1; }
+// ---------- the 1.17 biome layout: Java's layer stack (net.minecraft.world.level.newbiome.layer), with the same rules
+// and the same random numbers, so a seed gets the original's climates, biomes, hills, rare biomes, rivers and shores:
+// continents at 1:4096 are zoomed and given islands, then a climate (warm / temperate / cold / icy, never warm beside
+// cold), then a biome from that climate's list, edges (no desert beside snow, swamp beside jungle...), hills and
+// mutated variants in the middle of a biome, shores, rivers, and ocean temperatures, ending at one value per 4x4 blocks.
+// Numbers are Java's 64-bit longs (BigInt here); biome ids are Java's numeric ids ----------
+const JBN = [];
+'ocean plains desert mountains forest taiga swamp river - - frozen_ocean frozen_river snowy_tundra snowy_mountains mushroom_fields mushroom_field_shore beach desert_hills wooded_hills taiga_hills mountain_edge jungle jungle_hills jungle_edge deep_ocean stone_shore snowy_beach birch_forest birch_forest_hills dark_forest snowy_taiga snowy_taiga_hills giant_tree_taiga giant_tree_taiga_hills wooded_mountains savanna savanna_plateau badlands wooded_badlands_plateau badlands_plateau - - - - warm_ocean lukewarm_ocean cold_ocean deep_warm_ocean deep_lukewarm_ocean deep_cold_ocean deep_frozen_ocean'.split(' ').forEach((k, i) => { if (k !== '-') JBN[i] = k; });
+for (const [i, k] of [[129, 'sunflower_plains'], [130, 'desert_lakes'], [131, 'gravelly_mountains'], [132, 'flower_forest'], [133, 'taiga_mountains'], [134, 'swamp_hills'], [140, 'ice_spikes'], [149, 'modified_jungle'], [151, 'modified_jungle_edge'], [155, 'tall_birch_forest'], [156, 'tall_birch_hills'], [157, 'dark_forest_hills'], [158, 'snowy_taiga_mountains'], [160, 'giant_spruce_taiga'], [161, 'giant_spruce_taiga_hills'], [162, 'modified_gravelly_mountains'], [163, 'shattered_savanna'], [164, 'shattered_savanna_plateau'], [165, 'eroded_badlands'], [166, 'modified_wooded_badlands_plateau'], [167, 'modified_badlands_plateau'], [168, 'bamboo_jungle'], [169, 'bamboo_jungle_hills']]) JBN[i] = k;
+const JMUT = { 1: 129, 2: 130, 3: 131, 4: 132, 5: 133, 6: 134, 12: 140, 21: 149, 23: 151, 27: 155, 28: 156, 29: 157, 30: 158, 32: 160, 33: 161, 34: 162, 35: 163, 36: 164, 37: 165, 38: 166, 39: 167 };
+// Biome.BiomeCategory, for Layers.isSame (0: none, as the stone shore)
+const JCAT = new Uint8Array(256);
+for (const [c, ids] of [[1, [0, 10, 24, 44, 45, 46, 47, 48, 49, 50]], [2, [1, 129]], [3, [2, 17, 130]], [4, [3, 20, 34, 131, 162]], [5, [4, 18, 27, 28, 29, 132, 155, 156, 157]], [6, [5, 19, 30, 31, 32, 33, 133, 158, 160, 161]],
+  [7, [6, 134]], [8, [7, 11]], [9, [12, 13, 140]], [10, [14, 15]], [11, [16, 26]], [12, [21, 22, 23, 149, 151, 168, 169]], [13, [35, 36, 163, 164]], [14, [37, 38, 39, 165, 166, 167]]]) for (const i of ids) JCAT[i] = c;
+const JSNOW = new Set([10, 11, 12, 13, 26, 30, 31, 140, 158]); // precipitation: snow
+// [depth, scale] of each biome: how high the ground lies and how much it varies (Biome.depth / Biome.scale)
+const JDS = {};
+for (const [ids, d, s] of [[[0, 10, 44, 45, 46], -1, 0.1], [[24, 47, 48, 49, 50], -1.8, 0.1], [[1, 2, 12, 35, 129], 0.125, 0.05], [[3, 34, 131, 162], 1, 0.5], [[4, 21, 23, 27, 29, 37, 165, 168], 0.1, 0.2],
+  [[5, 30, 32, 160, 161], 0.2, 0.2], [[6], -0.2, 0.1], [[7, 11], -0.5, 0], [[13, 17, 18, 19, 22, 28, 31, 33, 166, 167, 169], 0.45, 0.3], [[14], 0.2, 0.3], [[15, 16, 26], 0, 0.025], [[20], 0.8, 0.3],
+  [[25], 0.1, 0.8], [[36, 38, 39], 1.5, 0.025], [[130], 0.225, 0.25], [[132, 149, 151, 155, 157], 0.2, 0.4], [[133, 158], 0.3, 0.4], [[134], -0.1, 0.3], [[140], 0.425, 0.45], [[156], 0.55, 0.5],
+  [[163], 0.3625, 1.225], [[164], 1.05, 1.2125]]) for (const i of ids) JDS[i] = [d, s];
+const jShallow = b => b === 0 || b === 10 || b === 44 || b === 45 || b === 46, jOcean = b => JCAT[b] === 1, jSame = (a, b) => a === b || (JCAT[a] !== 0 && JCAT[a] === JCAT[b]);
+const jMesa = b => b === 37 || b === 38 || b === 39 || b === 165 || b === 166 || b === 167;
+const LCG_A = 6364136223846793005n, LCG_C = 1442695040888963407n;
+const lnext = (a, b) => BigInt.asIntN(64, a * (a * LCG_A + LCG_C) + b); // LinearCongruentialGenerator.next
+function jMix(seed, salt) { let l = lnext(salt, salt); l = lnext(l, salt); l = lnext(l, salt); let m = lnext(seed, l); m = lnext(m, l); m = lnext(m, l); return m; }
+// LazyAreaContext: one per layer, reseeded at every cell
+function JCtx(seed, salt) { this.s = jMix(seed, BigInt(salt)); this.r = 0n; }
+JCtx.prototype.init = function (x, z) { const X = BigInt(x), Z = BigInt(z); let l = lnext(this.s, X); l = lnext(l, Z); l = lnext(l, X); this.r = lnext(l, Z); };
+JCtx.prototype.next = function (b) { const B = BigInt(b); let i = (this.r >> 24n) % B; if (i < 0n) i += B; this.r = lnext(this.r, this.s); return Number(i); };
+JCtx.prototype.pick2 = function (a, b) { return this.next(2) === 0 ? a : b; };
+JCtx.prototype.pick4 = function (a, b, c, d) { const i = this.next(4); return i === 0 ? a : i === 1 ? b : i === 2 ? c : d; };
+// java.util.Random and ImprovedNoise, for the ocean temperature layer
+function JRandom(seed) { this.s = (BigInt(seed) ^ 0x5DEECE66Dn) & ((1n << 48n) - 1n); }
+JRandom.prototype.bits = function (n) { this.s = (this.s * 0x5DEECE66Dn + 0xBn) & ((1n << 48n) - 1n); return Number(BigInt.asIntN(32, this.s >> BigInt(48 - n))); };
+JRandom.prototype.nextDouble = function () { return (this.bits(26) * 134217728 + this.bits(27)) / 9007199254740992; };
+JRandom.prototype.nextInt = function (bound) { let r = this.bits(31); const m = bound - 1; if ((bound & m) === 0) return Number((BigInt(bound) * BigInt(r)) >> 31n); for (let u = r; u - (r = u % bound) + m > 2147483647 || u - r + m < 0; u = this.bits(31)); return r; };
+const JGRAD = [[1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0], [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1], [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1], [1, 1, 0], [0, -1, 1], [-1, 1, 0], [0, -1, -1]];
+function JNoise(rand) {
+  this.xo = rand.nextDouble() * 256; this.yo = rand.nextDouble() * 256; this.zo = rand.nextDouble() * 256; const p = this.p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 0; i < 256; i++) { const j = rand.nextInt(256 - i), b = p[i]; p[i] = p[i + j]; p[i + j] = b; }
+}
+JNoise.prototype.noise = function (x, y, z) {
+  const P = i => this.p[i & 255], gd = (h, a, b, c) => { const g = JGRAD[h & 15]; return g[0] * a + g[1] * b + g[2] * c; }, sm = t => t * t * t * (t * (t * 6 - 15) + 10), lerp = (t, a, b) => a + t * (b - a);
+  const d = x + this.xo, e = y + this.yo, f = z + this.zo, i = Math.floor(d), j = Math.floor(e), k = Math.floor(f), g = d - i, h = e - j, l = f - k;
+  const a0 = P(i), a1 = P(i + 1), n = P(a0 + j), o = P(a0 + j + 1), q = P(a1 + j), r = P(a1 + j + 1);
+  const s = gd(P(n + k), g, h, l), t = gd(P(q + k), g - 1, h, l), u = gd(P(o + k), g, h - 1, l), v = gd(P(r + k), g - 1, h - 1, l);
+  const w = gd(P(n + k + 1), g, h, l - 1), X = gd(P(q + k + 1), g - 1, h, l - 1), Y = gd(P(o + k + 1), g, h - 1, l - 1), Z = gd(P(r + k + 1), g - 1, h - 1, l - 1);
+  const aa = sm(g), ab = sm(h), ac = sm(l);
+  return lerp(ac, lerp(ab, lerp(aa, s, t), lerp(aa, u, v)), lerp(ab, lerp(aa, w, X), lerp(aa, Y, Z)));
+};
+// layer kinds: each makes the values of an area (x, z, w, h) from its parent's
+function jl0(seed, salt, f) { const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const o = new Int32Array(w * h); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { c.init(x + i, z + j); o[j * w + i] = f(c, x + i, z + j); } return o; } }; }
+function jl1(seed, salt, P, f) { const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const p = P.gen(x, z, w, h); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { c.init(x + i, z + j); p[j * w + i] = f(c, p[j * w + i]); } return p; } }; }
+function jlCross(seed, salt, P, f) { // CastleTransformer: north, east, south, west, centre
+  const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const pw = w + 2, p = P.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const k = (j + 1) * pw + i + 1; c.init(x + i, z + j); o[j * w + i] = f(c, p[k - pw], p[k + 1], p[k + pw], p[k - 1], p[k]); } return o; } };
+}
+function jlDiag(seed, salt, P, f) { // BishopTransformer: south-west, south-east, north-east, north-west, centre
+  const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const pw = w + 2, p = P.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const k = (j + 1) * pw + i + 1; c.init(x + i, z + j); o[j * w + i] = f(c, p[k + pw - 1], p[k + pw + 1], p[k - pw + 1], p[k - pw - 1], p[k]); } return o; } };
+}
+function jlZoom(seed, salt, P, fuzzy) {
+  const c = new JCtx(seed, salt);
+  const mode = (a, b, cc, d) => {
+    if (b === cc && cc === d) return b; if (a === b && a === cc) return a; if (a === b && a === d) return a; if (a === cc && a === d) return a;
+    if (a === b && cc !== d) return a; if (a === cc && b !== d) return a; if (a === d && b !== cc) return a;
+    if (b === cc && a !== d) return b; if (b === d && a !== cc) return b; if (cc === d && a !== b) return cc; return c.pick4(a, b, cc, d);
+  };
+  return { gen(x, z, w, h) {
+    const px = x >> 1, pz = z >> 1, pw = ((x + w) >> 1) - px + 2, p = P.gen(px, pz, pw, ((z + h) >> 1) - pz + 2), o = new Int32Array(w * h), g = (X, Z) => p[(Z - pz) * pw + X - px];
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const X = x + i, Z = z + j, a = g(X >> 1, Z >> 1); c.init(X >> 1 << 1, Z >> 1 << 1); const dx = X & 1, dz = Z & 1;
+      if (!dx && !dz) { o[j * w + i] = a; continue; }
+      const b = g(X >> 1, (Z + 1) >> 1), cc = c.pick2(a, b); if (!dx) { o[j * w + i] = cc; continue; }
+      const d = g((X + 1) >> 1, Z >> 1), e = c.pick2(a, d); if (!dz) { o[j * w + i] = e; continue; }
+      const f = g((X + 1) >> 1, (Z + 1) >> 1); o[j * w + i] = fuzzy ? c.pick4(a, d, b, f) : mode(a, d, b, f);
+    }
+    return o; } };
+}
+const jZooms = (seed, salt, P, n) => { for (let i = 0; i < n; i++) P = jlZoom(seed, salt + i, P, false); return P; };
+const JWARM = [2, 2, 2, 35, 35, 1], JMED = [4, 29, 3, 1, 27, 6], JCOLD = [4, 3, 5, 1], JICE = [12, 12, 12, 30];
+function addIsland(c, sw, se, ne, nw, m) {
+  if (!jShallow(m) || (jShallow(nw) && jShallow(ne) && jShallow(sw) && jShallow(se))) {
+    if (!jShallow(m) && (jShallow(nw) || jShallow(sw) || jShallow(ne) || jShallow(se)) && c.next(5) === 0) {
+      if (jShallow(nw)) return m === 4 ? 4 : nw; if (jShallow(sw)) return m === 4 ? 4 : sw; if (jShallow(ne)) return m === 4 ? 4 : ne; if (jShallow(se)) return m === 4 ? 4 : se;
+    }
+    return m;
+  }
+  let n = 1, o = 1;
+  if (!jShallow(nw) && c.next(n++) === 0) o = nw; if (!jShallow(ne) && c.next(n++) === 0) o = ne; if (!jShallow(sw) && c.next(n++) === 0) o = sw; if (!jShallow(se) && c.next(n++) === 0) o = se;
+  if (c.next(3) === 0) return o; return o === 4 ? 4 : m;
+}
+function makeLayers(worldSeed) {
+  const S = BigInt(worldSeed), ins = (salt, P) => jlDiag(S, salt, P, addIsland);
+  let L = jl0(S, 1, (c, x, z) => x === 0 && z === 0 ? 1 : c.next(10) === 0 ? 1 : 0);
+  L = jlZoom(S, 2000, L, true); L = ins(1, L); L = jlZoom(S, 2001, L, false); L = ins(2, L); L = ins(50, L); L = ins(70, L);
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => jShallow(m) && jShallow(n) && jShallow(e) && jShallow(w) && jShallow(s) && c.next(2) === 0 ? 1 : m); // remove too much ocean
+  const noise = new JNoise(new JRandom(S));
+  let O = jl0(S, 2, (c, x, z) => { const d = noise.noise(x / 8, z / 8, 0); return d > 0.4 ? 44 : d > 0.2 ? 45 : d < -0.4 ? 10 : d < -0.2 ? 46 : 0; });
+  O = jZooms(S, 2001, O, 6);
+  L = jl1(S, 2, L, (c, v) => { if (jShallow(v)) return v; const i = c.next(6); return i === 0 ? 4 : i === 1 ? 3 : 1; }); // climates: 1 warm, 2 temperate, 3 cold, 4 icy
+  L = ins(3, L);
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => m === 1 && (n === 3 || e === 3 || w === 3 || s === 3 || n === 4 || e === 4 || w === 4 || s === 4) ? 2 : m); // warm beside cold becomes temperate
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => m === 4 && (n === 2 || e === 2 || w === 2 || s === 2 || n === 1 || e === 1 || w === 1 || s === 1) ? 3 : m); // icy beside warm becomes cold
+  L = jl1(S, 3, L, (c, v) => { if (!jShallow(v) && c.next(13) === 0) v |= ((1 + c.next(15)) << 8) & 3840; return v; }); // special: jungles, giant taiga, badlands plateaus
+  L = jlZoom(S, 2002, L, false); L = jlZoom(S, 2003, L, false); L = ins(4, L);
+  L = jlDiag(S, 5, L, (c, sw, se, ne, nw, m) => jShallow(m) && jShallow(nw) && jShallow(ne) && jShallow(sw) && jShallow(se) && c.next(100) === 0 ? 14 : m); // mushroom islands
+  L = jlCross(S, 4, L, (c, n, e, s, w, m) => { if (!jShallow(m)) return m; const k = jShallow(n) + jShallow(e) + jShallow(w) + jShallow(s); if (k <= 3) return m; return m === 44 ? 47 : m === 45 ? 48 : m === 46 ? 49 : m === 10 ? 50 : 24; }); // deep ocean
+  let R = jl1(S, 100, L, (c, v) => jShallow(v) ? v : c.next(299999) + 2); // river noise
+  let B = jl1(S, 200, L, (c, v) => {
+    const sp = (v & 3840) >> 8; v &= -3841; if (jOcean(v) || v === 14) return v;
+    switch (v) { case 1: return sp > 0 ? (c.next(3) === 0 ? 39 : 38) : JWARM[c.next(6)]; case 2: return sp > 0 ? 21 : JMED[c.next(6)]; case 3: return sp > 0 ? 32 : JCOLD[c.next(4)]; case 4: return JICE[c.next(4)]; default: return 14; }
+  });
+  B = jl1(S, 1001, B, (c, v) => c.next(10) === 0 && v === 21 ? 168 : v); // bamboo jungle
+  B = jZooms(S, 1000, B, 2);
+  B = jlCross(S, 1000, B, (c, n, e, s, w, m) => { // biome edges
+    if (JCAT[m] === 4) return m; // mountains: every neighbour is a fit (all temperate)
+    const strict = (base, edge) => m !== base ? -1 : jSame(n, base) && jSame(e, base) && jSame(w, base) && jSame(s, base) ? m : edge;
+    let r = strict(38, 37); if (r < 0) r = strict(39, 37); if (r < 0) r = strict(32, 5); if (r >= 0) return r;
+    if (m === 2 && (n === 12 || e === 12 || w === 12 || s === 12)) return 34; // desert beside snow: wooded mountains between
+    if (m === 6) {
+      if (n === 2 || e === 2 || w === 2 || s === 2 || n === 30 || e === 30 || w === 30 || s === 30 || n === 12 || e === 12 || w === 12 || s === 12) return 1;
+      if (n === 21 || s === 21 || e === 21 || w === 21 || n === 168 || s === 168 || e === 168 || w === 168) return 23;
+    }
+    return m;
+  });
+  const R2 = jZooms(S, 1000, R, 2), Bp = B, hills = new JCtx(S, 1000);
+  B = { gen(x, z, w, h) { // RegionHillsLayer: hills and mutated variants inside a biome
+    const pw = w + 2, p = Bp.gen(x - 1, z - 1, pw, h + 2), r = R2.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h), c = hills;
+    for (let j = 0; j < h; j++) for (let ii = 0; ii < w; ii++) {
+      const k0 = (j + 1) * pw + ii + 1, i = p[k0], jr = r[k0]; c.init(x + ii, z + j); const k = (jr - 2) % 29;
+      if (!jShallow(i) && jr >= 2 && k === 1) { o[j * w + ii] = JMUT[i] != null ? JMUT[i] : i; continue; }
+      let out = i;
+      if (c.next(3) === 0 || k === 0) {
+        let l = i;
+        if (i === 2) l = 17; else if (i === 4) l = 18; else if (i === 27) l = 28; else if (i === 29) l = 1; else if (i === 5) l = 19; else if (i === 32) l = 33; else if (i === 30) l = 31;
+        else if (i === 1) l = c.next(3) === 0 ? 18 : 4; else if (i === 12) l = 13; else if (i === 21) l = 22; else if (i === 168) l = 169; else if (i === 0) l = 24; else if (i === 45) l = 48;
+        else if (i === 46) l = 49; else if (i === 10) l = 50; else if (i === 3) l = 34; else if (i === 35) l = 36; else if (jSame(i, 38)) l = 37;
+        else if ((i === 24 || i === 48 || i === 49 || i === 50) && c.next(3) === 0) l = c.next(2) === 0 ? 1 : 4;
+        if (k === 0 && l !== i) l = JMUT[l] != null ? JMUT[l] : i;
+        if (l !== i) { const m = jSame(p[k0 - pw], i) + jSame(p[k0 + 1], i) + jSame(p[k0 - 1], i) + jSame(p[k0 + pw], i); if (m >= 3) out = l; }
+      }
+      o[j * w + ii] = out;
+    }
+    return o; } };
+  R = jZooms(S, 1000, R, 2); R = jZooms(S, 1000, R, 4);
+  const rf = v => v >= 2 ? 2 + (v & 1) : v;
+  R = jlCross(S, 1, R, (c, n, e, s, w, m) => { const i = rf(m); return i === rf(w) && i === rf(n) && i === rf(e) && i === rf(s) ? -1 : 7; });
+  const smooth = (c, n, e, s, w, m) => { const a = e === w, b = n === s; if (a === b) return a ? c.pick2(w, n) : m; return a ? w : n; };
+  R = jlCross(S, 1000, R, smooth);
+  B = jl1(S, 1001, B, (c, v) => c.next(57) === 0 && v === 1 ? 129 : v); // sunflower plains
+  const jungleOk = v => JCAT[v] === 12 || v === 4 || v === 5 || jOcean(v);
+  for (let i = 0; i < 4; i++) {
+    B = jlZoom(S, 1000 + i, B, false);
+    if (i === 0) B = ins(3, B);
+    if (i === 1) B = jlCross(S, 1000, B, (c, n, e, s, w, m) => { // shores
+      const anyO = jOcean(n) || jOcean(e) || jOcean(s) || jOcean(w);
+      if (m === 14) return jShallow(n) || jShallow(e) || jShallow(s) || jShallow(w) ? 15 : m;
+      if (JCAT[m] === 12) { if (!jungleOk(n) || !jungleOk(e) || !jungleOk(s) || !jungleOk(w)) return 23; return anyO ? 16 : m; }
+      if (m !== 3 && m !== 34 && m !== 20) {
+        if (JSNOW.has(m)) return !jOcean(m) && anyO ? 26 : m;
+        if (m !== 37 && m !== 38) return !jOcean(m) && m !== 7 && m !== 6 && anyO ? 16 : m;
+        return !anyO && (!jMesa(n) || !jMesa(e) || !jMesa(s) || !jMesa(w)) ? 2 : m;
+      }
+      return !jOcean(m) && anyO ? 25 : m;
+    });
+  }
+  B = jlCross(S, 1000, B, smooth);
+  const Bm = B, Rm = R, Om = O;
+  return { gen(x, z, w, h) { // rivers and ocean temperatures mixed in
+    const b = Bm.gen(x - 8, z - 8, w + 16, h + 16), r = Rm.gen(x, z, w, h), oc = Om.gen(x, z, w, h), o = new Int32Array(w * h), bw = w + 16;
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      let v = b[(j + 8) * bw + i + 8]; const rv = r[j * w + i];
+      if (!jOcean(v)) { if (rv === 7) v = v === 12 ? 11 : v === 14 || v === 15 ? 15 : 7; o[j * w + i] = v; continue; }
+      const t = oc[j * w + i]; let res = -1;
+      for (let dz = -8; dz <= 8 && res < 0; dz += 4) for (let dx = -8; dx <= 8; dx += 4) { const m = b[(j + 8 + dz) * bw + i + 8 + dx]; if (jOcean(m)) continue; if (t === 44) { res = 45; break; } if (t === 10) { res = 46; break; } }
+      if (res < 0) res = v === 24 ? (t === 45 ? 48 : t === 0 ? 24 : t === 46 ? 49 : t === 10 ? 50 : t) : t;
+      o[j * w + i] = res;
+    }
+    return o; } };
+}
+// BiomeManager's fuzzy zoom from 4x4 cells to blocks: each block takes the nearest of the 8 surrounding cell corners,
+// each corner nudged by a hash of the seed (SHA-256, as Java's obfuscateSeed)
+function sha256Long(seed) {
+  const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+  const msg = new Uint8Array(64), v = BigInt.asUintN(64, BigInt(seed)); for (let i = 0; i < 8; i++) msg[i] = Number((v >> BigInt(8 * i)) & 255n); // Guava hashLong: little-endian
+  msg[8] = 0x80; msg[63] = 64; // one block: 8 bytes, the 1 bit, the length in bits
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19], Wd = new Array(64), ror = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let i = 0; i < 16; i++) Wd[i] = (msg[i * 4] << 24) | (msg[i * 4 + 1] << 16) | (msg[i * 4 + 2] << 8) | msg[i * 4 + 3];
+  for (let i = 16; i < 64; i++) { const s0 = ror(Wd[i - 15], 7) ^ ror(Wd[i - 15], 18) ^ (Wd[i - 15] >>> 3), s1 = ror(Wd[i - 2], 17) ^ ror(Wd[i - 2], 19) ^ (Wd[i - 2] >>> 10); Wd[i] = (Wd[i - 16] + s0 + Wd[i - 7] + s1) | 0; }
+  let [a, b, c, d, e, f, g, h] = H;
+  for (let i = 0; i < 64; i++) { const S1 = ror(e, 6) ^ ror(e, 11) ^ ror(e, 25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + Wd[i]) | 0, S0 = ror(a, 2) ^ ror(a, 13) ^ ror(a, 22), mj = (a & b) ^ (a & c) ^ (b & c), t2 = (S0 + mj) | 0; h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0; }
+  const out = [a, b, c, d, e, f, g, h].map((x, i) => (x + H[i]) >>> 0), bytes = []; for (const x of out) bytes.push(x >>> 24, (x >>> 16) & 255, (x >>> 8) & 255, x & 255);
+  let r = 0n; for (let i = 7; i >= 0; i--) r = (r << 8n) | BigInt(bytes[i]); return BigInt.asIntN(64, r); // asLong: the first 8 bytes, little-endian
+}
+const JREG = 32; // biome regions of 32x32 cells (128x128 blocks), cached
+function makeBiomeMap(worldSeed) {
+  const lay = makeLayers(worldSeed), zs = sha256Long(worldSeed), regs = new Map(), fid = new Map();
+  const region = (rx, rz) => {
+    const key = rx * 65536 + rz; let r = regs.get(key); if (r) return r;
+    const x0 = rx * JREG - 3, z0 = rz * JREG - 3, n = JREG + 7, b = lay.gen(x0, z0, n, n);
+    // Java's biome depth and scale, blended over 5x5 cells (NoiseBasedChunkGenerator), at every cell corner of the region
+    const m = JREG + 1, D = new Float32Array(m * m), Sc = new Float32Array(m * m);
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+      const c = JDS[b[(j + 3) * n + i + 3]] || [0.1, 0.2], k = c[0]; let f = 0, g = 0, hh = 0;
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const q = JDS[b[(j + 3 + dz) * n + i + 3 + dx]] || [0.1, 0.2], wgt = (q[0] > k ? 0.5 : 1) * 10 / Math.sqrt(dx * dx + dz * dz + 0.2) / (q[0] + 2);
+        f += q[1] * wgt; g += q[0] * wgt; hh += wgt;
+      }
+      D[j * m + i] = g / hh; Sc[j * m + i] = f / hh;
+    }
+    r = { b, x0, z0, n, D, Sc, m }; regs.set(key, r); if (regs.size > 40) regs.delete(regs.keys().next().value); return r;
+  };
+  const cellBiome = (qx, qz) => { const r = region(Math.floor(qx / JREG), Math.floor(qz / JREG)); return r.b[(qz - r.z0) * r.n + qx - r.x0]; };
+  const fiddle = (x, y, z) => {
+    const key = ((x + 2097152) * 4194304 + z + 2097152) * 2 + (y & 1); let f = fid.get(key); if (f) return f;
+    const X = BigInt(x), Y = BigInt(y), Z = BigInt(z), g = l => (Number(((l >> 24n) % 1024n + 1024n) % 1024n) / 1024 - 0.5) * 0.9;
+    let l = lnext(zs, X); l = lnext(l, Y); l = lnext(l, Z); l = lnext(l, X); l = lnext(l, Y); l = lnext(l, Z); const a = g(l); l = lnext(l, zs); const b = g(l); l = lnext(l, zs);
+    f = [a, b, g(l)]; fid.set(key, f); if (fid.size > 40000) fid.clear(); return f;
+  };
+  return {
+    // the biome (Java id) at a block, its surface taken as y 64
+    biome(x, z) {
+      const i = x - 2, j = 62, k = z - 2, l = i >> 2, mm = j >> 2, nn = k >> 2, d = (i & 3) / 4, e = (j & 3) / 4, f = (k & 3) / 4;
+      let best = 0, bd = Infinity;
+      for (let p = 0; p < 8; p++) {
+        const bx = (p & 4) === 0, by = (p & 2) === 0, bz = (p & 1) === 0, q = bx ? l : l + 1, rr = by ? mm : mm + 1, s = bz ? nn : nn + 1, fd = fiddle(q, rr, s);
+        const h = (bx ? d : d - 1) + fd[0], t = (by ? e : e - 1) + fd[1], u = (bz ? f : f - 1) + fd[2], v = h * h + t * t + u * u;
+        if (bd > v) { best = p; bd = v; }
+      }
+      return cellBiome((best & 4) === 0 ? l : l + 1, (best & 1) === 0 ? nn : nn + 1);
+    },
+    // the blended depth and scale at a block (between the corners of its 4x4 cell)
+    depthScale(x, z) {
+      const qx = x >> 2, qz = z >> 2, r = region(Math.floor(qx / JREG), Math.floor(qz / JREG)), i = qx - (r.x0 + 3), j = qz - (r.z0 + 3), fx = (x & 3) / 4, fz = (z & 3) / 4, m = r.m;
+      const at = (A, a, b) => A[b * m + a], bl = A => (at(A, i, j) * (1 - fx) + at(A, i + 1, j) * fx) * (1 - fz) + (at(A, i, j + 1) * (1 - fx) + at(A, i + 1, j + 1) * fx) * fz;
+      return [bl(r.D), bl(r.Sc)];
+    },
+    cell: cellBiome,
+  };
+}
+// which world generator: 1 for worlds made before the Java biome layers (their new chunks must match the old ones), 2 after
+let GENV = 2; const setGenVersion = v => { GENV = v || 1; };
+const BMAPS = new Map();
+const biomeMapFor = seed => { let m = BMAPS.get(seed); if (!m) { m = makeBiomeMap(seed); BMAPS.set(seed, m); if (BMAPS.size > 2) BMAPS.delete(BMAPS.keys().next().value); } return m; };
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
   const nC = makeNoise(seed), nM = makeNoise(seed + 1), nD = makeNoise(seed + 2), nT = makeNoise(seed + 3), nH = makeNoise(seed + 4), nR = makeNoise(seed + 5), nX = makeNoise(seed + 6);
+  const BM = GENV >= 2 ? biomeMapFor(seed) : null;
+  // version 2: the biome from Java's layers, the ground from that biome's depth and scale (blended as Java does) with
+  // this generator's noise for the shape
+  function columnJ(wx, wz) {
+    const jb = BM.biome(wx, wz), ds = BM.depthScale(wx, wz), D = ds[0], Sc = ds[1];
+    const hills = nD.fbm(wx / 130, wz / 130, 4), detail = nD.n2(wx / 28, wz / 28), ridge = 1 - Math.abs(nM.n2(wx / 160, wz / 160));
+    let h = 63 + 17 * D + (hills + detail * 0.15) * (2 + 58 * Sc) + smooth(0.3, 0.5, Sc) * ridge * ridge * 46 * Sc; // mountains: ridges and peaks
+    const K = BIOK, v0 = K[JBN[jb]], v = v0 != null ? v0 : K.plains;
+    if (jb === 7 || jb === 11) h = Math.min(h, SEA - 3 + detail); // a river holds water
+    if (JCAT[jb] === 14 && h > 72) h = 72 + Math.round((h - 72) / 4) * 4; // badlands: terraces up to the plateaus
+    if (jb === 165) { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h += Math.min(40, (sp - 0.55) * 120); } // eroded badlands: hoodoos
+    if (jb === 163 || jb === 164) h += Math.max(0, nD.n2(wx / 9, wz / 9)) * 6; // shattered savanna: jagged
+    h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
+    return [h, BB[v], v];
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (BM) return columnJ(wx, wz);
     const cont = nC.fbm(wx / 900, wz / 900, 4) * 1.6 + 0.12;
     const land = smooth(-0.22, 0.02, cont);
     const mRaw = nM.fbm(wx / 420, wz / 420, 3);
@@ -918,7 +1181,7 @@ function makeGen(seed) {
     if (add > 0) h = Math.min(CH - 6, h + Math.floor(add * fade));
     return [h, b, v];
   }
-  return { column, nD, nX };
+  return { column, nD, nX, biomes: BM };
 }
 // Cave worms (MC-style carvers) are deterministic per origin chunk, so each origin's
 // carve spheres are simulated once and cached; every chunk within 8 reuses them.
@@ -3609,14 +3872,14 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
   self.onmessage = e => {
     const m = e.data;
     if (m.type === 'gen') {
-      const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
+      S.setGenVersion(m.gen); const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
     } else if (m.type === 'structs') S.setStructs(m.data);
     else if (m.type === 'mesh') {

@@ -1143,12 +1143,275 @@ const isDripstoneCaves = (seed, x, z) => caveNoise(seed, 0).n2(x / 420, z / 420)
 const isLushCaves = (seed, x, z) => caveNoise(seed, 1).n2(x / 380, z / 380) > 0.55;
 // the cave biome at a spot well below the surface, or -1 (lush caves only with the experimental option, as in 1.17)
 function caveBiomeAt(seed, x, y, z, surface, exp) { if (y > Math.min(56, surface - 10)) return -1; if (exp && isLushCaves(seed, x, z)) return BIOK.lush_caves; return isDripstoneCaves(seed, x, z) ? BIOK.dripstone_caves : -1; }
+// ---------- the 1.17 biome layout: Java's layer stack (net.minecraft.world.level.newbiome.layer), with the same rules
+// and the same random numbers, so a seed gets the original's climates, biomes, hills, rare biomes, rivers and shores:
+// continents at 1:4096 are zoomed and given islands, then a climate (warm / temperate / cold / icy, never warm beside
+// cold), then a biome from that climate's list, edges (no desert beside snow, swamp beside jungle...), hills and
+// mutated variants in the middle of a biome, shores, rivers, and ocean temperatures, ending at one value per 4x4 blocks.
+// Numbers are Java's 64-bit longs (BigInt here); biome ids are Java's numeric ids ----------
+const JBN = [];
+'ocean plains desert mountains forest taiga swamp river - - frozen_ocean frozen_river snowy_tundra snowy_mountains mushroom_fields mushroom_field_shore beach desert_hills wooded_hills taiga_hills mountain_edge jungle jungle_hills jungle_edge deep_ocean stone_shore snowy_beach birch_forest birch_forest_hills dark_forest snowy_taiga snowy_taiga_hills giant_tree_taiga giant_tree_taiga_hills wooded_mountains savanna savanna_plateau badlands wooded_badlands_plateau badlands_plateau - - - - warm_ocean lukewarm_ocean cold_ocean deep_warm_ocean deep_lukewarm_ocean deep_cold_ocean deep_frozen_ocean'.split(' ').forEach((k, i) => { if (k !== '-') JBN[i] = k; });
+for (const [i, k] of [[129, 'sunflower_plains'], [130, 'desert_lakes'], [131, 'gravelly_mountains'], [132, 'flower_forest'], [133, 'taiga_mountains'], [134, 'swamp_hills'], [140, 'ice_spikes'], [149, 'modified_jungle'], [151, 'modified_jungle_edge'], [155, 'tall_birch_forest'], [156, 'tall_birch_hills'], [157, 'dark_forest_hills'], [158, 'snowy_taiga_mountains'], [160, 'giant_spruce_taiga'], [161, 'giant_spruce_taiga_hills'], [162, 'modified_gravelly_mountains'], [163, 'shattered_savanna'], [164, 'shattered_savanna_plateau'], [165, 'eroded_badlands'], [166, 'modified_wooded_badlands_plateau'], [167, 'modified_badlands_plateau'], [168, 'bamboo_jungle'], [169, 'bamboo_jungle_hills']]) JBN[i] = k;
+const JMUT = { 1: 129, 2: 130, 3: 131, 4: 132, 5: 133, 6: 134, 12: 140, 21: 149, 23: 151, 27: 155, 28: 156, 29: 157, 30: 158, 32: 160, 33: 161, 34: 162, 35: 163, 36: 164, 37: 165, 38: 166, 39: 167 };
+// Biome.BiomeCategory, for Layers.isSame (0: none, as the stone shore)
+const JCAT = new Uint8Array(256);
+for (const [c, ids] of [[1, [0, 10, 24, 44, 45, 46, 47, 48, 49, 50]], [2, [1, 129]], [3, [2, 17, 130]], [4, [3, 20, 34, 131, 162]], [5, [4, 18, 27, 28, 29, 132, 155, 156, 157]], [6, [5, 19, 30, 31, 32, 33, 133, 158, 160, 161]],
+  [7, [6, 134]], [8, [7, 11]], [9, [12, 13, 140]], [10, [14, 15]], [11, [16, 26]], [12, [21, 22, 23, 149, 151, 168, 169]], [13, [35, 36, 163, 164]], [14, [37, 38, 39, 165, 166, 167]]]) for (const i of ids) JCAT[i] = c;
+const JSNOW = new Set([10, 11, 12, 13, 26, 30, 31, 140, 158]); // precipitation: snow
+// [depth, scale] of each biome: how high the ground lies and how much it varies (Biome.depth / Biome.scale)
+const JDS = {};
+for (const [ids, d, s] of [[[0, 10, 44, 45, 46], -1, 0.1], [[24, 47, 48, 49, 50], -1.8, 0.1], [[1, 2, 12, 35, 129], 0.125, 0.05], [[3, 34, 131, 162], 1, 0.5], [[4, 21, 23, 27, 29, 37, 165, 168], 0.1, 0.2],
+  [[5, 30, 32, 160, 161], 0.2, 0.2], [[6], -0.2, 0.1], [[7, 11], -0.5, 0], [[13, 17, 18, 19, 22, 28, 31, 33, 166, 167, 169], 0.45, 0.3], [[14], 0.2, 0.3], [[15, 16, 26], 0, 0.025], [[20], 0.8, 0.3],
+  [[25], 0.1, 0.8], [[36, 38, 39], 1.5, 0.025], [[130], 0.225, 0.25], [[132, 149, 151, 155, 157], 0.2, 0.4], [[133, 158], 0.3, 0.4], [[134], -0.1, 0.3], [[140], 0.425, 0.45], [[156], 0.55, 0.5],
+  [[163], 0.3625, 1.225], [[164], 1.05, 1.2125]]) for (const i of ids) JDS[i] = [d, s];
+const jShallow = b => b === 0 || b === 10 || b === 44 || b === 45 || b === 46, jOcean = b => JCAT[b] === 1, jSame = (a, b) => a === b || (JCAT[a] !== 0 && JCAT[a] === JCAT[b]);
+const jMesa = b => b === 37 || b === 38 || b === 39 || b === 165 || b === 166 || b === 167;
+const LCG_A = 6364136223846793005n, LCG_C = 1442695040888963407n;
+const lnext = (a, b) => BigInt.asIntN(64, a * (a * LCG_A + LCG_C) + b); // LinearCongruentialGenerator.next
+function jMix(seed, salt) { let l = lnext(salt, salt); l = lnext(l, salt); l = lnext(l, salt); let m = lnext(seed, l); m = lnext(m, l); m = lnext(m, l); return m; }
+// LazyAreaContext: one per layer, reseeded at every cell
+function JCtx(seed, salt) { this.s = jMix(seed, BigInt(salt)); this.r = 0n; }
+JCtx.prototype.init = function (x, z) { const X = BigInt(x), Z = BigInt(z); let l = lnext(this.s, X); l = lnext(l, Z); l = lnext(l, X); this.r = lnext(l, Z); };
+JCtx.prototype.next = function (b) { const B = BigInt(b); let i = (this.r >> 24n) % B; if (i < 0n) i += B; this.r = lnext(this.r, this.s); return Number(i); };
+JCtx.prototype.pick2 = function (a, b) { return this.next(2) === 0 ? a : b; };
+JCtx.prototype.pick4 = function (a, b, c, d) { const i = this.next(4); return i === 0 ? a : i === 1 ? b : i === 2 ? c : d; };
+// java.util.Random and ImprovedNoise, for the ocean temperature layer
+function JRandom(seed) { this.s = (BigInt(seed) ^ 0x5DEECE66Dn) & ((1n << 48n) - 1n); }
+JRandom.prototype.bits = function (n) { this.s = (this.s * 0x5DEECE66Dn + 0xBn) & ((1n << 48n) - 1n); return Number(BigInt.asIntN(32, this.s >> BigInt(48 - n))); };
+JRandom.prototype.nextDouble = function () { return (this.bits(26) * 134217728 + this.bits(27)) / 9007199254740992; };
+JRandom.prototype.nextInt = function (bound) { let r = this.bits(31); const m = bound - 1; if ((bound & m) === 0) return Number((BigInt(bound) * BigInt(r)) >> 31n); for (let u = r; u - (r = u % bound) + m > 2147483647 || u - r + m < 0; u = this.bits(31)); return r; };
+const JGRAD = [[1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0], [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1], [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1], [1, 1, 0], [0, -1, 1], [-1, 1, 0], [0, -1, -1]];
+function JNoise(rand) {
+  this.xo = rand.nextDouble() * 256; this.yo = rand.nextDouble() * 256; this.zo = rand.nextDouble() * 256; const p = this.p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 0; i < 256; i++) { const j = rand.nextInt(256 - i), b = p[i]; p[i] = p[i + j]; p[i + j] = b; }
+}
+JNoise.prototype.noise = function (x, y, z) {
+  const P = i => this.p[i & 255], gd = (h, a, b, c) => { const g = JGRAD[h & 15]; return g[0] * a + g[1] * b + g[2] * c; }, sm = t => t * t * t * (t * (t * 6 - 15) + 10), lerp = (t, a, b) => a + t * (b - a);
+  const d = x + this.xo, e = y + this.yo, f = z + this.zo, i = Math.floor(d), j = Math.floor(e), k = Math.floor(f), g = d - i, h = e - j, l = f - k;
+  const a0 = P(i), a1 = P(i + 1), n = P(a0 + j), o = P(a0 + j + 1), q = P(a1 + j), r = P(a1 + j + 1);
+  const s = gd(P(n + k), g, h, l), t = gd(P(q + k), g - 1, h, l), u = gd(P(o + k), g, h - 1, l), v = gd(P(r + k), g - 1, h - 1, l);
+  const w = gd(P(n + k + 1), g, h, l - 1), X = gd(P(q + k + 1), g - 1, h, l - 1), Y = gd(P(o + k + 1), g, h - 1, l - 1), Z = gd(P(r + k + 1), g - 1, h - 1, l - 1);
+  const aa = sm(g), ab = sm(h), ac = sm(l);
+  return lerp(ac, lerp(ab, lerp(aa, s, t), lerp(aa, u, v)), lerp(ab, lerp(aa, w, X), lerp(aa, Y, Z)));
+};
+// layer kinds: each makes the values of an area (x, z, w, h) from its parent's
+function jl0(seed, salt, f) { const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const o = new Int32Array(w * h); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { c.init(x + i, z + j); o[j * w + i] = f(c, x + i, z + j); } return o; } }; }
+function jl1(seed, salt, P, f) { const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const p = P.gen(x, z, w, h); for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { c.init(x + i, z + j); p[j * w + i] = f(c, p[j * w + i]); } return p; } }; }
+function jlCross(seed, salt, P, f) { // CastleTransformer: north, east, south, west, centre
+  const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const pw = w + 2, p = P.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const k = (j + 1) * pw + i + 1; c.init(x + i, z + j); o[j * w + i] = f(c, p[k - pw], p[k + 1], p[k + pw], p[k - 1], p[k]); } return o; } };
+}
+function jlDiag(seed, salt, P, f) { // BishopTransformer: south-west, south-east, north-east, north-west, centre
+  const c = new JCtx(seed, salt); return { gen(x, z, w, h) { const pw = w + 2, p = P.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const k = (j + 1) * pw + i + 1; c.init(x + i, z + j); o[j * w + i] = f(c, p[k + pw - 1], p[k + pw + 1], p[k - pw + 1], p[k - pw - 1], p[k]); } return o; } };
+}
+function jlZoom(seed, salt, P, fuzzy) {
+  const c = new JCtx(seed, salt);
+  const mode = (a, b, cc, d) => {
+    if (b === cc && cc === d) return b; if (a === b && a === cc) return a; if (a === b && a === d) return a; if (a === cc && a === d) return a;
+    if (a === b && cc !== d) return a; if (a === cc && b !== d) return a; if (a === d && b !== cc) return a;
+    if (b === cc && a !== d) return b; if (b === d && a !== cc) return b; if (cc === d && a !== b) return cc; return c.pick4(a, b, cc, d);
+  };
+  return { gen(x, z, w, h) {
+    const px = x >> 1, pz = z >> 1, pw = ((x + w) >> 1) - px + 2, p = P.gen(px, pz, pw, ((z + h) >> 1) - pz + 2), o = new Int32Array(w * h), g = (X, Z) => p[(Z - pz) * pw + X - px];
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const X = x + i, Z = z + j, a = g(X >> 1, Z >> 1); c.init(X >> 1 << 1, Z >> 1 << 1); const dx = X & 1, dz = Z & 1;
+      if (!dx && !dz) { o[j * w + i] = a; continue; }
+      const b = g(X >> 1, (Z + 1) >> 1), cc = c.pick2(a, b); if (!dx) { o[j * w + i] = cc; continue; }
+      const d = g((X + 1) >> 1, Z >> 1), e = c.pick2(a, d); if (!dz) { o[j * w + i] = e; continue; }
+      const f = g((X + 1) >> 1, (Z + 1) >> 1); o[j * w + i] = fuzzy ? c.pick4(a, d, b, f) : mode(a, d, b, f);
+    }
+    return o; } };
+}
+const jZooms = (seed, salt, P, n) => { for (let i = 0; i < n; i++) P = jlZoom(seed, salt + i, P, false); return P; };
+const JWARM = [2, 2, 2, 35, 35, 1], JMED = [4, 29, 3, 1, 27, 6], JCOLD = [4, 3, 5, 1], JICE = [12, 12, 12, 30];
+function addIsland(c, sw, se, ne, nw, m) {
+  if (!jShallow(m) || (jShallow(nw) && jShallow(ne) && jShallow(sw) && jShallow(se))) {
+    if (!jShallow(m) && (jShallow(nw) || jShallow(sw) || jShallow(ne) || jShallow(se)) && c.next(5) === 0) {
+      if (jShallow(nw)) return m === 4 ? 4 : nw; if (jShallow(sw)) return m === 4 ? 4 : sw; if (jShallow(ne)) return m === 4 ? 4 : ne; if (jShallow(se)) return m === 4 ? 4 : se;
+    }
+    return m;
+  }
+  let n = 1, o = 1;
+  if (!jShallow(nw) && c.next(n++) === 0) o = nw; if (!jShallow(ne) && c.next(n++) === 0) o = ne; if (!jShallow(sw) && c.next(n++) === 0) o = sw; if (!jShallow(se) && c.next(n++) === 0) o = se;
+  if (c.next(3) === 0) return o; return o === 4 ? 4 : m;
+}
+function makeLayers(worldSeed) {
+  const S = BigInt(worldSeed), ins = (salt, P) => jlDiag(S, salt, P, addIsland);
+  let L = jl0(S, 1, (c, x, z) => x === 0 && z === 0 ? 1 : c.next(10) === 0 ? 1 : 0);
+  L = jlZoom(S, 2000, L, true); L = ins(1, L); L = jlZoom(S, 2001, L, false); L = ins(2, L); L = ins(50, L); L = ins(70, L);
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => jShallow(m) && jShallow(n) && jShallow(e) && jShallow(w) && jShallow(s) && c.next(2) === 0 ? 1 : m); // remove too much ocean
+  const noise = new JNoise(new JRandom(S));
+  let O = jl0(S, 2, (c, x, z) => { const d = noise.noise(x / 8, z / 8, 0); return d > 0.4 ? 44 : d > 0.2 ? 45 : d < -0.4 ? 10 : d < -0.2 ? 46 : 0; });
+  O = jZooms(S, 2001, O, 6);
+  L = jl1(S, 2, L, (c, v) => { if (jShallow(v)) return v; const i = c.next(6); return i === 0 ? 4 : i === 1 ? 3 : 1; }); // climates: 1 warm, 2 temperate, 3 cold, 4 icy
+  L = ins(3, L);
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => m === 1 && (n === 3 || e === 3 || w === 3 || s === 3 || n === 4 || e === 4 || w === 4 || s === 4) ? 2 : m); // warm beside cold becomes temperate
+  L = jlCross(S, 2, L, (c, n, e, s, w, m) => m === 4 && (n === 2 || e === 2 || w === 2 || s === 2 || n === 1 || e === 1 || w === 1 || s === 1) ? 3 : m); // icy beside warm becomes cold
+  L = jl1(S, 3, L, (c, v) => { if (!jShallow(v) && c.next(13) === 0) v |= ((1 + c.next(15)) << 8) & 3840; return v; }); // special: jungles, giant taiga, badlands plateaus
+  L = jlZoom(S, 2002, L, false); L = jlZoom(S, 2003, L, false); L = ins(4, L);
+  L = jlDiag(S, 5, L, (c, sw, se, ne, nw, m) => jShallow(m) && jShallow(nw) && jShallow(ne) && jShallow(sw) && jShallow(se) && c.next(100) === 0 ? 14 : m); // mushroom islands
+  L = jlCross(S, 4, L, (c, n, e, s, w, m) => { if (!jShallow(m)) return m; const k = jShallow(n) + jShallow(e) + jShallow(w) + jShallow(s); if (k <= 3) return m; return m === 44 ? 47 : m === 45 ? 48 : m === 46 ? 49 : m === 10 ? 50 : 24; }); // deep ocean
+  let R = jl1(S, 100, L, (c, v) => jShallow(v) ? v : c.next(299999) + 2); // river noise
+  let B = jl1(S, 200, L, (c, v) => {
+    const sp = (v & 3840) >> 8; v &= -3841; if (jOcean(v) || v === 14) return v;
+    switch (v) { case 1: return sp > 0 ? (c.next(3) === 0 ? 39 : 38) : JWARM[c.next(6)]; case 2: return sp > 0 ? 21 : JMED[c.next(6)]; case 3: return sp > 0 ? 32 : JCOLD[c.next(4)]; case 4: return JICE[c.next(4)]; default: return 14; }
+  });
+  B = jl1(S, 1001, B, (c, v) => c.next(10) === 0 && v === 21 ? 168 : v); // bamboo jungle
+  B = jZooms(S, 1000, B, 2);
+  B = jlCross(S, 1000, B, (c, n, e, s, w, m) => { // biome edges
+    if (JCAT[m] === 4) return m; // mountains: every neighbour is a fit (all temperate)
+    const strict = (base, edge) => m !== base ? -1 : jSame(n, base) && jSame(e, base) && jSame(w, base) && jSame(s, base) ? m : edge;
+    let r = strict(38, 37); if (r < 0) r = strict(39, 37); if (r < 0) r = strict(32, 5); if (r >= 0) return r;
+    if (m === 2 && (n === 12 || e === 12 || w === 12 || s === 12)) return 34; // desert beside snow: wooded mountains between
+    if (m === 6) {
+      if (n === 2 || e === 2 || w === 2 || s === 2 || n === 30 || e === 30 || w === 30 || s === 30 || n === 12 || e === 12 || w === 12 || s === 12) return 1;
+      if (n === 21 || s === 21 || e === 21 || w === 21 || n === 168 || s === 168 || e === 168 || w === 168) return 23;
+    }
+    return m;
+  });
+  const R2 = jZooms(S, 1000, R, 2), Bp = B, hills = new JCtx(S, 1000);
+  B = { gen(x, z, w, h) { // RegionHillsLayer: hills and mutated variants inside a biome
+    const pw = w + 2, p = Bp.gen(x - 1, z - 1, pw, h + 2), r = R2.gen(x - 1, z - 1, pw, h + 2), o = new Int32Array(w * h), c = hills;
+    for (let j = 0; j < h; j++) for (let ii = 0; ii < w; ii++) {
+      const k0 = (j + 1) * pw + ii + 1, i = p[k0], jr = r[k0]; c.init(x + ii, z + j); const k = (jr - 2) % 29;
+      if (!jShallow(i) && jr >= 2 && k === 1) { o[j * w + ii] = JMUT[i] != null ? JMUT[i] : i; continue; }
+      let out = i;
+      if (c.next(3) === 0 || k === 0) {
+        let l = i;
+        if (i === 2) l = 17; else if (i === 4) l = 18; else if (i === 27) l = 28; else if (i === 29) l = 1; else if (i === 5) l = 19; else if (i === 32) l = 33; else if (i === 30) l = 31;
+        else if (i === 1) l = c.next(3) === 0 ? 18 : 4; else if (i === 12) l = 13; else if (i === 21) l = 22; else if (i === 168) l = 169; else if (i === 0) l = 24; else if (i === 45) l = 48;
+        else if (i === 46) l = 49; else if (i === 10) l = 50; else if (i === 3) l = 34; else if (i === 35) l = 36; else if (jSame(i, 38)) l = 37;
+        else if ((i === 24 || i === 48 || i === 49 || i === 50) && c.next(3) === 0) l = c.next(2) === 0 ? 1 : 4;
+        if (k === 0 && l !== i) l = JMUT[l] != null ? JMUT[l] : i;
+        if (l !== i) { const m = jSame(p[k0 - pw], i) + jSame(p[k0 + 1], i) + jSame(p[k0 - 1], i) + jSame(p[k0 + pw], i); if (m >= 3) out = l; }
+      }
+      o[j * w + ii] = out;
+    }
+    return o; } };
+  R = jZooms(S, 1000, R, 2); R = jZooms(S, 1000, R, 4);
+  const rf = v => v >= 2 ? 2 + (v & 1) : v;
+  R = jlCross(S, 1, R, (c, n, e, s, w, m) => { const i = rf(m); return i === rf(w) && i === rf(n) && i === rf(e) && i === rf(s) ? -1 : 7; });
+  const smooth = (c, n, e, s, w, m) => { const a = e === w, b = n === s; if (a === b) return a ? c.pick2(w, n) : m; return a ? w : n; };
+  R = jlCross(S, 1000, R, smooth);
+  B = jl1(S, 1001, B, (c, v) => c.next(57) === 0 && v === 1 ? 129 : v); // sunflower plains
+  const jungleOk = v => JCAT[v] === 12 || v === 4 || v === 5 || jOcean(v);
+  for (let i = 0; i < 4; i++) {
+    B = jlZoom(S, 1000 + i, B, false);
+    if (i === 0) B = ins(3, B);
+    if (i === 1) B = jlCross(S, 1000, B, (c, n, e, s, w, m) => { // shores
+      const anyO = jOcean(n) || jOcean(e) || jOcean(s) || jOcean(w);
+      if (m === 14) return jShallow(n) || jShallow(e) || jShallow(s) || jShallow(w) ? 15 : m;
+      if (JCAT[m] === 12) { if (!jungleOk(n) || !jungleOk(e) || !jungleOk(s) || !jungleOk(w)) return 23; return anyO ? 16 : m; }
+      if (m !== 3 && m !== 34 && m !== 20) {
+        if (JSNOW.has(m)) return !jOcean(m) && anyO ? 26 : m;
+        if (m !== 37 && m !== 38) return !jOcean(m) && m !== 7 && m !== 6 && anyO ? 16 : m;
+        return !anyO && (!jMesa(n) || !jMesa(e) || !jMesa(s) || !jMesa(w)) ? 2 : m;
+      }
+      return !jOcean(m) && anyO ? 25 : m;
+    });
+  }
+  B = jlCross(S, 1000, B, smooth);
+  const Bm = B, Rm = R, Om = O;
+  return { gen(x, z, w, h) { // rivers and ocean temperatures mixed in
+    const b = Bm.gen(x - 8, z - 8, w + 16, h + 16), r = Rm.gen(x, z, w, h), oc = Om.gen(x, z, w, h), o = new Int32Array(w * h), bw = w + 16;
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      let v = b[(j + 8) * bw + i + 8]; const rv = r[j * w + i];
+      if (!jOcean(v)) { if (rv === 7) v = v === 12 ? 11 : v === 14 || v === 15 ? 15 : 7; o[j * w + i] = v; continue; }
+      const t = oc[j * w + i]; let res = -1;
+      for (let dz = -8; dz <= 8 && res < 0; dz += 4) for (let dx = -8; dx <= 8; dx += 4) { const m = b[(j + 8 + dz) * bw + i + 8 + dx]; if (jOcean(m)) continue; if (t === 44) { res = 45; break; } if (t === 10) { res = 46; break; } }
+      if (res < 0) res = v === 24 ? (t === 45 ? 48 : t === 0 ? 24 : t === 46 ? 49 : t === 10 ? 50 : t) : t;
+      o[j * w + i] = res;
+    }
+    return o; } };
+}
+// BiomeManager's fuzzy zoom from 4x4 cells to blocks: each block takes the nearest of the 8 surrounding cell corners,
+// each corner nudged by a hash of the seed (SHA-256, as Java's obfuscateSeed)
+function sha256Long(seed) {
+  const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+  const msg = new Uint8Array(64), v = BigInt.asUintN(64, BigInt(seed)); for (let i = 0; i < 8; i++) msg[i] = Number((v >> BigInt(8 * i)) & 255n); // Guava hashLong: little-endian
+  msg[8] = 0x80; msg[63] = 64; // one block: 8 bytes, the 1 bit, the length in bits
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19], Wd = new Array(64), ror = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let i = 0; i < 16; i++) Wd[i] = (msg[i * 4] << 24) | (msg[i * 4 + 1] << 16) | (msg[i * 4 + 2] << 8) | msg[i * 4 + 3];
+  for (let i = 16; i < 64; i++) { const s0 = ror(Wd[i - 15], 7) ^ ror(Wd[i - 15], 18) ^ (Wd[i - 15] >>> 3), s1 = ror(Wd[i - 2], 17) ^ ror(Wd[i - 2], 19) ^ (Wd[i - 2] >>> 10); Wd[i] = (Wd[i - 16] + s0 + Wd[i - 7] + s1) | 0; }
+  let [a, b, c, d, e, f, g, h] = H;
+  for (let i = 0; i < 64; i++) { const S1 = ror(e, 6) ^ ror(e, 11) ^ ror(e, 25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + Wd[i]) | 0, S0 = ror(a, 2) ^ ror(a, 13) ^ ror(a, 22), mj = (a & b) ^ (a & c) ^ (b & c), t2 = (S0 + mj) | 0; h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0; }
+  const out = [a, b, c, d, e, f, g, h].map((x, i) => (x + H[i]) >>> 0), bytes = []; for (const x of out) bytes.push(x >>> 24, (x >>> 16) & 255, (x >>> 8) & 255, x & 255);
+  let r = 0n; for (let i = 7; i >= 0; i--) r = (r << 8n) | BigInt(bytes[i]); return BigInt.asIntN(64, r); // asLong: the first 8 bytes, little-endian
+}
+const JREG = 32; // biome regions of 32x32 cells (128x128 blocks), cached
+function makeBiomeMap(worldSeed) {
+  const lay = makeLayers(worldSeed), zs = sha256Long(worldSeed), regs = new Map(), fid = new Map();
+  const region = (rx, rz) => {
+    const key = rx * 65536 + rz; let r = regs.get(key); if (r) return r;
+    const x0 = rx * JREG - 3, z0 = rz * JREG - 3, n = JREG + 7, b = lay.gen(x0, z0, n, n);
+    // Java's biome depth and scale, blended over 5x5 cells (NoiseBasedChunkGenerator), at every cell corner of the region
+    const m = JREG + 1, D = new Float32Array(m * m), Sc = new Float32Array(m * m);
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+      const c = JDS[b[(j + 3) * n + i + 3]] || [0.1, 0.2], k = c[0]; let f = 0, g = 0, hh = 0;
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const q = JDS[b[(j + 3 + dz) * n + i + 3 + dx]] || [0.1, 0.2], wgt = (q[0] > k ? 0.5 : 1) * 10 / Math.sqrt(dx * dx + dz * dz + 0.2) / (q[0] + 2);
+        f += q[1] * wgt; g += q[0] * wgt; hh += wgt;
+      }
+      D[j * m + i] = g / hh; Sc[j * m + i] = f / hh;
+    }
+    r = { b, x0, z0, n, D, Sc, m }; regs.set(key, r); if (regs.size > 40) regs.delete(regs.keys().next().value); return r;
+  };
+  const cellBiome = (qx, qz) => { const r = region(Math.floor(qx / JREG), Math.floor(qz / JREG)); return r.b[(qz - r.z0) * r.n + qx - r.x0]; };
+  const fiddle = (x, y, z) => {
+    const key = ((x + 2097152) * 4194304 + z + 2097152) * 2 + (y & 1); let f = fid.get(key); if (f) return f;
+    const X = BigInt(x), Y = BigInt(y), Z = BigInt(z), g = l => (Number(((l >> 24n) % 1024n + 1024n) % 1024n) / 1024 - 0.5) * 0.9;
+    let l = lnext(zs, X); l = lnext(l, Y); l = lnext(l, Z); l = lnext(l, X); l = lnext(l, Y); l = lnext(l, Z); const a = g(l); l = lnext(l, zs); const b = g(l); l = lnext(l, zs);
+    f = [a, b, g(l)]; fid.set(key, f); if (fid.size > 40000) fid.clear(); return f;
+  };
+  return {
+    // the biome (Java id) at a block, its surface taken as y 64
+    biome(x, z) {
+      const i = x - 2, j = 62, k = z - 2, l = i >> 2, mm = j >> 2, nn = k >> 2, d = (i & 3) / 4, e = (j & 3) / 4, f = (k & 3) / 4;
+      let best = 0, bd = Infinity;
+      for (let p = 0; p < 8; p++) {
+        const bx = (p & 4) === 0, by = (p & 2) === 0, bz = (p & 1) === 0, q = bx ? l : l + 1, rr = by ? mm : mm + 1, s = bz ? nn : nn + 1, fd = fiddle(q, rr, s);
+        const h = (bx ? d : d - 1) + fd[0], t = (by ? e : e - 1) + fd[1], u = (bz ? f : f - 1) + fd[2], v = h * h + t * t + u * u;
+        if (bd > v) { best = p; bd = v; }
+      }
+      return cellBiome((best & 4) === 0 ? l : l + 1, (best & 1) === 0 ? nn : nn + 1);
+    },
+    // the blended depth and scale at a block (between the corners of its 4x4 cell)
+    depthScale(x, z) {
+      const qx = x >> 2, qz = z >> 2, r = region(Math.floor(qx / JREG), Math.floor(qz / JREG)), i = qx - (r.x0 + 3), j = qz - (r.z0 + 3), fx = (x & 3) / 4, fz = (z & 3) / 4, m = r.m;
+      const at = (A, a, b) => A[b * m + a], bl = A => (at(A, i, j) * (1 - fx) + at(A, i + 1, j) * fx) * (1 - fz) + (at(A, i, j + 1) * (1 - fx) + at(A, i + 1, j + 1) * fx) * fz;
+      return [bl(r.D), bl(r.Sc)];
+    },
+    cell: cellBiome,
+  };
+}
+// which world generator: 1 for worlds made before the Java biome layers (their new chunks must match the old ones), 2 after
+let GENV = 2; const setGenVersion = v => { GENV = v || 1; };
+const BMAPS = new Map();
+const biomeMapFor = seed => { let m = BMAPS.get(seed); if (!m) { m = makeBiomeMap(seed); BMAPS.set(seed, m); if (BMAPS.size > 2) BMAPS.delete(BMAPS.keys().next().value); } return m; };
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
   const nC = makeNoise(seed), nM = makeNoise(seed + 1), nD = makeNoise(seed + 2), nT = makeNoise(seed + 3), nH = makeNoise(seed + 4), nR = makeNoise(seed + 5), nX = makeNoise(seed + 6);
+  const BM = GENV >= 2 ? biomeMapFor(seed) : null;
+  // version 2: the biome from Java's layers, the ground from that biome's depth and scale (blended as Java does) with
+  // this generator's noise for the shape
+  function columnJ(wx, wz) {
+    const jb = BM.biome(wx, wz), ds = BM.depthScale(wx, wz), D = ds[0], Sc = ds[1];
+    const hills = nD.fbm(wx / 130, wz / 130, 4), detail = nD.n2(wx / 28, wz / 28), ridge = 1 - Math.abs(nM.n2(wx / 160, wz / 160));
+    let h = 63 + 17 * D + (hills + detail * 0.15) * (2 + 58 * Sc) + smooth(0.3, 0.5, Sc) * ridge * ridge * 46 * Sc; // mountains: ridges and peaks
+    const K = BIOK, v0 = K[JBN[jb]], v = v0 != null ? v0 : K.plains;
+    if (jb === 7 || jb === 11) h = Math.min(h, SEA - 3 + detail); // a river holds water
+    if (JCAT[jb] === 14 && h > 72) h = 72 + Math.round((h - 72) / 4) * 4; // badlands: terraces up to the plateaus
+    if (jb === 165) { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h += Math.min(40, (sp - 0.55) * 120); } // eroded badlands: hoodoos
+    if (jb === 163 || jb === 164) h += Math.max(0, nD.n2(wx / 9, wz / 9)) * 6; // shattered savanna: jagged
+    h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
+    return [h, BB[v], v];
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (BM) return columnJ(wx, wz);
     const cont = nC.fbm(wx / 900, wz / 900, 4) * 1.6 + 0.12;
     const land = smooth(-0.22, 0.02, cont);
     const mRaw = nM.fbm(wx / 420, wz / 420, 3);
@@ -1236,7 +1499,7 @@ function makeGen(seed) {
     if (add > 0) h = Math.min(CH - 6, h + Math.floor(add * fade));
     return [h, b, v];
   }
-  return { column, nD, nX };
+  return { column, nD, nX, biomes: BM };
 }
 // Cave worms (MC-style carvers) are deterministic per origin chunk, so each origin's
 // carve spheres are simulated once and cached; every chunk within 8 reuses them.
@@ -3927,14 +4190,14 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
   self.onmessage = e => {
     const m = e.data;
     if (m.type === 'gen') {
-      const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
+      S.setGenVersion(m.gen); const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
     } else if (m.type === 'structs') S.setStructs(m.data);
     else if (m.type === 'mesh') {
@@ -6741,7 +7004,7 @@ function addChunk(cx, cz, d, tiles) {
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
   w.busy++; const id = jobId++; W.pending.set(ckey(cx, cz), id);
-  w.postMessage({ type: 'gen', id, seed: W.seed, cx, cz, dim: W.dim, exp: W.exp });
+  w.postMessage({ type: 'gen', id, seed: W.seed, gen: W.gen || 1, cx, cz, dim: W.dim, exp: W.exp });
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
@@ -14008,7 +14271,7 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
+function craftResult(grid, w) { const rep = repairCraft(grid); if (rep) return rep; const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'adv') return L; // the advancements screen has no slots
@@ -14160,7 +14423,18 @@ function closeScreenItems() {
 }
 // ---------- anvil (repair, combine, rename) ----------
 const REPAIR_MAT = { chainmail: 'iron_ingot', wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
-function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null; if (!m) return []; const k = REPAIR_MAT[m]; return TAGS[k] || [IID[k]]; }
+const REPAIR_ITEM = { shield: 'planks', elytra: 'phantom_membrane', turtle_helmet: 'scute' }; // items repaired with something of their own
+function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null, k = REPAIR_ITEM[d.key] || (m && REPAIR_MAT[m]); if (!k) return []; return TAGS[k] || (IID[k] != null ? [IID[k]] : []); }
+// two of the same worn item anywhere in a crafting grid (Java's RepairItemRecipe): their durability together and 5% more;
+// enchantments are lost, curses stay
+function repairCraft(grid) {
+  const st = grid.filter(Boolean); if (st.length !== 2 || st[0].id !== st[1].id) return null;
+  const d = ITEMS[st[0].id]; if (!d || !d.dur || maxStack(st[0].id) !== 1) return null;
+  const left = (d.dur - (st[0].d || 0)) + (d.dur - (st[1].d || 0)) + Math.floor(d.dur * 5 / 100), out = { id: st[0].id, n: 1 };
+  const dm = Math.max(0, d.dur - left); if (dm) out.d = dm;
+  for (const c of ['binding_curse', 'vanishing_curse']) for (const x of st) if (x.e && x.e[c]) { out.e = out.e || {}; out.e[c] = x.e[c]; }
+  return out;
+}
 function anvilResult(c) {
   const a = c.items && c.items[0], b = c.items && c.items[1]; if (!a) return null;
   const da = ITEMS[a.id], out = { ...a, e: a.e ? { ...a.e } : undefined }; let cost = (a.rp || 0) + (b ? b.rp || 0 : 0), used = 0, changed = false;
@@ -14385,6 +14659,7 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
@@ -14392,16 +14667,18 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (dmg <= 0) return false;
   if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
-  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
+  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava' || cause === 'burn')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
-  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion' || cause === 'player') {
+  // the damage armour takes (Java: every source but those that bypass armour: falling, burning, drowning, starving,
+  // magic, wither, suffocation, freezing, the void); each piece wears by a quarter of the damage before armour, at least 1
+  if (ARMORED[cause]) {
+    for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
-    for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
   }
   if (cause !== 'void' && cause !== 'kill' && cause !== 'starve' && cause !== 'drown') { // protection, and the kinds that guard against one cause
-    const sp = cause === 'fire' || cause === 'lava' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
+    const sp = cause === 'fire' || cause === 'lava' || cause === 'burn' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
     const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * 2 : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
@@ -14418,7 +14695,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', burn: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -14590,7 +14867,7 @@ function survivalTick(inWater, inLava, eyeF) {
   if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
-  if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'fire'); }
+  if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'burn'); } // on fire: through armour, as Java's onFire
   // contact damage
   inBlock(b => { if (b === BID.cactus) { hurtPlayer(1, 'cactus'); return true; } if (b === BID.fire) { PL.fire = Math.max(PL.fire, 160); if (W.tickN % 10 === 0) hurtPlayer(1, 'fire'); return true; } });
   if (PL.onGround && blockUnder() === BID.magma_block && !PL.sneaking && W.tickN % 20 === 0 && !enchLv(INV.armor[3], 'frost_walker')) hurtPlayer(1, 'fire');
@@ -14678,7 +14955,7 @@ function attackEntity(e) {
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
   if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
   { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
@@ -14707,9 +14984,10 @@ function breakBlock(x, y, z) {
     HIVE_KEEP.on = null;
     if (d.xp) spawnXP(x + .5, y + .5, z + .5, d.xp);
     PL.exh += 0.005;
-    const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
-    if (held && held.id === IID.shears) damageItem(INV.slots, INV.sel, 1);
   }
+  // the tool wears whether or not blocks drop (Java: diggers 1, swords 2, for any block that isn't broken at once; shears 1 for any but fire)
+  if (!creative()) { const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
+    if (held && held.id === IID.shears && id !== BID.fire) damageItem(INV.slots, INV.sel, 1); }
   // water flows into the gap
   for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : 30); }
 }
@@ -16450,7 +16728,7 @@ function mpWorldCore(store, out) {
     switch (m.t) {
       case 'create': // a new world, or the start of an upload of an existing one
         if (S.meta) { send(p, { t: 'error', msg: '이 서버에는 이미 세계가 있습니다' }); return; }
-        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
+        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, gen: +m.meta.gen || 1, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
@@ -16646,7 +16924,7 @@ const mpLogKeys = async id => new Set(((await dbReq('chunks', 'readonly', st => 
 // the world core's storage in this browser: the world's own chunk records, plus the changes made since each was stored
 function mpHostStore() {
   const id = W.id, logKey = dk => 'mplog:' + id + ':' + dk, dirty = new Map(), sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
-  const state = { meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
+  const state = { meta: { name: W.meta.name, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
     time: W.time, rain: W.rainTarget, thunder: W.thunderOn, weatherT: 24000, players: W.meta.mpPlayers || (W.meta.mpPlayers = {}) };
   const toNet = r => { if (!r || typeof r !== 'object') return null; // (dbReq gives true for a missing key) if (!r.b) return { v: 2, it: r.it, mobs: r.mobs || null };
     let b = r.b, m = r.m, l = r.l; const h = r.ch || 128; if (r.v < 3) { const n = 256 * h, dec = a => r.v >= 2 ? rleDec(a, n, Uint8Array) : a; b = rleEnc(Uint16Array.from(dec(b))); m = rleEnc(dec(m)); l = rleEnc(dec(l)); } // older saves: 8-bit ids
@@ -16699,7 +16977,7 @@ function mpHandle(m, from) {
     case 'join': if (!host || MP.server) return; { // a new guest: hand over the world's seed, clock and what has been edited
       const p = { id: from, name: String(m.name || '손님').slice(0, 16), skin: m.skin || { tex: 'steve', slim: false }, s: null }; MP.peers.set(from, p);
       const edited = [...W.saved]; for (const c of W.chunks.values()) if (c.edited) edited.push(dkey(c.cx, c.cz));
-      mpSend({ t: 'welcome', you: from, seed: W.seed, exp: W.exp, mode: PL.mode === 'hardcore' ? 'survival' : PL.mode, diff: PL.difficulty, time: W.time, rain: W.rain, thunder: W.thunderOn, dim: W.dim,
+      mpSend({ t: 'welcome', you: from, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: PL.mode === 'hardcore' ? 'survival' : PL.mode, diff: PL.difficulty, time: W.time, rain: W.rain, thunder: W.thunderOn, dim: W.dim,
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
@@ -16762,7 +17040,7 @@ async function mpEnterHostWorld(m) {
   MP.id = m.you;
   MP.peers.set(0, { id: 0, name: m.host.name, skin: m.host.skin, s: null });
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
-  const meta = { id: 'mp-' + Date.now(), name: m.host.name + '의 세계', seed: m.seed, mode: m.mode, diff: m.diff, cheats: false, exp: m.exp, spawn: m.spawn, remote: true, gamerules: m.gr, dim: 0 };
+  const meta = { id: 'mp-' + Date.now(), name: m.host.name + '의 세계', seed: m.seed, gen: m.gen || 1, mode: m.mode, diff: m.diff, cheats: false, exp: m.exp, spawn: m.spawn, remote: true, gamerules: m.gr, dim: 0 };
   await startWorld(meta.id, meta);
   if (m.dim !== W.dim && typeof switchDim === 'function') { /* guests start where the host's world spawns */ }
   W.saved = new Set(m.edited); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
@@ -16966,7 +17244,7 @@ async function mpEnterServerWorld(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta, d = m.pdata;
-  const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
+  const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
     dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off } : null, time: m.time, rain: m.rain, thunder: m.thunder };
   MP.rolePending = true; MP.role = 'guest';
   await startWorld(meta.id, meta);
@@ -17034,7 +17312,7 @@ async function mpUpload(url) {
   const link = await mpWebSocket(url, 'world'); if (link.hello.kind !== 'world') { link.close(); throw new Error('이 주소는 서버 세계를 받지 않습니다'); }
   if (link.hello.world) { link.close(); throw new Error('서버에 이미 세계가 있습니다 (' + link.hello.world.name + ')'); }
   const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
-  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
+  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, gen: W.gen || 1, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
   const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys()); const mine = (keys || []).filter(k => typeof k === 'string' && k.startsWith(W.id + ':'));
   let n = 0;
   for (const k of mine) { const rec = await dbReq('chunks', 'readonly', st => st.get(k)); if (!rec) continue; const dk = k.slice(W.id.length + 1);
@@ -17236,7 +17514,7 @@ function mpAttackPeer(p) {
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2);
 }
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
@@ -17301,7 +17579,7 @@ async function mpAction(a) {
   try {
     if (a === 'mp_join' || a === 'mp_host') { MP.status = ''; showMenu(a); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 2, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const n = await mpUpload(ad.value.trim()); say(`올렸습니다 (청크 ${n}개). 이제 타이틀 → 멀티플레이 → 서버에 접속으로 누구나 들어올 수 있습니다.`); }
     else if (a === 'mp_answer') { say('답장 코드를 만드는 중...'); MP.role = 'guest'; MP.on = true; mpInstall(); const code = await mpAnswerInvite(codeIn); $('mpOut').value = code; $('mpOut').select(); say('답장 코드를 호스트에게 보내세요. 호스트가 넣으면 연결됩니다.'); }
@@ -17528,7 +17806,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 2, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -17548,7 +17826,7 @@ async function startWorld(id, meta) {
   showMenu('loading', '세계를 불러오는 중');
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
-  W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
+  W.id = meta.id; W.seed = meta.seed; W.gen = meta.gen || 1; S.setGenVersion(W.gen); W.genCache = null; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
   await loadSavedKeys(meta.id);
   W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
@@ -17753,7 +18031,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 2; S.setGenVersion(2); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }
