@@ -20,7 +20,7 @@ function invSlots(list) {
   for (let i = 9; i < 36; i++) list.push(slotRef(INV.slots, i, { group: 'main' }));
   for (let i = 0; i < 9; i++) list.push(slotRef(INV.slots, i, { group: 'hot' }));
 }
-function craftResult(grid, w) { const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
+function craftResult(grid, w) { const rep = repairCraft(grid); if (rep) return rep; const r = matchRecipe(grid.map(s => s ? s.id : 0), w); if (!r) return typeof craftCustom === 'function' ? craftCustom(grid) : null; const out = { id: r.out, n: r.n }; const box = isShulkerItem(r.out) && grid.find(s => s && s.items); if (box) out.items = box.items; if (typeof craftExtra === 'function') craftExtra(out, grid); return out; } // dyed shulker boxes keep their contents
 function buildSlots(type, ctx) {
   const L = [];
   if (type === 'adv') return L; // the advancements screen has no slots
@@ -172,7 +172,18 @@ function closeScreenItems() {
 }
 // ---------- anvil (repair, combine, rename) ----------
 const REPAIR_MAT = { chainmail: 'iron_ingot', wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
-function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null; if (!m) return []; const k = REPAIR_MAT[m]; return TAGS[k] || [IID[k]]; }
+const REPAIR_ITEM = { shield: 'planks', elytra: 'phantom_membrane', turtle_helmet: 'scute' }; // items repaired with something of their own
+function repairMaterial(st) { const d = ITEMS[st.id], m = d.tool ? d.tool.mat : d.armor ? d.armor.mat : null, k = REPAIR_ITEM[d.key] || (m && REPAIR_MAT[m]); if (!k) return []; return TAGS[k] || (IID[k] != null ? [IID[k]] : []); }
+// two of the same worn item anywhere in a crafting grid (Java's RepairItemRecipe): their durability together and 5% more;
+// enchantments are lost, curses stay
+function repairCraft(grid) {
+  const st = grid.filter(Boolean); if (st.length !== 2 || st[0].id !== st[1].id) return null;
+  const d = ITEMS[st[0].id]; if (!d || !d.dur || maxStack(st[0].id) !== 1) return null;
+  const left = (d.dur - (st[0].d || 0)) + (d.dur - (st[1].d || 0)) + Math.floor(d.dur * 5 / 100), out = { id: st[0].id, n: 1 };
+  const dm = Math.max(0, d.dur - left); if (dm) out.d = dm;
+  for (const c of ['binding_curse', 'vanishing_curse']) for (const x of st) if (x.e && x.e[c]) { out.e = out.e || {}; out.e[c] = x.e[c]; }
+  return out;
+}
 function anvilResult(c) {
   const a = c.items && c.items[0], b = c.items && c.items[1]; if (!a) return null;
   const da = ITEMS[a.id], out = { ...a, e: a.e ? { ...a.e } : undefined }; let cost = (a.rp || 0) + (b ? b.rp || 0 : 0), used = 0, changed = false;

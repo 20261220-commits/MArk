@@ -78,6 +78,7 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
@@ -85,16 +86,18 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (dmg <= 0) return false;
   if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
-  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
+  if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava' || cause === 'burn')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
-  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion' || cause === 'player') {
+  // the damage armour takes (Java: every source but those that bypass armour: falling, burning, drowning, starving,
+  // magic, wither, suffocation, freezing, the void); each piece wears by a quarter of the damage before armour, at least 1
+  if (ARMORED[cause]) {
+    for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
-    for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
   }
   if (cause !== 'void' && cause !== 'kill' && cause !== 'starve' && cause !== 'drown') { // protection, and the kinds that guard against one cause
-    const sp = cause === 'fire' || cause === 'lava' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
+    const sp = cause === 'fire' || cause === 'lava' || cause === 'burn' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
     const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * 2 : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
@@ -111,7 +114,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', burn: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -283,7 +286,7 @@ function survivalTick(inWater, inLava, eyeF) {
   if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
-  if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'fire'); }
+  if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'burn'); } // on fire: through armour, as Java's onFire
   // contact damage
   inBlock(b => { if (b === BID.cactus) { hurtPlayer(1, 'cactus'); return true; } if (b === BID.fire) { PL.fire = Math.max(PL.fire, 160); if (W.tickN % 10 === 0) hurtPlayer(1, 'fire'); return true; } });
   if (PL.onGround && blockUnder() === BID.magma_block && !PL.sneaking && W.tickN % 20 === 0 && !enchLv(INV.armor[3], 'frost_walker')) hurtPlayer(1, 'fire');
@@ -371,7 +374,7 @@ function attackEntity(e) {
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
   if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
   { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
@@ -400,9 +403,10 @@ function breakBlock(x, y, z) {
     HIVE_KEEP.on = null;
     if (d.xp) spawnXP(x + .5, y + .5, z + .5, d.xp);
     PL.exh += 0.005;
-    const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
-    if (held && held.id === IID.shears) damageItem(INV.slots, INV.sel, 1);
   }
+  // the tool wears whether or not blocks drop (Java: diggers 1, swords 2, for any block that isn't broken at once; shears 1 for any but fire)
+  if (!creative()) { const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
+    if (held && held.id === IID.shears && id !== BID.fire) damageItem(INV.slots, INV.sel, 1); }
   // water flows into the gap
   for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : 30); }
 }

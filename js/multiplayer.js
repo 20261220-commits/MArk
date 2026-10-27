@@ -728,7 +728,7 @@ function mpAttackPeer(p) {
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2);
 }
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
