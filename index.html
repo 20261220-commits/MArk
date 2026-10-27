@@ -159,7 +159,10 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
 .titleSide{position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:calc(3 * var(--px));pointer-events:auto}
 .titleDoll{width:min(17vw,190px);height:min(34vh,260px);cursor:pointer}
-.titleSide .mb{width:calc(96 * var(--px));min-width:0;font-size:calc(7 * var(--px))}
+/* the free space right of the main buttons (200 px-units wide, centred): the side column never reaches over them */
+.titleSide{max-width:calc(50vw - 100 * var(--px) - max(8px, 4vw) - 8px)}
+.titleSide .mb{width:min(calc(96 * var(--px)),calc(50vw - 100 * var(--px) - max(8px, 4vw) - 8px));min-width:0;font-size:calc(7 * var(--px));white-space:nowrap;overflow:hidden}
+.titleSide .titleDoll{max-width:100%}
 .titleSide .acc{display:flex;align-items:center;gap:calc(3 * var(--px));font-size:calc(6.5 * var(--px));max-width:calc(110 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .titleSide .acc img{width:calc(10 * var(--px));height:calc(10 * var(--px));border-radius:50%}
 .skinRow{display:flex;gap:calc(4 * var(--px));align-items:center;justify-content:center}
