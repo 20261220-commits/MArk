@@ -146,6 +146,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta); // multiplayer: the host's world (and what a guest did) reaches the others
   if (id && y > c.maxY) c.maxY = y;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
+  if (id === BID.oak_sign && !c.tiles.has(i)) c.tiles.set(i, { type: 'sign', lines: ['', '', '', ''] });
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
   if (old !== id || oe !== ne) relight(x, y, z, old, id, oe, ne);
   markDirty(x, z);
@@ -276,6 +277,11 @@ function updateConnections(x, y, z, b) {
 }
 // a chunk generated on its own can't see its neighbours: fences, walls and panes along its edges are joined to the
 // neighbouring chunk's once both are here (straight into the arrays: every player works out the same, nothing to save)
+// a sign is drawn from its tile (text, wood): give one to every sign that came without (structures, commands)
+function signTiles(c) {
+  const id = BID.oak_sign, b = c.blocks; if (id == null) return;
+  for (let i = 0; i < b.length; i++) if (b[i] === id && !c.tiles.has(i)) c.tiles.set(i, { type: 'sign', lines: ['', '', '', ''] });
+}
 function joinConnections(c) {
   for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     const n = chunkAt(c.cx + ox, c.cz + oz); if (!n) continue;
@@ -569,7 +575,7 @@ function addChunk(cx, cz, d, tiles) {
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
-  joinConnections(c);
+  joinConnections(c); signTiles(c);
   if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
 }
 function requestGen(cx, cz) {

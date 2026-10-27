@@ -29,7 +29,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['lectern_base', 'grindstone_pivot', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -668,7 +668,7 @@ function shapes(id, meta) {
     case 228: return [[0, 0, 0, 16, 6, 16]];
     case 232: { const f = meta & 3; if (meta & 4) return [rotBox([0, 0, 13, 16, 16, 16], f)]; return [meta & 8 ? [0, 13, 0, 16, 16, 16] : [0, 0, 0, 16, 3, 16]]; }
     case 233: { const lv = Math.min(8, meta & 15), b = [[0, 0, 0, 16, 2, 16], [0, 2, 0, 2, 16, 16], [14, 2, 0, 16, 16, 16], [2, 2, 0, 14, 16, 2], [2, 2, 14, 14, 16, 16]]; if (lv) b.push([2, 2, 2, 14, 2 + Math.ceil(lv * 13 / 8), 14]); return b; }
-    case 240: return [[0, 0, 0, 16, 9, 16]];
+    case 240: return [[0, 0, 0, 16, 9, 16], rotBox([1, 9, 8, 15, 16, 8], meta & 3)]; // the base and its saw blade (block/stonecutter.json)
     case 241: return [[4, 4, 2, 12, 16, 14], [2, 0, 6, 4, 13, 10], [12, 0, 6, 14, 13, 10]];
     case 242: return meta & 4 ? [[0, 0, 0, 16, 2, 16], [4, 2, 4, 12, 13, 12], [0, 13, 0, 16, 16, 16], [2, 16, 3, 14, 17, 13]] : [[0, 0, 0, 16, 2, 16], [4, 2, 4, 12, 13, 12], [0, 13, 0, 16, 16, 16]]; // meta 4: a book lies open on it
     case 246: { // chain | lightning rod (facing = DIR6 index of the tip) | plain candle
@@ -3143,7 +3143,12 @@ function meshChunk(B, M, L, bio, opts) {
         else if (id === 233 && bi > 0 && F.n[1] > 0) { tile = T.composter_top; }
         else if (id === 224 && bi === 0 && f === 2) { tile = T.hopper_top; }
         else if (id === 215) { u0 = 0; u1 = 2; v0 = 0; v1 = 16; if (bi === 0) { u0 = 2; u1 = 6; v0 = 2; v1 = 6; } }
-        else if (id === 1054 || id === 1055) { if (bi === 4) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit; else if (bi >= 5) { tile = id === 1055 ? T.soul_fire : T.fire; u0 = 0; u1 = 16; v0 = 0; v1 = 16; } else if ((meta & 4) && F.n[1] > 0) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit; }
+        else if (id === 240 && bi === 1) { tile = T.stonecutter_saw; u0 = 1; u1 = 15; v0 = 9; v1 = 16; }
+        else if (id === 1054 || id === 1055) { // block/template_campfire.json: bark from rows 0-4 of the log texture, the cut ends from 4-8
+          if (bi === 4) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit; else if (bi >= 5) { tile = id === 1055 ? T.soul_fire : T.fire; u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
+          else { if (meta & 4) tile = id === 1055 ? T.soul_campfire_log_lit : T.campfire_log_lit;
+            const alongX = bx[3] - bx[0] === 16;
+            if (alongX ? F.n[0] : F.n[2]) { u0 = 0; u1 = 4; v0 = 4; v1 = 8; } else { u0 = 0; u1 = 16; v0 = 0; v1 = 4; if (F.n[1] && !alongX) rot = 1; } } }
         else if (id === 1056) { if (bi >= 2) tile = T.dark_oak_planks; }
         else if (id === 1100) { if (bi === 0) { if (F.n[1] === 0) { v0 = 8; v1 = 16; } } else if (bi === 1) { tile = T[(meta & 31) ? COLORS[(meta & 31) - 1] + '_candle' : 'candle']; u0 = 7; u1 = 9; if (F.n[1]) { v0 = 0; v1 = 2; } } else { tile = meta & 32 ? T.candle_flame : T.candle_wick; u0 = 7; u1 = 9; v0 = 0; v1 = 16; } }
         else if (id === 242 && bi === 3) { tile = T.lectern_book; if (!F.n[1]) { v0 = 15; v1 = 16; } }
