@@ -21,7 +21,13 @@ async function mpUnpack(code) { const u8 = mpUnB64(code.replace(/\s+/g, ''), Uin
 
 // ---------- transports: every message goes guest -> host or host -> guest(s) ----------
 // relay server: the server forwards guests' messages to the host and the host's to one guest or all of them
+// "my-server.onrender.com", "https://my-server.onrender.com" or "192.168.0.2:8080" -> a WebSocket address ending in /mp
+function mpWsUrl(a) {
+  a = String(a || '').trim(); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
+  a = a.replace(/^http(s?):\/\//i, 'ws$1://'); try { const u = new URL(a); if (u.pathname === '/' || u.pathname === '') u.pathname = '/mp'; return u.href; } catch (e) { return a; }
+}
 function mpWebSocket(url, role) {
+  url = mpWsUrl(url);
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
     const link = { kind: 'ws', send(o, to) { if (ws.readyState === 1) ws.send(JSON.stringify(to != null ? { ...o, to } : o)); }, close() { try { ws.close(); } catch (e) {} } };

@@ -8,13 +8,16 @@
 //  - one player's own world opened to others ("서버로 열기"), as before: guests' messages go to that host.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const root = path.join(__dirname, '..'), args = process.argv.slice(2);
-const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a) && i !== wi + 1) || 8080), worldName = (wi >= 0 && args[wi + 1] ? args[wi + 1] : 'world').replace(/[^\w\-가-힣]/g, '_');
+// on a hosting service (Render and the like) the port comes from PORT; WORLD names the world and WORLDS_DIR is where worlds are
+// kept (point it at a persistent disk there, or the world is lost whenever the service restarts)
+const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a) && i !== wi + 1) || process.env.PORT || 8080), worldName = (wi >= 0 && args[wi + 1] ? args[wi + 1] : process.env.WORLD || 'world').replace(/[^\w\-가-힣]/g, '_');
+const WORLDS = path.resolve(process.env.WORLDS_DIR || path.join(root, 'worlds'));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
 
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   const f = path.join(root, path.normalize(u));
-  if (!f.startsWith(root + path.sep) || f.startsWith(path.join(root, 'worlds') + path.sep)) { res.writeHead(403); res.end(); return; }
+  if (!f.startsWith(root + path.sep) || f.startsWith(WORLDS + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); res.end(d); });
 });
 
@@ -44,13 +47,15 @@ function wsAccept(req, sock, onText, onClose) {
       if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; onText(msg); } }
     }
   });
-  sock.on('close', () => { if (!closed) { closed = true; onClose(); } }); sock.on('error', () => {});
+  // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself)
+  const ping = setInterval(() => { if (!closed) try { sock.write(frame(9, Buffer.alloc(0))); } catch (e) {} }, 25000);
+  sock.on('close', () => { clearInterval(ping); if (!closed) { closed = true; onClose(); } }); sock.on('error', () => {});
   return c;
 }
 
 // ---------- the saved server world (js/mpcore.js does the work; the files are here) ----------
 const { mpWorldCore } = require(path.join(root, 'js', 'mpcore.js'));
-const WDIR = path.join(root, 'worlds', worldName), CDIR = path.join(WDIR, 'chunks');
+const WDIR = path.join(WORLDS, worldName), CDIR = path.join(WDIR, 'chunks');
 const state = { meta: null, time: 1000, rain: 0, thunder: false, players: {}, weatherT: 12000 + Math.random() * 168000 };
 const keys = new Set(), dirty = new Map(); let stateDirty = false;
 const fileOf = dk => path.join(CDIR, encodeURIComponent(dk) + '.json');
