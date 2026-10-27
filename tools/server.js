@@ -14,8 +14,12 @@ const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a)
 const WORLDS = path.resolve(process.env.WORLDS_DIR || path.join(root, 'worlds'));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
 
+// SERVER_URL and GOOGLE_CLIENT_ID (environment) reach the game as js/config.js; REQUIRE_LOGIN=1 lets only players
+// signed in with Google into the server world
+const CFG = { server: process.env.SERVER_URL || '', googleClientId: process.env.GOOGLE_CLIENT_ID || '' }, REQUIRE_LOGIN = /^(1|true|yes)$/i.test(process.env.REQUIRE_LOGIN || '');
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
+  if (u === '/js/config.js' && (CFG.server || CFG.googleClientId)) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
   const f = path.join(root, path.normalize(u));
   if (!f.startsWith(root + path.sep) || f.startsWith(WORLDS + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); res.end(d); });
@@ -73,6 +77,13 @@ setInterval(() => { core.tick(); }, 1000);
 setInterval(() => { stateDirty = true; saveWorld(); }, 5000);
 for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stateDirty = true; saveWorld(); process.exit(0); });
 
+// a Google sign-in sent with "join": checked with Google, so the player's things are kept by account
+async function verifyGoogle(tok) {
+  if (!tok || !CFG.googleClientId || typeof fetch !== 'function') return null;
+  try { const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(tok)); if (!r.ok) return null; const c = await r.json();
+    if (c.aud !== CFG.googleClientId || +c.exp * 1000 < Date.now() || !c.sub) return null; return { sub: c.sub, name: c.name || c.given_name || String(c.email || '').split('@')[0], email: c.email || '' }; }
+  catch (e) { return null; }
+}
 // ---------- rooms of a player's own world: one host, any number of guests ----------
 const rooms = new Map(); let nextId = 1;
 server.on('upgrade', (req, sock) => {
@@ -81,7 +92,19 @@ server.on('upgrade', (req, sock) => {
   const id = nextId++; let role = null, wp = false;
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
-    if (wp) { core.message(id, m); return; }
+    if (wp) {
+      if (c.waiting) { c.waiting.push(m); return; }
+      if (m.t !== 'join') { core.message(id, m); return; }
+      // the sign-in is checked before anything else from this player is taken
+      c.waiting = []; const tok = m.google; delete m.google;
+      verifyGoogle(tok).then(acc => {
+        if (acc) { m.account = acc.sub; m.name = acc.name.replace(/\s+/g, '').slice(0, 16) || m.name; }
+        const q = c.waiting; c.waiting = null;
+        if (REQUIRE_LOGIN && !acc) { c.send(JSON.stringify({ t: 'error', msg: '이 서버는 Google 로그인이 필요합니다 (타이틀 → Google 로그인)' })); return; }
+        core.message(id, m); for (const x of q) core.message(id, x);
+      });
+      return;
+    }
     if (!role) { // the first message says who this is
       if (m.t !== 'hello') return;
       // "join": a player's open world if someone hosts one here, otherwise the saved server world

@@ -205,9 +205,12 @@ function buildParticleSheet() {
   const t = new THREE.CanvasTexture(c); t.flipY = false; t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; pMat.uniforms.sheet.value = t;
 }
 R.buildParticleSheet = buildParticleSheet;
+// the "particle" texture of Java's block models, where it isn't the block's side
+const PARTICLE_TILE = { grass_block: 'dirt', podzol: 'dirt', mycelium: 'dirt', dirt_path: 'dirt', farmland: 'dirt', crimson_nylium: 'netherrack', warped_nylium: 'netherrack',
+  red_bed: 'oak_planks', chest: 'oak_planks', trapped_chest: 'oak_planks', ender_chest: 'obsidian', banner: 'oak_planks', wall_banner: 'oak_planks', lectern: 'lectern_sides', campfire: 'campfire_log', soul_campfire: 'campfire_log' };
 function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
-  const t = S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
-  const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
+  const pk = BLOCKS[id] && PARTICLE_TILE[BLOCKS[id].key], t = pk && S.T[pk] != null ? S.T[pk] : S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
+  const tint = S.TINT[id] && !pk ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
   for (let i = 0; i < n; i++) {
     const px = x + 0.1 + Math.random() * 0.8, py = y + 0.1 + Math.random() * 0.8, pz = z + 0.1 + Math.random() * 0.8;
     spawnParticle({ x: px, y: py, z: pz, vx: (px - x - .5) * 3, vy: Math.random() * 3 + 1, vz: (pz - z - .5) * 3, life: 0.6 + Math.random() * 0.6, size: 0.12 + Math.random() * 0.08,

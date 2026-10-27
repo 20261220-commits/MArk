@@ -44,16 +44,20 @@ function mpWorldCore(store, out) {
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
-        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null;
-        for (const q of players.values()) if (q !== p && q.joined && q.name === p.name) { send(p, { t: 'error', msg: '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
+        // a signed-in player is kept by account (the server checked it); others by name, which a signed-in player's name can't take
+        p.key = p.account ? 'g:' + p.account : p.name;
+        for (const q of players.values()) if (q !== p && q.joined && (q.name === p.name || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        if (!p.account && S.accounts && S.accounts[p.name]) { send(p, { t: 'error', msg: '이 이름은 Google 계정에 묶여 있습니다. Google 로그인 후 접속하세요' }); return; }
+        if (p.account) { S.accounts = S.accounts || {}; S.accounts[p.name] = p.account; }
         p.joined = true;
-        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.name] || null, stored: [...store.keys],
+        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.key] || null, stored: [...store.keys],
           players: [...players.values()].filter(q => q !== p && q.joined).map(q => ({ id: q.id, name: q.name, skin: q.skin })), auth: Object.fromEntries(auth) });
         others(p, { t: 'peer', id: from, name: p.name, skin: p.skin }); store.log(`${p.name} 접속 (${[...players.values()].filter(q => q.joined).length}명)`); return;
       }
       case 'dim': setDim(p, +m.dim || 0); return;
       case 'pl': p.s = m; if (m.dim !== p.dim && p.joined) setDim(p, m.dim); others(p, m); return;
-      case 'pdata': { const nm = p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; store.saveState(); } return; }
+      case 'pdata': { const nm = p.key || p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; store.saveState(); } return; }
       case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }

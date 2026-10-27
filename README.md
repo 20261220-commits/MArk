@@ -29,7 +29,16 @@
 - Render 대시보드에서 **New → Web Service** 로 이 저장소를 고르고 **Start Command** 를 `node tools/server.js` 로 둡니다(Build Command 는 비워 두거나 `echo ok`). 또는 **New → Blueprint** 로 고르면 `render.yaml` 설정으로 만들어집니다. 포트는 Render 가 주는 `PORT` 를 그대로 씁니다.
 - 다 되면 나오는 주소(`https://이름.onrender.com`)를 브라우저로 열면 게임이 뜨고, 멀티플레이 → **서버에 접속** 의 주소 칸은 처음부터 그 서버(`wss://이름.onrender.com/mp`)로 채워져 있습니다. 다른 곳(GitHub Pages 등)에서 연 게임에서는 주소 칸에 `이름.onrender.com` 만 적어도 됩니다.
 - **세계 저장**: 무료 플랜은 재배포하거나 15분 동안 아무도 없어 잠들었다 깨어날 때 파일이 지워져 세계가 처음부터 다시 시작됩니다. 계속 남기려면 유료 플랜에서 디스크(Disks)를 `/var/data` 에 붙이고 환경 변수 `WORLDS_DIR=/var/data/worlds` 를 넣으세요. 무료로 쓸 때는 세계를 각자 기기에 두었다가 **서버 세계로 올리기** 로 다시 올릴 수 있습니다.
-- 환경 변수: `WORLD`(세계 이름, 기본 world), `WORLDS_DIR`(세계를 둘 폴더).
+- 환경 변수: `WORLD`(세계 이름, 기본 world), `WORLDS_DIR`(세계를 둘 폴더), `SERVER_URL`(게임이 처음 보여 줄 서버 주소), `GOOGLE_CLIENT_ID`(Google 로그인), `REQUIRE_LOGIN=1`(Google 로그인한 사람만 접속).
+- GitHub Pages 에서 연 게임이 처음부터 Render 서버를 가리키게 하려면 `js/config.js` 의 `server` 에 `이름.onrender.com` 을 적어 두세요. 잠들어 있던 무료 서버는 접속할 때 자동으로 깨우고(최대 1분) 연결될 때까지 다시 시도합니다.
+
+### Google 로그인
+- 타이틀 오른쪽의 **Google 로그인** 으로 로그인하면 이름이 Google 계정 이름이 됩니다. 같은 클라이언트 ID 를 가진 서버는 로그인을 Google 에 확인하고, 그 사람의 인벤토리·위치를 이름이 아니라 계정으로 저장합니다(다른 사람이 같은 이름으로 들어와도 그 물건을 가져갈 수 없음).
+- 설정: [Google Cloud 콘솔](https://console.cloud.google.com/apis/credentials) → 사용자 인증 정보 만들기 → **OAuth 클라이언트 ID** → 유형 **웹 애플리케이션** → "승인된 JavaScript 원본"에 게임 주소(`https://이름.onrender.com`, `https://아이디.github.io`)를 넣고, 나온 클라이언트 ID(`….apps.googleusercontent.com`)를 Render 의 환경 변수 `GOOGLE_CLIENT_ID` 와(또는) `js/config.js` 의 `googleClientId` 에 넣습니다.
+- 비밀번호는 게임이 받지 않습니다. 서버로 가는 것은 Google 이 준 로그인 토큰뿐입니다.
+
+### 스킨
+- 타이틀 → **스킨 바꾸기**: 스티브·알렉스, PNG 파일(64×64·64×32), 또는 자바 에디션 닉네임으로 그 사람의 스킨을 가져옵니다. 멀티플레이에서 다른 사람에게도 보입니다.
 
 ### 내 세계를 친구에게 열기
 
