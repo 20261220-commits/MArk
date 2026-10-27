@@ -1,7 +1,7 @@
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 3; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens
+const UPACK = { name: null }, UPACK_VER = 4; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -124,13 +124,16 @@ async function importPack(file, progress) {
   const { out, data } = PACKMAP.packBuild(f => imgs.get(f) || null, S.TILES, items);
   const pack = { name: file.name, out, data, date: Date.now(), ver: UPACK_VER };
   await upPut(pack);
+  try { await upPut(new Blob([buf]), 'jar'); } catch (e) { /* no room: the pack still works, it just can't be rebuilt by itself */ }
   return pack;
 }
 
 // boot: lay the stored pack over the built-in one; textures it lacks stay as they are, but the built-in pack's OptiFine
 // extras (random skins, emissive layers) are dropped unless the chosen pack has its own
 async function applyUserPack() {
-  const up = await upGet(); if (!up) return false;
+  let up = await upGet(); if (!up) return false;
+  // converted by an older version of the game: convert the kept file again, so fixes reach packs imported before them
+  if ((up.ver || 1) < UPACK_VER) { const jar = await upGetKey('jar'); if (jar) try { up = await importPack(new File([jar], up.name || 'client.jar')); } catch (e) { console.warn('pack rebuild failed', e); } }
   for (const k of Object.keys(PACKPX.ent)) if ((k.startsWith('r_') || k.endsWith('_e')) && !up.out.ent[k]) delete PACKPX.ent[k];
   applyPackData(up.out, up.data);
   UPACK.name = up.name; UPACK.stale = (up.ver || 1) < UPACK_VER;
@@ -148,4 +151,4 @@ function pickPackFile() {
   };
   inp.click();
 }
-async function resetPack() { await upPut(null); await upPut(null, 'structs'); location.reload(); }
+async function resetPack() { await upPut(null); await upPut(null, 'structs'); await upPut(null, 'jar'); location.reload(); }

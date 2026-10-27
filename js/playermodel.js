@@ -51,6 +51,16 @@ function loadCustomSkin(done) {
   if (!rec || !rec.data) { done(false); return; }
   const img = new Image(); img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { done(false); return; } PACKPX.ent.custom_skin = { px: new Uint8Array(skinPixels(img).buffer.slice(0)), w: 64, h: 64 }; delete entTex.custom_skin; PSKIN.customSlim = !!rec.slim; done(true); }; img.onerror = () => done(false); img.src = rec.data;
 }
+// a Java Edition player's skin by name (mc-heads.net serves skins with CORS), kept like a picked file
+function skinFromUrl(url, label) {
+  const img = new Image(); img.crossOrigin = 'anonymous';
+  img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { UI.flash('스킨을 읽지 못했어요'); return; }
+    let data; try { const c = document.createElement('canvas'); c.width = 64; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); data = c.toDataURL('image/png'); } catch (e) { UI.flash('이 스킨은 불러올 수 없어요'); return; }
+    const px = skinPixels(img), slim = img.height === 64 && px[(20 * 64 + 54) * 4 + 3] === 0;
+    try { localStorage.setItem(SKIN_KEY, JSON.stringify({ data, slim })); } catch (e) { UI.flash('스킨을 저장하지 못했어요'); return; }
+    OPT.skin = 'custom'; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'skins') showMenu('skins'); }); UI.flash(label + ' 스킨을 가져왔어요'); };
+  img.onerror = () => UI.flash('스킨을 찾지 못했어요 (닉네임·인터넷 연결 확인)'); img.src = url;
+}
 function pickSkinFile() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png';
   inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => {
@@ -58,7 +68,7 @@ function pickSkinFile() {
       if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { UI.flash('64×64 또는 64×32 크기의 스킨 PNG가 필요해요'); return; }
       const px = skinPixels(img), slim = img.height === 64 && px[(20 * 64 + 54) * 4 + 3] === 0; // slim skins leave the 4th arm column empty
       try { localStorage.setItem(SKIN_KEY, JSON.stringify({ data: rd.result, slim })); } catch (e) { UI.flash('스킨을 저장하지 못했어요'); return; }
-      OPT.skin = 'custom'; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'options') showMenu('options'); }); UI.flash(slim ? '내 스킨 (얇은 팔)' : '내 스킨 (기본 팔)');
+      OPT.skin = 'custom'; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'options' || UI.menu === 'skins') showMenu(UI.menu); }); UI.flash(slim ? '내 스킨 (얇은 팔)' : '내 스킨 (기본 팔)');
     }; img.src = rd.result; }; rd.readAsDataURL(f); };
   inp.click();
 }
@@ -289,5 +299,5 @@ function dollRender(el, mx, my) {
 const DOLL = { mx: innerWidth / 2, my: innerHeight / 2 };
 addEventListener('pointermove', e => { DOLL.mx = e.clientX; DOLL.my = e.clientY; });
 // the title screen shows your own skin on the right, turning to follow the mouse like the inventory figure
-(function titleDoll() { requestAnimationFrame(titleDoll); if (typeof UI === 'undefined' || UI.menu !== 'title' || !PLM.model) return; const el = document.querySelector('.titleDoll'); if (el) dollRender(el, DOLL.mx, DOLL.my); })();
+(function titleDoll() { requestAnimationFrame(titleDoll); if (typeof UI === 'undefined' || (UI.menu !== 'title' && UI.menu !== 'skins') || !PLM.model) return; const el = document.querySelector('.titleDoll'); if (el) dollRender(el, DOLL.mx, DOLL.my); })();
 function dollTick() { const el = document.querySelector('.doll'); if (el && UI.screen) dollRender(el, DOLL.mx, DOLL.my); }

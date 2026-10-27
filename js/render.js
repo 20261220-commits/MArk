@@ -205,9 +205,12 @@ function buildParticleSheet() {
   const t = new THREE.CanvasTexture(c); t.flipY = false; t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; pMat.uniforms.sheet.value = t;
 }
 R.buildParticleSheet = buildParticleSheet;
+// the "particle" texture of Java's block models, where it isn't the block's side
+const PARTICLE_TILE = { grass_block: 'dirt', podzol: 'dirt', mycelium: 'dirt', dirt_path: 'dirt', farmland: 'dirt', crimson_nylium: 'netherrack', warped_nylium: 'netherrack',
+  red_bed: 'oak_planks', chest: 'oak_planks', trapped_chest: 'oak_planks', ender_chest: 'obsidian', banner: 'oak_planks', wall_banner: 'oak_planks', lectern: 'lectern_sides', campfire: 'campfire_log', soul_campfire: 'campfire_log' };
 function blockParticles(x, y, z, id, n = 24, light = 1, meta = 0) {
-  const t = S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
-  const tint = S.TINT[id] ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
+  const pk = BLOCKS[id] && PARTICLE_TILE[BLOCKS[id].key], t = pk && S.T[pk] != null ? S.T[pk] : S.tileFor(id, meta, 0); const tu = (t % S.TPR) * 16, tv = ((t / S.TPR) | 0) * 16;
+  const tint = S.TINT[id] && !pk ? (DEFAULT_TINT[S.TINT[id]] || [255, 255, 255]) : [255, 255, 255];
   for (let i = 0; i < n; i++) {
     const px = x + 0.1 + Math.random() * 0.8, py = y + 0.1 + Math.random() * 0.8, pz = z + 0.1 + Math.random() * 0.8;
     spawnParticle({ x: px, y: py, z: pz, vx: (px - x - .5) * 3, vy: Math.random() * 3 + 1, vz: (pz - z - .5) * 3, life: 0.6 + Math.random() * 0.6, size: 0.12 + Math.random() * 0.08,
@@ -417,7 +420,7 @@ function renderBlockIcons() {
     const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
     rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
     mesh.geometry = blockGeometry(id);
-    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : 1; mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
+    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : /_button$/.test(ITEMS[id].key) ? 2.2 : 1; // buttons: Java's button_inventory model is drawn larger mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
     renderer.setRenderTarget(rt); renderer.render(sc, cam);
   });
   const buf = new Uint8Array(Wd * Hd * 4);

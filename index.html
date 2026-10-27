@@ -90,7 +90,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .sl.dragsel{background:#a8a8a8;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #fff,inset 0 0 0 calc(2*var(--px)) rgba(255,255,255,.35)}
 .sl.dragsel::before{content:attr(data-prev);position:absolute;left:var(--px);top:0;font-size:calc(6*var(--px));color:#ffff80;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
 .sl.big{width:calc(26 * var(--px));height:calc(26 * var(--px))}
-.sl.ghost{position:fixed;background:none;box-shadow:none;pointer-events:none;transform:translate(-50%,-50%);z-index:30}
+.sl.ghost,body.vgui .sl.ghost{position:fixed;background:none;box-shadow:none;pointer-events:none;transform:translate(-50%,-50%);z-index:30}
 .sl.armor:empty::after{content:"";width:calc(12 * var(--px));height:calc(12 * var(--px));opacity:.35;background:#373737;clip-path:polygon(15% 0,85% 0,100% 30%,85% 100%,15% 100%,0 30%)}
 .sl.trash{background:#8b8b8b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4h8v10H4zM3 3h10v1H3zM6 2h4v1H6z' fill='%23555'/%3E%3C/svg%3E") center/70% no-repeat}
 .grid9{display:grid;grid-template-columns:repeat(9,calc(18 * var(--px)))}
@@ -104,6 +104,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 .arrow.prog::after{content:"";position:absolute;inset:0;width:calc(var(--p) * 100%);background:#fff}
 .flame{width:calc(14 * var(--px));height:calc(14 * var(--px));margin:calc(2 * var(--px)) auto;background:linear-gradient(to top,#ff8a1a calc(var(--p) * 100%),#8b8b8b calc(var(--p) * 100%));clip-path:polygon(50% 0,80% 35%,100% 65%,80% 100%,20% 100%,0 65%,20% 35%)}
 .doll{width:calc(52 * var(--px));height:calc(72 * var(--px));background:#000;overflow:hidden;box-shadow:inset var(--px) var(--px) 0 #373737,inset calc(-1*var(--px)) calc(-1*var(--px)) 0 #fff;display:grid;place-items:center}
+.offc{align-self:flex-end;margin-right:calc(2 * var(--px))} /* the off hand: below the doll's right side, as in Java */
 .doll-fig{position:relative;width:calc(16 * var(--px));height:calc(64 * var(--px))}
 .doll-fig i{position:absolute;display:block}
 .dh{left:calc(4*var(--px));top:0;width:calc(8*var(--px));height:calc(8*var(--px));background:linear-gradient(#3b2a16 30%,#c98e6a 30%)}
@@ -156,8 +157,15 @@ body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgb
 body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
-.titleDoll{position:absolute;right:max(8px,3vw);top:50%;transform:translateY(-46%);width:min(30vw,380px);height:min(58vh,500px);cursor:pointer;pointer-events:auto}
-@media (max-aspect-ratio:1/1){.titleDoll{display:none}}
+.titleSide{position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:calc(3 * var(--px));pointer-events:auto}
+.titleDoll{width:min(17vw,190px);height:min(34vh,260px);cursor:pointer}
+.titleSide .mb{width:calc(96 * var(--px));min-width:0;font-size:calc(7 * var(--px))}
+.titleSide .acc{display:flex;align-items:center;gap:calc(3 * var(--px));font-size:calc(6.5 * var(--px));max-width:calc(110 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.titleSide .acc img{width:calc(10 * var(--px));height:calc(10 * var(--px));border-radius:50%}
+.skinRow{display:flex;gap:calc(4 * var(--px));align-items:center;justify-content:center}
+.skinRow .titleDoll{width:min(24vw,200px);height:min(40vh,280px)}
+#gsiBtn{min-height:44px;display:flex;justify-content:center;margin:calc(4 * var(--px)) 0}
+@media (max-aspect-ratio:1/1){.titleSide{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb:hover,.mb:focus-visible{background-color:#7e88c8;color:#ffffa0;outline:none;box-shadow:inset var(--px) var(--px) 0 #c8d0ff,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #4a5288}
@@ -281,6 +289,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 <div id="menu"></div>
 <!-- scripts: order matters (shared globals) -->
 <script src="vendor/three.min.js"></script>
+<script src="js/config.js"></script>
 <script src="js/shared.js"></script>
 <script src="js/pack.js"></script>
 <script src="js/packmap.js"></script>
@@ -334,6 +343,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 <script src="js/playermodel.js"></script>
 <script src="js/mpcore.js"></script>
 <script src="js/multiplayer.js"></script>
+<script src="js/account.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

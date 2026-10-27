@@ -11,7 +11,11 @@ const MP = { server: false, auth: {}, rolePending: false, queue: [], replaying: 
 const MP_NAME_KEY = 'nemo-mp-name', MP_ADDR_KEY = 'nemo-mp-addr';
 try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
 if (!MP.name) MP.name = '플레이어' + (100 + Math.floor(Math.random() * 900));
-const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a) return a; } catch (e) {} return /^https?:$/.test(location.protocol) ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp' : 'ws://192.168.0.2:8080/mp'; };
+// the address offered first: the last one used, then the one this game was published with (js/config.js or the server's
+// SERVER_URL), then the server this page came from, if it came from one (not a static host such as GitHub Pages)
+const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a) return a; } catch (e) {}
+  if (typeof NEMO_CONFIG !== 'undefined' && NEMO_CONFIG.server) return mpWsUrl(NEMO_CONFIG.server);
+  return /^https?:$/.test(location.protocol) && !/github\.io$|claude\.ai$|claudeusercontent\.com$/.test(location.hostname) ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp' : 'ws://192.168.0.2:8080/mp'; };
 
 // ---------- binary <-> text for chunk data ----------
 function mpB64(ta) { const u8 = new Uint8Array(ta.buffer, ta.byteOffset, ta.byteLength); let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
@@ -26,15 +30,29 @@ function mpWsUrl(a) {
   a = String(a || '').trim(); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
   a = a.replace(/^http(s?):\/\//i, 'ws$1://'); try { const u = new URL(a); if (u.pathname === '/' || u.pathname === '') u.pathname = '/mp'; return u.href; } catch (e) { return a; }
 }
-function mpWebSocket(url, role) {
-  url = mpWsUrl(url);
+// a hosted server (Render's free plan and the like) sleeps when nobody uses it and takes up to a minute to wake:
+// knock on its web page, then keep trying for a while instead of failing at once
+async function mpWebSocket(url, role) {
+  url = mpWsUrl(url); const local = /^wss?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url), t0 = Date.now();
+  const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
+  for (let k = 0; ; k++) {
+    try { return await mpWsOnce(url, role); }
+    catch (e) {
+      if (local || e.fromServer || Date.now() - t0 > 75000) throw e;
+      if (k === 0) { say('서버를 깨우는 중... (잠들어 있던 서버는 1분쯤 걸릴 수 있어요)'); try { fetch(url.replace(/^ws/, 'http').replace(/\/mp.*$/, '/'), { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (er) {} }
+      else say(`서버를 깨우는 중... ${Math.round((Date.now() - t0) / 1000)}초`);
+      await new Promise(r => setTimeout(r, 4000));
+    }
+  }
+}
+function mpWsOnce(url, role) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
     const link = { kind: 'ws', send(o, to) { if (ws.readyState === 1) ws.send(JSON.stringify(to != null ? { ...o, to } : o)); }, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
-      if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { rej(new Error(m.msg)); ws.close(); } return; }
+      if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { const er = new Error(m.msg); er.fromServer = true; rej(er); ws.close(); } return; }
       if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
       if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
@@ -67,7 +85,7 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
@@ -102,7 +120,7 @@ async function mpHostStart(kind) {
   MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
-  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
+  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
   chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
@@ -134,12 +152,13 @@ function mpHostStore() {
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
 async function mpJoinWs(url) {
+  if (typeof accFresh === 'function') await accFresh(); // a signed-in player's sign-in, renewed if it ran out
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join'); } catch (e) { MP.on = false; MP.role = null; throw e; }
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
-  mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
+  mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
 }
 function mpStop() {
   if (!MP.on) return;
@@ -172,7 +191,7 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); return;
+    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;

@@ -163,7 +163,7 @@ UI.renderScreen = () => {
   const T = UI.screen, el = $('screen');
   let h = '';
   if (T === 'inv') {
-    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
+    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
     h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
@@ -283,7 +283,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleDoll" title="스킨 바꾸기" data-act="options"></div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc">${ACC.user.picture ? `<img src="${ACC.user.picture.replace(/"/g, '')}" referrerpolicy="no-referrer" alt="">` : ''}<span>${ACC.user.name.replace(/</g, '&lt;')}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : 'Google 로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -295,6 +295,11 @@ function showMenu(name, data) {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}${btn('실험 기능(동굴과 절벽): ' + (c.exp ? '켜짐' : '꺼짐'), 'cexp')}<p class="muted">켜면 무성한 동굴이 생성됩니다 (1.17 실험용 데이터 팩)</p><label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
+  } else if (name === 'account') {
+    h = `<h2>Google 로그인</h2><p class="muted">로그인하면 이름이 Google 계정 이름이 되고, 로그인을 확인하는 서버에서는 인벤토리와 위치가 계정에 저장되어 다른 사람이 같은 이름으로 들어올 수 없습니다.</p><div id="gsiBtn"></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('돌아가기', 'title')}</div>`;
+  } else if (name === 'skins') {
+    const cur = { steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브';
+    h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}${localStorage.getItem(SKIN_KEY) ? btn((OPT.skin === 'custom' ? '▶ ' : '') + '내 스킨', 'skinset_custom') : ''}${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}${btn('완료', 'title')}</div></div><p class="muted">지금 스킨: ${cur} · 멀티플레이에서 다른 플레이어에게도 이 스킨이 보입니다</p>`;
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
@@ -343,6 +348,11 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'advs') { resumeGame(); UI.openScreen('adv'); }
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
+  else if (a === 'skins') showMenu('skins');
+  else if (a === 'account') { showMenu('account'); accShowButton(); }
+  else if (a === 'accout') accLogout();
+  else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
+  else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }
   else if (a === 'mainhand') { OPT.mainHand = OPT.mainHand === 'left' ? 'right' : 'left'; saveOpt(); R.setHandSkin(); showMenu('options'); }
   else if (a === 'packLoad') pickPackFile();
   else if (a === 'packReset') resetPack();
