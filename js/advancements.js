@@ -108,7 +108,7 @@ const ADVM = {}; for (const a of ADV2) ADVM[a[0]] = { id: a[0], parent: a[1], ic
 for (const a of Object.values(ADVM)) if (a.parent) ADVM[a.parent].kids.push(a.id);
 
 // ---------- progress ----------
-const advState = () => { if (UI.menu === 'advview' && ADVUI.view) return ADVUI.view.adv2 || {}; /* a saved world's, looked at from the title screen */ if (!W.meta) return null; const s = W.meta.adv2 || (W.meta.adv2 = {}); if (W.meta.adv && !W.meta.advMigrated) { migrateOldAdv(s); W.meta.advMigrated = true; } return s; };
+const advState = () => { if (UI.menu === 'advview' && ADVUI.view) return ADVUI.view.adv2 || {}; /* a saved world's, looked at from the title screen */ if (!W.meta) return null; if (!W.meta.adv2 || typeof W.meta.adv2 !== 'object') W.meta.adv2 = {}; const s = W.meta.adv2; if (W.meta.adv && !W.meta.advMigrated) { migrateOldAdv(s); W.meta.advMigrated = true; } return s; };
 function migrateOldAdv(s) { // worlds from before the full set: carry the old (subset) advancements over
   const MAP = { root: 'story/root', stone: 'story/mine_stone', upgrade: 'story/upgrade_tools', iron: 'story/smelt_iron', armor: 'story/obtain_armor', lava: 'story/lava_bucket', ironpick: 'story/iron_tools', diamond: 'story/mine_diamond', obsidian: 'story/form_obsidian', enchant: 'story/enchant_item', portal: 'story/enter_the_nether', nether: 'nether/root', blaze: 'nether/obtain_blaze_rod', debris: 'nether/obtain_ancient_debris', netherite: 'nether/netherite_armor', end: 'end/root', dragon: 'end/kill_dragon', trade: 'adventure/trade', wolf: 'husbandry/tame_an_animal', elytra: 'end/elytra', breed: 'husbandry/breed_an_animal', hunter: 'adventure/kill_a_mob', sleep: 'adventure/sleep_in_bed', seed: 'husbandry/plant_seed', snow: 'adventure/walk_on_powder_snow_with_leather_boots', spyglass: 'adventure/spyglass_at_parrot', cure: 'story/cure_zombie_villager', raid: 'adventure/hero_of_the_village', wither: 'nether/summon_wither', eye: 'story/follow_ender_eye' };
   for (const [k, t] of Object.entries(W.meta.adv)) if (MAP[k] && ADVM[MAP[k]]) s[MAP[k]] = { done: t, c: {} };
@@ -190,7 +190,7 @@ function advNetherTravel(from, to) {
 const ADV_INV = { 'story/root': 'crafting_table', 'story/upgrade_tools': 'stone_pickaxe', 'story/smelt_iron': 'iron_ingot', 'story/lava_bucket': 'lava_bucket', 'story/iron_tools': 'iron_pickaxe', 'story/form_obsidian': 'obsidian', 'story/mine_diamond': 'diamond', 'nether/get_wither_skull': 'wither_skeleton_skull', 'nether/obtain_ancient_debris': 'ancient_debris', 'nether/obtain_blaze_rod': 'blaze_rod', 'nether/obtain_crying_obsidian': 'crying_obsidian', 'end/dragon_breath': 'dragon_breath', 'end/dragon_egg': 'dragon_egg', 'end/elytra': 'elytra', 'husbandry/obtain_netherite_hoe': 'netherite_hoe' };
 function advScan() {
   if (!W.meta || !W.active) return;
-  const have = new Set(); for (const s of [...INV.slots, ...INV.armor, INV.off, INV.cursor]) if (s) have.add(ITEMS[s.id].key);
+  const have = new Set(); for (const s of [...INV.slots, ...INV.armor, INV.off, INV.cursor]) if (s && ITEMS[s.id]) have.add(ITEMS[s.id].key);
   for (const [id, k] of Object.entries(ADV_INV)) if (have.has(k)) advGrant(id);
   if (have.has('cobblestone') || have.has('blackstone') || have.has('cobbled_deepslate')) advGrant('story/mine_stone');
   for (const p of ['helmet', 'chestplate', 'leggings', 'boots']) { if (have.has('iron_' + p)) advGrant('story/obtain_armor', 'iron_' + p); if (have.has('diamond_' + p)) advGrant('story/shiny_gear', 'diamond_' + p); }
