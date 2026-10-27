@@ -89,6 +89,7 @@ function lightRemove(x, y, z, sh) {
       if (nl && (nl < l || (sh && k === 3 && l === 15 && nl === 15))) {
         nc.light[ni] = sh ? nc.light[ni] & 0x0f : nc.light[ni] & 0xf0; markDirty(nx, nz);
         q.push(nx, ny, nz, nl);
+        const e = sh ? 0 : S.emitOf(nc.blocks[ni], nc.meta[ni]); if (e) { nc.light[ni] |= e; re.push([nx, ny, nz]); } // a dimmer light source in the dark wave keeps its own glow
       } else if (nl >= l) re.push([nx, ny, nz]);
     }
   }
