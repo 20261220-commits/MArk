@@ -837,10 +837,12 @@ function spawnerTick() {
   }
 }
 // persist passive mobs with their chunk
-R.onChunkUnloaded = c => {
+// what a chunk keeps of the entities standing in it: animals, persistent monsters, vehicles, frames, paintings, stands,
+// and (as Java does) items on the ground and experience orbs; remove: take them out of the world as well
+function chunkKeep(c, remove) {
   const keep = [];
   for (const e of ENT) {
-    if (e.dead) continue;
+    if (e.dead || e.remote) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
     if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
@@ -848,10 +850,17 @@ R.onChunkUnloaded = c => {
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
     else if (e.kind === 'painting') keep.push(['painting', e.ax, e.ay, e.az, 0, 0, { f: e.f, motif: e.motif }]);
     else if (e.kind === 'armor_stand') keep.push(['armor_stand', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, armor: e.armor }]);
-    if (e === PL.riding) continue;
-    removeEnt(e);
+    else if (e.kind === 'item' && e.stack && (e.life == null || e.life > 0)) keep.push(['item', e.x, e.y, e.z, 0, 0, { st: e.stack, age: e.age || 0 }]);
+    else if (e.kind === 'xp' && e.value) keep.push(['xp', e.x, e.y, e.z, 0, 0, { v: e.value }]);
+    if (remove && e !== PL.riding) removeEnt(e); // (arrows, falling blocks and the like just go)
   }
+  return keep;
+}
+R.onChunkUnloaded = c => {
+  const keep = chunkKeep(c, true);
+  for (const e of ENT) if (e.remote && !e.dead && Math.floor(e.x) >> 4 === c.cx && Math.floor(e.z) >> 4 === c.cz && e !== PL.riding) removeEnt(e); // another player's world: gone with the chunk
   if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; } // unloadChunk saves right after this
+  c.mobsFresh = true;
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
@@ -861,7 +870,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
 // ---------- render update (interpolated) ----------

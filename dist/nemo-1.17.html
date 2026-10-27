@@ -6390,6 +6390,14 @@ function neighborUpdate(x, y, z) {
   // any block change can reroute dust next to it
   for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === BID.redstone_wire) { rsMark(x + dx, y + dy, z + dz); break; }
 }
+// changes made while this world was open to others, kept beside chunks that weren't stored again (see mpcore.js)
+async function applyMpLog(c) {
+  const dk = dkey(c.cx, c.cz), key = 'mplog:' + W.id + ':' + dk, wid = W.id; W.mpLogs.delete(dk);
+  const lg = await dbReq('chunks', 'readonly', st => st.get(key)); if (!lg || typeof lg !== 'object' || wid !== W.id || W.chunks.get(c.key) !== c) return;
+  for (const [x, y, z, id, m, mo] of lg.edits || []) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); }
+  for (const i in lg.tiles || {}) c.tiles.set(+i, lg.tiles[i]);
+  c.modified = c.edited = true; saveChunk(c, false, true); dbReq('chunks', 'readwrite', st => st.delete(key));
+}
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
@@ -6692,6 +6700,7 @@ function addChunk(cx, cz, d, tiles) {
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c);
+  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
@@ -8311,10 +8320,12 @@ function spawnerTick() {
   }
 }
 // persist passive mobs with their chunk
-R.onChunkUnloaded = c => {
+// what a chunk keeps of the entities standing in it: animals, persistent monsters, vehicles, frames, paintings, stands,
+// and (as Java does) items on the ground and experience orbs; remove: take them out of the world as well
+function chunkKeep(c, remove) {
   const keep = [];
   for (const e of ENT) {
-    if (e.dead) continue;
+    if (e.dead || e.remote) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
     if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
@@ -8322,10 +8333,17 @@ R.onChunkUnloaded = c => {
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
     else if (e.kind === 'painting') keep.push(['painting', e.ax, e.ay, e.az, 0, 0, { f: e.f, motif: e.motif }]);
     else if (e.kind === 'armor_stand') keep.push(['armor_stand', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, armor: e.armor }]);
-    if (e === PL.riding) continue;
-    removeEnt(e);
+    else if (e.kind === 'item' && e.stack && (e.life == null || e.life > 0)) keep.push(['item', e.x, e.y, e.z, 0, 0, { st: e.stack, age: e.age || 0 }]);
+    else if (e.kind === 'xp' && e.value) keep.push(['xp', e.x, e.y, e.z, 0, 0, { v: e.value }]);
+    if (remove && e !== PL.riding) removeEnt(e); // (arrows, falling blocks and the like just go)
   }
+  return keep;
+}
+R.onChunkUnloaded = c => {
+  const keep = chunkKeep(c, true);
+  for (const e of ENT) if (e.remote && !e.dead && Math.floor(e.x) >> 4 === c.cx && Math.floor(e.z) >> 4 === c.cz && e !== PL.riding) removeEnt(e); // another player's world: gone with the chunk
   if (keep.length || c.mobs) { c.mobs = keep; c.modified = true; } // unloadChunk saves right after this
+  c.mobsFresh = true;
 };
 W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
@@ -8335,7 +8353,7 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
 // ---------- render update (interpolated) ----------
@@ -16330,6 +16348,100 @@ addEventListener('pointermove', e => { DOLL.mx = e.clientX; DOLL.my = e.clientY;
 function dollTick() { const el = document.querySelector('.doll'); if (el && UI.screen) dollRender(el, DOLL.mx, DOLL.my); }
 
 </script>
+<script>/* js/mpcore.js */
+// The world's side of multiplayer, shared by the server (tools/server.js, files on disk) and a player who opens their own
+// world to others (this browser, IndexedDB): who is playing and where, who runs each dimension, the clock and the weather,
+// every chunk's stored state with the changes made since, containers, each player's saved inventory and place.
+// The first player in a dimension runs it (mobs, fluids, crops, redstone) and stores its chunks here; when that player
+// leaves or changes dimension, the next one there takes over with the stored mobs.
+//   store: { state: { meta, time, rain, thunder, weatherT, players }, keys: Set of chunk keys, load(dk) -> Promise of
+//            { rec, edits, tiles } | null, save(dk, entry), saveState(), log(text) }
+//   out(id, message): deliver a message to one player
+function mpWorldCore(store, out) {
+  const S = store.state, players = new Map(), auth = new Map(), cache = new Map();
+  const blank = () => ({ rec: null, edits: [], tiles: {} });
+  const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
+  const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
+  const prefix = dim => ({ '-1': 'n', 1: 'e' }[dim] || '');
+  const chunkKey = (dim, x, z) => prefix(dim) + (x >> 4) + ',' + (z >> 4);
+  const send = (p, o) => out(p.id, o);
+  const others = (p, o, sameDim) => { for (const q of players.values()) if (q !== p && q.joined && (!sameDim || q.dim === p.dim)) out(q.id, o); };
+  function pickAuth(dim) {
+    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim);
+    if (cur != null && here.some(q => q.id === cur)) return;
+    if (here.length) auth.set(dim, here[0].id); else auth.delete(dim);
+    const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
+  }
+  function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
+  function tick() { // once a second: 20 ticks of the clock and the weather while anyone plays
+    if (!players.size || !S.meta) return;
+    const g = S.meta.gamerules || {};
+    if (g.doDaylightCycle !== false) S.time += 20;
+    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - 20) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+    // the night passes once everyone in the Overworld has been in bed for a few seconds
+    const ow = [...players.values()].filter(q => q.joined && q.dim === 0 && q.s && q.s.mode !== 'spectator');
+    const asleep = ow.length && ow.every(q => q.s.sleep); S.sleepT = asleep ? (S.sleepT || 0) + 1 : 0;
+    if (S.sleepT >= 5) { S.time = Math.ceil(S.time / 24000) * 24000; S.rain = 0; S.thunder = false; S.sleepT = 0; for (const q of players.values()) if (q.joined) out(q.id, { t: 'wake' }); }
+    for (const q of players.values()) if (q.joined) out(q.id, { t: 'time', time: S.time, rain: S.rain, thunder: S.thunder });
+    if (S.time % 200 === 0) store.saveState();
+  }
+  function message(id, m) {
+    let p = players.get(id); if (!p) { p = { id, name: null, dim: null, joined: false, s: null }; players.set(id, p); }
+    const from = id; m.from = from;
+    switch (m.t) {
+      case 'create': // a new world, or the start of an upload of an existing one
+        if (S.meta) { send(p, { t: 'error', msg: '이 서버에는 이미 세계가 있습니다' }); return; }
+        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
+        S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
+      case 'join': {
+        if (!S.meta) { send(p, { t: 'noworld' }); return; }
+        p.name = String(m.name || '손님').slice(0, 16); p.skin = m.skin || null;
+        for (const q of players.values()) if (q !== p && q.joined && q.name === p.name) { send(p, { t: 'error', msg: '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        p.joined = true;
+        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.name] || null, stored: [...store.keys],
+          players: [...players.values()].filter(q => q !== p && q.joined).map(q => ({ id: q.id, name: q.name, skin: q.skin })), auth: Object.fromEntries(auth) });
+        others(p, { t: 'peer', id: from, name: p.name, skin: p.skin }); store.log(`${p.name} 접속 (${[...players.values()].filter(q => q.joined).length}명)`); return;
+      }
+      case 'dim': setDim(p, +m.dim || 0); return;
+      case 'pl': p.s = m; if (m.dim !== p.dim && p.joined) setDim(p, m.dim); others(p, m); return;
+      case 'pdata': { const nm = p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; store.saveState(); } return; }
+      case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
+      case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
+      case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
+        entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null };
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+          send(p, o); }); return; }
+      case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
+      case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;
+      case 'mobsnap': // the runner's mobs, items and vehicles every few seconds: what the next runner starts from
+        if (auth.get(p.dim) !== from) return;
+        for (const [dk, list] of m.l || []) entry(dk).then(c => { if (c.rec) c.rec.mobs = list; else c.rec = { v: 2, it: m.it, mobs: list }; c.recChanged = true; touch(dk, c); });
+        return;
+      case 'sets': // the dimension's runner: every change, kept until that chunk is stored again
+        if (auth.get(p.dim) !== from) return;
+        for (const e of m.l || []) { const dk = chunkKey(m.dim, e[0], e[2]); entry(dk).then(c => { c.edits.push(e); if (c.edits.length > 20000) c.edits.splice(0, c.edits.length - 20000); touch(dk, c); }); }
+        others(p, m, true); return;
+      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15); entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
+      case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+    }
+    // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
+    const to = m.to; delete m.to;
+    if (typeof to === 'number') { if (players.has(to)) out(to, m); }
+    else if (to === 'auth') { const a = auth.get(m.dim != null ? m.dim : p.dim); if (a != null && a !== from) out(a, m); }
+    else if (to === 'dim') others(p, m, true);
+    else others(p, m);
+  }
+  function leave(id) {
+    const p = players.get(id); if (!p) return; players.delete(id); if (!p.joined) return;
+    others(p, { t: 'gone', id }); store.log(`${p.name} 나감 (${[...players.values()].filter(q => q.joined).length}명)`);
+    if (p.dim != null) pickAuth(p.dim);
+    store.saveState();
+  }
+  return { message, leave, tick, players, auth };
+}
+if (typeof module !== 'undefined') module.exports = { mpWorldCore };
+
+</script>
 <script>/* js/multiplayer.js */
 // Multiplayer basics: one player hosts their world (like Java's "Open to LAN"), others join it.
 // Two ways to connect: a relay server (node tools/server.js, it also serves the game on your network) or,
@@ -16362,6 +16474,7 @@ function mpWebSocket(url, role) {
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
       if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { rej(new Error(m.msg)); ws.close(); } return; }
+      if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
       if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
       mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
@@ -16385,7 +16498,7 @@ async function mpMakeInvite() {
   const pc = new RTCPeerConnection(RTC_CFG), dc = pc.createDataChannel('mp', { ordered: true });
   await pc.setLocalDescription(await pc.createOffer()); await iceDone(pc);
   MP.rtc = { pc, dc, code: await mpPack(pc.localDescription.sdp) };
-  dc.onopen = () => { const id = MP.nextId++, send = rtcWire(dc, m => mpHandle(m, id), () => mpPeerGone(id)); MP.rtcLinks.set(id, send); MP.status = '새 참가자 연결됨'; if (UI.menu === 'mp_host') showMenu('mp_host'); };
+  dc.onopen = () => { const id = MP.nextId++, send = rtcWire(dc, m => MP.core ? MP.core.message(id, m) : mpHandle(m, id), () => MP.core ? MP.core.leave(id) : mpPeerGone(id)); MP.rtcLinks.set(id, send); MP.status = '새 참가자 연결됨'; if (UI.menu === 'mp_host') showMenu('mp_host'); };
   return MP.rtc.code;
 }
 async function mpAcceptAnswer(code) { if (!MP.rtc) throw new Error('먼저 초대 코드를 만드세요'); await MP.rtc.pc.setRemoteDescription({ type: 'answer', sdp: await mpUnpack(code) }); MP.rtc = null; }
@@ -16393,7 +16506,7 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
@@ -16416,26 +16529,68 @@ function mpSkinTex(p) { // another player's custom skin, decoded once into a pac
 }
 
 // ---------- starting and stopping ----------
+// your own world opened to others: this browser runs the world core (js/mpcore.js) on this world's IndexedDB, and
+// you are its player 0; friends reach it through the relay server or WebRTC. Same rules as a server world: each
+// dimension is run by a player there, so everyone can go anywhere.
 async function mpHostStart(kind) {
   if (!W.active || W.meta.remote) throw new Error('먼저 세계에 들어가세요');
-  MP.role = 'host'; MP.on = true; MP.eid = 1; MP.peers.clear();
-  MP.link = kind === 'ws' ? await mpWebSocket($('mpAddr').value.trim(), 'host') : mpRtcHostLink();
-  mpInstall(); chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
+  const relay = kind === 'ws' ? await mpWebSocket($('mpAddr').value.trim(), 'host') : mpRtcHostLink();
+  saveAll(true); await new Promise(r => setTimeout(r, 300));
+  W.mpLogs = await mpLogKeys(W.id);
+  Object.assign(MP, { on: true, server: true, isHost: true, role: 'guest', rolePending: true, id: 0, eid: 1, auth: {}, queue: [], relay, inbox: [] }); MP.peers.clear();
+  MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
+  MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
+  MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
+  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
+  chatMsg('멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
+// the core's messages: to you (in order, after the current one), or out to a guest
+function mpCoreOut(id, o) {
+  if (id !== 0) { if (MP.relay) MP.relay.send(o, id); return; }
+  MP.inbox.push(o); if (MP.inbox.length === 1) Promise.resolve().then(() => { const l = MP.inbox; MP.inbox = []; for (const m of l) mpHandle(m, m.from); });
+}
+const mpLogKeys = async id => new Set(((await dbReq('chunks', 'readonly', st => st.getAllKeys(IDBKeyRange.bound('mplog:' + id + ':', 'mplog:' + id + ':￿')))) || []).map(k => k.slice(('mplog:' + id + ':').length)));
+// the world core's storage in this browser: the world's own chunk records, plus the changes made since each was stored
+function mpHostStore() {
+  const id = W.id, logKey = dk => 'mplog:' + id + ':' + dk, dirty = new Map(), sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
+  const state = { meta: { name: W.meta.name, seed: W.seed, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh },
+    time: W.time, rain: W.rainTarget, thunder: W.thunderOn, weatherT: 24000, players: W.meta.mpPlayers || (W.meta.mpPlayers = {}) };
+  const toNet = r => { if (!r || typeof r !== 'object') return null; // (dbReq gives true for a missing key) if (!r.b) return { v: 2, it: r.it, mobs: r.mobs || null };
+    let b = r.b, m = r.m, l = r.l; const h = r.ch || 128; if (r.v < 3) { const n = 256 * h, dec = a => r.v >= 2 ? rleDec(a, n, Uint8Array) : a; b = rleEnc(Uint16Array.from(dec(b))); m = rleEnc(dec(m)); l = rleEnc(dec(l)); } // older saves: 8-bit ids
+    return { v: 3, it: r.it, ch: h, b: mpB64(b), m: mpB64(m), l: mpB64(l), bio: Array.from(r.bio), t: r.t || [], mobs: r.mobs || null }; };
+  const fromNet = r => r.b ? { v: 3, it: r.it, ch: r.ch, b: mpUnB64(r.b, Uint16Array), m: mpUnB64(r.m, Uint8Array), l: mpUnB64(r.l, Uint8Array), bio: Uint8Array.from(r.bio), t: r.t || [], mobs: r.mobs || null } : { v: 2, it: r.it, mobs: r.mobs || null };
+  return { state, keys: new Set([...W.saved, ...(W.mpLogs || [])]),
+    async load(dk) { const rec = await dbReq('chunks', 'readonly', st => st.get(id + ':' + dk)), lg = await dbReq('chunks', 'readonly', st => st.get(logKey(dk))); const ok = lg && typeof lg === 'object'; return { rec: toNet(rec), edits: ok && lg.edits || [], tiles: ok && lg.tiles || {} }; },
+    save(dk, c) { dirty.set(dk, c); },
+    saveState() { W.meta.mpPlayers = state.players; for (const k in state.meta.shared) W.meta[k] = state.meta.shared[k]; if (state.meta.gamerules) W.meta.gamerules = state.meta.gamerules; },
+    log(t) { if (/접속|나감/.test(t)) return; chatMsg(t, '#aaaaaa'); },
+    async flush() { const l = [...dirty]; dirty.clear();
+      for (const [dk, c] of l) {
+        if (c.recChanged && c.rec) { c.recChanged = false; const rec = fromNet(c.rec); await dbReq('chunks', 'readwrite', st => st.put(rec, id + ':' + dk)); W.saved.add(dk); }
+        if (c.edits.length || Object.keys(c.tiles).length) { await dbReq('chunks', 'readwrite', st => st.put({ edits: c.edits, tiles: c.tiles }, logKey(dk))); (W.mpLogs || (W.mpLogs = new Set())).add(dk); }
+        else { await dbReq('chunks', 'readwrite', st => st.delete(logKey(dk))); if (W.mpLogs) W.mpLogs.delete(dk); }
+      } } };
+}
+function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
 async function mpJoinWs(url) {
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join'); } catch (e) { MP.on = false; MP.role = null; throw e; }
   mpInstall();
-  if (MP.link.hello.kind === 'world') { MP.server = true; MP.rolePending = true; if (!MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; } }
+  MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
+  if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
   mpSend({ t: 'join', name: MP.name, skin: mpSkin() });
 }
 function mpStop() {
   if (!MP.on) return;
-  if (MP.server) mpServerLeave(); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
-  if (MP.link) MP.link.close(); MP.link = null; if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
+  const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
+  if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
+  if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
+    setTimeout(() => { st.flush(); setTimeout(() => st.flush(), 500); }, 50); try { MP.relay.close(); } catch (e) {} MP.relay = null; MP.core = null; MP.store = null; MP.isHost = false; }
+  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; // the last stored chunks get through before the connection closes if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
   MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.auth = {}; MP.rolePending = false; MP.queue = [];
+  if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
@@ -16454,7 +16609,7 @@ function mpHandle(m, from) {
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
-    case 'welcome': if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
+    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
     case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin() }); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
@@ -16640,6 +16795,7 @@ function mpTick() {
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
+  if (MP.server && W.tickN % 200 === 100) mpMobSnapshot();
   if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
   // guests' surroundings stay loaded and alive on the host: chunks, random ticks (crops, fire, ice), mob spawning
   const here = [...MP.peers.values()].filter(p => p.s && p.s.dim === W.dim && performance.now() - p.at < 5000);
@@ -16744,7 +16900,8 @@ function mpRestoreMobs(l) {
 function mpStoreChunk(c) {
   if (!c.modified) return; c.modified = false;
   const dk = dkey(c.cx, c.cz); W.saved.add(dk);
-  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs: c.mobs || null } : { v: 2, it: ITEM_TABLE, mobs: c.mobs || null };
+  const mobs = c.mobsFresh || W.chunks.get(c.key) !== c ? c.mobs || null : chunkKeep(c, false); c.mobsFresh = false; // a chunk still here: what stands in it now
+  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
   mpSend({ t: 'store', dk, rec });
 }
 function mpPdata() {
@@ -16754,11 +16911,19 @@ function mpPdata() {
 function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
 let mpSharedLast = '';
 function mpSendShared() { const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k]; const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
-function mpServerLeave() { // keep everything on the server before going
+function mpServerLeave(stay) { // keep everything in the world's store before going (stay: the host closes multiplayer and plays on)
   if (!W.active) return;
   mpSendPdata();
-  if (MP.role === 'host') { mpSendShared(); if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; } for (const c of W.chunks.values()) { R.onChunkUnloaded(c); mpStoreChunk(c); } }
+  if (MP.role === 'host') { mpSendShared(); if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
+    for (const c of W.chunks.values()) { if (stay) { c.mobs = chunkKeep(c, false); c.mobsFresh = true; c.modified = true; } else R.onChunkUnloaded(c); mpStoreChunk(c); } }
 }
+// every ten seconds the runner sends what lives in its chunks, so whoever takes over starts from the world as it was
+function mpMobSnapshot() {
+  const l = []; for (const c of W.chunks.values()) { const k = chunkKeep(c, false); if (k.length || c.mobs) l.push([dkey(c.cx, c.cz), k]); }
+  if (l.length) mpSend({ t: 'mobsnap', dim: W.dim, it: ITEM_TABLE, l });
+}
+// after closing a world you didn't run: its chunks come back from the save, with their mobs
+function mpDropChunks() { for (const c of [...W.chunks.values()]) { c.modified = false; if (W.onChunkUnloaded) W.onChunkUnloaded(c); W.chunks.delete(c.key); } W.lastKey = -1; }
 // your own world, sent to a server so others can play it without you: chunks, world data and your player
 async function mpUpload(url) {
   if (!W.active || W.meta.remote) throw new Error('먼저 올릴 세계에 들어가세요');
@@ -17231,6 +17396,7 @@ async function startWorld(id, meta) {
   W.id = meta.id; W.seed = meta.seed; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
   W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
   await loadSavedKeys(meta.id);
+  W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null;

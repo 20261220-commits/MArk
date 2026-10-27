@@ -260,6 +260,14 @@ function neighborUpdate(x, y, z) {
   // any block change can reroute dust next to it
   for (const [dx, dy, dz] of N6) if (getBlock(x + dx, y + dy, z + dz) === BID.redstone_wire) { rsMark(x + dx, y + dy, z + dz); break; }
 }
+// changes made while this world was open to others, kept beside chunks that weren't stored again (see mpcore.js)
+async function applyMpLog(c) {
+  const dk = dkey(c.cx, c.cz), key = 'mplog:' + W.id + ':' + dk, wid = W.id; W.mpLogs.delete(dk);
+  const lg = await dbReq('chunks', 'readonly', st => st.get(key)); if (!lg || typeof lg !== 'object' || wid !== W.id || W.chunks.get(c.key) !== c) return;
+  for (const [x, y, z, id, m, mo] of lg.edits || []) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); }
+  for (const i in lg.tiles || {}) c.tiles.set(+i, lg.tiles[i]);
+  c.modified = c.edited = true; saveChunk(c, false, true); dbReq('chunks', 'readwrite', st => st.delete(key));
+}
 // fences and panes store their N/E/S/W connections in meta (like block states)
 function updateConnections(x, y, z, b) {
   const kind = BLOCKS[b].connect; let m = 0;
@@ -562,6 +570,7 @@ function addChunk(cx, cz, d, tiles) {
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c);
+  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
