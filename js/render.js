@@ -26,7 +26,7 @@ varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 512.0;
+  vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
@@ -322,7 +322,7 @@ function meshedBlockGeometry(id, meta, single) {
   for (const d of [r.o, r.c, r.t]) for (let k = 0; k < d.idx.length; k++) {
     const v = d.idx[k];
     pos.push(d.pos[v * 3] / 16 - 1 - 8.5, d.pos[v * 3 + 1] / 16 - 1.5, d.pos[v * 3 + 2] / 16 - 1 - (put.length > 1 ? 8 : 8.5));
-    uv.push(d.uv[v * 2] / 512, d.uv[v * 2 + 1] / 512); shade.push(d.lt[v * 4 + 2] / 255);
+    uv.push(d.uv[v * 2] / 8192, d.uv[v * 2 + 1] / 8192); shade.push(d.lt[v * 4 + 2] / 255);
     const c = [d.col[v * 4], d.col[v * 4 + 1], d.col[v * 4 + 2]], tinted = c[0] < 250 || c[1] < 250 || c[2] < 250;
     tintA.push(...(tinted && def ? def : c).map(q => q / 255));
   }

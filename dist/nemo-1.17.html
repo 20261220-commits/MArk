@@ -1138,12 +1138,12 @@ function makeGen(seed) {
     let river = false;
     if (land > 0.6 && mount < 0.5 && rv < 0.05) { const k = 1 - rv / 0.05; h = h + (57 - h) * smooth(0, 0.65, k); river = rv < 0.03; }
     // mushroom fields: rare islands far out at sea
-    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.05 ? smooth(0.5, 0.62, mush) : 0;
+    const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.08 ? smooth(0.8, 0.88, mush) : 0; // about 0.2% of the world, as in Java
     if (mk > 0) h = h + (SEA + 3 + hills * 4 - h) * mk;
     h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
     const hum = nH.fbm(wx / 900, wz / 900, 3) * 1.6;
     let b;
-    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.32 ? BIO.WARM_OCEAN : temp > 0.12 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
+    if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.42 ? BIO.WARM_OCEAN : temp > 0.18 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
     else if (river && h <= SEA) b = BIO.RIVER;
     else if (h <= SEA + 2 && cont < 0.2 && mount < 0.2) b = temp > 0.5 && hum < -0.1 ? BIO.DESERT : BIO.BEACH;
     else if (mount > 0.45) b = BIO.MOUNTAINS;
@@ -1153,7 +1153,7 @@ function makeGen(seed) {
     else if (hum > 0.45 && temp > 0.1 && h <= SEA + 6) b = BIO.SWAMP;
     else if (temp > 0.3 && hum > 0.3) b = BIO.JUNGLE;
     else if (temp > 0.3 && hum < 0.2) b = BIO.SAVANNA;
-    else if (hum > 0.15) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.25 ? BIO.BIRCH : f < -0.35 ? BIO.DARK_FOREST : BIO.FOREST; }
+    else if (hum > -0.22) { const f = nX.n2(wx / 300, wz / 300); b = f > 0.3 ? BIO.BIRCH : f < -0.4 ? BIO.DARK_FOREST : BIO.FOREST; } // forests are the commonest temperate land
     else b = BIO.PLAINS;
     if (mk > 0.5 && h >= SEA) b = BIO.MUSHROOM;
     else if (b === BIO.TUNDRA && nX.n2(wx / 420 + 31, wz / 420) > 0.35) b = BIO.ICE_SPIKES;
@@ -3092,7 +3092,7 @@ Buf.prototype.out = function (flip) {
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
   // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
-  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), oFlip = [], cFlip = [], tFlip = [];
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = []; // Wt: water, drawn before the other translucent blocks
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -3132,7 +3132,10 @@ function meshChunk(B, M, L, bio, opts) {
   const isRS = b => b === 1062 || b === 120 || b === 121 || b === 122 || b === 125 || b === 126 || b === 127 || b === 128 || b === 104 || b === 225 || b === 228 || b === 229;
   function quad(buf, flipArr, cs, tile, u0, v0, u1, v1, rot, lights, sh, flip) {
     const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
-    QU[0] = tu + u0; QU[1] = tv + v1; QU[2] = tu + u1; QU[3] = tv + v1; QU[4] = tu + u1; QU[5] = tv + v0; QU[6] = tu + u0; QU[7] = tv + v0;
+    // texture coordinates in 1/16 pixels, pulled 1/16 pixel into the face so the edge never samples the next tile
+    // of the atlas (that showed as dark dashed lines across water and other surfaces at a distance)
+    const iu = u1 > u0 ? 1 : u1 < u0 ? -1 : 0, iv = v1 > v0 ? 1 : v1 < v0 ? -1 : 0, a0 = (tu + u0) * 16 + iu, a1 = (tu + u1) * 16 - iu, b0 = (tv + v0) * 16 + iv, b1 = (tv + v1) * 16 - iv;
+    QU[0] = a0; QU[1] = b1; QU[2] = a1; QU[3] = b1; QU[4] = a1; QU[5] = b0; QU[6] = a0; QU[7] = b0;
     if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
     const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
     for (let k = 0; k < 4; k++) {
@@ -3468,7 +3471,7 @@ function meshChunk(B, M, L, bio, opts) {
     return n ? s / n : 0.89;
   }
   function fluid(id, meta, x, y, z) {
-    const water = id === 27, buf = water ? Tr : O, fl = water ? tFlip : oFlip, tile = FT[id * 4];
+    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, tile = FT[id * 4];
     const top = bw(x, y + 1, z) === id;
     const h00 = top ? 1 : corner(x, y, z, id, -1, -1), h10 = top ? 1 : corner(x, y, z, id, 1, -1), h11 = top ? 1 : corner(x, y, z, id, 1, 1), h01 = top ? 1 : corner(x, y, z, id, -1, 1);
     const HH = (cx, cz) => cx ? (cz ? h11 : h10) : (cz ? h01 : h00);
@@ -3477,7 +3480,7 @@ function meshChunk(B, M, L, bio, opts) {
       if (nb === id) continue;
       if (f !== 2 && OPQ[nb]) continue;
       if (f === 2 && top) continue;
-      if (water && nb === 52 && f !== 2) continue;
+      if (water && nb === 52) continue; // under ice the water's surface is hidden (it doubled the blend in rows)
       flatLight(nx, ny, nz);
       const ownL = lightAt(x, y, z); if (f === 2 || ((ownL >> 4) > (lightAt(nx, ny, nz) >> 4))) { const s = (ownL >> 4) * 17, b = (ownL & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = Math.max(L4[k][0], s); L4[k][1] = Math.max(L4[k][1], b); } }
       SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
@@ -3486,7 +3489,10 @@ function meshChunk(B, M, L, bio, opts) {
       if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
-  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Tr.out(tFlip) };
+  // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
+  // water drawn over ice darkened whole rows of a frozen ocean
+  for (let i = 0; i < Tr.n; i++) { if (Wt.n * 3 + 3 >= Wt.pos.length) Wt.grow(); const n = Wt.n++; Wt.pos.set(Tr.pos.subarray(i * 3, i * 3 + 3), n * 3); Wt.uv.set(Tr.uv.subarray(i * 2, i * 2 + 2), n * 2); Wt.lt.set(Tr.lt.subarray(i * 4, i * 4 + 4), n * 4); Wt.col.set(Tr.col.subarray(i * 4, i * 4 + 4), n * 4); }
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)) };
 }
 
 // ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
@@ -6850,7 +6856,7 @@ varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 512.0;
+  vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
   float blk = curve(lt.y) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
@@ -7146,7 +7152,7 @@ function meshedBlockGeometry(id, meta, single) {
   for (const d of [r.o, r.c, r.t]) for (let k = 0; k < d.idx.length; k++) {
     const v = d.idx[k];
     pos.push(d.pos[v * 3] / 16 - 1 - 8.5, d.pos[v * 3 + 1] / 16 - 1.5, d.pos[v * 3 + 2] / 16 - 1 - (put.length > 1 ? 8 : 8.5));
-    uv.push(d.uv[v * 2] / 512, d.uv[v * 2 + 1] / 512); shade.push(d.lt[v * 4 + 2] / 255);
+    uv.push(d.uv[v * 2] / 8192, d.uv[v * 2 + 1] / 8192); shade.push(d.lt[v * 4 + 2] / 255);
     const c = [d.col[v * 4], d.col[v * 4 + 1], d.col[v * 4 + 2]], tinted = c[0] < 250 || c[1] < 250 || c[2] < 250;
     tintA.push(...(tinted && def ? def : c).map(q => q / 255));
   }
