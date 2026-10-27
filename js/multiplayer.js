@@ -116,7 +116,7 @@ function mpHandle(m, from) {
     case 'gone': mpPeerGone(m.id); return;
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
-    case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); if (host) mpSend({ ...m, id }); return; }
+    case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (host) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'sets': if (!host) mpApplySets(m); return;
@@ -385,14 +385,21 @@ function mpRender(dt) {
   for (const p of MP.peers.values()) {
     const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
-    const last = p.pos || [s.x, s.y, s.z]; p.pos = [last[0] + (s.x - last[0]) * k, last[1] + (s.y - last[1]) * k, last[2] + (s.z - last[2]) * k];
-    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20;
+    // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
+    // (updates come 10 times a second); the legs swing with the speed between updates, as Java's limbDistance does
+    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 130; let a = H[H.length - 1], b = a;
+    for (let i = H.length - 1; i > 0; i--) if (H[i - 1][0] <= rt) { a = H[i - 1]; b = H[i]; break; }
+    const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
+    p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
+    if (Math.hypot(p.pos[0] - last[0], p.pos[2] - last[2]) > 8) p.hist = [[performance.now(), s.x, s.y, s.z]]; // a teleport: no sliding across the world
+    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20, segT = a && b && b[0] > a[0] ? (b[0] - a[0]) / 50 : 0;
+    p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
     const glide = !!s.glide, swim = s.pose === 'swim' && !glide; p.glideT = glide ? (p.glideT || 0) + dtT : 0;
     const ps = { headYaw: 0, headPitch: -s.pitch, headPitchW: -s.pitch, yaw: s.yaw, right: s.held ? 'item' : null, left: s.off ? 'item' : null, two: null, charge: 0, swing: s.swing, swingLeft: false,
       sneak: (!!s.sneak || s.pose === 'crouch') && !s.fly && !glide, riding: false, flying: !!s.fly, gliding: glide, glideT: p.glideT, vel2: mvx * mvx + mvz * mvz, vy: (s.y - last[1]) || 0, swim, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
     tickBodyYaw(st, ps, mvx, mvz, dtT);
-    const spd = Math.min(1, Math.hypot(mvx, mvz) / Math.max(dt, 1e-3) / 20 * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
+    const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
     st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
     ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
     m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);

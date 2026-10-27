@@ -47,6 +47,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #heldName{position:fixed;left:50%;bottom:calc(60 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(74 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;opacity:0;transition:opacity .4s;white-space:nowrap;background:rgba(0,0,0,.35);padding:var(--px) calc(4 * var(--px))}
 #toast.show{opacity:1;transition:none}
+#plist{position:fixed;left:50%;top:calc(10 * var(--px));transform:translateX(-50%);min-width:calc(120 * var(--px));background:rgba(0,0,0,.45);padding:calc(2 * var(--px)) calc(4 * var(--px));z-index:30;font-size:calc(8 * var(--px));color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
+#plist div{padding:calc(1 * var(--px)) 0;border-bottom:1px solid rgba(255,255,255,.12)}
 #debug{position:fixed;left:calc(2 * var(--px));top:calc(2 * var(--px));white-space:pre;font-size:calc(7 * var(--px));line-height:1.35;color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #2a2a2a;background:transparent}
 #chatLog{position:fixed;left:calc(2 * var(--px));bottom:calc(48 * var(--px));width:min(calc(320 * var(--px)),70vw);font-size:calc(7 * var(--px));line-height:1.45}
 #chatLog div{background:rgba(0,0,0,.45);padding:0 calc(2 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow-wrap:anywhere}
@@ -154,6 +156,8 @@ body.pano #menu:not(.m-loading){background:radial-gradient(ellipse at center,rgb
 body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,body.pano #menu.m-create{background:rgba(0,0,0,.5)}
 #menu.m-pause,#menu.m-death{background:linear-gradient(rgba(16,16,16,.6),rgba(16,16,16,.75))}
 #menu.m-death{background:linear-gradient(rgba(120,0,0,.45),rgba(60,0,0,.6))}
+.titleDoll{position:absolute;right:max(8px,3vw);top:50%;transform:translateY(-46%);width:min(30vw,380px);height:min(58vh,500px);cursor:pointer;pointer-events:auto}
+@media (max-aspect-ratio:1/1){.titleDoll{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mb:hover,.mb:focus-visible{background-color:#7e88c8;color:#ffffa0;outline:none;box-shadow:inset var(--px) var(--px) 0 #c8d0ff,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #4a5288}
@@ -317,7 +321,7 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -883,6 +887,22 @@ function rotBox(b, f) { const [x0, y0, z0, x1, y1, z1] = b; return f === 0 ? b :
 const DIR6_IDS = new Set([125, 126, 129, 130, 131]), fix6 = (id, m) => DIR6_IDS.has(id) && (m & 7) > 5 ? (m & ~7) | 5 : m;
 // blocks that take another block's shape (trapped chests, damaged anvils, the extra slab / stair / wall sets)
 const SHAPE_AS = { 1102: 44, 1116: 250, 1117: 250, 1118: 251, 1119: 251, 1120: 253 };
+// Java's model elements for blocks whose shapes plain boxes can't draw: [from, to, rotation [axis, degrees, origin] | null,
+// faces {e,w,u,d,s,n: [tile, u0, v0, u1, v1, uv rotation]}] (block/lectern.json, block/grindstone.json)
+const LECTERN_TOP = ['x', -22.5, [8, 8, 8]], FN = { e: 0, w: 1, u: 2, d: 3, s: 4, n: 5 }, NV = [0, 0, 0], PV = [0, 0, 0];
+const MODEL_ELS = {
+  242: meta => [
+    [[0, 0, 0], [16, 2, 16], null, { n: ['lectern_base', 0, 14, 16, 16], e: ['lectern_base', 0, 6, 16, 8], s: ['lectern_base', 0, 6, 16, 8], w: ['lectern_base', 0, 6, 16, 8], u: ['lectern_base', 0, 0, 16, 16, 180], d: ['oak_planks', 0, 0, 16, 16] }],
+    [[4, 2, 4], [12, 15, 12], null, { n: ['lectern_front', 0, 0, 8, 13], e: ['lectern_sides', 2, 16, 15, 8, 90], s: ['lectern_front', 8, 3, 16, 16], w: ['lectern_sides', 2, 8, 15, 16, 90] }],
+    [[0.0125, 12, 3], [15.9875, 16, 16], LECTERN_TOP, { n: ['lectern_sides', 0, 0, 16, 4], e: ['lectern_sides', 0, 4, 13, 8], s: ['lectern_sides', 0, 4, 16, 8], w: ['lectern_sides', 0, 4, 13, 8], u: ['lectern_top', 0, 1, 16, 14, 180], d: ['oak_planks', 0, 0, 16, 13] }],
+    ...(meta & 4 ? [[[1, 16, 4], [15, 17, 15], LECTERN_TOP, { u: ['lectern_book', 0, 0, 16, 16], n: ['lectern_book', 0, 15, 16, 16], s: ['lectern_book', 0, 15, 16, 16], e: ['lectern_book', 0, 15, 16, 16], w: ['lectern_book', 0, 15, 16, 16] }]] : [])],
+  241: () => [
+    [[12, 0, 6], [14, 7, 10], null, { n: ['dark_oak_log', 2, 9, 4, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 12, 9, 14, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 12, 6, 14, 10] }],
+    [[2, 0, 6], [4, 7, 10], null, { n: ['dark_oak_log', 12, 9, 14, 16], e: ['dark_oak_log', 10, 16, 6, 9], s: ['dark_oak_log', 2, 9, 4, 16], w: ['dark_oak_log', 6, 9, 10, 16], d: ['dark_oak_log', 2, 6, 4, 10] }],
+    [[12, 7, 5], [14, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], e: ['grindstone_pivot', 0, 0, 6, 6], s: ['grindstone_pivot', 6, 0, 8, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[2, 7, 5], [4, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], s: ['grindstone_pivot', 6, 0, 8, 6], w: ['grindstone_pivot', 0, 0, 6, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
+    [[4, 4, 2], [12, 16, 14], null, { n: ['grindstone_round', 0, 0, 8, 12], e: ['grindstone_side', 0, 0, 12, 12], s: ['grindstone_round', 0, 0, 8, 12], w: ['grindstone_side', 0, 0, 12, 12], u: ['grindstone_round', 0, 0, 8, 12], d: ['grindstone_round', 0, 0, 8, 12] }]],
+};
 function shapes(id, meta) {
   meta = fix6(id, meta); id = SHAPE_AS[id] || id;
   switch (id) {
@@ -3239,8 +3259,8 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
-      const boxes = shapes(id, meta);
-      boxFaces(id, meta, x, y, z, boxes, Cu, cFlip);
+      if (MODEL_ELS[id]) modelFaces(id, meta, x, y, z, MODEL_ELS[id](meta), meta & 3, Cu, cFlip);
+      else boxFaces(id, meta, x, y, z, shapes(id, meta), Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);
       if (id === 1086 && (meta & 3)) crossAt(x, y, z, (meta & 3) === 2 ? T.bamboo_leaves : T.bamboo_small_leaves, 0, 1, 0.05);
     } else if (rt === RT.TBOX) {
@@ -3320,6 +3340,28 @@ function meshChunk(B, M, L, bio, opts) {
     }
     quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false);
     if (up) { for (let k = 0; k < 4; k++) CS[k][1] -= 1 / 32; const t = CS[1]; CS[1] = CS[3]; CS[3] = t; quad(Cu, cFlip, CS, tile, 0, 0, 16, 16, rot, L4, SH4, false); } // underside of a slope
+  }
+  // blocks drawn from Java's own model elements (models/block/*.json): boxes with per-face uvs and uv rotation, an
+  // optional element rotation (the lectern's sloped top) and the blockstate's y rotation from the facing
+  function rotP(v, ax, a, o) { const c = Math.cos(a), s = Math.sin(a), i = ax === 'x' ? 1 : 0, j = ax === 'z' ? 1 : 2, p = v[i] - o[i], q = v[j] - o[j];
+    if (ax === 'y') { v[0] = o[0] + p * c + q * s; v[2] = o[2] - p * s + q * c; } else { v[i] = o[i] + p * c - q * s; v[j] = o[j] + p * s + q * c; } }
+  function modelFaces(id, meta, x, y, z, els, yRot, OUT, OFL) {
+    const ya = -yRot * Math.PI / 2, C8 = [8, 8, 8], Z3 = [0, 0, 0];
+    for (const [fr, to, er, faces] of els) for (const fk in faces) {
+      const f = FN[fk], F = FACES[f], [tn, u0, v0, u1, v1, ur] = faces[fk];
+      NV[0] = F.n[0]; NV[1] = F.n[1]; NV[2] = F.n[2];
+      if (er) rotP(NV, er[0], er[1] * Math.PI / 180, Z3); if (yRot) rotP(NV, 'y', ya, Z3);
+      const an = [Math.abs(NV[0]), Math.abs(NV[1]), Math.abs(NV[2])], axn = an[0] > an[1] && an[0] > an[2] ? 0 : an[1] > an[2] ? 1 : 2, sgn = NV[axn] > 0 ? 1 : -1;
+      const g = axn === 0 ? (sgn > 0 ? 0 : 1) : axn === 1 ? (sgn > 0 ? 2 : 3) : (sgn > 0 ? 4 : 5);
+      for (let k = 0; k < 4; k++) { const c = F.c[k]; PV[0] = c[0] ? to[0] : fr[0]; PV[1] = c[1] ? to[1] : fr[1]; PV[2] = c[2] ? to[2] : fr[2];
+        if (er) rotP(PV, er[0], er[1] * Math.PI / 180, er[2]); if (yRot) rotP(PV, 'y', ya, C8);
+        CS[k][0] = x + PV[0] / 16; CS[k][1] = y + PV[1] / 16; CS[k][2] = z + PV[2] / 16; }
+      const G = FACES[g], edge = !er && ((sgn > 0 ? Math.max(CS[0][axn], CS[2][axn]) : Math.min(CS[0][axn], CS[2][axn])) - [x, y, z][axn]) === (sgn > 0 ? 1 : 0);
+      if (edge && OPQ[blk(x + G.n[0], y + G.n[1], z + G.n[2])]) continue;
+      if (edge) flatLight(x + G.n[0], y + G.n[1], z + G.n[2]); else flatLight(x, y, z);
+      SH4[0] = SH4[1] = SH4[2] = SH4[3] = G.s;
+      quad(OUT, OFL, CS, T[tn] != null ? T[tn] : FT[id * 4], u0, v0, u1, v1, (4 - ((ur || 0) / 90)) & 3, L4, SH4, false);
+    }
   }
   function boxFaces(id, meta, x, y, z, boxes, OUT, OFL) {
     for (let bi = 0; bi < boxes.length; bi++) {
@@ -3903,7 +3945,7 @@ const TILE = {
   slime_block: 'slime_block',
 };
 // expansion tiles share the pack's names
-for (const t of 'jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3'.split(' ')) TILE[t] = t;
+for (const t of 'lectern_base grindstone_pivot jungle_log jungle_log_top jungle_planks jungle_leaves jungle_sapling acacia_log acacia_log_top acacia_planks acacia_leaves acacia_sapling dark_oak_log dark_oak_log_top dark_oak_planks dark_oak_leaves dark_oak_sapling stripped_oak_log stripped_oak_log_top stripped_spruce_log stripped_spruce_log_top stripped_birch_log stripped_birch_log_top stripped_jungle_log stripped_jungle_log_top stripped_acacia_log stripped_acacia_log_top stripped_dark_oak_log stripped_dark_oak_log_top terracotta allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip lily_of_the_valley blue_orchid wither_rose red_sand red_sandstone red_sandstone_top red_sandstone_bottom podzol_side podzol_top mycelium_side mycelium_top coarse_dirt packed_ice blue_ice bone_block_side bone_block_top prismarine sea_lantern sponge wet_sponge purpur_block purpur_pillar purpur_pillar_top end_rod chorus_plant chorus_flower brown_mushroom_block red_mushroom_block mushroom_stem lily_pad vine observer_side observer_top observer_front hopper_outside hopper_top comparator dispenser_front dropper_front daylight_detector_side daylight_detector_top target_side target_top note_block iron_door_bottom iron_door_top oak_trapdoor composter_side composter_top composter_bottom barrel_side barrel_top barrel_bottom blast_furnace_side blast_furnace_top blast_furnace_front smoker_side smoker_top smoker_bottom smoker_front cartography_table_side1 cartography_table_top cartography_table_side3 fletching_table_side fletching_table_top fletching_table_front loom_side loom_top loom_bottom loom_front stonecutter_side stonecutter_top stonecutter_bottom grindstone_side grindstone_round lectern_sides lectern_top lectern_front soul_torch soul_lantern soul_fire chain gilded_blackstone lodestone_side lodestone_top nether_sprouts carrots_stage0 orange_wool magenta_wool light_blue_wool yellow_wool lime_wool pink_wool gray_wool light_gray_wool cyan_wool purple_wool blue_wool brown_wool green_wool red_wool black_wool white_concrete orange_concrete magenta_concrete light_blue_concrete yellow_concrete lime_concrete pink_concrete gray_concrete light_gray_concrete cyan_concrete purple_concrete blue_concrete brown_concrete green_concrete red_concrete black_concrete white_concrete_powder orange_concrete_powder magenta_concrete_powder light_blue_concrete_powder yellow_concrete_powder lime_concrete_powder pink_concrete_powder gray_concrete_powder light_gray_concrete_powder cyan_concrete_powder purple_concrete_powder blue_concrete_powder brown_concrete_powder green_concrete_powder red_concrete_powder black_concrete_powder white_terracotta orange_terracotta magenta_terracotta light_blue_terracotta yellow_terracotta lime_terracotta pink_terracotta gray_terracotta light_gray_terracotta cyan_terracotta purple_terracotta blue_terracotta brown_terracotta green_terracotta red_terracotta black_terracotta white_stained_glass orange_stained_glass magenta_stained_glass light_blue_stained_glass yellow_stained_glass lime_stained_glass pink_stained_glass gray_stained_glass light_gray_stained_glass cyan_stained_glass purple_stained_glass blue_stained_glass brown_stained_glass green_stained_glass red_stained_glass black_stained_glass polished_granite polished_diorite polished_andesite chiseled_stone_bricks cut_sandstone chiseled_sandstone quartz_bricks chiseled_quartz_block red_nether_bricks chiseled_nether_bricks cracked_nether_bricks prismarine_bricks dark_prismarine polished_blackstone polished_blackstone_bricks cut_red_sandstone observer_back observer_back_on dispenser_front_vertical dropper_front_vertical blast_furnace_front_on smoker_front_on composter_compost composter_ready comparator_on carrots_stage1 carrots_stage2 carrots_stage3 potatoes_stage0 potatoes_stage1 potatoes_stage2 potatoes_stage3 beetroots_stage0 beetroots_stage1 beetroots_stage2 beetroots_stage3'.split(' ')) TILE[t] = t;
 TILE.soul_fire = 'soul_fire_0';
 for (let i = 0; i < 8; i++) TILE['wheat' + i] = 'wheat_stage' + i;
 // newer tiles the full pack has under the same names (first animation frame where animated)
@@ -4022,6 +4064,7 @@ Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', gui_inv
   env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
   pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
   banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
+  ...Object.fromEntries([...Array(10).keys()].map(i => ['destroy_' + i, 'block/destroy_stage_' + i])), // the breaking overlay
   conduit_base: 'entity/conduit/base', lectern_book_ent: 'entity/enchanting_table_book', arrow_ent: 'entity/projectiles/arrow', spectral_arrow_ent: 'entity/projectiles/spectral_arrow',
   minecart_ent: 'entity/minecart', armorstand: 'entity/armorstand/wood', fishing_hook: 'entity/fishing_hook', lead_knot: 'entity/lead_knot', evoker_fangs: 'entity/illager/evoker_fangs',
   llama_spit: 'entity/llama/spit', trident_ent: 'entity/trident', dragon_fireball: 'entity/enderdragon/dragon_fireball', beacon_beam: 'entity/beacon_beam', wither_armor: 'entity/wither/wither_armor',
@@ -5591,6 +5634,8 @@ const SCAF_C = hex(0xd8b45a);
 PAINT.scaffolding_side = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || Math.abs(x - y) < 1.5) ? quant(shade(SCAF_C, (x < 2 || x > 13 ? 0.85 : 1) * (0.9 + r() * 0.15)), 3) : null);
 PAINT.scaffolding_top = r => fill((x, y) => (x < 2 || x > 13 || y < 2 || y > 13 || (x + y) % 5 === 0) ? quant(shade(SCAF_C, 0.9 + r() * 0.15), 3) : null);
 PAINT.scaffolding_bottom = PAINT.scaffolding_top;
+PAINT.lectern_base = r => fill((x, y) => quant(shade(hex(0xa8865a), (y % 4 === 0 ? 0.8 : 1) * (0.92 + r() * 0.12)), 3));
+PAINT.grindstone_pivot = r => fill((x, y) => quant(shade(hex(0x8a8a8a), 0.9 + r() * 0.15), 3));
 PAINT.lectern_book = r => fill((x, y) => x < 1 || x > 14 ? hex(0x6a3a1a) : x === 7 || x === 8 ? hex(0xb8a888) : y % 3 === 1 && y > 1 && y < 14 && x > 1 && x < 14 ? hex(0x5a5a5a) : quant(shade(hex(0xf0e8d0), 0.95 + r() * 0.06), 3));
 // tiles with no painter borrow a similar one until a resource pack supplies the real texture (nothing new is drawn)
 const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate', polished_deepslate: 'deepslate', chiseled_deepslate: 'deepslate', cracked_deepslate_bricks: 'deepslate', cracked_deepslate_tiles: 'deepslate',
@@ -6099,7 +6144,7 @@ const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 var
 function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
-  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = true; };
+  const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = c.urgent = true; }; // edits are remeshed first, on their own worker
   m(cx, cz);
   if (lx === 0) m(cx - 1, cz); else if (lx === 15) m(cx + 1, cz);
   if (lz === 0) m(cx, cz - 1); else if (lz === 15) m(cx, cz + 1);
@@ -6550,6 +6595,8 @@ const NWORK = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1))
 const workers = [];
 let jobId = 0;
 for (let i = 0; i < NWORK; i++) { const w = new Worker(workerURL); w.busy = 0; w.onmessage = e => onWorker(w, e.data); workers.push(w); }
+// one more worker only for chunks the player just changed: a broken or placed block never waits behind terrain generation
+const editWorker = new Worker(workerURL); editWorker.busy = 0; editWorker.onmessage = e => onWorker(editWorker, e.data);
 const bufPool = [];
 for (let i = 0; i < 4; i++) bufPool.push([new Uint16Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH), new Uint8Array(S.PA * S.PH)]); // allocated up front: no GC spike on the first meshes
 function idleWorker(max) { let best = null; for (const w of workers) if (w.busy < max && (!best || w.busy < best.busy)) best = w; return best; }
@@ -6570,7 +6617,7 @@ function handleWorker(m) {
     if (!c) return;
     c.meshing = false;
     if (m.ver !== c.ver) return;
-    W.meshInbox.push([c, m, m.ver]);
+    if (m.ver === c.urgentVer) W.meshInbox.unshift([c, m, m.ver]); else W.meshInbox.push([c, m, m.ver]);
   }
 }
 // a rolled loot entry -> stack, with what jar loot tables add: damage, random / leveled enchantments, explorer maps
@@ -6614,8 +6661,8 @@ function requestGen(cx, cz) {
   return true;
 }
 function meshable(c) { for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (!chunkAt(c.cx + dx, c.cz + dz)) return false; return true; }
-function requestMesh(c, opts) {
-  const w = idleWorker(3); if (!w) return false;
+function requestMesh(c, opts, urgent) {
+  const w = urgent && editWorker.busy < 2 ? editWorker : idleWorker(3); if (!w) return false;
   const PA = S.PA, PH = S.PH, P = bufPool.pop() || [new Uint16Array(PA * PH), new Uint8Array(PA * PH), new Uint8Array(PA * PH)];
   const [B, M, L] = P, bio = new Uint8Array(PA);
   // only copy layers up to the tallest neighbour; everything above is open sky
@@ -6636,7 +6683,7 @@ function requestMesh(c, opts) {
       }
     }
   }
-  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; // unique across chunks, so a stale job can never match a reloaded chunk
+  w.busy++; c.meshing = true; c.dirty = false; c.ver = ++W.verSeq; if (urgent) { c.urgent = false; c.urgentVer = c.ver; } // unique across chunks, so a stale job can never match a reloaded chunk
   w.postMessage({ type: 'mesh', id: jobId++, cx: c.cx, cz: c.cz, ver: c.ver, B, M, L, bio, opts: { ...opts, h } }, [B.buffer, M.buffer, L.buffer, bio.buffer]);
   return true;
 }
@@ -6726,6 +6773,8 @@ function buildSpiral(r) { const a = []; for (let dx = -r; dx <= r; dx++) for (le
 function streamChunks(px, pz, rd, meshOpts, budget) {
   const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = rd + 1;
   if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; }
+  // chunks the player just changed come first, even while an older mesh of them is still on its way
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const c = chunkAt(pcx + dx, pcz + dz); if (c && c.urgent && c.dirty && meshable(c)) requestMesh(c, meshOpts, true); }
   // meshing first (nearest first): visible chunks beat far terrain generation
   let sent = 0;
   for (const [dx, dz] of spiral) {
@@ -6864,6 +6913,7 @@ W.onMesh = (c, m) => {
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
     scene.add(mesh); c.mesh[k] = mesh;
   }
+  c.mesh.ver = c.ver;
 };
 W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
@@ -6918,8 +6968,30 @@ function setSelection(x, y, z, boxes) {
   selGeo.setDrawRange(0, n / 3); selGeo.attributes.position.needsUpdate = true; sel.visible = true;
 }
 const crackTexs = crackCanvases.map(c => { const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
-const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, fog: false }));
+// the breaking overlay covers the block's own model (a slab, a torch, a lectern), not a whole cube, and blends like
+// Java's crumbling layer: colour = 2 x texture x what is behind (grey keeps it, dark lines darken), clear pixels skipped
+const crack = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), new THREE.MeshBasicMaterial({ map: crackTexs[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4, fog: false, alphaTest: 0.1,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.DstColorFactor, blendDst: THREE.SrcColorFactor }));
 crack.visible = false; scene.add(crack);
+const crackGeos = new Map();
+function crackGeometry(id, meta) {
+  const key = id * 256 + (meta & 255); let g = crackGeos.get(key); if (g) return g;
+  let src = !BOX_ICON(id) ? meshedBlockGeometry(id, meta, true) : null, pos;
+  if (src) pos = src.attributes.position.array;
+  else { const a = []; for (const b of S.shapes(id, meta) || [[0, 0, 0, 16, 16, 16]]) { const bg = new THREE.BoxGeometry((b[3] - b[0]) / 16, (b[4] - b[1]) / 16, (b[5] - b[2]) / 16).toNonIndexed(); bg.translate((b[0] + b[3]) / 32 - .5, (b[1] + b[4]) / 32 - .5, (b[2] + b[5]) / 32 - .5); a.push(...bg.attributes.position.array); } pos = new Float32Array(a); }
+  const uv = new Float32Array(pos.length / 3 * 2), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  for (let t = 0; t < pos.length; t += 9) { // texture coordinates from the position on the face, as Java's sheeted decal does
+    A.fromArray(pos, t); B.fromArray(pos, t + 3); C.fromArray(pos, t + 6); const n = B.clone().sub(A).cross(C.clone().sub(A));
+    const ax = Math.abs(n.x) > Math.abs(n.y) && Math.abs(n.x) > Math.abs(n.z) ? 0 : Math.abs(n.y) > Math.abs(n.z) ? 1 : 2;
+    for (let k = 0; k < 3; k++) { const x = pos[t + k * 3] + .5, y = pos[t + k * 3 + 1] + .5, z = pos[t + k * 3 + 2] + .5, o = (t / 3 + k) * 2;
+      uv[o] = ax === 0 ? (n.x > 0 ? 1 - z : z) : x; uv[o + 1] = ax === 1 ? (n.y > 0 ? 1 - z : z) : y; } }
+  g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  crackGeos.set(key, g); return g;
+}
+R.setCrack = (x, y, z, id, meta, stage) => { if (stage < 0) { crack.visible = false; return; }
+  crack.geometry = crackGeometry(id, meta); crack.position.set(x + .5, y + .5, z + .5); crack.scale.setScalar(1.002); crack.material.map = crackTexs[Math.min(9, stage)]; crack.visible = true; };
+function applyPackCracks() { crackTexs.forEach((t, i) => { const c = entCanvas('destroy_' + i); if (c) { t.image = c; t.needsUpdate = true; } }); }
+R.applyPackCracks = applyPackCracks;
 R.setSelection = setSelection; R.sel = sel; R.crack = crack; R.crackTexs = crackTexs;
 
 // ---------- particles ----------
@@ -7056,9 +7128,38 @@ function itemGeometry(id) {
 }
 // a cube (or shaped block) with atlas UVs, centered at origin, unit size
 const DEFAULT_META = { 116: 5, 117: 10, 99: 0, 252: 5, 254: 10, 253: 5, 165: 5, 173: 10, 215: 1 }; // fence/pane icons show their connected arms
+// block items as the world draws them: the block (both halves of a bed) meshed alone by the terrain mesher, so
+// lecterns, beds, grindstones, end rods, beacons and every other shaped block look the same in the hand and the
+// inventory as when placed. Fences, walls and panes keep their inventory shapes (arms out) from the boxes below.
+let iconVol = null;
+const BOX_ICON = id => DEFAULT_META[id] != null || /(_wall|_fence|_pane|iron_bars)$/.test(ITEMS[id] ? ITEMS[id].key : '');
+function meshedBlockGeometry(id, meta, single) {
+  const PA = S.PA, PW = S.PW;
+  if (!iconVol) iconVol = { B: new Uint16Array(PA * S.PH), M: new Uint8Array(PA * S.PH), L: new Uint8Array(PA * S.PH).fill(0xf0), bio: new Uint8Array(PA).fill(2) };
+  const { B, M, L, bio } = iconVol, put = [[8, 1, 8, meta]];
+  if (id === S.BID.red_bed && !single) { put[0][3] = (meta & 0xf0) | 0; put.push([8, 1, 7, (meta & 0xf0) | 4]); } // foot, and the head one block north (DIRS[0])
+  for (const [x, y, z, m] of put) { const i = S.pidx(x, y, z); B[i] = id; M[i] = m; }
+  let r; try { r = S.meshChunk(B, M, L, bio, { fancy: true, smooth: false, h: 4 }); } catch (e) { r = null; }
+  for (const [x, y, z] of put) { const i = S.pidx(x, y, z); B[i] = 0; M[i] = 0; }
+  if (!r) return null;
+  const pos = [], uv = [], shade = [], tintA = [], def = DEFAULT_TINT[S.TINT[id]];
+  for (const d of [r.o, r.c, r.t]) for (let k = 0; k < d.idx.length; k++) {
+    const v = d.idx[k];
+    pos.push(d.pos[v * 3] / 16 - 1 - 8.5, d.pos[v * 3 + 1] / 16 - 1.5, d.pos[v * 3 + 2] / 16 - 1 - (put.length > 1 ? 8 : 8.5));
+    uv.push(d.uv[v * 2] / 512, d.uv[v * 2 + 1] / 512); shade.push(d.lt[v * 4 + 2] / 255);
+    const c = [d.col[v * 4], d.col[v * 4 + 1], d.col[v * 4 + 2]], tinted = c[0] < 250 || c[1] < 250 || c[2] < 250;
+    tintA.push(...(tinted && def ? def : c).map(q => q / 255));
+  }
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('shade', new THREE.Float32BufferAttribute(shade, 1)); geo.setAttribute('tint', new THREE.Float32BufferAttribute(tintA, 3));
+  if (put.length > 1) geo.userData.long = true;
+  return geo;
+}
 function blockGeometry(iid) { // iid: an item id (variant items resolve to their block and meta)
   if (blockGeoCache[iid]) return blockGeoCache[iid];
   const it = ITEMS[iid], id = it && it.place != null && it.block ? it.place : iid, vmeta = it && it.vi ? it.vi << S.VSH[id] : 0;
+  if (!BOX_ICON(id) && id !== S.BID.oak_door) { const g = meshedBlockGeometry(id, vmeta); if (g) return blockGeoCache[iid] = g; }
   const pos = [], uv = [], shade = [], tintA = [];
   const boxes = S.shapes(id, (DEFAULT_META[id] || 0) | vmeta) || [[0, 0, 0, 16, 16, 16]];
   const tint = DEFAULT_TINT[S.TINT[id]] || [255, 255, 255];
@@ -7140,7 +7241,7 @@ function renderBlockIcons() {
     const x = (i % cols) * ICON, y = Hd - (Math.floor(i / cols) + 1) * ICON;
     rt.viewport.set(x, y, ICON, ICON); rt.scissor.set(x, y, ICON, ICON);
     mesh.geometry = blockGeometry(id);
-    const s = id === S.BID.oak_door ? 0.55 : 1; mesh.scale.set(s, s, s);
+    const head = /_(skull|head)$/.test(ITEMS[id].key), s = id === S.BID.oak_door ? 0.55 : mesh.geometry.userData.long ? 0.66 : head ? 1.6 : 1; mesh.scale.set(s, s, s); mesh.position.y = head ? 0.25 * s : 0; // beds: template_bed's gui scale against a block's; heads: template_skull draws the head at full size
     renderer.setRenderTarget(rt); renderer.render(sc, cam);
   });
   const buf = new Uint8Array(Wd * Hd * 4);
@@ -10272,7 +10373,7 @@ function beaconHtml() {
 const shieldUp = () => USE.kind === 'shield' && USE.t >= 5 && !(PL.shieldCd > 0); // 5 ticks to raise it
 // called by hurtPlayer: true when the hit came from the front and the shield took it
 function shieldBlocks(dmg, cause, attacker, from) {
-  if (!shieldUp() || (cause !== 'mob' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
+  if (!shieldUp() || (cause !== 'mob' && cause !== 'player' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
   const src = from || attacker; if (!src) return false;
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
@@ -13882,8 +13983,8 @@ function buildSlots(type, ctx) {
     L.push(slotRef(t.items, 2, { group: 'fout', accepts: st => !st, takeOnly: true, onTake: () => { const x = t.xp || 0; let n = Math.floor(x); if (Math.random() < x - n) n++; if (n) spawnXP(PL.x, PL.y + 1, PL.z, n); t.xp = 0; } }));
   }
   if (type !== 'creative') invSlots(L);
-  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   else for (let i = 0; i < 9; i++) L.push(slotRef(INV.slots, i, { group: 'hot' }));
+  if (type === 'inv') L.push(slotRef(INV, 'off', { group: 'off' })); // the off hand, last so the other indices stay put
   return L;
 }
 function clickSlot(i, btn, shift) {
@@ -14197,7 +14298,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava')) return false;
   const res = effLv(PL, 'resistance'); if (res && cause !== 'void' && cause !== 'kill' && cause !== 'starve') { dmg *= Math.max(0, 1 - 0.2 * res); if (dmg <= 0) return false; }
-  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion') {
+  if (cause === 'mob' || cause === 'arrow' || cause === 'explosion' || cause === 'player') {
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
@@ -14221,7 +14322,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -14282,7 +14383,7 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping++; if (PL.sleeping > 100) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) { PL.sleeping = Math.min(101, PL.sleeping + 1); if (PL.sleeping > 100 && (typeof mpCanSkipNight !== 'function' || mpCanSkipNight())) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -15109,7 +15210,7 @@ function grindHtml() {
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, coords: true, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -15232,9 +15333,11 @@ function renderChat() {
 let dbgT = 0;
 function renderDebug(dt, fps) {
   const el = $('debug');
-  el.hidden = !UI.debug && !OPT.showFps;
-  if (el.hidden || (dbgT -= dt) > 0) return; dbgT = 0.25;
-  if (!UI.debug) { el.textContent = fps + ' fps'; return; }
+  el.hidden = !UI.debug && !OPT.showFps && !OPT.coords;
+  if (el.hidden || (dbgT -= dt) > 0) return; dbgT = 0.1;
+  if (!UI.debug) { // the short line: frame rate and where you are (Bedrock's "show coordinates")
+    const dir = ['북', '서', '남', '동'][((Math.round((((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)) % 4) + 4) % 4];
+    el.textContent = [OPT.showFps ? fps + ' fps' : '', OPT.coords ? `위치: ${Math.floor(PL.x)}, ${Math.floor(PL.y)}, ${Math.floor(PL.z)} · ${dir}쪽` : ''].filter(Boolean).join('\n'); return; }
   const bx = Math.floor(PL.x), by = Math.floor(PL.y), bz = Math.floor(PL.z), l = getLight(bx, by, bz);
   const facing = ['북쪽 (-Z)', '서쪽 (-X)', '남쪽 (+Z)', '동쪽 (+X)'][[0, 1, 2, 3][((Math.round((((PL.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)) % 4) + 4) % 4]];
   let meshed = 0; for (const c of W.chunks.values()) if (c.mesh) meshed++;
@@ -15388,7 +15491,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleDoll" title="스킨 바꾸기" data-act="options"></div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -15403,7 +15506,7 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('coords', '좌표 표시')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
@@ -15726,7 +15829,7 @@ function advGrant(id, crit) {
 function advComplete(a, st) {
   st.done = Date.now();
   const verb = a.frame === 'c' ? ['도전 과제', '을(를) 완료했습니다', '#aa00aa'] : a.frame === 'g' ? ['목표', '에 도달했습니다', '#55ff55'] : ['발전 과제', '을(를) 달성했습니다', '#55ff55'];
-  if (gr('announceAdvancements')) chatMsg(`플레이어가 ${verb[0]} [${a.name}]${verb[1]}`, verb[2]);
+  if (gr('announceAdvancements')) { const who = typeof MP !== 'undefined' && MP.on ? MP.name + '님이' : '플레이어가', t = `${who} ${verb[0]} [${a.name}]${verb[1]}`; chatMsg(t, verb[2]); if (typeof MP !== 'undefined' && MP.on) mpSend({ t: 'sys', text: t, c: verb[2] }); } // everyone in the world hears about it
   if (a.xp) addXP(a.xp);
   advQueue.push(a); if (advQueue.length === 1) showAdv();
 }
@@ -16050,7 +16153,7 @@ function setPart(b, pivot, pitch, yaw, roll, root) {
 // s: the pose inputs; returns nothing, poses m in place
 function posePlayer(m, s) {
   const P = m.userData.parts, slim = m.userData.slim, ay = slim ? 2.5 : 2, st = m.userData.st;
-  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = s.flying ? 0 : st.limbD, age = s.age;
+  const headYaw = s.headYaw, headPitch = s.headPitch, la = st.limb, ld = st.limbD, age = s.age; // flying players swing their legs too, as in Java
   let A = { head: [headPitch, headYaw, 0], body: [0, 0, 0], rarm: [0, 0, 0], larm: [0, 0, 0], rleg: [0, 0, 0], lleg: [0, 0, 0] };
   const piv = { head: [0, 0, 0], body: [0, 0, 0], rarm: [-5, ay, 0], larm: [5, ay, 0], rleg: [-1.9, 12, 0], lleg: [1.9, 12, 0] };
   if (s.gliding || s.swim) A.head[0] = lerpA(s.gliding ? 1 : st.lean, headPitch, -Math.PI / 4);
@@ -16168,7 +16271,7 @@ function dollRender(el, mx, my) {
   }
   if (D.cv.parentNode !== el) { el.innerHTML = ''; el.appendChild(D.cv); }
   const w = el.clientWidth || 104, h = el.clientHeight || 144;
-  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = 1.05; D.cam.updateProjectionMatrix(); }
+  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = el.classList.contains('titleDoll') ? 0.92 : 1.05; D.cam.updateProjectionMatrix(); }
   // InventoryScreen.drawEntity: the body turns toward the mouse by atan(dx/40)*20 degrees, the head by 40, pitch by atan(dy/40)*20
   const rc = el.getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height * 0.25;
   const fx = Math.atan((cx - mx) / 40 / (rc.width / 52)), fy = Math.atan((cy - my) / 40 / (rc.width / 52));
@@ -16183,6 +16286,8 @@ function dollRender(el, mx, my) {
 }
 const DOLL = { mx: innerWidth / 2, my: innerHeight / 2 };
 addEventListener('pointermove', e => { DOLL.mx = e.clientX; DOLL.my = e.clientY; });
+// the title screen shows your own skin on the right, turning to follow the mouse like the inventory figure
+(function titleDoll() { requestAnimationFrame(titleDoll); if (typeof UI === 'undefined' || UI.menu !== 'title' || !PLM.model) return; const el = document.querySelector('.titleDoll'); if (el) dollRender(el, DOLL.mx, DOLL.my); })();
 function dollTick() { const el = document.querySelector('.doll'); if (el && UI.screen) dollRender(el, DOLL.mx, DOLL.my); }
 
 </script>
@@ -16305,7 +16410,7 @@ function mpHandle(m, from) {
     case 'gone': mpPeerGone(m.id); return;
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
-    case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); if (host) mpSend({ ...m, id }); return; }
+    case 'pl': { const id = host ? from : m.id; if (id === MP.id && !host) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (host) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'sets': if (!host) mpApplySets(m); return;
@@ -16325,7 +16430,14 @@ function mpHandle(m, from) {
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) hurtMob(e, Math.min(30, +m.dmg || 0), null, +m.kx || 0, +m.kz || 0, 'player'); } return;
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player');
+      if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
+    case 'pvp': if (host && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(host ? from : m.from)); return;
+    case 'hitfx': { const p = MP.peers.get(host ? from : m.id); if (p) p.hurtFx = 10; if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
+    case 'use': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from); if (e && p && p.s) mpRemoteUse(p, e, m.st && ITEMS[m.st.id] ? m.st : null, m.sneak); } return;
+    case 'held': if (!host) { const h = INV.slots[INV.sel]; if ((h ? h.id : 0) === m.was) { INV.slots[INV.sel] = m.st && ITEMS[m.st.id] ? m.st : null; UI.hudDirty = true; } } return;
+    case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (host) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
+    case 'wake': if (!host && PL.sleeping) { PL.sleeping = 0; PL.rest = 0; UI.flash('좋은 아침이에요!'); } return;
   }
 }
 // a guest becomes a visitor in the host's world: same seed, nothing saved locally
@@ -16457,7 +16569,7 @@ function mpChunkLoaded(c) {
 function mpTick() {
   if (!MP.on || !W.active) return;
   if (W.tickN % 2 === 0) { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
-    sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0,
+    sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0,
     armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0) }); }
   if (MP.role !== 'host') { if (W.tickN % 200 === 0) mpGuestSave(); return; }
   if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; }
@@ -16546,28 +16658,48 @@ function mpAvatar(p) {
   const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
-  const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = 'bold 28px sans-serif'; const w = Math.ceil(g.measureText(p.name).width) + 16; c.width = w; c.height = 40;
-  g.font = 'bold 28px sans-serif'; g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, w, 40); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 8, 21);
-  const t = new THREE.CanvasTexture(c), tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); tag.scale.set(w / 40 * 0.3, 0.3, 1); tag.renderOrder = 5;
-  p.tag = tag; p.m = m; p.pos = null; scene.add(m, tag); return m;
+  // the name above the head as Java draws it: white text on a faint dark plate, bright where it can be seen and dim
+  // through walls (the dim one is hidden while the player sneaks)
+  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif';
+  const draw = () => { g.font = F; const w = Math.ceil(g.measureText(p.name).width) + 24; c.width = w; c.height = 60; g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 12, 32); if (p.tags) for (const t of p.tags) t.userData.w = w / 60; };
+  draw(); if (document.fonts) document.fonts.load(F).then(() => { draw(); t.needsUpdate = true; }).catch(() => {}); // the game's pixel font, once it has loaded
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; const w = c.width;
+  const mk = (through) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, opacity: through ? 0.3 : 1, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData.w = w / 60; return sp; };
+  p.tags = [mk(true), mk(false)]; p.m = m; p.pos = null; scene.add(m, ...p.tags); return m;
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); scene.remove(p.tag); p.m = null; } }
+const MP_HURT = new THREE.Color(1, 0.6, 0.6);
+function mpPlaceTag(p, s, ps) {
+  const y = p.pos[1] + (ps.sleep ? 0.6 : ps.swim || ps.gliding ? 0.9 : ps.sneak ? 1.85 : 2.05) + 0.25, d = Math.hypot(camera.position.x - p.pos[0], camera.position.y - y, camera.position.z - p.pos[2]);
+  const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
+  p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
+}
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } }
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) p.m.visible = p.tag.visible = false; continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
-    const last = p.pos || [s.x, s.y, s.z]; p.pos = [last[0] + (s.x - last[0]) * k, last[1] + (s.y - last[1]) * k, last[2] + (s.z - last[2]) * k];
-    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20;
+    // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
+    // (updates come 10 times a second); the legs swing with the speed between updates, as Java's limbDistance does
+    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 130; let a = H[H.length - 1], b = a;
+    for (let i = H.length - 1; i > 0; i--) if (H[i - 1][0] <= rt) { a = H[i - 1]; b = H[i]; break; }
+    const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
+    p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
+    if (Math.hypot(p.pos[0] - last[0], p.pos[2] - last[2]) > 8) p.hist = [[performance.now(), s.x, s.y, s.z]]; // a teleport: no sliding across the world
+    const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20, segT = a && b && b[0] > a[0] ? (b[0] - a[0]) / 50 : 0;
+    p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
+    const glide = !!s.glide, swim = s.pose === 'swim' && !glide; p.glideT = glide ? (p.glideT || 0) + dtT : 0;
     const ps = { headYaw: 0, headPitch: -s.pitch, headPitchW: -s.pitch, yaw: s.yaw, right: s.held ? 'item' : null, left: s.off ? 'item' : null, two: null, charge: 0, swing: s.swing, swingLeft: false,
-      sneak: !!s.sneak, riding: false, flying: !!s.fly, gliding: false, glideT: 0, vel2: mvx * mvx + mvz * mvz, vy: 0, swim: false, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
+      sneak: (!!s.sneak || s.pose === 'crouch') && !s.fly && !glide, riding: false, flying: !!s.fly, gliding: glide, glideT: p.glideT, vel2: mvx * mvx + mvz * mvz, vy: (s.y - last[1]) || 0, swim, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
     tickBodyYaw(st, ps, mvx, mvz, dtT);
-    const spd = Math.min(1, Math.hypot(mvx, mvz) / Math.max(dt, 1e-3) / 20 * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
-    ps.headYaw = -wrapA(s.yaw - st.bodyYaw);
-    m.visible = p.tag.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
-    p.tag.position.set(p.pos[0], p.pos[1] + (s.sneak ? 1.95 : 2.15), p.pos[2]);
-    const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]); for (const mt of m.userData.mats) mt.color.setScalar(light);
+    const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
+    st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
+    ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
+    m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
+    mpPlaceTag(p, s, ps);
+    const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light);
   }
@@ -16598,7 +16730,77 @@ function mpInstall() {
   const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpSend({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
   const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) mpTileChanged(c.x, c.y, c.z); };
   const ol = W.onChunkLoaded; W.onChunkLoaded = (c, fresh) => { if (ol) ol(c, fresh); if (MP.on) mpChunkLoaded(c); };
+  const ui0 = useItem; useItem = function (first) { const t = TARGET; if (MP.role === 'guest' && first && t && t.type === 'ent' && t.e.remote && t.e.kind === 'mob' && mpRemoteUsable(t.e)) { const h = PL.held(); mpSend({ t: 'use', e: t.e.rid, st: h ? { ...h } : null, sneak: PL.sneaking ? 1 : 0 }); swing(); USE.placeCd = 4; return; } return ui0.apply(this, arguments); };
+  const ia = INV.add; INV.add = st => { if (MP.useFor) { mpSend({ t: 'give', st }, MP.useFor.id); return 0; } return ia(st); }; // milk, a bowl of stew... go to the guest
+  const os = UI.openScreen; UI.openScreen = (a, b) => { if (!MP.useFor) os(a, b); };
+  const rc = raycast; raycast = function () { const r = rc.apply(this, arguments); if (!MP.on) return r; const h = mpRayPeer(); return h && (!r || h.t < r.t) ? h : r; };
+  const ae0 = attackEntity; attackEntity = e => e.kind === 'peer' ? mpAttackPeer(e.peer) : ae0(e);
+  const sd = UI.showDeath; UI.showDeath = msg => { if (MP.on) { msg = PL.lastHurtBy === 'player' && MP.lastHitBy ? MP.name + '님이 ' + MP.lastHitBy + '님에게 살해당했습니다' : msg.replace(/^플레이어가 /, MP.name + '님이 '); mpSend({ t: 'sys', text: msg }); } return sd(msg); };
 }
+
+// ---------- players hitting each other ----------
+// another player in the crosshair is a target like a mob; the damage is worked out by the attacker (weapon, charge,
+// critical hit) and the one hit takes it through their own armour, shield and enchantments
+function mpRayPeer() {
+  if (!MP.on || PL.mode === 'spectator') return null;
+  const [dx, dy, dz] = lookDir(), ox = PL.x, oy = PL.y + PL.eyeH, oz = PL.z, lim = creative() ? 5 : 3; let best = null;
+  for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'spectator' || !p.pos || performance.now() - p.at > 5000) continue;
+    const [x, y, z] = p.pos, hg = s.h || 1.8, h = rayBox(ox, oy, oz, dx, dy, dz, [x - .35, y, z - .35, x + .35, y + hg, z + .35]);
+    if (h && h[0] <= lim && (!best || h[0] < best.t)) { const e = p.hit || (p.hit = { kind: 'peer', peer: p, w: .3 }); e.x = x; e.y = y; e.z = z; e.h = hg; best = { type: 'ent', e, t: h[0] }; } }
+  return best;
+}
+function mpAttackPeer(p) {
+  const s = p.s; if (!s || s.dead || s.mode === 'creative' || s.mode === 'spectator' || MP.pvp === false) { PL.attackT = 0; return; }
+  const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool, sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4;
+  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + meleeBonus()) * (0.2 + q * q * 0.8);
+  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
+  PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
+  mpSend({ t: 'pvp', tgt: p.id, from: MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' ? p.id : undefined);
+  if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
+  PL.exh += 0.1; p.hurtFx = 10; play('hit');
+  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 1 : 2);
+}
+function mpGotHit(m, att) {
+  if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
+  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer' };
+  MP.lastHitBy = att ? att.name : null;
+  if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
+  mpSend({ t: 'hitfx', id: MP.role === 'host' ? 0 : MP.id });
+  if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
+  // LivingEntity.takeKnockback: 0.4 away from the attacker, and the knockback level along the attacker's look
+  const kn = (str, x, z) => { const l = Math.hypot(x, z) || 1; PL.vx = PL.vx / 2 - x / l * str; PL.vz = PL.vz / 2 - z / l * str; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + str); };
+  kn(0.4, src.x - PL.x, src.z - PL.z); if (m.kb > 0) kn(Math.min(5, m.kb) * 0.5, Math.sin(m.yaw), Math.cos(m.yaw));
+}
+// a guest's right click on one of the host's mobs (feeding, shearing, milking, dyeing, taming, naming...) happens on the
+// host, holding the guest's item; what the item becomes and anything handed over goes back to the guest
+function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return h.id !== IID.lead; }
+function mpRemoteUse(p, e, st, sneak) {
+  const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
+  INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); }
+  finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
+}
+// the night passes when everyone in the world is asleep (the host decides, and wakes the guests)
+function mpCanSkipNight() {
+  if (!MP.on) return true; if (MP.role !== 'host') return false;
+  const here = [...MP.peers.values()].filter(p => p.s && p.s.dim === W.dim && p.s.mode !== 'spectator' && performance.now() - p.at < 5000);
+  const asleep = here.filter(p => p.s.sleep).length;
+  if (asleep < here.length) { if (W.tickN % 20 === 0) UI.flash(`잠자는 플레이어 ${asleep + 1}/${here.length + 1}`); return false; }
+  mpSend({ t: 'wake' }); return true;
+}
+// Tab: who is playing
+let mpListEl = null;
+function mpShowList(on) {
+  if (!mpListEl) { mpListEl = document.createElement('div'); mpListEl.id = 'plist'; document.body.appendChild(mpListEl); }
+  if (!on || !W.active) { mpListEl.hidden = true; return; }
+  const me = MP.on ? MP.name : '플레이어', rows = [me + (MP.role === 'host' ? ' (호스트)' : '')];
+  for (const p of MP.peers.values()) rows.push(p.name + (p.id === 0 ? ' (호스트)' : '') + (p.s && p.s.dim !== W.dim ? ' · ' + ({ '-1': '네더', 1: '디 엔드', 0: '오버월드' })[p.s.dim] : p.s && p.pos ? ' · ' + Math.round(Math.hypot(p.pos[0] - PL.x, p.pos[2] - PL.z)) + 'm' : ''));
+  mpListEl.innerHTML = rows.map(r => `<div>${esc(r)}</div>`).join(''); mpListEl.hidden = false;
+}
+addEventListener('keydown', e => { if (e.code === 'Tab' && W.active && !UI.menu && !UI.screen && !UI.chatOpen) mpShowList(true); });
+addEventListener('keyup', e => { if (e.code === 'Tab') mpShowList(false); });
+addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
@@ -16991,7 +17193,7 @@ function frame(now) {
   // selection & crack
   const t = !UI.paused && TARGET && TARGET.type === 'block' ? TARGET : null;
   if (t && view === 0 && !UI.hideHud) R.setSelection(t.x, t.y, t.z, selShape(t.id, t.m) || [[0, 0, 0, 16, 16, 16]]); else R.sel.visible = false;
-  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) { R.crack.visible = true; R.crack.position.set(t.x + .5, t.y + .5, t.z + .5); R.crack.material.map = R.crackTexs[Math.min(9, Math.floor(MINE.prog * 10))]; } else R.crack.visible = false;
+  if (t && MINE.prog > 0 && MINE.id === t.id && !creative()) R.setCrack(t.x, t.y, t.z, t.id, getMeta(t.x, t.y, t.z), Math.floor(MINE.prog * 10)); else R.crack.visible = false;
   // hand
   if (R.hand.swing > 0) R.hand.swing = Math.max(0, R.hand.swing - dt * 3.5);
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
@@ -17078,6 +17280,16 @@ function autoRes() {
   if (old !== R.pixelScale) R.resize();
 }
 
+// which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their
+// 3D block model even though a sprite-sized texture exists (end rods, trapdoors, the small dripleaf, spore blossoms)
+function javaItemModels() {
+  const flat = { glass_pane: 'glass', lilac: 'lilac_top', rose_bush: 'rose_bush_top', peony: 'peony_top', sunflower: 'sunflower_top', tall_grass: 'tall_grass_top', large_fern: 'large_fern_top', weeping_vines: 'weeping_vines_plant', twisting_vines: 'twisting_vines_plant' };
+  for (const c of S.COLORS) flat[c + '_stained_glass_pane'] = c + '_stained_glass';
+  for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const k of [c + '_coral', c + '_coral_fan', 'dead_' + c + '_coral', 'dead_' + c + '_coral_fan']) flat[k] = k;
+  for (const k in flat) { const id = IID[k]; if (id != null && S.T[flat[k]] != null && !PACKPX.items[k]) ITEMS[id].sprite = flat[k]; }
+  for (const k of ['end_rod', 'spore_blossom', 'small_dripleaf', ...['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped', 'iron'].map(w => w + '_trapdoor')]) { const id = IID[k]; if (id != null) ITEMS[id].sprite = null; }
+}
+
 // ---------- boot ----------
 (async function boot() {
   applyOpt();
@@ -17085,8 +17297,9 @@ function autoRes() {
     atlasTex.needsUpdate = true;
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
+  javaItemModels();
   if (UPACK.stale) setTimeout(() => UI.flash('설정 → 리소스 팩에서 client.jar 를 다시 불러오면 원작 텍스처가 더 많이 적용됩니다'), 1500);
-  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
+  try { R.applyPackSky(); applyGuiPack(); R.buildParticleSheet(); R.applyPackWeather(); R.applyPackGlint(); R.applyPackCracks(); arrowPackModel(); } catch (e) { console.warn('pack sky / HUD unavailable', e); }
   try { await loadStructs(); } catch (e) { console.warn('stored structures unavailable', e); } // the game's own structure pieces, if a client.jar was chosen
   rebuildPlayer(); if (OPT.skin === 'custom') loadCustomSkin(ok => { if (ok) rebuildPlayer(); }); // the player model needs the pack's skin
   buildIcons(); try { R.renderBlockIcons(); } catch (e) { console.warn('3D icons unavailable', e); }
