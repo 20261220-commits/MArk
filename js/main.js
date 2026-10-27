@@ -255,7 +255,7 @@ function saveWorldMeta() {
 function saveAll(sync) { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c, false, sync === true); }
 function pauseGame() { if (!W.active || UI.menu) return; if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
 function resumeGame() {
-  if (PL.dead) return; UI.paused = false; showMenu(null);
+  if (PL.dead) return; if (!W.active) { UI.paused = false; showMenu('title'); return; } UI.paused = false; showMenu(null);
   if (OPT.fullscreen && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {}); grabLock(); }).catch(() => grabLock());
   else grabLock();
   if (isTouch) $('touch').hidden = false;
