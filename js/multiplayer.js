@@ -13,9 +13,13 @@ try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
 if (!MP.name) MP.name = '플레이어' + (100 + Math.floor(Math.random() * 900));
 // the address offered first: the last one used, then the one this game was published with (js/config.js or the server's
 // SERVER_URL), then the server this page came from, if it came from one (not a static host such as GitHub Pages)
-const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a) return a; } catch (e) {}
+// pages hosts that serve files only: they can't be a multiplayer server
+const MP_STATIC = /(^|\.)(github\.io|claude\.ai|claudeusercontent\.com|netlify\.app|vercel\.app|pages\.dev)$/i;
+const mpStaticHost = a => { try { return MP_STATIC.test(new URL(mpWsUrl(a)).hostname); } catch (e) { return false; } };
+const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a && !mpStaticHost(a)) return a; } catch (e) {}
   if (typeof NEMO_CONFIG !== 'undefined' && NEMO_CONFIG.server) return mpWsUrl(NEMO_CONFIG.server);
-  return /^https?:$/.test(location.protocol) && !/github\.io$|claude\.ai$|claudeusercontent\.com$/.test(location.hostname) ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp' : 'ws://192.168.0.2:8080/mp'; };
+  if (/^https?:$/.test(location.protocol) && !MP_STATIC.test(location.hostname)) return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp';
+  return location.protocol === 'https:' ? '' : 'ws://192.168.0.2:8080/mp'; }; // on GitHub Pages: empty, the field shows what to write
 
 // ---------- binary <-> text for chunk data ----------
 function mpB64(ta) { const u8 = new Uint8Array(ta.buffer, ta.byteOffset, ta.byteLength); let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
@@ -33,6 +37,8 @@ function mpWsUrl(a) {
 // a hosted server (Render's free plan and the like) sleeps when nobody uses it and takes up to a minute to wake:
 // knock on its web page, then keep trying for a while instead of failing at once
 async function mpWebSocket(url, role) {
+  if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.onrender.com)');
+  if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. Render 서버 주소(이름.onrender.com)를 넣어 주세요');
   url = mpWsUrl(url); const local = /^wss?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url), t0 = Date.now();
   const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
   for (let k = 0; ; k++) {
@@ -767,7 +773,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}"></label>`;
+  const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') return `<h2>멀티플레이</h2><div class="form">${nameRow}${addr}${btn('서버에 접속', 'mp_joinws')}<p class="muted">서버 없이: 호스트가 보낸 초대 코드를 붙여 넣으세요.</p><textarea id="mpCode" rows="3" placeholder="초대 코드"></textarea>${btn('초대 코드로 참가', 'mp_answer')}<textarea id="mpOut" rows="3" readonly placeholder="여기 나오는 답장 코드를 호스트에게 보내세요"></textarea>${st}</div><div class="btncol">${btn('뒤로', 'title')}</div>`;
