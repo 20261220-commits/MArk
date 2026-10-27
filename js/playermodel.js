@@ -283,7 +283,14 @@ function dollRender(el, mx, my) {
   }
   if (D.cv.parentNode !== el) { el.innerHTML = ''; el.appendChild(D.cv); }
   const w = el.clientWidth || 104, h = el.clientHeight || 144;
-  if (D.cv.width !== w || D.cv.height !== h) { D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; const a = w / h; D.cam.left = -a; D.cam.right = a; D.cam.top = 1; D.cam.bottom = -1; D.cam.zoom = el.classList.contains('titleDoll') ? 0.92 : 1.05; D.cam.updateProjectionMatrix(); }
+  const title = el.classList.contains('titleDoll');
+  if (D.cv.width !== w || D.cv.height !== h || D.title !== title) {
+    D.r.setPixelRatio(1); D.r.setSize(w, h, false); D.cv.style.width = w + 'px'; D.cv.style.height = h + 'px'; D.title = title;
+    // inventory: InventoryScreen draws the 32 px model (x0.9375) at 30 px a block into the 70 px box, feet 3 px above its bottom
+    const hh = title ? 1 : 72 / 56.25, cy = title ? 0.95 : (68 / 72 - 0.5) * 2 * hh, a = w / h * hh;
+    D.cam.left = -a; D.cam.right = a; D.cam.top = hh; D.cam.bottom = -hh; D.cam.zoom = title ? 0.92 : 1;
+    D.cam.position.set(0, cy, 5); D.cam.lookAt(0, cy, 0); D.cam.updateProjectionMatrix();
+  }
   // InventoryScreen.drawEntity: the body turns toward the mouse by atan(dx/40)*20 degrees, the head by 40, pitch by atan(dy/40)*20
   const rc = el.getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height * 0.25;
   const fx = Math.atan((cx - mx) / 40 / (rc.width / 52)), fy = Math.atan((cy - my) / 40 / (rc.width / 52));
