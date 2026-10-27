@@ -47,6 +47,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #heldName{position:fixed;left:50%;bottom:calc(60 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;white-space:nowrap}
 #toast{position:fixed;left:50%;bottom:calc(74 * var(--px));transform:translateX(-50%);font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;opacity:0;transition:opacity .4s;white-space:nowrap;background:rgba(0,0,0,.35);padding:var(--px) calc(4 * var(--px))}
 #toast.show{opacity:1;transition:none}
+#plist{position:fixed;left:50%;top:calc(10 * var(--px));transform:translateX(-50%);min-width:calc(120 * var(--px));background:rgba(0,0,0,.45);padding:calc(2 * var(--px)) calc(4 * var(--px));z-index:30;font-size:calc(8 * var(--px));color:#fff;text-shadow:var(--px) var(--px) 0 #3f3f3f;pointer-events:none}
+#plist div{padding:calc(1 * var(--px)) 0;border-bottom:1px solid rgba(255,255,255,.12)}
 #debug{position:fixed;left:calc(2 * var(--px));top:calc(2 * var(--px));white-space:pre;font-size:calc(7 * var(--px));line-height:1.35;color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #2a2a2a;background:transparent}
 #chatLog{position:fixed;left:calc(2 * var(--px));bottom:calc(48 * var(--px));width:min(calc(320 * var(--px)),70vw);font-size:calc(7 * var(--px));line-height:1.45}
 #chatLog div{background:rgba(0,0,0,.45);padding:0 calc(2 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow-wrap:anywhere}

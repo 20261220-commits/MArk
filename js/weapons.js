@@ -5,7 +5,7 @@
 const shieldUp = () => USE.kind === 'shield' && USE.t >= 5 && !(PL.shieldCd > 0); // 5 ticks to raise it
 // called by hurtPlayer: true when the hit came from the front and the shield took it
 function shieldBlocks(dmg, cause, attacker, from) {
-  if (!shieldUp() || (cause !== 'mob' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
+  if (!shieldUp() || (cause !== 'mob' && cause !== 'player' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
   const src = from || attacker; if (!src) return false;
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
