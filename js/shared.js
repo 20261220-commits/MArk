@@ -3301,6 +3301,11 @@ function meshChunk(B, M, L, bio, opts) {
     return t;
   }
   function logRot(id, meta, f) { if (!LOGAX[id] || !meta) return 0; if (meta === 1) return (f === 2 || f === 3 || f === 4 || f === 5) ? 1 : 0; return (f === 0 || f === 1 || f === 2 || f === 3) ? 1 : 0; }
+  // cave culling (opts.cullDark, while the player is above ground): a cube face looking into air that no sky light
+  // reaches, more than 8 below its column's top, can't be seen from up there (caves are closed; sky light runs ~15 blocks
+  // in from an opening); skipping those is a third or more of the terrain's triangles with the 1.18 caves
+  let colTop = null;
+  if (opts.cullDark) { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
   for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const pi = pidx(x, y, z), id = B[pi]; if (!id) continue;
     const rt = RTYPE[id], meta = fix6(id, M[pi]);
@@ -3312,6 +3317,7 @@ function meshChunk(B, M, L, bio, opts) {
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
         if (OPQ[nb]) continue;
+        if (colTop && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x] && !trans) continue; // no sky light, deep: out of sight from above
         const F = FACES[f];
         if (nb === id && (SELFCULL[id] || (leaves && !fancy)) && (!HASV[id] || M[ni] === meta)) continue;
         if (trans && nb && RTYPE[nb] === RT.CUBE) continue;
