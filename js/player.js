@@ -573,6 +573,7 @@ function useItem(first) {
     if (e.type === 'villager' && (e.prof === 'none' || e.prof === 'nitwit') && !e.baby && !(d && h.id === IID.name_tag)) { play('hmm', { pitch: 0.7 }); swing(); return; } // no job, no trades: it shakes its head
     if (e.type === 'villager' && !e.baby && !(d && h.id === IID.name_tag)) { UI.openScreen('trade', { e }); e.trading = true; play('hmm'); return; }
     if (e.kind !== 'mob') return;
+    if (d && h.id === IID.name_tag && h.name && !e.def.boss) { e.name = String(h.name).slice(0, 50); e.persistent = true; consume(); swing(); play('pop', { vol: 0.4 }); return; } // a renamed name tag names the mob (and keeps it from despawning)
     if (d && h.id === IID.shears && e.type === 'sheep' && !e.sheared && !e.baby) { setSheared(e); dropItem(e.x, e.y + 1, e.z, BID.white_wool, 1 + Math.floor(Math.random() * 3)); damageItem(INV.slots, INV.sel, 1); swing(); return; }
     if (d && h.id === IID.bucket && (e.type === 'cow' || e.type === 'goat') && !e.baby) { consume(); INV.add({ id: IID.milk_bucket, n: 1 }) && dropItem(PL.x, PL.y + 1, PL.z, IID.milk_bucket, 1); swing(); return; }
     if (d && e.def.food && isFood(e.def, h.id) && !e.baby && e.love <= 0 && (!e.def.tameFirst || e.owner === 'player')) { e.love = 600; consume(); if (h.id === IID.tropical_fish_bucket && !creative()) INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; for (let i = 0; i < 5; i++) R.simpleParticle(e.x, e.y + e.h + .3, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); swing(); return; }
@@ -840,11 +841,18 @@ function useRod() {
   }
   const [dx, dy, dz] = lookDir();
   const e = Ent('bobber', PL.x + dx * .4, PL.y + PL.eyeH - .1, PL.z + dz * .4); e.kind = 'bobber'; e.w = 0.12; e.h = 0.25; e.vx = dx * 0.6; e.vy = dy * 0.6 + 0.15; e.vz = dz * 0.6; e.bite = 0; e.wait = Math.max(20, 100 + Math.floor(Math.random() * 400) - 100 * enchLv(PL.held(), 'lure'));
-  const hook = PACKPX.ent.fishing_hook && entCanvas('fishing_hook');
-  if (hook) { const t = new THREE.CanvasTexture(hook); t.magFilter = t.minFilter = THREE.NearestFilter; e.mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.5 })); e.mesh.scale.setScalar(0.5); }
-  else e.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
-  e.tick = bobberTick; e.render = (e, x, y, z) => e.mesh.position.set(x, y + 0.06, z);
+  e.mesh = new THREE.Group(); e.mesh.add(fishHookMesh());
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x101010 })); line.frustumCulled = false; e.mesh.add(line);
+  e.tick = bobberTick; e.render = (e, x, y, z) => { e.mesh.position.set(x, y + 0.06, z); // the line runs from the rod tip to the hook
+    const yw = PL.yaw, fp = typeof view === 'undefined' || view === 0, c = camera.position;
+    const hx = fp ? c.x - Math.sin(yw) * 0.7 + Math.cos(yw) * 0.3 : PL.x - Math.sin(yw) * 0.6 + Math.cos(yw) * 0.35, hy = fp ? c.y - 0.2 : PL.y + 1.45, hz = fp ? c.z - Math.cos(yw) * 0.7 - Math.sin(yw) * 0.3 : PL.z - Math.cos(yw) * 0.6 - Math.sin(yw) * 0.35;
+    const a = line.geometry.attributes.position; a.setXYZ(1, hx - x, hy - y - 0.06, hz - z); a.needsUpdate = true; };
   addEnt(e); play('bow', { vol: 0.3 });
+}
+function fishHookMesh() { // the hook from the pack (a sprite), or a red float
+  const hook = PACKPX.ent.fishing_hook && entCanvas('fishing_hook');
+  if (hook) { const t = new THREE.CanvasTexture(hook); t.magFilter = t.minFilter = THREE.NearestFilter; const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.5 })); m.scale.setScalar(0.5); return m; }
+  return new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
 }
 function bobberTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1;

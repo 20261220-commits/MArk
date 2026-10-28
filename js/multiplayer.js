@@ -185,7 +185,7 @@ function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
@@ -238,6 +238,13 @@ function mpHandle(m, from) {
       if (m.seat !== 2 && e.kind === 'boat' && e.rider === PL && !e.seat2Other && !e.mob) { e.rider = 'other'; e.rider2 = PL; e.mpWas = false; UI.flash('뒷자리에 탔습니다'); } // both got on at once: the back seat
       else { dismount(); UI.flash('다른 플레이어가 이미 타고 있습니다'); } } return;
     case 'items': if (!host) mpMirrorItems(m.l); return;
+    case 'fx': if (!host && Array.isArray(m.l)) mpMirrorFx(m.l); return;
+    case 'deflect': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'fireball'), p = MP.peers.get(from), d = Array.isArray(m.d) && m.d.length === 3 && m.d.every(isFinite) ? m.d : null; if (e && p && d) { e.ax = d[0] * 0.1; e.ay = d[1] * 0.1; e.az = d[2] * 0.1; e.vx = d[0]; e.vy = d[1]; e.vz = d[2]; e.owner = PL; e.guestOwner = p; } } return; // a guest bats a ghast's fireball back
+    case 'bfx': mpGotBfx(m, from); return;
+    case 'snd': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite) && typeof m.n === 'string') { const d = Math.hypot(PL.x - m.x, PL.y - m.y, PL.z - m.z), o = m.o && typeof m.o === 'object' ? m.o : {}; if (d < 16) { MP.sndIn = true; try { play(m.n, { mat: o.mat, pitch: isFinite(o.pitch) ? +o.pitch : undefined, vol: (isFinite(o.vol) ? +o.vol : 1) * (1 - d / 16) }); } finally { MP.sndIn = false; } } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
+    case 'bolt': if (!host && m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) mpBoltFx(+m.x, +m.y, +m.z); return;
+    case 'strike': if (host && m.dim === W.dim && [m.x, m.y, m.z].every(Number.isInteger)) strikeLightning(m.x, m.y, m.z, !!m.rod); return;
+    case 'ignite': if (!host) PL.fire = Math.max(PL.fire || 0, Math.min(200, +m.f || 0)); return;
     case 'xps': if (!host) mpMirrorXP(m.l); return;
     case 'xp': if (host) spawnXP(+m.x, +m.y, +m.z, Math.min(2000, +m.v || 0)); return;
     case 'pickxp': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'xp'); if (e) { removeEnt(e); mpSend({ t: 'givexp', v: e.value }, from); } } return;
@@ -308,7 +315,9 @@ function mpApplyTile(m, from) {
       for (const k of Object.keys(m.tile)) { const a = old[k], b = m.tile[k]; if (Array.isArray(a) && Array.isArray(b)) { a.length = b.length; for (let j = 0; j < b.length; j++) a[j] = b[j]; } else old[k] = b; } }
     else c.tiles.set(i, m.tile);
     c.modified = c.edited = true; if (/^(furnace|brewing|campfire)$/.test(m.tile.type)) c.hasFurnace = true; // so it keeps working here
-    if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); } }
+    if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); }
+    if (m.tile.type === 'jukebox') { const t = c.tiles.get(i), k = m.x + ',' + m.y + ',' + m.z, st = t.items && t.items[0]; // someone else's record: heard here too
+      if (t.playing && st && ITEMS[st.id] && ITEMS[st.id].disc) { if (!PLAYING.has(k)) playDisc(ITEMS[st.id].key.replace('music_disc_', ''), m.x, m.y, m.z); } else stopDisc(m.x, m.y, m.z); } }
   else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
 }
@@ -467,11 +476,17 @@ function mpChunkLoaded(c) {
 }
 
 // ---------- every tick: your state out; the host also sends the clock and nearby mobs ----------
+function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...), the bed's direction, fire, the block being dug, the hook and eye in the air
+  const ps = playerPoseInputs(0), o = { pr: ps.right, plf: ps.left, two: ps.two, chg: +(ps.charge || 0).toFixed(2), swl: ps.swingLeft ? 1 : 0, by: PSTATE.bedYaw || 0, lh: mainRight() ? 0 : 1, fire: PL.fire > 0 && !PL.inWater ? 1 : 0 };
+  const t = TARGET; if (t && t.type === 'block' && MINE.prog > 0 && MINE.id === t.id && !creative()) o.mine = [t.x, t.y, t.z, Math.floor(MINE.prog * 10)];
+  const fx = []; for (const e of ENT) if (!e.dead && !e.remote && (e.kind === 'bobber' || e.kind === 'eye') && fx.length < 2) fx.push([e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); if (fx.length) o.fx = fx;
+  return o;
+}
 function mpTick() {
-  if (!MP.on || !W.active) return;
+  if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0) }); }
+    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -504,12 +519,14 @@ function mpTick() {
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
     for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
-      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null, e.leash === 'player' ? { p: MP.id } : e.leash || 0]); }
+      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null, e.leash === 'player' ? { p: MP.id } : e.leash || 0, mpMobVis(e)]); }
     mpSend({ t: 'mobs', l }, p.id);
     mpSendVehicles(p);
     if (W.tickN % 4) continue;
     const it = []; for (const e of ENT) { if (e.dead || e.kind !== 'item' || e.remote || Math.abs(e.x - p.s.x) > 32 || Math.abs(e.z - p.s.z) > 32) continue; if (!e.mpid) e.mpid = mpNewId(); it.push([e.mpid, { id: e.stack.id, n: e.stack.n, d: e.stack.d, e: e.stack.e }, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
     mpSend({ t: 'items', l: it }, p.id);
+    const fx = []; for (const e of ENT) { if (e.dead || e.remote || !MP_FX[e.kind] || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64 || (e.kind === 'arrow' && (e.visual || e.owner === PL))) continue; if (!e.mpid) e.mpid = mpNewId(); fx.push([e.mpid, e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), MP_FX[e.kind](e)]); }
+    if (fx.length || p.fxOn) { mpSend({ t: 'fx', l: fx }, p.id); p.fxOn = fx.length > 0; }
     const xo = []; for (const e of ENT) { if (e.dead || e.kind !== 'xp' || e.remote || Math.abs(e.x - p.s.x) > 24 || Math.abs(e.z - p.s.z) > 24) continue; if (!e.mpid) e.mpid = mpNewId(); xo.push([e.mpid, e.value, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); }
     mpSend({ t: 'xps', l: xo }, p.id);
   }
@@ -518,10 +535,13 @@ function mpNewId() { return MP.server ? MP.id * 1000000 + MP.eid++ : MP.eid++; }
 // guests: the host's mobs as puppets that move where the host says
 function mpMirrorMobs(l) {
   const seen = new Set();
-  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor, leash] of l) {
-    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob');
-    if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared }); } finally { MP.allowSpawn = false; } e.remote = true; e.rid = id; e.persistent = true; e.yaw = yaw; }
-    if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) e.hurt = 10; if (dying && !e.deathT) e.deathT = 1;
+  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor, leash, vis] of l) {
+    seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob'); const v = vis && typeof vis === 'object' ? vis : {};
+    if (e && PL.riding !== e && ((variant != null && e.variant !== variant) || !!baby !== !!e.baby || (size && e.size !== size) || (prof && e.prof !== prof) || (vtype && e.vtype !== vtype) || (!sheared && e.sheared))) { removeEnt(e); e = null; } // it grew up, changed job or colour: built again
+    if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared, captain: v.captain, carpet: v.carpet, gene: v.gene, gene2: v.gene2 }); } finally { MP.allowSpawn = false; } e.remote = true; e.idleSnd = 100 + Math.random() * 400; e.rid = id; e.persistent = true; e.yaw = yaw; }
+    if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) { e.hurt = 10; mpMobSound(e, e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, 0.8); } if (dying && !e.deathT) e.deathT = 1;
+    if (sheared && !e.sheared && e.type === 'sheep') setSheared(e);
+    mpApplyMobVis(e, v);
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
     if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
@@ -535,7 +555,23 @@ function mpPuppetTick(e) {
   if (e.tx == null) return; const dx = e.tx - e.x, dz = e.tz - e.z;
   e.x += dx * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += dz * 0.5; e.yaw += wrapA(e.tyaw - e.yaw) * 0.5;
   const sp = Math.hypot(dx, dz); e.walkAmt = Math.min(1, sp * 6); e.walk = (e.walk || 0) + sp * 3; if (e.hurt > 0) e.hurt--; if (e.deathT) e.deathT++;
+  if (--e.idleSnd <= 0 && !e.deathT) { e.idleSnd = 300 + Math.random() * 500; mpMobSound(e, e.def.snd, 0.6); } // its own noises, heard here
+  if (e.fire > 0 && Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
 }
+// what the runner's mobs look like right now (anger, creeper fuse, sitting, sleeping, spells, fire, boss health...)
+const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name'];
+function mpMobVis(e) {
+  const v = {}; for (const k of MP_MOBV) { const x = e[k]; if (x != null && x !== false && x !== 0 && (typeof x !== 'object')) v[k] = typeof x === 'number' ? +x.toFixed(2) : x; }
+  if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp);
+  return v;
+}
+function mpApplyMobVis(e, v) {
+  const f0 = e.fuse || 0;
+  for (const k of MP_MOBV) e[k] = v[k];
+  e.target = v.tgt ? PL : null; e.fire = v.fire ? 2 : 0; e.eff = v.glow ? { glowing: { t: 40, lv: 0 } } : null; if (v.hp != null && isFinite(v.hp)) e.hp = +v.hp;
+  if (e.fuse > 0 && !f0) mpMobSound(e, 'fuse', 1);
+}
+function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z); if (d < 16) play(snd, { vol: vol * (1 - d / 16) }); }
 
 // ---------- a saved server world (node tools/server.js) ----------
 // The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
@@ -673,7 +709,7 @@ function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRide
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
 // tick, and damage, knockback and effects meant for "PL" go to the guest instead
-const PROXY_KEYS = ['x', 'y', 'z', 'px', 'py', 'pz', 'vx', 'vy', 'vz', 'mode', 'dead', 'eff', 'h', 'sneaking', 'onGround'];
+const PROXY_KEYS = ['x', 'y', 'z', 'px', 'py', 'pz', 'vx', 'vy', 'vz', 'mode', 'dead', 'eff', 'h', 'sneaking', 'onGround', 'fire'];
 function mpNearestGuest(e) {
   let best = null, bd = PL.dead || PL.mode === 'creative' || PL.mode === 'spectator' ? Infinity : (PL.x - e.x) ** 2 + (PL.y - e.y) ** 2 + (PL.z - e.z) ** 2;
   for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative' || s.mode === 'spectator' || performance.now() - p.at > 5000) continue;
@@ -682,10 +718,10 @@ function mpNearestGuest(e) {
 }
 function mpProxy(p, fn) {
   const save = {}; for (const k of PROXY_KEYS) save[k] = PL[k];
-  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: false, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true });
+  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: false, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
   MP.proxy = p;
   try { fn(); } finally {
-    const kb = [PL.vx, PL.vy, PL.vz]; MP.proxy = null; for (const k of PROXY_KEYS) PL[k] = save[k];
+    const kb = [PL.vx, PL.vy, PL.vz], fire = PL.fire; MP.proxy = null; for (const k of PROXY_KEYS) PL[k] = save[k]; if (fire > 0) mpSend({ t: 'ignite', f: fire }, p.id); // set alight by a blaze or a bolt: the guest burns, not the host
     if (kb[0] || kb[1] || kb[2]) mpSend({ t: 'kb', vx: kb[0], vy: kb[1], vz: kb[2] }, p.id);
   }
 }
@@ -780,6 +816,65 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
   return false;
 }
 
+const MP_SND_SKIP = new Set(['break', 'place', 'dig', 'step', 'pop', 'xp', 'levelup', 'hurt']); // sent another way, or only for you
+const MP_FX = { arrow: e => [e.stuck ? 1 : 0, e.trident ? 1 : 0, +e.vx.toFixed(2), +e.vy.toFixed(2), +e.vz.toFixed(2)], fireball: e => e.small ? 1 : 0, wskull: e => e.blue ? 1 : 0, bullet: () => 0, fang: e => e.mesh && e.mesh.visible ? 1 : 0, falling: e => [e.block, e.bmeta || 0] };
+function mpMirrorFx(l) {
+  const seen = new Set();
+  for (const [id, k, x, y, z, s] of l) { if (![x, y, z].every(isFinite)) continue; seen.add(id); let e = ENT.find(q => q.kind === 'mpfx' && q.rid === id && !q.dead);
+    if (!e) { e = mpFxMake(k, x, y, z, s); if (!e) continue; e.rid = id; }
+    e.tx = x; e.ty = y; e.tz = z; e.fs = s; }
+  for (const e of ENT) if (e.kind === 'mpfx' && !e.dead && !seen.has(e.rid)) removeEnt(e);
+}
+function mpFxMake(k, x, y, z, s) {
+  let mesh = null;
+  if (k === 'arrow') mesh = Array.isArray(s) && s[1] ? R.itemMesh(IID.trident) : new THREE.Mesh(arrowGeo, arrowMat.clone());
+  else if (k === 'fireball') { mesh = R.itemMesh(IID.fire_charge); mesh.scale.setScalar(s ? 0.3 : 1); }
+  else if (k === 'wskull') mesh = new THREE.Mesh(skullGeo, new THREE.MeshBasicMaterial({ color: s ? 0x6a8aff : 0x2a2a2a }));
+  else if (k === 'bullet') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8f0d0 }));
+  else if (k === 'fang') { mesh = new THREE.Group(); for (const sd of [-1, 1]) { const m = new THREE.Mesh(fangGeo, fangMat.clone()); m.position.set(0, 0.3, sd * 0.15); mesh.add(m); } }
+  else if (k === 'falling' && Array.isArray(s) && BLOCKS[s[0]]) mesh = new THREE.Mesh(R.blockGeometry(itemOfBlock(s[0], s[1] | 0)), R.blockMaterial());
+  if (!mesh) return null;
+  const e = Ent('mpfx', x, y, z); e.kind = 'mpfx'; e.fk = k; e.mesh = mesh; e.w = k === 'fireball' && !s ? 0.5 : 0; e.h = k === 'fireball' && !s ? 1 : 0; e.tick = mpFxTick; e.render = mpFxRender;
+  if (k === 'fireball' && !s) { e.hittable = true; e.onHit = q => { mpToAuth({ t: 'deflect', e: q.rid, d: lookDir() }); play('hit'); }; } // big fireballs can be hit back
+  return addEnt(e);
+}
+function mpFxTick(e) { if (e.tx == null) return; e.x += (e.tx - e.x) * 0.6; e.y += (e.ty - e.y) * 0.6; e.z += (e.tz - e.z) * 0.6; if (e.fk === 'fireball' && Math.random() < 0.5) R.simpleParticle(e.x, e.y + (e.fs ? 0.16 : 0.5), e.z, [0.4, 0.4, 0.4], { kind: 'smoke', size: e.fs ? 0.15 : 0.4, vy: 0.1, grav: 0, life: 0.4 }); }
+function mpFxRender(e, x, y, z, br, now) {
+  const m = e.mesh, s = e.fs;
+  if (e.fk === 'arrow') { m.position.set(x, y, z); if (Array.isArray(s) && !s[0] && (s[2] || s[3] || s[4])) m.lookAt(x + s[2], y + s[3], z + s[4]); m.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); }); }
+  else if (e.fk === 'falling') { m.position.set(x, y + 0.5, z); R.setMeshLight(m, br); }
+  else if (e.fk === 'fang') { m.position.set(x, y, z); m.visible = !!s; }
+  else { m.position.set(x, y + (e.fk === 'fireball' ? (s ? 0.16 : 0.5) : 0.15), z); m.rotation.set(now / 200, now / 300, 0); if (e.fk === 'fireball') m.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
+}
+// ---------- what other players do to blocks: the sound and the pieces flying ----------
+function mpGotBfx(m, from) {
+  if (m.dim === W.dim && [m.x, m.y, m.z].every(Number.isInteger) && BLOCKS[m.id]) { const d = Math.hypot(PL.x - m.x - .5, PL.y - m.y, PL.z - m.z - .5);
+    if (d < 24) { const mat = soundMat(m.id), vol = 1 - d / 24; if (m.k === 'dig') play('dig', { mat, vol: 0.5 * vol }); else play(m.k === 'place' ? 'place' : 'break', { mat, vol }); R.blockParticles(m.x, m.y, m.z, m.id, m.k === 'dig' ? 1 : m.k === 'place' ? 0 : 24, lightBright(m.x + .5, m.y + 1, m.z + .5), m.m | 0); } }
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+// ---------- lightning: the runner strikes, everyone sees the bolt (and takes it where they stand) ----------
+function mpBoltFx(x, y, z) {
+  W.flash = 1; boltMesh(x + .5, y, z + .5);
+  const dist = Math.hypot(PL.x - x - .5, PL.z - z - .5); play('thunder', { vol: Math.max(0.15, 1 - dist / 160) }); if (dist < 24) play('explode', { vol: 0.5 * (1 - dist / 24) });
+  if (!PL.dead && Math.abs(PL.x - x - .5) < 3 && Math.abs(PL.z - z - .5) < 3 && PL.y > y - 3 && PL.y < y + 6 && !creative()) { PL.fire = Math.max(PL.fire, 160); hurtPlayer(5, 'lightning'); }
+}
+// ---------- the fishing line and the eye of ender another player threw ----------
+function mpPeerFx(p, s, light) {
+  const want = Array.isArray(s.fx) ? s.fx : [], have = p.fxm || (p.fxm = {});
+  for (const k of ['bobber', 'eye']) {
+    const f = want.find(q => Array.isArray(q) && q[0] === k && [q[1], q[2], q[3]].every(isFinite)); let o = have[k];
+    if (!f) { if (o) { scene.remove(o); o.traverse(q => { if (q.material) q.material.dispose(); if (q.geometry && k === 'bobber' && q.isLine) q.geometry.dispose(); }); delete have[k]; } continue; }
+    if (!o) { o = have[k] = new THREE.Group();
+      if (k === 'eye') { const m = R.itemMesh(IID.ender_eye); m.scale.setScalar(0.3); o.add(m); }
+      else { o.add(fishHookMesh()); const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x101010 })); ln.frustumCulled = false; o.add(ln); o.userData.line = ln; }
+      scene.add(o); }
+    o.position.set(+f[1], +f[2] + 0.06, +f[3]); o.visible = !s.dead;
+    if (o.userData.line) { const yw = s.yaw, hx = p.pos[0] - Math.sin(yw) * 0.6 + Math.cos(yw) * 0.35, hy = p.pos[1] + (s.sneak ? 1.25 : 1.45), hz = p.pos[2] - Math.cos(yw) * 0.6 - Math.sin(yw) * 0.35;
+      const a = o.userData.line.geometry.attributes.position; a.setXYZ(0, 0, 0, 0); a.setXYZ(1, hx - o.position.x, hy - o.position.y, hz - o.position.z); a.needsUpdate = true; }
+    o.traverse(q => { if (q.isMesh || q.isSprite) R.setMeshLight(q, light); });
+  }
+}
+function mpDropPeerFx(p) { if (p.fxm) { for (const k in p.fxm) scene.remove(p.fxm[k]); p.fxm = null; } if (p.crack) { scene.remove(p.crack); p.crack.material.dispose(); p.crack = null; } }
 // ---------- other players' figures ----------
 function mpAvatar(p) {
   if (p.m) return p.m;
@@ -806,7 +901,7 @@ function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if 
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } mpDropPeerFx(p); continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
     // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
@@ -819,8 +914,9 @@ function mpRender(dt) {
     p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
     const glide = !!s.glide, swim = s.pose === 'swim' && !glide; p.glideT = glide ? (p.glideT || 0) + dtT : 0;
-    const ps = { headYaw: 0, headPitch: -s.pitch, headPitchW: -s.pitch, yaw: s.yaw, right: s.held ? 'item' : null, left: s.off ? 'item' : null, two: null, charge: 0, swing: s.swing, swingLeft: false,
-      sneak: (!!s.sneak || s.pose === 'crouch') && !s.fly && !glide, riding: !!s.ride, flying: !!s.fly, gliding: glide, glideT: p.glideT, vel2: mvx * mvx + mvz * mvz, vy: (s.y - last[1]) || 0, swim, sleep: !!s.sleep, bedYaw: 0, age: performance.now() / 50 };
+    const pk = v => typeof v === 'string' && /^(item|block|spear|spy)$/.test(v) ? v : null, hasPose = 'pr' in s;
+    const ps = { headYaw: 0, headPitch: -s.pitch, headPitchW: -s.pitch, yaw: s.yaw, right: hasPose ? pk(s.pr) : s.held ? 'item' : null, left: hasPose ? pk(s.plf) : s.off ? 'item' : null, two: /^(bow|xbow|xcharge)$/.test(s.two || '') ? s.two : null, charge: +s.chg || 0, swing: s.swing, swingLeft: !!s.swl,
+      sneak: (!!s.sneak || s.pose === 'crouch') && !s.fly && !glide, riding: !!s.ride, flying: !!s.fly, gliding: glide, glideT: p.glideT, vel2: mvx * mvx + mvz * mvz, vy: (s.y - last[1]) || 0, swim, sleep: !!s.sleep, bedYaw: +s.by || 0, age: performance.now() / 50 };
     tickBodyYaw(st, ps, mvx, mvz, dtT);
     const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
     st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
@@ -830,7 +926,13 @@ function mpRender(dt) {
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
     for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
-    updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light);
+    updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
+    if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
+    mpPeerFx(p, s, light);
+    const mn = Array.isArray(s.mine) && s.mine.length === 4 && s.mine.every(Number.isInteger) ? s.mine : null, mid = mn && getBlock(mn[0], mn[1], mn[2]); // the cracks in the block they dig
+    if (mn && mid && (p.digT = (p.digT || 0) + dtT) > 4) { p.digT = 0; mpGotBfx({ dim: W.dim, x: mn[0], y: mn[1], z: mn[2], id: mid, m: getMeta(mn[0], mn[1], mn[2]), k: 'dig' }); }
+    if (mn && mid) { if (!p.crack) { p.crack = new THREE.Mesh(R.crack.geometry, R.crack.material.clone()); scene.add(p.crack); } p.crack.geometry = crackGeometry(mid, getMeta(mn[0], mn[1], mn[2])); p.crack.position.set(mn[0] + .5, mn[1] + .5, mn[2] + .5); p.crack.scale.setScalar(1.002); p.crack.material.map = R.crackTexs[Math.max(0, Math.min(9, mn[3]))]; p.crack.visible = true; }
+    else if (p.crack) p.crack.visible = false;
   }
 }
 
@@ -852,6 +954,15 @@ function mpInstall() {
   const scl = spawnCloud; spawnCloud = function (x, y, z, type, o) { if (MP.on && !MP.splashIn && W.active) mpSend({ t: 'splash', k: 'cloud', dim: W.dim, x, y, z, type, r: o && o.r, dur: o && o.dur, breath: o && o.breath, col: o && o.col }); return scl.apply(this, arguments); };
   const lr = launchRocket; launchRocket = function (x, y, z, st, rider, shot) { const r = lr.apply(this, arguments); if (MP.on && !rider && !MP.fwIn && W.active) mpSend({ t: 'fw', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), fw: st && st.fw || null, shot: shot || null }); return r; }; // everyone sees (and feels) a rocket
   const i6 = items6Use; items6Use = function (t, h) { if (MP.role === 'guest' && h && h.id === IID.lead && t && t.type === 'block' && FENCES.has(t.id) && ENT.some(e => e.remote && e.leash && e.leash.p === MP.id)) { mpToAuth({ t: 'tie', x: t.x, y: t.y, z: t.z }); play('place', { mat: 'wool' }); swing(); return true; } return i6.apply(this, arguments); };
+  const bb = breakBlock; breakBlock = function (x, y, z) { const id = getBlock(x, y, z), m = getMeta(x, y, z), r = bb.apply(this, arguments); if (MP.on && id && getBlock(x, y, z) !== id && W.active) mpSend({ t: 'bfx', k: 'break', dim: W.dim, x, y, z, id, m }); return r; }; // others hear it and see the pieces
+  const pbk = placeBlock; placeBlock = function (t) { const at = t ? [[t.x, t.y, t.z], [t.x + t.nx, t.y + t.ny, t.z + t.nz]] : [], was = at.map(q => getBlock(...q)), r = pbk.apply(this, arguments);
+    if (MP.on && W.active) at.forEach((q, i) => { const id = getBlock(...q); if (id && id !== was[i]) mpSend({ t: 'bfx', k: 'place', dim: W.dim, x: q[0], y: q[1], z: q[2], id, m: getMeta(...q) }); }); return r; };
+  const slk = strikeLightning; strikeLightning = function (x, y, z, rod) { if (MP.on && MP.role === 'guest') { if (!MP.wx && W.active) mpToAuth({ t: 'strike', x, y, z, rod: rod ? 1 : 0 }); return; } const r = slk.apply(this, arguments); if (MP.on && W.active) mpSend({ t: 'bolt', dim: W.dim, x, y, z }); return r; }; // the runner strikes; a guest's trident asks it to
+  const wtk = weatherTick; weatherTick = function () { MP.wx = true; try { return wtk.apply(this, arguments); } finally { MP.wx = false; } }; // a guest's sky only follows the runner's bolts
+  for (const n of ['fireballTick', 'witherSkullTick', 'bulletTick']) { const f = window[n]; if (typeof f === 'function') window[n] = function (e) { if (MP.role === 'host' && MP.peers.size) { const g = e.guestOwner || mpNearestGuest(e); if (g) return mpProxy(g, () => f(e)); } return f(e); }; } // projectiles chase and hit the nearest player, guests too
+  const sfg = spawnFang; spawnFang = function () { const e = sfg.apply(this, arguments); if (e && e.tick) { const t = e.tick; e.tick = function (q) { if (MP.role === 'host' && MP.peers.size) { const g = mpNearestGuest(q); if (g) return mpProxy(g, () => t(q)); } return t(q); }; } return e; };
+  const ib = interactBlock; interactBlock = function (t, dry) { if (dry || !MP.on || !t || t.type !== 'block') return ib.apply(this, arguments); const j0 = JSON.stringify(getTile(t.x, t.y, t.z) || null), r = ib.apply(this, arguments);
+    const j1 = JSON.stringify(getTile(t.x, t.y, t.z) || null); if (j1 !== j0 && j1 !== 'null' && !UI.screen) mpTileChanged(t.x, t.y, t.z); return r; }; // a record, a book, a cake bite changed in place: everyone gets it
   const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
   for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
   const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
@@ -863,7 +974,9 @@ function mpInstall() {
     if (MP.proxy && !(id === 'husbandry/breed_an_animal' || id === 'husbandry/bred_all_animals')) { mpSend({ t: 'adv', id, crit: crit == null ? null : crit }, MP.proxy.id); return; } return ag.apply(this, arguments); };
   const hp = hurtPlayer; hurtPlayer = function (dmg, cause) { if (MP.proxy) { mpSend({ t: 'hurt', dmg, cause }, MP.proxy.id); return true; } return hp.apply(this, arguments); };
   const ae = addEffect; addEffect = function (t, k, dur, lv) { if (MP.proxy && t === PL) { mpSend({ t: 'eff', k, dur, lv: lv || 0 }, MP.proxy.id); return; } return ae.apply(this, arguments); };
-  const pl = play; play = function () { if (!MP.proxy) return pl.apply(this, arguments); }; // a guest's fight isn't heard at the host's ears
+  const pl = play; play = function (name, o) { if (MP.proxy) return; // a guest's fight isn't heard at the host's ears
+    if (MP.on && MP.act && !MP.sndIn && W.active && !MP_SND_SKIP.has(name) && (MP.sndN = (MP.sndN || 0) + 1) <= 4) mpSend({ t: 'snd', dim: W.dim, x: +PL.x.toFixed(1), y: +PL.y.toFixed(1), z: +PL.z.toFixed(1), n: name, o: o && typeof o === 'object' ? { mat: o.mat, pitch: o.pitch, vol: o.vol } : null }); // doors, note blocks, bells, buckets... heard nearby
+    return pl.apply(this, arguments); };
   const at = arrowTick; arrowTick = function (e) { if (e.visual) return mpVisualArrow(e); if (MP.peers.size && e.owner === PL && mpArrowAtPeer(e)) return; if (MP.role === 'host' && MP.peers.size && mpArrowAtGuest(e)) return; return at.apply(this, arguments); };
   // your arrows and tridents fly on the others' screens too (only for looks: hits are worked out by whoever shot)
   // explosions happen in the runner's world: a guest's TNT, bed or anchor asks for one there; everyone else gets the bang,
@@ -951,7 +1064,7 @@ function mpGotHit(m, att) {
 }
 // a guest's right click on one of the host's mobs (feeding, shearing, milking, dyeing, taming, naming...) happens on the
 // host, holding the guest's item; what the item becomes and anything handed over goes back to the guest
-function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return !!e.leash || ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return true; }
+function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return !!(h && h.id === IID.name_tag && h.name); if (!h) return !!e.leash || ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return true; }
 function mpLeashHolder(l) { // {p: id}: that player (yourself included) while in this world and dimension (a tab in the background still holds on)
   if (!l || l.p == null) return null; if (l.p === MP.id) return PL;
   const p = MP.peers.get(l.p); return p && p.s && p.s.dim === W.dim ? { x: +p.s.x, y: +p.s.y, z: +p.s.z, dead: !!p.s.dead } : null;

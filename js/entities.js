@@ -372,7 +372,7 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite.material.map.dispose(); e.nameSprite.material.dispose(); e.nameSprite = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -844,7 +844,7 @@ function chunkKeep(c, remove) {
   for (const e of ENT) {
     if (e.dead || e.remote) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0 }]); // persistent monsters (structures, curing, charged) and leads survive unloading
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0, name: e.name || null }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);
@@ -870,9 +870,22 @@ W.onChunkLoaded = (c, fresh) => {
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
-  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
+  if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
+// a named mob (name tag) shows its name while the crosshair is on it, as in Java
+function mobNameTag(e, x, y, z) {
+  if (!e.nameSprite || e.nameSprite.userData.text !== e.name) {
+    if (e.nameSprite) scene.remove(e.nameSprite);
+    const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif'; g.font = F; const w = Math.ceil(g.measureText(e.name).width) + 24; c.width = w; c.height = 60;
+    g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(e.name, 12, 32);
+    const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    e.nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true, fog: false })); e.nameSprite.userData = { text: e.name, w: w / 60 }; e.nameSprite.renderOrder = 6; scene.add(e.nameSprite);
+  }
+  const s = e.nameSprite, d = Math.hypot(camera.position.x - x, camera.position.y - y, camera.position.z - z);
+  s.visible = !e.deathT && d < 64 && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e;
+  s.position.set(x, y + e.h + 0.45, z); s.scale.set(s.userData.w * 0.32, 0.32, 1);
+}
 // ---------- render update (interpolated) ----------
 function entityRender(alpha, now) {
   for (const e of ENT) {
@@ -905,6 +918,7 @@ function entityRender(alpha, now) {
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
+      if (e.name) mobNameTag(e, x, y, z); else if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite = null; }
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

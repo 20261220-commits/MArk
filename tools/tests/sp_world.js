@@ -9,7 +9,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     PL.health = 20; PL.inv = 0; hurtPlayer(10, 'mob'); out.diamond10 = +(20 - PL.health).toFixed(2); INV.armor.fill(null);
     PL.health = 10; PL.food = 17; PL.sat = 0; PL.exh = 0; for (let i = 0; i < 40; i++) { UI.paused = false; await wait(50); } out.regen17 = PL.health - 10;
     PL.health = 10; PL.food = 20; PL.sat = 5; for (let i = 0; i < 40; i++) { UI.paused = false; await wait(50); } out.regen20 = PL.health - 10;
-    PL.health = 20; PL.inv = 0; PL.y = Y + 10; PL.vy = 0; PL.fallDist = 0; PL.onGround = false; PL.food = 0; PL.sat = 0; let hp0 = 20; for (let i = 0; i < 80 && !PL.onGround; i++) { UI.paused = false; await wait(50); } await wait(100); out.fall10 = 20 - PL.health;
+    PL.health = 20; PL.inv = 0; PL.y = Y + 10; PL.vy = 0; PL.fallDist = 0; PL.onGround = false; let fallDmg = 0; const hp0 = hurtPlayer; hurtPlayer = function (d, cause) { if (cause === 'fall') fallDmg += d; return hp0.apply(this, arguments); }; for (let i = 0; i < 200 && !PL.onGround; i++) { UI.paused = false; await wait(50); } await wait(100); hurtPlayer = hp0; out.fall10 = fallDmg; // the fall itself (no hunger or regeneration in the way)
     PL.food = 20; PL.health = 20;
     const use = (item, t) => { INV.slots[INV.sel] = item ? { id: IID[item], n: 4 } : null; TARGET = { type: 'block', ...t, id: getBlock(t.x, t.y, t.z), m: getMeta(t.x, t.y, t.z), t: 2 }; USE.placeCd = 0; useItem(true); };
     setBlock(X + 3, Y, Z, BID.redstone_lamp); const lamp0 = getBlock(X + 3, Y, Z); use('lever', { x: X + 4, y: Y - 1, z: Z, nx: 0, ny: 1, nz: 0 }); use(null, { x: X + 4, y: Y, z: Z, nx: 0, ny: 1, nz: 0 }); await wait(500);
@@ -37,5 +37,10 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.portal, 'flint and steel lights an obsidian frame');
   ok(r.nether.dim === -1 && r.nether.inPortal && !r.nether.stuck && r.nether.xScaled, 'the portal leads into a portal in the Nether at 1/8 the distance', r.nether);
   ok(r.lightBad === 0, '2000 random light-source edits leave block light consistent', r.lightBad);
+  // a renamed name tag names a mob; the name is kept when its chunk is saved and loaded
+  const nt = await p.evaluate(() => { const c = spawnMob('cow', PL.x + 2, PL.y, PL.z); c.persistent = true; PL.mode = 'survival'; INV.slots[INV.sel] = { id: IID.name_tag, n: 1, name: '누렁이' }; TARGET = { type: 'ent', e: c, t: 1 }; USE.placeCd = 0; useItem(true);
+    const ch = chunkAt(Math.floor(c.x) >> 4, Math.floor(c.z) >> 4), kept = chunkKeep(ch, false).find(m => m[0] === 'cow' && m[6] && m[6].name === '누렁이');
+    return { name: c.name, used: !INV.slots[INV.sel], kept: !!kept }; });
+  ok(nt.name === '누렁이' && nt.used && nt.kept, 'a name tag names a mob and the name is saved', nt);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
