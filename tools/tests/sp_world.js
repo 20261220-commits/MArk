@@ -9,7 +9,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     PL.health = 20; PL.inv = 0; hurtPlayer(10, 'mob'); out.diamond10 = +(20 - PL.health).toFixed(2); INV.armor.fill(null);
     PL.health = 10; PL.food = 17; PL.sat = 0; PL.exh = 0; for (let i = 0; i < 40; i++) { UI.paused = false; await wait(50); } out.regen17 = PL.health - 10;
     PL.health = 10; PL.food = 20; PL.sat = 5; for (let i = 0; i < 40; i++) { UI.paused = false; await wait(50); } out.regen20 = PL.health - 10;
-    PL.health = 20; PL.inv = 0; PL.y = Y + 10; PL.vy = 0; PL.fallDist = 0; PL.onGround = false; PL.food = 0; PL.sat = 0; let hp0 = 20; for (let i = 0; i < 80 && !PL.onGround; i++) { UI.paused = false; await wait(50); } await wait(100); out.fall10 = 20 - PL.health;
+    PL.health = 20; PL.inv = 0; PL.y = Y + 10; PL.vy = 0; PL.fallDist = 0; PL.onGround = false; let fallDmg = 0; const hp0 = hurtPlayer; hurtPlayer = function (d, cause) { if (cause === 'fall') fallDmg += d; return hp0.apply(this, arguments); }; for (let i = 0; i < 200 && !PL.onGround; i++) { UI.paused = false; await wait(50); } await wait(100); hurtPlayer = hp0; out.fall10 = fallDmg; // the fall itself (no hunger or regeneration in the way)
     PL.food = 20; PL.health = 20;
     const use = (item, t) => { INV.slots[INV.sel] = item ? { id: IID[item], n: 4 } : null; TARGET = { type: 'block', ...t, id: getBlock(t.x, t.y, t.z), m: getMeta(t.x, t.y, t.z), t: 2 }; USE.placeCd = 0; useItem(true); };
     setBlock(X + 3, Y, Z, BID.redstone_lamp); const lamp0 = getBlock(X + 3, Y, Z); use('lever', { x: X + 4, y: Y - 1, z: Z, nx: 0, ny: 1, nz: 0 }); use(null, { x: X + 4, y: Y, z: Z, nx: 0, ny: 1, nz: 0 }); await wait(500);
