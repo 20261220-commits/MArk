@@ -52,8 +52,8 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 1, { group: 's1', accepts: st => !st || st.id === IID.netherite_ingot }));
     L.push({ group: 'result', output: true, get: () => smithResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const g = ctx.items[1]; g.n--; if (!g.n) ctx.items[1] = null; play('anvil', { vol: 0.5 }); } });
   } else if (type === 'trade') {
-    ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
-    L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
+    ctx.items = ctx.items || [null, null]; if (ctx.items.length < 2) ctx.items.push(null); ctx.sel = ctx.sel || 0;
+    L.push(slotRef(ctx.items, 0, { group: 'tpay' })); L.push(slotRef(ctx.items, 1, { group: 'tpay' })); // two payment slots, as in Java
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
   } else if (type === 'loom') {
     ctx.items = ctx.items || [null, null, null];

@@ -137,6 +137,7 @@ body.vfurn .panel.inv .arrow{width:calc(15 * var(--px))}
 #aname{font:inherit;font-size:calc(7*var(--px));background:#000;color:#fff;border:var(--px) solid #a0a0a0;padding:var(--px) calc(3*var(--px));width:calc(110*var(--px))}
 .plus{font-size:calc(10*var(--px));color:#404040}
 .acost{color:#3a9a10}.acost.bad{color:#d03030}
+.txp{height:calc(3 * var(--px));background:#3a3a3a;border:var(--px) solid #000;margin:0 0 calc(2 * var(--px))}.txp i{display:block;height:100%;background:#7cd43a}
 .toffers{display:flex;flex-direction:column;gap:var(--px);max-height:calc(110*var(--px));overflow-y:auto}
 .toff{display:flex;align-items:center;gap:calc(3*var(--px));background:#8b8b8b;border:var(--px) solid #000;padding:var(--px) calc(3*var(--px));cursor:pointer;font:inherit}
 .stattabs{display:flex;gap:4px;justify-content:center;margin-bottom:6px}.stattabs button{width:auto;padding:0 14px}.stattabs button.on{filter:brightness(1.3)}.statbody{max-height:55vh;overflow-y:auto;background:rgba(0,0,0,.45);padding:6px 10px;margin-bottom:8px}.stattab{width:100%;border-collapse:collapse}.stattab td,.stattab th{padding:2px 8px;text-align:left;color:#fff}.stattab td:not(:first-child),.stattab th:not(:first-child){text-align:right}.stattab .ic{vertical-align:middle;zoom:.6}
@@ -366,7 +367,9 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']))
+  // beds from the jar's entity textures: the foot half's long side and each half's outer end (bed_side is the head half's side)
+  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -3558,7 +3561,7 @@ Buf.prototype.out = function (flip) {
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
   // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
-  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = []; // Wt: water, drawn before the other translucent blocks
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), Dp = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = [], dFlip = []; // Dp: deep cave faces (cave culling) // Wt: water, drawn before the other translucent blocks
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -3637,11 +3640,12 @@ function meshChunk(B, M, L, bio, opts) {
     return t;
   }
   function logRot(id, meta, f) { if (!LOGAX[id] || !meta) return 0; if (meta === 1) return (f === 2 || f === 3 || f === 4 || f === 5) ? 1 : 0; return (f === 0 || f === 1 || f === 2 || f === 3) ? 1 : 0; }
-  // cave culling (opts.cullDark, while the player is above ground): a cube face looking into air that no sky light
-  // reaches, more than 8 below its column's top, can't be seen from up there (caves are closed; sky light runs ~15 blocks
-  // in from an opening); skipping those is a third or more of the terrain's triangles with the 1.18 caves
+  // cave culling: an opaque cube face looking into air that no sky light reaches, more than 8 below its column's top,
+  // can't be seen from above ground (caves are closed; sky light runs ~15 blocks in from an opening). Those go in their
+  // own mesh, drawn only near the player or while the player is underground: a third or more of the terrain's
+  // triangles with the 1.18 caves
   let colTop = null;
-  if (opts.cullDark) { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
+  { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
   for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const pi = pidx(x, y, z), id = B[pi]; if (!id) continue;
     const rt = RTYPE[id], meta = fix6(id, M[pi]);
@@ -3649,11 +3653,11 @@ function meshChunk(B, M, L, bio, opts) {
     setTint(TINT[id], x, z, meta);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
       const leaves = LEAF[id] === 1, trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(leaves && !fancy);
-      const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
+      const buf0 = trans ? Tr : cut ? Cu : O, fl0 = trans ? tFlip : cut ? cFlip : oFlip;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
         if (OPQ[nb]) continue;
-        if (colTop && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x] && !trans) continue; // no sky light, deep: out of sight from above
+        const deep = buf0 === O && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x], buf = deep ? Dp : buf0, fl = deep ? dFlip : fl0; // no sky light, deep: out of sight from above
         const F = FACES[f];
         if (nb === id && (SELFCULL[id] || (leaves && !fancy)) && (!HASV[id] || M[ni] === meta)) continue;
         if (trans && nb && RTYPE[nb] === RT.CUBE) continue;
@@ -3867,8 +3871,12 @@ function meshChunk(B, M, L, bio, opts) {
           if (f === 2) { tile = T[(head ? 'bed_head' : 'bed_foot') + sfx]; rot = [2, 3, 0, 1][fac]; u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
           else if (f === 3) { tile = T.oak_planks; }
           else if (bi > 0) tile = T.oak_planks;
-          else { tile = T['bed_side' + sfx]; v0 = 3; v1 = 9; }
-        } else if (DOOR[id]) { const dw = id === 96 ? (meta >> 4) & 7 : 0; tile = dw ? T[WOOD8[dw][0] + (meta & 8 ? '_door_top' : '_door_bottom')] : meta & 8 ? FT[id * 4 + 1] : FT[id * 4]; if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = id === 96 ? T[WOOD8[dw][0] + '_planks'] : FT[id * 4]; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
+          else { // the mattress: long sides run from the head end (tile column 0) to the foot end; each half has its outer end
+            const d = DIRS[fac], along = F.n[0] * d[0] + F.n[2] * d[2]; v0 = 3; v1 = 9;
+            if (along === 0) { tile = T[(head ? 'bed_side' : 'bed_sidef') + sfx]; const eu = [[0, 0, -1], [0, 0, 1], null, null, [1, 0, 0], [-1, 0, 0]][f], toHead = eu[0] * d[0] + eu[2] * d[2]; if (toHead > 0) { u0 = 16; u1 = 0; } else { u0 = 0; u1 = 16; } }
+            else tile = T[(along > 0 ? 'bed_endh' : 'bed_endf') + sfx];
+          }
+        } else if (DOOR[id]) { const dw = id === 96 ? (meta >> 4) & 7 : 0; tile = id === 96 ? T[WOOD8[dw][0] + (meta & 8 ? '_door_top' : '_door_bottom')] : meta & 8 ? FT[id * 4 + 1] : FT[id * 4]; /* oak too: its block lists only the bottom texture */ if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = id === 96 ? T[WOOD8[dw][0] + '_planks'] : FT[id * 4]; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
         else if (id === 97) { u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
         else if (id === 99 || id === 244) { // lantern pixels
           if (bi === 0) { if (F.n[1]) { u0 = 0; u1 = 6; v0 = 9; v1 = 15; } else { u0 = 0; u1 = 6; v0 = 2; v1 = 9; } }
@@ -3969,7 +3977,7 @@ function meshChunk(B, M, L, bio, opts) {
   // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
   // water drawn over ice darkened whole rows of a frozen ocean
   for (let i = 0; i < Tr.n; i++) { if (Wt.n * 3 + 3 >= Wt.pos.length) Wt.grow(); const n = Wt.n++; Wt.pos.set(Tr.pos.subarray(i * 3, i * 3 + 3), n * 3); Wt.uv.set(Tr.uv.subarray(i * 2, i * 2 + 2), n * 2); Wt.lt.set(Tr.lt.subarray(i * 4, i * 4 + 4), n * 4); Wt.col.set(Tr.col.subarray(i * 4, i * 4 + 4), n * 4); }
-  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)) };
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)), d: Dp.out(dFlip) };
 }
 
 // ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
@@ -4376,8 +4384,8 @@ function workerMain(S) {
     else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);
       const tr = [m.B.buffer, m.M.buffer, m.L.buffer];
-      for (const k of ['o', 'c', 't']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
-      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
+      for (const k of ['o', 'c', 't', 'd']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
+      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, d: r.d, B: m.B, M: m.M, L: m.L }, tr);
     }
   };
 }
@@ -4634,7 +4642,12 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       // turned half round: the entity texture has the pillow at the top, the block mesher wants the head end at the bottom
       const rot = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + 15 - y) * W + sx + 15 - x) * 4, d = (y * 16 + x) * 4; for (let c = 0; c < 4; c++) t[d + c] = P[s + c]; } return t; };
       const side = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = ((6 + x) * W + r) * 4, d = ((3 + r) * 16 + x) * 4; for (let k = 0; k < 4; k++) side[d + k] = P[s + k]; side[d + 3] = 255; }
-      out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28)); out.tiles['bed_side' + sfx] = put(side);
+      // the mattress's sides and ends (Java's bed model: a 16x16x6 box per half, laid flat): rows 3..8 of a tile, the bottom
+      // of the mattress (the texture's first column / row) at the bottom; along the bed the head end comes first
+      const strip = (sx, sy, w, h, vert) => { const t = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = vert ? ((sy + x) * W + sx + r) * 4 : ((sy + r) * W + sx + x) * 4, d = ((8 - r) * 16 + x) * 4; for (let k = 0; k < 4; k++) t[d + k] = P[s + k]; t[d + 3] = 255; } return t; };
+      out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28));
+      out.tiles['bed_side' + sfx] = put(strip(0, 6, 6, 16, true)); out.tiles['bed_sidef' + sfx] = put(strip(0, 28, 6, 16, true));
+      out.tiles['bed_endh' + sfx] = put(strip(6, 0, 16, 6, false)); out.tiles['bed_endf' + sfx] = put(strip(22, 22, 16, 6, false));
     }
   }
   { // tiles Java draws from entity / particle / item textures: nearest-neighbour scaled into 16x16
@@ -4687,7 +4700,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 4; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon
+const UPACK = { name: null }, UPACK_VER = 5; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -6136,6 +6149,7 @@ const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate'
   stripped_warped_stem: 'warped_stem', stripped_warped_stem_top: 'warped_stem_top', tall_grass_bottom: 'short_grass', tall_grass_top: 'short_grass', large_fern_bottom: 'fern', large_fern_top: 'fern',
   chipped_anvil_top: 'anvil_top', damaged_anvil_top: 'anvil_top', trapped_chest_side: 'chest_side', trapped_chest_top: 'chest_top', trapped_chest_front: 'chest_front', iron_trapdoor: 'oak_trapdoor', player_head_side: 'zombie_head_side', player_head_front: 'zombie_head_front' };
 for (const w of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) Object.assign(TILE_ALIAS, { [w + '_door_bottom']: 'oak_door_bottom', [w + '_door_top']: 'oak_door_top', [w + '_trapdoor']: 'oak_trapdoor' });
+PAINT.bed_sidef = PAINT.bed_endh = PAINT.bed_endf = r => PAINT.bed_side(r); // (a jar draws these from the bed's entity texture)
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
     curTile = i;
@@ -6165,6 +6179,12 @@ function applyPackData(P, D) {
     const t = S.T[name]; if (t == null) continue;
     const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
     for (let y = 0; y < TS; y++) AD.set(D.subarray(off + y * 64, off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4);
+  }
+  // a pack without the bed's foot side and ends (Pixel Perfection, older converted jars): its bed side stands in for them
+  for (const c of ['', ...['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'black'].map(c => '_' + c)]) {
+    const src = S.T['bed_side' + c]; if (P.tiles['bed_side' + c] == null) continue;
+    for (const k of ['bed_sidef', 'bed_endh', 'bed_endf']) { if (P.tiles[k + c] != null) continue; const t = S.T[k + c], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+      for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4); }
   }
   for (const [k, [off, frames]] of Object.entries(P.anim)) if (S.T[k] != null) PACKPX.anim[k] = { data: D, off, frames };
   for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
@@ -6828,6 +6848,7 @@ function neighborUpdate(x, y, z) {
   if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.red_bed) { const f = m & 3, dir = DIRS[f], s = (m & 4) ? -1 : 1; if (getBlock(x + dir[0] * s, y, z + dir[2] * s) !== b) setBlock(x, y, z, 0); return; }
   if (b === BID.farmland && SOLID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] === RT.CUBE) { setBlock(x, y, z, 3); return; }
+  if (b === BID.dirt_path && SOLID[getBlock(x, y + 1, z)] && !FLUID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] !== RT.CROSS) { setBlock(x, y, z, 3); if (W.onPathToDirt) W.onPathToDirt(x, y, z); return; } // a solid block on a path turns it to dirt
   // pointed dripstone: meta 0 hangs (needs the block above), meta 1 stands (needs the block below); an unsupported stalactite falls
   if (b === BID.pointed_dripstone) {
     if (m === 0) { const up = getBlock(x, y + 1, z); if (!OPQ[up] && !(up === b && getMeta(x, y + 1, z) === 0)) { setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); } }
@@ -7508,19 +7529,20 @@ function makeChunkGeo(d) {
   return g;
 }
 W.onMesh = (c, m) => {
-  if (!c.mesh) c.mesh = { o: null, c: null, t: null };
-  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans]]) {
+  if (!c.mesh) c.mesh = { o: null, c: null, t: null, d: null };
+  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans], ['d', m.d, matOpaque]]) {
     const old = c.mesh[k];
     if (old) { scene.remove(old); old.geometry.dispose(); c.mesh[k] = null; }
     if (!d.count) continue;
     const mesh = new THREE.Mesh(makeChunkGeo(d), mat);
     mesh.position.set(c.cx * 16, S.MINY, c.cz * 16); /* meshes are built in array rows: row 0 is y -64 */ mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
+    if (k === 'd') mesh.visible = R.deepShown(c); // deep cave faces: only where they can be seen (main.js)
     scene.add(mesh); c.mesh[k] = mesh;
   }
   c.mesh.ver = c.ver;
 };
-W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
+W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't', 'd']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
 
 // ---------- sky ----------
@@ -7969,7 +7991,8 @@ R.rd = 6; R.fov = 70; R.fovMul = 1;
 function fogCull() {
   const cx = camera.position.x, cz = camera.position.z, lim = (fog.far + 1) ** 2;
   for (const c of W.chunks.values()) { if (!c.mesh) continue; const x0 = c.cx * 16, z0 = c.cz * 16, dx = cx < x0 ? x0 - cx : cx > x0 + 16 ? cx - x0 - 16 : 0, dz = cz < z0 ? z0 - cz : cz > z0 + 16 ? cz - z0 - 16 : 0, v = dx * dx + dz * dz <= lim;
-    for (const k of ['o', 'c', 't']) if (c.mesh[k]) c.mesh[k].visible = v; }
+    for (const k of ['o', 'c', 't']) if (c.mesh[k]) c.mesh[k].visible = v;
+    if (c.mesh.d) c.mesh.d.visible = v && R.deepShown(c); }
 }
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -14632,8 +14655,8 @@ function buildSlots(type, ctx) {
     L.push(slotRef(ctx.items, 1, { group: 's1', accepts: st => !st || st.id === IID.netherite_ingot }));
     L.push({ group: 'result', output: true, get: () => smithResult(ctx), set: () => {}, take: () => { ctx.items[0] = null; const g = ctx.items[1]; g.n--; if (!g.n) ctx.items[1] = null; play('anvil', { vol: 0.5 }); } });
   } else if (type === 'trade') {
-    ctx.items = ctx.items || [null]; ctx.sel = ctx.sel || 0;
-    L.push(slotRef(ctx.items, 0, { group: 'tpay' }));
+    ctx.items = ctx.items || [null, null]; if (ctx.items.length < 2) ctx.items.push(null); ctx.sel = ctx.sel || 0;
+    L.push(slotRef(ctx.items, 0, { group: 'tpay' })); L.push(slotRef(ctx.items, 1, { group: 'tpay' })); // two payment slots, as in Java
     L.push({ group: 'result', output: true, get: () => tradeResult(ctx), set: () => {}, take: () => tradeTake(ctx) });
   } else if (type === 'loom') {
     ctx.items = ctx.items || [null, null, null];
@@ -15565,7 +15588,7 @@ function useItem(first) {
       const tool = d.tool;
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); advGrant('husbandry/wax_off'); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
-      if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
+      if (tool && tool.type === S.TOOL.SHOVEL && t.ny !== -1 && [2, 3, BID.podzol, BID.mycelium, BID.coarse_dirt, BID.rooted_dirt].includes(id) && !getBlock(x, y + 1, z)) { setBlock(x, y, z, BID.dirt_path); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // a shovel makes a path (Java: not from below, nothing on top)
       if (tool && tool.type === S.TOOL.AXE && STRIP()[id] != null) { // axes strip logs, wood, stems and hyphae (the axis / kind stays)
         const to = STRIP()[id]; setBlock(x, y, z, to, id === BID.wood ? t.m : t.m & 3); play('place', { mat: 'wood' }); swing(); if (!creative()) damageItem(INV.slots, INV.sel, 1); return;
       }
@@ -15862,6 +15885,8 @@ function elytraTick() {
   if (W.tickN % 20 === 0 && !creative()) damageItem(INV.armor, 1, 1);
   return true;
 }
+// a path turned into dirt under someone standing on it: up the sixteenth it grew (Java pushes entities out of the block)
+W.onPathToDirt = (x, y, z) => { for (const e of [PL, ...ENT.filter(q => q.kind === 'mob' && !q.dead)]) if (Math.floor(e.x) === x && Math.floor(e.z) === z && e.y >= y && e.y < y + 1) e.y = y + 1; };
 
 </script>
 <script>/* js/stats.js */
@@ -16192,8 +16217,11 @@ UI.renderScreen = () => {
   } else if (T === 'smithing') {
     h = `<div class="panel"><div class="cap">네더라이트 장비로 업그레이드</div><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">다이아몬드 장비 + 네더라이트 주괴</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'trade') {
-    const c = GUI.ctx, offers = villagerOffers(c.e);
-    h = `<div class="panel trade"><div class="cap">${PROF_NAME[c.e.prof] || '주민'}</div><div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span><i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.ench ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}<div class="arrow"></div>${slotHtml(1, 'big')}</div><p class="tip">${(() => { const o = offers[c.sel]; return o ? itemName(o.a) + ' ' + o.an + '개 → ' + (o.ench ? '마법이 부여된 책' : itemName(o.b)) + ' ' + o.bn + '개' + (o.uses >= o.max ? ' (품절)' : '') : ''; })()}</p></div></div><div class="cap">인벤토리</div>${invRows(2)}</div>`;
+    const c = GUI.ctx, offers = villagerOffers(c.e), lv = c.e.vlvl || 1, wand = c.e.prof === 'wandering';
+    const xpBar = wand ? '' : (() => { const lo = VLEVEL_XP[lv - 1], hi = VLEVEL_XP[lv], f = lv >= 5 ? 1 : Math.max(0, Math.min(1, ((c.e.vxp || 0) - lo) / (hi - lo))); return `<div class="txp"><i style="width:${(f * 100).toFixed(0)}%"></i></div>`; })();
+    const name = wand ? '떠돌이 상인' : (PROF_NAME[c.e.prof] || '주민') + ' · ' + VLEVEL_NAME[lv - 1];
+    const tipOf = o => o ? (o.a2 != null ? itemName(o.a) + ' ' + tradePrice(o) + '개 + ' + itemName(o.a2) + ' ' + o.an2 + '개' : itemName(o.a) + ' ' + tradePrice(o) + '개') + ' → ' + (o.e && o.b === IID.enchanted_book ? '마법이 부여된 책 (' + Object.entries(o.e).map(([k, v]) => (ENCH[k] ? ENCH[k][0] : k) + ' ' + v).join(', ') + ')' : itemName(o.b) + ' ' + o.bn + '개') + (o.uses >= o.max ? ' (품절 — 일터에서 다시 채웁니다)' : '') : '';
+    h = `<div class="panel trade"><div class="cap">${name}</div>${xpBar}<div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span>${o.a2 != null ? `<span>${icon(o.a2, o.an2)}</span>` : ''}<i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.e ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">${tipOf(offers[c.sel])}</p></div></div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
@@ -17577,9 +17605,9 @@ function mpHandle(m, from) {
     case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
     case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
     case 'use': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from); if (e && p && p.s) mpRemoteUse(p, e, m.st && ITEMS[m.st.id] ? m.st : null, m.sneak); } return;
-    case 'trades': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && (e.type === 'villager' || e.type === 'wandering_trader')) { if (e.type === 'wandering_trader') e.prof = 'wandering'; mpSend({ t: 'tradelist', e: m.e, l: villagerOffers(e).map(o => ({ ...o, made: null })) }, from); } } return;
-    case 'tradelist': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead); if (e && Array.isArray(m.l)) { e.trades = m.l; if (UI.screen && GUI.type === 'trade' && GUI.ctx && GUI.ctx.e === e) UI.renderScreen(); } } return;
-    case 'traded': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'), o = e && e.trades && e.trades[+m.i]; if (o && o.uses < o.max) { o.uses++; o.e = null; o.made = null; e.traded = true; e.rep = Math.min(150, (e.rep || 0) + 2); } } return;
+    case 'trades': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && (e.type === 'villager' || e.type === 'wandering_trader')) { if (e.type === 'wandering_trader') e.prof = 'wandering'; mpSend({ t: 'tradelist', e: m.e, l: villagerOffers(e).map(o => ({ ...o, made: null })), lv: e.vlvl || 1, xp: e.vxp || 0 }, from); } } return;
+    case 'tradelist': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead); if (e && Array.isArray(m.l)) { e.trades = m.l; e.vlvl = m.lv || 1; e.vxp = m.xp || 0; if (UI.screen && GUI.type === 'trade' && GUI.ctx && GUI.ctx.e === e) UI.renderScreen(); } } return;
+    case 'traded': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'), o = e && e.trades && e.trades[+m.i]; if (o && o.uses < o.max) tradeCounted(e, o); } return; // the runner's villager: its stock, experience and level
     case 'cartinv': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { if (typeof cartFillLoot === 'function') cartFillLoot(e); mpSend({ t: 'cartitems', e: m.e, items: e.items }, from); } } return;
     case 'cartitems': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead && q.kind === 'minecart'); if (e && e.items && Array.isArray(m.items)) { for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } e.loot = null; if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
     case 'cartset': if (host && Array.isArray(m.items)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { e.loot = null; for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
@@ -18554,6 +18582,195 @@ function accLogin() {
 function accLogout() { ACC.user = null; ACC.cred = null; accSave(); UI.flash('로그아웃했습니다'); showMenu('title'); }
 
 </script>
+<script>/* js/trades.js */
+// Villager trades as in Java 1.17 (TradeOffers): each profession has five levels (novice, apprentice, journeyman,
+// expert, master) with their own pool; a villager unlocks 2 offers of a level when it reaches it, gains experience from
+// each trade (10 / 70 / 150 / 250 to level up), restocks at its job site twice a day, and its prices rise with demand.
+// An offer: a / an (first price, adjusted), a2 / an2 (an optional second item), b / bn (what it sells), max uses,
+// xp (villager experience), mult (price multiplier: 0.05, or 0.2 for enchanted things), demand.
+const VLEVEL_NAME = ['초보자', '견습생', '숙련자', '전문가', '달인'], VLEVEL_XP = [0, 10, 70, 150, 250];
+const DYES16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+// buy: the player gives n of key for one emerald; sell: price emeralds for n of key; proc: inN of inKey + price emeralds
+const VBUY = (key, n, max, xp) => ({ a: key, an: n, b: 'emerald', bn: 1, max, xp, mult: 0.05 });
+const VS = (key, price, n, max, xp, mult = 0.05) => ({ a: 'emerald', an: price, b: key, bn: n, max, xp, mult });
+const VP = (inKey, inN, price, key, n, max, xp) => ({ a: inKey, an: inN, a2: 'emerald', an2: price, b: key, bn: n, max, xp, mult: 0.05 });
+const VE = (key, base, xp) => ({ a: 'emerald', an: base, b: key, bn: 1, max: 3, xp, mult: 0.2, enchant: 1 }); // enchanted at level 5..19, the price grows by the level
+const VBOOK = xp => ({ a: 'emerald', an: 0, a2: 'book', an2: 1, b: 'enchanted_book', bn: 1, max: 12, xp, mult: 0.2, book: 1 });
+const VMAP = (price, map, xp) => ({ a: 'emerald', an: price, a2: 'compass', an2: 1, b: map, bn: 1, max: 12, xp, mult: 0.2, map: 1 });
+const vEach = (f, list = DYES16) => list.map(f);
+const VTRADES = {
+  farmer: [[VBUY('wheat', 20, 16, 2), VBUY('potato', 26, 16, 2), VBUY('carrot', 22, 16, 2), VBUY('beetroot', 15, 16, 2), VS('bread', 1, 6, 16, 1)],
+    [VBUY('pumpkin', 6, 12, 10), VS('pumpkin_pie', 1, 4, 12, 5), VS('apple', 1, 4, 16, 5)],
+    [VS('cookie', 3, 18, 12, 10), VBUY('melon', 4, 12, 20)],
+    [VS('cake', 1, 1, 12, 15), ...[['night_vision', 100], ['jump_boost', 160], ['weakness', 140], ['blindness', 120], ['poison', 280], ['saturation', 7]].map(s => ({ ...VS('suspicious_stew', 1, 1, 12, 15), stew: s }))],
+    [VS('golden_carrot', 3, 3, 12, 30), VS('glistering_melon_slice', 4, 3, 12, 30)]],
+  fisherman: [[VBUY('string', 20, 16, 2), VBUY('coal', 10, 16, 2), VP('cod', 6, 1, 'cooked_cod', 6, 16, 1), VS('cod_bucket', 3, 1, 16, 1)],
+    [VBUY('cod', 15, 16, 10), VP('salmon', 6, 1, 'cooked_salmon', 6, 16, 5), VS('campfire', 2, 1, 12, 5)],
+    [VBUY('salmon', 13, 16, 20), VE('fishing_rod', 3, 10)],
+    [VBUY('tropical_fish', 6, 12, 30)],
+    [VBUY('pufferfish', 4, 12, 30), { ...VBUY('oak_boat', 1, 12, 30), boat: 1 }]],
+  shepherd: [[VBUY('white_wool', 18, 16, 2), VBUY('brown_wool', 18, 16, 2), VBUY('black_wool', 18, 16, 2), VBUY('gray_wool', 18, 16, 2), VS('shears', 2, 1, 12, 1)],
+    [...vEach(c => VBUY(c + '_dye', 12, 16, 10), ['white', 'gray', 'black', 'light_blue', 'lime']), ...vEach(c => VS(c + '_wool', 1, 1, 16, 5)), ...vEach(c => VS(c + '_carpet', 1, 4, 16, 5))],
+    [...vEach(c => VBUY(c + '_dye', 12, 16, 20), ['yellow', 'light_gray', 'orange', 'red', 'pink']), ...vEach(c => VS(c + '_bed', 3, 1, 12, 10))],
+    [...vEach(c => VBUY(c + '_dye', 12, 16, 30), ['brown', 'purple', 'blue', 'green', 'magenta', 'cyan']), ...vEach(c => VS(c + '_banner', 3, 1, 12, 15))],
+    [VS('painting', 2, 3, 12, 30)]],
+  fletcher: [[VBUY('stick', 32, 16, 2), VS('arrow', 1, 16, 12, 1), VP('gravel', 10, 1, 'flint', 10, 12, 1)],
+    [VBUY('flint', 26, 12, 10), VS('bow', 2, 1, 12, 5)],
+    [VBUY('string', 14, 16, 20), VS('crossbow', 3, 1, 12, 10)],
+    [VBUY('feather', 24, 16, 30), VE('bow', 2, 15)],
+    [VBUY('tripwire_hook', 8, 12, 30), VE('crossbow', 3, 15), { ...VP('arrow', 5, 2, 'tipped_arrow', 5, 12, 30), tipped: 1 }]],
+  librarian: [[VBUY('paper', 24, 16, 2), VBOOK(1), VS('bookshelf', 9, 1, 12, 1)],
+    [VBUY('book', 4, 12, 10), VBOOK(5), VS('lantern', 1, 1, 12, 5)],
+    [VBUY('ink_sac', 5, 12, 20), VBOOK(10), VS('glass', 1, 4, 12, 10)],
+    [VBUY('writable_book', 2, 12, 30), VBOOK(15), VS('clock', 5, 1, 12, 15), VS('compass', 4, 1, 12, 15)],
+    [VS('name_tag', 20, 1, 12, 30)]],
+  cartographer: [[VBUY('paper', 24, 16, 2), VS('map', 7, 1, 12, 1)],
+    [VBUY('glass_pane', 11, 16, 10), VMAP(13, 'ocean_explorer_map', 5)],
+    [VBUY('compass', 1, 12, 20), VMAP(14, 'woodland_explorer_map', 10)],
+    [VS('item_frame', 7, 1, 12, 15), ...vEach(c => VS(c + '_banner', 3, 1, 12, 15))],
+    [VS('globe_banner_pattern', 8, 1, 12, 30)]],
+  cleric: [[VBUY('rotten_flesh', 32, 16, 2), VS('redstone', 1, 2, 12, 1)],
+    [VBUY('gold_ingot', 3, 12, 10), VS('lapis_lazuli', 1, 1, 12, 5)],
+    [VBUY('rabbit_foot', 2, 12, 20), VS('glowstone', 4, 1, 12, 10)],
+    [VBUY('scute', 4, 12, 30), VBUY('glass_bottle', 9, 12, 30), VS('ender_pearl', 5, 1, 12, 15)],
+    [VBUY('nether_wart', 22, 12, 30), VS('experience_bottle', 3, 1, 12, 30)]],
+  armorer: [[VBUY('coal', 15, 16, 2), VS('iron_leggings', 7, 1, 12, 1), VS('iron_boots', 4, 1, 12, 1), VS('iron_helmet', 5, 1, 12, 1), VS('iron_chestplate', 9, 1, 12, 1)],
+    [VBUY('iron_ingot', 4, 12, 10), VS('bell', 36, 1, 12, 5), VS('chainmail_boots', 1, 1, 12, 5), VS('chainmail_leggings', 3, 1, 12, 5)],
+    [VBUY('lava_bucket', 1, 12, 20), VBUY('diamond', 1, 12, 20), VS('chainmail_helmet', 1, 1, 12, 10), VS('chainmail_chestplate', 4, 1, 12, 10), VS('shield', 5, 1, 12, 10)],
+    [VE('diamond_leggings', 14, 15), VE('diamond_boots', 8, 15)],
+    [VE('diamond_helmet', 8, 30), VE('diamond_chestplate', 16, 30)]],
+  weaponsmith: [[VBUY('coal', 15, 16, 2), VS('iron_axe', 3, 1, 12, 1), VE('iron_sword', 2, 1)],
+    [VBUY('iron_ingot', 4, 12, 10), VS('bell', 36, 1, 12, 5)],
+    [VBUY('flint', 24, 12, 20)],
+    [VBUY('diamond', 1, 12, 30), VE('diamond_axe', 12, 15)],
+    [VE('diamond_sword', 8, 30)]],
+  toolsmith: [[VBUY('coal', 15, 16, 2), VS('stone_axe', 1, 1, 12, 1), VS('stone_shovel', 1, 1, 12, 1), VS('stone_pickaxe', 1, 1, 12, 1), VS('stone_hoe', 1, 1, 12, 1)],
+    [VBUY('iron_ingot', 4, 12, 10), VS('bell', 36, 1, 12, 5)],
+    [VBUY('flint', 30, 12, 20), VE('iron_axe', 1, 10), VE('iron_shovel', 2, 10), VE('iron_pickaxe', 3, 10), VS('diamond_hoe', 4, 1, 3, 10)],
+    [VBUY('diamond', 1, 12, 30), VE('diamond_axe', 12, 15), VE('diamond_shovel', 5, 15)],
+    [VE('diamond_pickaxe', 13, 30)]],
+  butcher: [[VBUY('chicken', 14, 16, 2), VBUY('porkchop', 7, 16, 2), VBUY('rabbit', 4, 16, 2), VS('rabbit_stew', 1, 1, 12, 1)],
+    [VBUY('coal', 15, 16, 2), VS('cooked_porkchop', 1, 5, 16, 5), VS('cooked_chicken', 1, 8, 16, 5)],
+    [VBUY('mutton', 7, 16, 20), VBUY('beef', 10, 16, 20)],
+    [VBUY('dried_kelp_block', 10, 12, 30)],
+    [VBUY('sweet_berries', 10, 12, 30)]],
+  leatherworker: [[VBUY('leather', 6, 16, 2), VS('leather_leggings', 3, 1, 12, 1), VS('leather_chestplate', 7, 1, 12, 1)],
+    [VBUY('flint', 26, 12, 10), VS('leather_helmet', 5, 1, 12, 5), VS('leather_boots', 4, 1, 12, 5)],
+    [VBUY('rabbit_hide', 9, 12, 20), VS('leather_chestplate', 7, 1, 12, 10)],
+    [VBUY('scute', 4, 12, 30), VS('leather_horse_armor', 6, 1, 12, 15)],
+    [VS('saddle', 6, 1, 12, 30), VS('leather_helmet', 5, 1, 12, 30)]],
+  mason: [[VBUY('clay_ball', 10, 16, 2), VS('brick', 1, 10, 16, 1)],
+    [VBUY('stone', 20, 16, 10), VS('chiseled_stone_bricks', 1, 4, 16, 5)],
+    [VBUY('granite', 16, 16, 20), VBUY('andesite', 16, 16, 20), VBUY('diorite', 16, 16, 20), VS('polished_andesite', 1, 4, 16, 10), VS('polished_diorite', 1, 4, 16, 10), VS('polished_granite', 1, 4, 16, 10)],
+    [VBUY('quartz', 12, 12, 30), ...vEach(c => VS(c + '_terracotta', 1, 1, 12, 15)), ...vEach(c => VS(c + '_glazed_terracotta', 1, 1, 12, 15))],
+    [VS('quartz_pillar', 1, 1, 12, 30), VS('quartz_block', 1, 1, 12, 30)]],
+};
+const BOAT_OF = { plains: 'oak_boat', taiga: 'spruce_boat', snow: 'spruce_boat', desert: 'jungle_boat', jungle: 'jungle_boat', savanna: 'acacia_boat', swamp: 'dark_oak_boat' };
+const STEW_DUR = { night_vision: 100, jump_boost: 160, weakness: 140, blindness: 120, poison: 280, saturation: 7 };
+
+// one offer made real: item ids, the enchantment or effect it carries, its price
+function makeOffer(t, e, r) {
+  const o = { a: IID[t.a], an: t.an, b: IID[t.b], bn: t.bn, uses: 0, max: t.max, xp: t.xp, mult: t.mult, demand: 0 };
+  if (t.a2) { o.a2 = IID[t.a2]; o.an2 = t.an2; if (o.a2 == null) return null; }
+  if (t.boat) o.a = IID[BOAT_OF[e.vtype] || 'oak_boat'];
+  if (t.map) { o.b = IID.filled_map; o.special = t.b; }
+  if (t.stew) { o.stew = [t.stew[0], STEW_DUR[t.stew[0]] || t.stew[1]]; }
+  if (t.tipped) { const arrows = Object.keys(IID).filter(k => k.endsWith('_arrow') && k !== 'spectral_arrow' && ITEMS[IID[k]].tipped && ITEMS[IID[k]].tipped !== 'water'); if (!arrows.length) return null; o.b = IID[arrows[r.int(arrows.length)]]; }
+  if (t.book) { // Java's EnchantBookFactory: any enchantment a book can be traded with (not soul speed), at a random level
+    const keys = Object.keys(ENCH).filter(k => k !== 'soul_speed'), k = keys[r.int(keys.length)], lv = 1 + r.int(ENCH[k][1]);
+    o.e = { [k]: lv }; o.an = Math.min(64, 2 + r.int(5 + lv * 10) + 3 * lv) * (ENCH[k][3] ? 2 : 1); if (o.an > 64) o.an = 64;
+  }
+  if (t.enchant) { const lv = 5 + r.int(15); o.e = rollEnchant(o.b, lv, r.int(1e9)); o.an = Math.min(64, t.an + lv); }
+  if (o.a == null || o.b == null) return null;
+  return o;
+}
+function villagerAddLevel(e, lvl) {
+  const pool = (VTRADES[e.prof] || [])[lvl - 1]; if (!pool) return;
+  const r = S.rng((e.id * 7919 + lvl * 104729 + (e.tseed || 0)) >>> 0), idx = pool.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = r.int(i + 1); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  let n = 0; for (const i of idx) { if (n >= 2) break; const o = makeOffer(pool[i], e, r); if (o) { o.lvl = lvl; e.trades.push(o); n++; } }
+}
+// the villager's offers (a wandering trader keeps its own list)
+function villagerOffers(e) {
+  if (e.remote) return e.trades || []; // a multiplayer guest shows the runner's list
+  if (e.prof === 'wandering') return wanderingOffers(e);
+  if (!VTRADES[e.prof]) return [];
+  if (!e.trades || !e.tv) { e.trades = []; e.tv = 2; e.vlvl = e.vlvl || 1; e.vxp = e.vxp || 0; for (let l = 1; l <= e.vlvl; l++) villagerAddLevel(e, l); }
+  return e.trades;
+}
+function wanderingOffers(e) {
+  if (!e.trades) {
+    const r = S.rng(e.id * 7919 + 13), pick = (list, n) => list.map((_, i) => i).sort(() => r() - 0.5).slice(0, Math.min(list.length, n)).map(i => list[i]), picked = [];
+    for (const [[a, an], [b, bn]] of [...pick(TRADES.wandering, 5), ...pick(TRADES.wandering_rare, 1)]) if (IID[a] != null && IID[b] != null) picked.push({ a: IID[a], an, b: IID[b], bn, uses: 0, max: 12, xp: 1, mult: 0.05, demand: 0 });
+    e.trades = picked;
+  }
+  return e.trades;
+}
+// Java's TradeOffer.getAdjustedFirstBuyItem: base + demand bonus + special price (reputation, Hero of the Village)
+function tradePrice(o, v = GUI.ctx && GUI.ctx.e) {
+  const base = o.an, mult = o.mult != null ? o.mult : 0.05, demand = Math.max(0, Math.floor(base * (o.demand || 0) * mult));
+  let special = 0; const rep = v && v.rep ? v.rep : 0; if (rep) special -= Math.floor(rep * mult);
+  const h = PL.eff && PL.eff.hero_of_the_village; if (h) special -= Math.max(1, Math.floor((0.3 + 0.0625 * h.lv) * base));
+  return Math.max(1, Math.min(maxStack(o.a), base + demand + special));
+}
+function tradeResult(c) {
+  const o = villagerOffers(c.e)[c.sel], p = c.items[0], q = c.items[1];
+  if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
+  if (o.a2 != null && (!q || q.id !== o.a2 || q.n < o.an2)) return null;
+  if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
+  const out = { id: o.b, n: o.bn }; if (o.e) out.e = { ...o.e }; if (o.stew) out.stew = [...o.stew];
+  return out;
+}
+function tradeTake(c) {
+  const e = c.e, o = villagerOffers(e)[c.sel], p = c.items[0];
+  p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
+  if (o.a2 != null) { const q = c.items[1]; q.n -= o.an2; if (q.n <= 0) c.items[1] = null; }
+  const orbs = 3 + Math.floor(Math.random() * 4) + (tradeCounted(e, o) ? 5 : 0);
+  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, orbs); UI.advance('trade'); if (PL.y >= 319 && typeof advGrant === 'function') advGrant('adventure/trade_at_world_height'); stat('traded_with_villager');
+  // refill the payment slots from the inventory, as Java does after a trade
+  if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
+  if (o.a2 != null && !c.items[1] && INV.count(o.a2) > 0) { const n = Math.min(INV.count(o.a2), maxStack(o.a2)); INV.remove(o.a2, n); c.items[1] = { id: o.a2, n }; }
+  UI.renderScreen();
+}
+// one trade done with this villager: its stock, its experience (a level-up a moment later: true), the trading gossip
+function tradeCounted(e, o) {
+  o.uses++; o.made = null; e.traded = true; e.rep = Math.min(150, (e.rep || 0) + 2); // the villager keeps its job from now on
+  if (e.prof === 'wandering' || e.remote) return false;
+  e.vxp = (e.vxp || 0) + (o.xp || 0);
+  if ((e.vlvl || 1) < 5 && e.vxp >= VLEVEL_XP[e.vlvl || 1] && !e.lvlUpT) { e.lvlUpT = 40; return true; }
+  return false;
+}
+function selectTrade(i) {
+  const c = GUI.ctx, o = villagerOffers(c.e)[i]; if (!o) return;
+  c.sel = i;
+  for (const [k, id] of [[0, o.a], [1, o.a2]]) {
+    if (c.items[k] && c.items[k].id !== id) { INV.giveOrDrop(c.items[k]); c.items[k] = null; }
+    if (id == null) continue;
+    const have = INV.count(id), cur = c.items[k] ? c.items[k].n : 0, n = Math.min(have, maxStack(id) - cur);
+    if (n > 0) { INV.remove(id, n); c.items[k] = { id, n: cur + n }; }
+  }
+  UI.renderScreen();
+}
+// levelling up (a moment after the trade, with the green sparkles) and restocking at the job site twice a day
+function tradeTick(e) {
+  if (e.lvlUpT > 0 && --e.lvlUpT === 0 && (e.vlvl || 1) < 5) {
+    e.vlvl = (e.vlvl || 1) + 1; villagerAddLevel(e, e.vlvl); addEffect(e, 'regeneration', 200, 0); play('levelup', { vol: 0.4 });
+    for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + 1 + Math.random(), e.z + (Math.random() - .5), [0.4, 0.9, 0.3], { kind: 'happy', size: 0.12, vy: 0.6 });
+    if (UI.screen === 'trade' && GUI.ctx && GUI.ctx.e === e) UI.renderScreen();
+    if (e.vlvl < 5 && e.vxp >= VLEVEL_XP[e.vlvl]) e.lvlUpT = 40;
+  }
+  if (!e.trades || !e.job || e.prof === 'wandering' || W.tickN % 20) return;
+  const t = ((W.time % 24000) + 24000) % 24000, day = Math.floor(W.time / 24000), slot = t >= 2000 && t < 6000 ? 1 : t >= 6000 && t < 9000 ? 2 : 0;
+  if (!slot || e.restocked === day * 3 + slot || !e.trades.some(o => o.uses > 0)) return;
+  e.restocked = day * 3 + slot;
+  for (const o of e.trades) { o.demand = Math.max(0, (o.demand || 0) + o.uses - (o.max - o.uses)); o.uses = 0; } // Java's updateDemandBonus, then the stock is full again
+}
+{ const vai = villagerAIExtra; villagerAIExtra = function (e) { vai(e); tradeTick(e); }; }
+{ const d = MOBDEF.villager, save = d.save, init = d.init; // the level and experience are kept with the villager
+  d.save = e => ({ ...(save ? save(e) : {}), vlvl: e.vlvl || 1, vxp: e.vxp || 0, tv: e.tv || 0, restocked: e.restocked || 0 });
+  d.init = (e, o) => { if (init) init(e, o); e.vlvl = o.vlvl || 1; e.vxp = o.vxp || 0; e.tv = o.tv || 0; e.restocked = o.restocked || 0; }; }
+
+</script>
 <script>/* js/main.js */
 // Main loop, input, camera and world lifecycle.
 const isTouch = matchMedia('(pointer:coarse)').matches && !matchMedia('(pointer:fine)').matches;
@@ -18897,22 +19114,25 @@ function updateCamera(alpha, dt) {
 }
 
 // worker results also re-fill the job queue immediately (not only once per frame)
-W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, 2); };
+W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, 2); };
 // ---------- frame ----------
 let last = performance.now(), acc = 0, fpsN = 0, fpsT = 0, fps = 60;
 const PERF = { inbox: 0, stream: 0, tick: 0, ents: 0, render: 0, hud: 0, n: 0 };
 const PERFMAX = {}; const pf = (k, t0) => { const d = performance.now() - t0; PERF[k] += d; if (!(PERFMAX[k] >= d)) PERFMAX[k] = d; };
-// cave culling: while the player is above ground, faces deep in pitch-dark caves aren't built (they can't be seen from
-// there). Going underground (or back up) for a moment and a half rebuilds the loaded chunks, nearest first.
-const CAVE = { on: true, want: true, since: 0 };
+// cave culling: each chunk keeps its deep cave faces (no sky light reaches them) in a mesh of their own, drawn only in
+// the chunks around the player, or everywhere while the player is underground (switching is just showing a mesh)
+const CAVE = { under: false, want: false, since: 0, pcx: 1e9, pcz: 1e9 };
+R.deepShown = c => CAVE.under || (Math.abs(c.cx - CAVE.pcx) <= 1 && Math.abs(c.cz - CAVE.pcz) <= 1); // (the chunk around the player and its neighbours: cave mouths up close)
 function caveCull() {
-  if (!W.active || W.pano) return false;
-  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH);
-  const want = !spectator() && ((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
-  const now = performance.now();
+  if (!W.active) return;
+  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH), now = performance.now();
+  const want = !!W.pano ? false : spectator() || !((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
   if (want !== CAVE.want) { CAVE.want = want; CAVE.since = now; }
-  if (CAVE.on !== want && now - CAVE.since > 1500) { CAVE.on = want; for (const c of W.chunks.values()) c.dirty = true; }
-  return CAVE.on;
+  const under = want !== CAVE.under && (want || now - CAVE.since > 500) ? want : CAVE.under; // going down: at once; coming up: after half a second
+  const pcx = x >> 4, pcz = z >> 4;
+  if (under === CAVE.under && pcx === CAVE.pcx && pcz === CAVE.pcz) return;
+  CAVE.under = under; CAVE.pcx = pcx; CAVE.pcz = pcz;
+  for (const c of W.chunks.values()) if (c.mesh && c.mesh.d) c.mesh.d.visible = R.deepShown(c);
 }
 function frame(now) {
   requestAnimationFrame(frame);
@@ -18922,7 +19142,7 @@ function frame(now) {
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
-  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
+  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0); caveCull();
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;

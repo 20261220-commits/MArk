@@ -24,9 +24,9 @@ module.exports = async ({ ok, srv, b, lib }) => {
     setBlock(X + 5, Y, Z, BID.anvil); UI.openScreen('anvil', { x: X + 5, y: Y, z: Z }); clickSlot(hot(), 0, true); clickSlot(hot() + 1, 0, true); clickSlot(GUI.slots.findIndex(s => s.output), 0, true); UI.closeScreen();
     out.anvil = { level: PL.level, ingots: cnt(IID.iron_ingot), dmg: all().filter(s => s && s.id === IID.iron_sword).map(s => s.d).join() };
     // trading: pick an offer that wants emeralds only and buy it once
-    const v = spawnMob('villager', X + 1.5, Y, Z - 2.5); v.prof = 'farmer'; v.level = 1; v.persistent = true; INV.slots.fill(null); INV.slots[0] = { id: IID.emerald, n: 20 }; INV.slots[1] = { id: IID.wheat, n: 64 };
+    const v = spawnMob('villager', X + 1.5, Y, Z - 2.5); v.prof = 'farmer'; v.persistent = true; INV.slots.fill(null);
     UI.openScreen('trade', { e: v }); const offers = v.trades || []; out.offers = offers.length;
-    const k = offers.findIndex(o => o && o.a != null && IID.emerald !== o.b && o.max > o.uses); const o = offers[k]; out.offer = o && { a: ITEMS[o.a].key, an: o.an, b: ITEMS[o.b].key, bn: o.bn };
+    const k = offers.findIndex(o => o && o.a != null && o.a2 == null && o.a !== o.b && o.max > o.uses); /* novice offers can all be crops for emeralds */ const o = offers[k]; out.offer = o && { a: ITEMS[o.a].key, an: o.an, b: ITEMS[o.b].key, bn: o.bn };
     if (o) { INV.slots[2] = { id: o.a, n: 64 }; const have = () => all().reduce((a, s) => a + (s && s.id === o.a ? s.n : 0), 0) + (GUI.ctx.items || []).reduce((a, s) => a + (s && s.id === o.a ? s.n : 0), 0);
       const before = have(), bBefore = cnt(o.b); selectTrade(k); const res = GUI.slots.findIndex(s => s.output); const got = GUI.slots[res].get(); clickSlot(res, 0, false);
       out.trade = { paid: before - have(), price: tradePrice(o), got: got && got.n, cursor: INV.cursor && INV.cursor.id === o.b ? INV.cursor.n : 0, uses: o.uses };

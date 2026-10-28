@@ -644,7 +644,7 @@ function useItem(first) {
       const tool = d.tool;
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); advGrant('husbandry/wax_off'); return; }
       if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
-      if (tool && tool.type === S.TOOL.SHOVEL && id === 2 && getBlock(x, y + 1, z) === 0) { return; }
+      if (tool && tool.type === S.TOOL.SHOVEL && t.ny !== -1 && [2, 3, BID.podzol, BID.mycelium, BID.coarse_dirt, BID.rooted_dirt].includes(id) && !getBlock(x, y + 1, z)) { setBlock(x, y, z, BID.dirt_path); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // a shovel makes a path (Java: not from below, nothing on top)
       if (tool && tool.type === S.TOOL.AXE && STRIP()[id] != null) { // axes strip logs, wood, stems and hyphae (the axis / kind stays)
         const to = STRIP()[id]; setBlock(x, y, z, to, id === BID.wood ? t.m : t.m & 3); play('place', { mat: 'wood' }); swing(); if (!creative()) damageItem(INV.slots, INV.sel, 1); return;
       }
@@ -941,3 +941,5 @@ function elytraTick() {
   if (W.tickN % 20 === 0 && !creative()) damageItem(INV.armor, 1, 1);
   return true;
 }
+// a path turned into dirt under someone standing on it: up the sixteenth it grew (Java pushes entities out of the block)
+W.onPathToDirt = (x, y, z) => { for (const e of [PL, ...ENT.filter(q => q.kind === 'mob' && !q.dead)]) if (Math.floor(e.x) === x && Math.floor(e.z) === z && e.y >= y && e.y < y + 1) e.y = y + 1; };

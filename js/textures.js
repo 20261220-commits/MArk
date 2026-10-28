@@ -433,6 +433,7 @@ const TILE_ALIAS = { deepslate_bricks: 'deepslate', deepslate_tiles: 'deepslate'
   stripped_warped_stem: 'warped_stem', stripped_warped_stem_top: 'warped_stem_top', tall_grass_bottom: 'short_grass', tall_grass_top: 'short_grass', large_fern_bottom: 'fern', large_fern_top: 'fern',
   chipped_anvil_top: 'anvil_top', damaged_anvil_top: 'anvil_top', trapped_chest_side: 'chest_side', trapped_chest_top: 'chest_top', trapped_chest_front: 'chest_front', iron_trapdoor: 'oak_trapdoor', player_head_side: 'zombie_head_side', player_head_front: 'zombie_head_front' };
 for (const w of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', 'warped']) Object.assign(TILE_ALIAS, { [w + '_door_bottom']: 'oak_door_bottom', [w + '_door_top']: 'oak_door_top', [w + '_trapdoor']: 'oak_trapdoor' });
+PAINT.bed_sidef = PAINT.bed_endh = PAINT.bed_endf = r => PAINT.bed_side(r); // (a jar draws these from the bed's entity texture)
 function paintAtlas() {
   S.TILES.forEach((name, i) => {
     curTile = i;
@@ -462,6 +463,12 @@ function applyPackData(P, D) {
     const t = S.T[name]; if (t == null) continue;
     const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
     for (let y = 0; y < TS; y++) AD.set(D.subarray(off + y * 64, off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4);
+  }
+  // a pack without the bed's foot side and ends (Pixel Perfection, older converted jars): its bed side stands in for them
+  for (const c of ['', ...['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'black'].map(c => '_' + c)]) {
+    const src = S.T['bed_side' + c]; if (P.tiles['bed_side' + c] == null) continue;
+    for (const k of ['bed_sidef', 'bed_endh', 'bed_endf']) { if (P.tiles[k + c] != null) continue; const t = S.T[k + c], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+      for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4); }
   }
   for (const [k, [off, frames]] of Object.entries(P.anim)) if (S.T[k] != null) PACKPX.anim[k] = { data: D, off, frames };
   for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
