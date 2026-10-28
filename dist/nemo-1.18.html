@@ -171,10 +171,8 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 .titleSide .mb{width:min(calc(96 * var(--px)),calc(50vw - 100 * var(--px) - max(8px, 4vw) - 8px));min-width:0;font-size:calc(7 * var(--px));white-space:nowrap;overflow:hidden}
 .titleSide .titleDoll{max-width:100%}
 .titleSide .acc{display:flex;align-items:center;gap:calc(3 * var(--px));font-size:calc(6.5 * var(--px));max-width:calc(110 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.titleSide .acc img{width:calc(10 * var(--px));height:calc(10 * var(--px));border-radius:50%}
 .skinRow{display:flex;gap:calc(4 * var(--px));align-items:center;justify-content:center}
 .skinRow .titleDoll{width:min(24vw,200px);height:min(40vh,280px)}
-#gsiBtn{min-height:44px;display:flex;justify-content:center;margin:calc(4 * var(--px)) 0}
 @media (max-aspect-ratio:1/1){.titleSide{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -329,10 +327,9 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 </script>
 <script>/* js/config.js */
 // Settings for where the game is published. On a server started with tools/server.js the server fills these in from its
-// environment (SERVER_URL, GOOGLE_CLIENT_ID); on a static host such as GitHub Pages, write them here.
-//   server:         the multiplayer server the game offers first, e.g. 'my-server.onrender.com' (empty: the page's own host)
-//   googleClientId: an OAuth client ID ("웹 애플리케이션") from console.cloud.google.com for "Google로 로그인"
-var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com', googleClientId: '' };
+// environment (SERVER_URL); on a static host such as GitHub Pages, write them here.
+//   server: the multiplayer server the game offers first, e.g. 'my-server.onrender.com' (empty: the page's own host)
+var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 
 </script>
 <script>/* js/shared.js */
@@ -8357,7 +8354,7 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite.material.map.dispose(); e.nameSprite.material.dispose(); e.nameSprite = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -8863,18 +8860,34 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
+// a name above a head, drawn as Java's EntityRenderer.renderLabelIfPresent does: 0.025 blocks a font pixel, so it keeps
+// its size at any distance; a faint plate (25% black) with faint text that shows through walls, and the text again in
+// full white where it can be seen. Sneaking leaves only the faint layer, and walls hide it too. It darkens in the dark.
+const TAG_PX = 6, TAG_F = (8 * TAG_PX) + 'px Galmuri11, sans-serif'; // canvas pixels a font pixel, the font a line tall
+function makeNameTag(text) {
+  const mk = (bg, a, through) => {
+    const c = document.createElement('canvas'), g = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+    const draw = () => { g.font = TAG_F; const w = Math.ceil(g.measureText(text).width) + 2 * TAG_PX; c.width = w; c.height = 9 * TAG_PX; g.font = TAG_F;
+      if (bg) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, w, c.height); } g.fillStyle = `rgba(255,255,255,${a})`; g.textBaseline = 'middle'; g.fillText(text, TAG_PX, c.height / 2 + TAG_PX * 0.5); sp.userData.w = w / c.height; t.needsUpdate = true; };
+    t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData = { w: 1 };
+    draw(); if (document.fonts) document.fonts.load(TAG_F).then(draw).catch(() => {}); // the game's pixel font, once it has loaded
+    return sp;
+  };
+  const tag = { text, back: mk(true, 32 / 255, true), front: mk(false, 1, false) }; scene.add(tag.back, tag.front); return tag;
+}
+// y: the top of the head (the label sits 0.5 above it); far: how far off it can be seen (64, or 32 for a sneaking player)
+function placeNameTag(tag, x, y, z, show, sneak, light) {
+  const d2 = (camera.position.x - x) ** 2 + (camera.position.y - y) ** 2 + (camera.position.z - z) ** 2, lim = sneak ? 32 : 64;
+  const on = show && !UI.hideHud && d2 < lim * lim, H = 0.025 * 9;
+  for (const sp of [tag.back, tag.front]) { sp.position.set(x, y + 0.5 + H / 2, z); sp.scale.set(sp.userData.w * H, H, 1); sp.material.color.setScalar(light == null ? 1 : Math.max(0.25, light)); }
+  tag.back.visible = on; tag.back.material.depthTest = !!sneak; tag.front.visible = on && !sneak;
+}
+function dropNameTag(tag) { if (!tag) return; for (const sp of [tag.back, tag.front]) { scene.remove(sp); sp.material.map.dispose(); sp.material.dispose(); } }
 // a named mob (name tag) shows its name while the crosshair is on it, as in Java
 function mobNameTag(e, x, y, z) {
-  if (!e.nameSprite || e.nameSprite.userData.text !== e.name) {
-    if (e.nameSprite) scene.remove(e.nameSprite);
-    const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif'; g.font = F; const w = Math.ceil(g.measureText(e.name).width) + 24; c.width = w; c.height = 60;
-    g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(e.name, 12, 32);
-    const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
-    e.nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true, fog: false })); e.nameSprite.userData = { text: e.name, w: w / 60 }; e.nameSprite.renderOrder = 6; scene.add(e.nameSprite);
-  }
-  const s = e.nameSprite, d = Math.hypot(camera.position.x - x, camera.position.y - y, camera.position.z - z);
-  s.visible = !e.deathT && d < 64 && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e;
-  s.position.set(x, y + e.h + 0.45, z); s.scale.set(s.userData.w * 0.32, 0.32, 1);
+  if (!e.nameTag || e.nameTag.text !== e.name) { dropNameTag(e.nameTag); e.nameTag = makeNameTag(e.name); }
+  placeNameTag(e.nameTag, x, y + e.h, z, !e.deathT && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e, false, typeof lightBright === 'function' ? lightBright(x, y + e.h, z) : 1);
 }
 // ---------- render update (interpolated) ----------
 function entityRender(alpha, now) {
@@ -8908,7 +8921,7 @@ function entityRender(alpha, now) {
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
-      if (e.name) mobNameTag(e, x, y, z); else if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite = null; }
+      if (e.name) mobNameTag(e, x, y, z); else if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; }
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });
@@ -16131,7 +16144,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc">${ACC.user.picture ? `<img src="${ACC.user.picture.replace(/"/g, '')}" referrerpolicy="no-referrer" alt="">` : ''}<span>${ACC.user.name.replace(/</g, '&lt;')}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : 'Google 로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(ACC.user.name)}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : '로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -16144,7 +16157,7 @@ function showMenu(name, data) {
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}${btn('실험 기능(동굴과 절벽): ' + (c.exp ? '켜짐' : '꺼짐'), 'cexp')}<p class="muted">켜면 무성한 동굴이 생성됩니다 (1.17 실험용 데이터 팩)</p><label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
   } else if (name === 'account') {
-    h = `<h2>Google 로그인</h2><p class="muted">로그인하면 이름이 Google 계정 이름이 되고, 로그인을 확인하는 서버에서는 인벤토리와 위치가 계정에 저장되어 다른 사람이 같은 이름으로 들어올 수 없습니다.</p><div id="gsiBtn"></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('돌아가기', 'title')}</div>`;
+    h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
     const cur = { steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브';
     h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}${localStorage.getItem(SKIN_KEY) ? btn((OPT.skin === 'custom' ? '▶ ' : '') + '내 스킨', 'skinset_custom') : ''}${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}${btn('완료', 'title')}</div></div><p class="muted">지금 스킨: ${cur} · 멀티플레이에서 다른 플레이어에게도 이 스킨이 보입니다</p>`;
@@ -16201,7 +16214,8 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
   else if (a === 'skins') showMenu('skins');
-  else if (a === 'account') { showMenu('account'); accShowButton(); }
+  else if (a === 'account') showMenu('account');
+  else if (a === 'acclogin') accLogin();
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }
@@ -17000,8 +17014,27 @@ function dollTick() { const el = document.querySelector('.doll'); if (el && UI.s
 //   store: { state: { meta, time, rain, thunder, weatherT, players }, keys: Set of chunk keys, load(dk) -> Promise of
 //            { rec, edits, tiles } | null, save(dk, entry), saveState(), log(text) }
 //   out(id, message): deliver a message to one player
+// SHA-256 of a text (UTF-8), as hex: the same in a browser (even on plain http, where crypto.subtle is missing) and in Node
+function mpSha256(str) {
+  const b = unescape(encodeURIComponent(str)), n = b.length, words = [], K = [], H = [];
+  const frac = x => (x - Math.floor(x)) * 4294967296 | 0;
+  for (let c = 2, k = 0; k < 64; c++) { let pr = true; for (let d = 2; d * d <= c; d++) if (c % d === 0) { pr = false; break; } if (pr) { if (k < 8) H[k] = frac(Math.pow(c, 1 / 2)); K[k++] = frac(Math.pow(c, 1 / 3)); } }
+  for (let i = 0; i < n; i++) words[i >> 2] |= b.charCodeAt(i) << (24 - (i % 4) * 8);
+  words[n >> 2] |= 0x80 << (24 - (n % 4) * 8); const L = (((n + 8) >> 6) + 1) * 16; for (let i = words.length; i < L; i++) words[i] = words[i] | 0; words[L - 1] = n * 8;
+  const r = (x, k) => (x >>> k) | (x << (32 - k)), w = new Array(64);
+  for (let o = 0; o < L; o += 16) {
+    let [a, bb, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      w[i] = i < 16 ? words[o + i] | 0 : (r(w[i - 2], 17) ^ r(w[i - 2], 19) ^ (w[i - 2] >>> 10)) + w[i - 7] + (r(w[i - 15], 7) ^ r(w[i - 15], 18) ^ (w[i - 15] >>> 3)) + w[i - 16] | 0;
+      const t1 = h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i] | 0, t2 = (r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & bb) ^ (a & c) ^ (bb & c)) | 0;
+      h = g; g = f; f = e; e = d + t1 | 0; d = c; c = bb; bb = a; a = t1 + t2 | 0;
+    }
+    H[0] = H[0] + a | 0; H[1] = H[1] + bb | 0; H[2] = H[2] + c | 0; H[3] = H[3] + d | 0; H[4] = H[4] + e | 0; H[5] = H[5] + f | 0; H[6] = H[6] + g | 0; H[7] = H[7] + h | 0;
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
 function mpWorldCore(store, out) {
-  const S = store.state, players = new Map(), auth = new Map(), cache = new Map();
+  const S = store.state, players = new Map(), auth = new Map(), cache = new Map(), fails = new Map();
   const blank = () => ({ rec: null, edits: [], tiles: {} });
   const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
   const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
@@ -17038,12 +17071,28 @@ function mpWorldCore(store, out) {
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
-        p.name = (typeof m.name === 'string' && m.name.trim() ? m.name.trim() : '손님').slice(0, 16); p.skin = m.skin || null; p.account = typeof m.account === 'string' ? m.account : null;
-        // a signed-in player is kept by account (the server checked it); others by name, which a signed-in player's name can't take
-        p.key = p.account ? 'g:' + p.account : p.name;
-        for (const q of players.values()) if (q !== p && q.joined && (q.name === p.name || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
-        if (!p.account && S.accounts && S.accounts[p.name]) { send(p, { t: 'error', msg: '이 이름은 Google 계정에 묶여 있습니다. Google 로그인 후 접속하세요' }); return; }
-        if (p.account) { S.accounts = S.accounts || {}; S.accounts[p.name] = p.account; }
+        p.name = (typeof m.name === 'string' && m.name.trim() ? m.name.trim() : '손님').slice(0, 16); p.skin = m.skin || null; p.account = null;
+        // a nickname with a password: the first time on this world it makes the account (only a salted hash of the
+        // proof is kept), after that the same password is needed. A name with an account can't be used without it.
+        S.logins = S.logins || {};
+        const lg = m.login && typeof m.login.name === 'string' && typeof m.login.cred === 'string' && /^[0-9a-f]{64}$/.test(m.login.cred) ? m.login : null;
+        if (lg) {
+          p.name = lg.name.trim().slice(0, 16) || p.name; const k = p.name.toLowerCase(), rec = S.logins[k], now = Date.now();
+          const f = fails.get(k); if (f && f.n >= 5 && now - f.t < 30000) { send(p, { t: 'error', msg: '비밀번호를 여러 번 틀렸습니다. 30초 뒤에 다시 해 보세요' }); return; }
+          if (rec && mpSha256(rec.salt + lg.cred) !== rec.h) { fails.set(k, { n: (f && now - f.t < 30000 ? f.n : 0) + 1, t: now }); send(p, { t: 'error', msg: `비밀번호가 틀렸습니다 ("${p.name}" 계정은 이 세계에 이미 있습니다)` }); return; }
+          fails.delete(k); p.account = k;
+          if (!rec) { // a new account takes over what that name had saved here
+            const salt = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
+            S.logins[k] = { salt, h: mpSha256(salt + lg.cred), at: now };
+            const old = Object.keys(S.players).find(n => n.toLowerCase() === k) || (S.accounts && S.accounts[p.name] ? 'g:' + S.accounts[p.name] : null);
+            if (old && S.players[old] && !S.players['a:' + k]) { S.players['a:' + k] = S.players[old]; delete S.players[old]; }
+            if (S.accounts) delete S.accounts[p.name];
+            store.saveState(); store.log(`${p.name} 계정을 만들었습니다`);
+          }
+        }
+        p.key = p.account ? 'a:' + p.account : p.name;
+        for (const q of players.values()) if (q !== p && q.joined && (q.name.toLowerCase() === p.name.toLowerCase() || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        if (!p.account && S.logins[p.name.toLowerCase()]) { send(p, { t: 'error', msg: `"${p.name}" 이름에는 비밀번호가 걸려 있습니다. 타이틀 → 로그인에서 이 이름과 비밀번호로 로그인한 뒤 접속하세요` }); return; }
         p.joined = true;
         send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.key] || null, stored: [...store.keys],
           players: [...players.values()].filter(q => q !== p && q.joined).map(q => ({ id: q.id, name: q.name, skin: q.skin })), auth: Object.fromEntries(auth) });
@@ -17086,7 +17135,7 @@ function mpWorldCore(store, out) {
   }
   return { message, leave, tick, players, auth };
 }
-if (typeof module !== 'undefined') module.exports = { mpWorldCore };
+if (typeof module !== 'undefined') module.exports = { mpWorldCore, mpSha256 };
 
 </script>
 <script>/* js/multiplayer.js */
@@ -17184,7 +17233,7 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
@@ -17220,7 +17269,7 @@ async function mpHostStart(kind) {
   MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
-  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpInstall(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
   chatMsg(MP.roomCode ? `멀티플레이가 열렸습니다 · 방 코드 ${MP.roomCode} — 친구는 타이틀 → 멀티플레이 목록에서 "${MP.name}님의 세계"를 누르면 들어와요` : '멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
@@ -17252,14 +17301,13 @@ function mpHostStore() {
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
 async function mpJoinWs(url, room) {
-  if (typeof accFresh === 'function') await accFresh(); // a signed-in player's sign-in, renewed if it ran out
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
-  mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
   if (!MP.on) return;
@@ -17292,7 +17340,7 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); return;
+    case 'created': mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
@@ -17584,7 +17632,7 @@ function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -17980,22 +18028,14 @@ function mpAvatar(p) {
   const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
-  // the name above the head as Java draws it: white text on a faint dark plate, bright where it can be seen and dim
-  // through walls (the dim one is hidden while the player sneaks)
-  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif';
-  const draw = () => { g.font = F; const w = Math.ceil(g.measureText(p.name).width) + 24; c.width = w; c.height = 60; g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 12, 32); if (p.tags) for (const t of p.tags) t.userData.w = w / 60; };
-  draw(); if (document.fonts) document.fonts.load(F).then(() => { draw(); t.needsUpdate = true; }).catch(() => {}); // the game's pixel font, once it has loaded
-  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; const w = c.width;
-  const mk = (through) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, opacity: through ? 0.3 : 1, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData.w = w / 60; return sp; };
-  p.tags = [mk(true), mk(false)]; p.m = m; p.pos = null; scene.add(m, ...p.tags); return m;
+  p.tag = makeNameTag(p.name); p.m = m; p.pos = null; scene.add(m); return m; // the name above the head, as Java draws it (entities.js)
 }
 const MP_HURT = new THREE.Color(1, 0.6, 0.6);
-function mpPlaceTag(p, s, ps) {
-  const y = p.pos[1] + (ps.sleep ? 0.6 : ps.swim || ps.gliding ? 0.9 : ps.sneak ? 1.85 : 2.05) + 0.25, d = Math.hypot(camera.position.x - p.pos[0], camera.position.y - y, camera.position.z - p.pos[2]);
-  const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
-  p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
+function mpPlaceTag(p, s, ps, light) { // Java: the player's height + 0.5 (1.8 standing, 1.5 sneaking, 0.6 swimming or gliding, 0.2 in bed); none while invisible
+  const h = ps.sleep ? 0.2 : ps.swim || ps.gliding ? 0.6 : ps.sneak ? 1.5 : 1.8;
+  placeNameTag(p.tag, p.pos[0], p.pos[1] + h, p.pos[2], !s.dead && !s.inv && !(s.mode === 'spectator' && PL.mode !== 'spectator'), ps.sneak, light);
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); dropNameTag(p.tag); p.tag = null; p.m = null; } } // the figure's own materials (textures and shapes are shared)
 function mpSeatOf(p) {
   const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
   const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
@@ -18010,7 +18050,7 @@ function mpSeatOf(p) {
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } mpDropPeerFx(p); continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; p.tag.back.visible = p.tag.front.visible = false; } mpDropPeerFx(p); continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
     // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
@@ -18031,10 +18071,11 @@ function mpRender(dt) {
     const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
     st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
     ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
-    m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
-    mpPlaceTag(p, s, ps);
+    const ghost = s.mode === 'spectator' && PL.mode !== 'spectator'; // spectators are seen only by other spectators
+    m.visible = !s.dead && !ghost; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
-    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
+    mpPlaceTag(p, s, ps, light);
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
@@ -18216,7 +18257,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
+  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}
@@ -18305,46 +18346,26 @@ async function mpAction(a) {
 
 </script>
 <script>/* js/account.js */
-// Signing in with a Google account (optional). The player's name comes from the account, and a server that knows the
-// same client ID checks the sign-in and keeps that player's inventory and place by account rather than by name, so no
-// one else can play as them. Nothing but the sign-in token goes to the server; the game itself keeps no password.
-const ACC = { user: null, token: null, exp: 0 }, ACC_KEY = 'nemo-account';
-try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user) Object.assign(ACC, a); } catch (e) {}
-const accClientId = () => (NEMO_CONFIG && NEMO_CONFIG.googleClientId) || '';
-const accToken = () => ACC.token && ACC.exp * 1000 > Date.now() + 60000 ? ACC.token : null; // a sign-in lasts an hour
-function accSave() { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); } catch (e) {} }
-let accGis = null;
-function accLoadGis() {
-  if (accGis) return accGis;
-  return accGis = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = () => res(window.google); s.onerror = () => { accGis = null; rej(new Error('Google 로그인을 불러오지 못했습니다 (인터넷 연결 확인)')); }; document.head.appendChild(s); });
+// Logging in with a nickname and a password (optional). Each world keeps its own accounts: the first time a nickname
+// joins a world with a password the account is made there, after that the same password is needed for that name, and
+// that player's inventory and place are kept by account. The password itself is never kept or sent: this device keeps
+// a hash of it (the proof), and the world keeps a salted hash of that proof (js/mpcore.js).
+const ACC = { user: null, cred: null }, ACC_KEY = 'nemo-account';
+try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user && typeof a.cred === 'string') Object.assign(ACC, { user: { name: String(a.user.name) }, cred: a.cred }); } catch (e) {} // (a Google sign-in from before is dropped)
+function accSave() { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC.user ? ACC : null)); } catch (e) {} }
+const accProof = (name, pw) => mpSha256('nemo-login\n' + name.toLowerCase() + '\n' + pw);
+// what "join" carries: the nickname and its proof, or nothing
+const accLoginMsg = () => ACC.user && ACC.cred ? { name: ACC.user.name, cred: ACC.cred } : null;
+const accName = () => ACC.user ? ACC.user.name : MP.name;
+function accLogin() {
+  const st = $('accStatus'), name = ($('accName') ? $('accName').value : '').trim(), pw = $('accPass') ? $('accPass').value : '';
+  const bad = !name ? '닉네임을 넣으세요' : name.length > 16 ? '닉네임은 16자까지입니다' : /\s/.test(name) ? '닉네임에는 띄어쓰기를 넣을 수 없습니다' : /[<>"'&\\]/.test(name) ? '닉네임에 < > " \' & \\ 는 쓸 수 없습니다' : pw.length < 4 ? '비밀번호는 4자 이상으로 하세요' : '';
+  if (bad) { if (st) st.textContent = bad; return; }
+  ACC.user = { name }; ACC.cred = accProof(name, pw); accSave();
+  MP.name = name; try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {}
+  UI.flash(name + '(으)로 로그인했습니다'); showMenu('title');
 }
-function accDecode(jwt) { const p = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); return JSON.parse(decodeURIComponent(escape(atob(p + '==='.slice((p.length + 3) % 4))))); }
-function accGot(resp) {
-  let c; try { c = accDecode(resp.credential); } catch (e) { UI.flash('로그인 정보를 읽지 못했습니다'); return; }
-  ACC.user = { sub: c.sub, name: c.name || c.given_name || (c.email || '').split('@')[0], email: c.email || '', picture: c.picture || '' }; ACC.token = resp.credential; ACC.exp = c.exp || 0; accSave();
-  MP.name = ACC.user.name.replace(/\s+/g, '').slice(0, 16) || MP.name; try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {}
-  UI.flash(ACC.user.name + '(으)로 로그인했습니다'); if (UI.menu === 'account' || UI.menu === 'title') showMenu('title');
-}
-let accInit = false;
-async function accStart() {
-  const id = accClientId(); if (!id) return false;
-  const g = await accLoadGis(); if (!accInit) { g.accounts.id.initialize({ client_id: id, callback: accGot, auto_select: true, cancel_on_tap_outside: true }); accInit = true; }
-  return g;
-}
-// the account screen: Google draws its own button there
-async function accShowButton() {
-  const el = $('gsiBtn'), st = $('accStatus'); if (!el) return;
-  if (!accClientId()) { if (st) st.innerHTML = 'Google 로그인을 쓰려면 이 게임을 올린 곳의 설정에 Google OAuth 클라이언트 ID가 있어야 합니다.<br>Render 서버라면 환경 변수 <b>GOOGLE_CLIENT_ID</b>, GitHub Pages라면 <b>js/config.js</b> (README 참고)'; return; }
-  try { const g = await accStart(); g.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', text: 'signin_with', locale: 'ko' }); g.accounts.id.prompt(); }
-  catch (e) { if (st) st.textContent = e.message; }
-}
-function accLogout() { if (window.google && google.accounts) try { google.accounts.id.disableAutoSelect(); } catch (e) {} ACC.user = null; ACC.token = null; ACC.exp = 0; accSave(); UI.flash('로그아웃했습니다'); showMenu('title'); }
-// before joining a server: a fresh sign-in if the last one has run out (quietly, when Google allows it)
-async function accFresh() {
-  if (!ACC.user || accToken() || !accClientId()) return accToken();
-  try { const g = await accStart(); await new Promise(r => { const t = setTimeout(r, 4000), cb = accGot; g.accounts.id.initialize({ client_id: accClientId(), auto_select: true, callback: resp => { clearTimeout(t); cb(resp); r(); } }); g.accounts.id.prompt(n => { if (n.isNotDisplayed() || n.isSkippedMoment()) { clearTimeout(t); r(); } }); }); } catch (e) {}
-  return accToken();
-}
+function accLogout() { ACC.user = null; ACC.cred = null; accSave(); UI.flash('로그아웃했습니다'); showMenu('title'); }
 
 </script>
 <script>/* js/main.js */

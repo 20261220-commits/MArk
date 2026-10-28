@@ -26,7 +26,8 @@ module.exports = async ({ ok, srv, b, lib }) => {
   // a horse: one rider
   await A.evaluate(p => { const h = spawnMob('horse', p[0] + 3.5, p[1], p[2] + 3.5); h.persistent = true; horseTame(h); if (h.gear) { h.gear[0] = { id: IID.saddle, n: 1 }; horseGearChanged(h); } else h.saddle = true; window.__h = h; }, pos); await A.waitForTimeout(2500);
   const ride = P => P.evaluate(() => { const e = ENT.find(q => q.remote && q.type === 'horse' && !q.dead); if (!e) return 'no horse'; PL.x = e.x - 1.2; PL.z = e.z; INV.slots[INV.sel] = null; const dx = e.x - PL.x, dz = e.z - PL.z; PL.yaw = Math.atan2(-dx, -dz); PL.pitch = -0.4; TARGET = raycast(4.5); if (!TARGET || TARGET.type !== 'ent') return 'no target'; useItem(true); return !!PL.riding; });
-  ok(await ride(B) === true, 'a guest mounts the runner\'s horse'); await A.waitForTimeout(1200);
+  ok(await ride(B) === true, 'a guest mounts the runner\'s horse');
+  await C.waitForFunction(() => ENT.some(q => q.remote && q.type === 'horse' && !q.dead && q.riderId), null, { timeout: 10000, polling: 250 }).catch(() => {}); // word of the rider reaches the other guest
   ok(await ride(C) === false, 'a second guest can\'t get on the same horse');
   ok(await A.evaluate(() => { const e = __h; PL.x = e.x - 1.2; PL.y = e.y; PL.z = e.z; const dx = e.x - PL.x, dz = e.z - PL.z; PL.yaw = Math.atan2(-dx, -dz); PL.pitch = -0.4; INV.slots[INV.sel] = null; TARGET = raycast(4.5); if (TARGET && TARGET.type === 'ent') useItem(true); return !PL.riding; }), 'nor can the runner');
   for (const P of [A, B, C]) await P.evaluate(() => { if (PL.riding) dismount(); });

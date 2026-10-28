@@ -92,7 +92,7 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
@@ -128,7 +128,7 @@ async function mpHostStart(kind) {
   MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
-  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpInstall(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
   chatMsg(MP.roomCode ? `멀티플레이가 열렸습니다 · 방 코드 ${MP.roomCode} — 친구는 타이틀 → 멀티플레이 목록에서 "${MP.name}님의 세계"를 누르면 들어와요` : '멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
@@ -160,14 +160,13 @@ function mpHostStore() {
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
 async function mpJoinWs(url, room) {
-  if (typeof accFresh === 'function') await accFresh(); // a signed-in player's sign-in, renewed if it ran out
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
-  mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
   if (!MP.on) return;
@@ -200,7 +199,7 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); return;
+    case 'created': mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
@@ -492,7 +491,7 @@ function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -888,22 +887,14 @@ function mpAvatar(p) {
   const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
-  // the name above the head as Java draws it: white text on a faint dark plate, bright where it can be seen and dim
-  // through walls (the dim one is hidden while the player sneaks)
-  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif';
-  const draw = () => { g.font = F; const w = Math.ceil(g.measureText(p.name).width) + 24; c.width = w; c.height = 60; g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 12, 32); if (p.tags) for (const t of p.tags) t.userData.w = w / 60; };
-  draw(); if (document.fonts) document.fonts.load(F).then(() => { draw(); t.needsUpdate = true; }).catch(() => {}); // the game's pixel font, once it has loaded
-  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; const w = c.width;
-  const mk = (through) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, opacity: through ? 0.3 : 1, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData.w = w / 60; return sp; };
-  p.tags = [mk(true), mk(false)]; p.m = m; p.pos = null; scene.add(m, ...p.tags); return m;
+  p.tag = makeNameTag(p.name); p.m = m; p.pos = null; scene.add(m); return m; // the name above the head, as Java draws it (entities.js)
 }
 const MP_HURT = new THREE.Color(1, 0.6, 0.6);
-function mpPlaceTag(p, s, ps) {
-  const y = p.pos[1] + (ps.sleep ? 0.6 : ps.swim || ps.gliding ? 0.9 : ps.sneak ? 1.85 : 2.05) + 0.25, d = Math.hypot(camera.position.x - p.pos[0], camera.position.y - y, camera.position.z - p.pos[2]);
-  const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
-  p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
+function mpPlaceTag(p, s, ps, light) { // Java: the player's height + 0.5 (1.8 standing, 1.5 sneaking, 0.6 swimming or gliding, 0.2 in bed); none while invisible
+  const h = ps.sleep ? 0.2 : ps.swim || ps.gliding ? 0.6 : ps.sneak ? 1.5 : 1.8;
+  placeNameTag(p.tag, p.pos[0], p.pos[1] + h, p.pos[2], !s.dead && !s.inv && !(s.mode === 'spectator' && PL.mode !== 'spectator'), ps.sneak, light);
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); dropNameTag(p.tag); p.tag = null; p.m = null; } } // the figure's own materials (textures and shapes are shared)
 function mpSeatOf(p) {
   const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
   const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
@@ -918,7 +909,7 @@ function mpSeatOf(p) {
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } mpDropPeerFx(p); continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; p.tag.back.visible = p.tag.front.visible = false; } mpDropPeerFx(p); continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
     // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
@@ -939,10 +930,11 @@ function mpRender(dt) {
     const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
     st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
     ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
-    m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
-    mpPlaceTag(p, s, ps);
+    const ghost = s.mode === 'spectator' && PL.mode !== 'spectator'; // spectators are seen only by other spectators
+    m.visible = !s.dead && !ghost; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
-    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
+    mpPlaceTag(p, s, ps, light);
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
@@ -1124,7 +1116,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
+  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}

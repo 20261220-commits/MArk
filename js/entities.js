@@ -372,7 +372,7 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite.material.map.dispose(); e.nameSprite.material.dispose(); e.nameSprite = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -878,18 +878,34 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
+// a name above a head, drawn as Java's EntityRenderer.renderLabelIfPresent does: 0.025 blocks a font pixel, so it keeps
+// its size at any distance; a faint plate (25% black) with faint text that shows through walls, and the text again in
+// full white where it can be seen. Sneaking leaves only the faint layer, and walls hide it too. It darkens in the dark.
+const TAG_PX = 6, TAG_F = (8 * TAG_PX) + 'px Galmuri11, sans-serif'; // canvas pixels a font pixel, the font a line tall
+function makeNameTag(text) {
+  const mk = (bg, a, through) => {
+    const c = document.createElement('canvas'), g = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+    const draw = () => { g.font = TAG_F; const w = Math.ceil(g.measureText(text).width) + 2 * TAG_PX; c.width = w; c.height = 9 * TAG_PX; g.font = TAG_F;
+      if (bg) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, w, c.height); } g.fillStyle = `rgba(255,255,255,${a})`; g.textBaseline = 'middle'; g.fillText(text, TAG_PX, c.height / 2 + TAG_PX * 0.5); sp.userData.w = w / c.height; t.needsUpdate = true; };
+    t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData = { w: 1 };
+    draw(); if (document.fonts) document.fonts.load(TAG_F).then(draw).catch(() => {}); // the game's pixel font, once it has loaded
+    return sp;
+  };
+  const tag = { text, back: mk(true, 32 / 255, true), front: mk(false, 1, false) }; scene.add(tag.back, tag.front); return tag;
+}
+// y: the top of the head (the label sits 0.5 above it); far: how far off it can be seen (64, or 32 for a sneaking player)
+function placeNameTag(tag, x, y, z, show, sneak, light) {
+  const d2 = (camera.position.x - x) ** 2 + (camera.position.y - y) ** 2 + (camera.position.z - z) ** 2, lim = sneak ? 32 : 64;
+  const on = show && !UI.hideHud && d2 < lim * lim, H = 0.025 * 9;
+  for (const sp of [tag.back, tag.front]) { sp.position.set(x, y + 0.5 + H / 2, z); sp.scale.set(sp.userData.w * H, H, 1); sp.material.color.setScalar(light == null ? 1 : Math.max(0.25, light)); }
+  tag.back.visible = on; tag.back.material.depthTest = !!sneak; tag.front.visible = on && !sneak;
+}
+function dropNameTag(tag) { if (!tag) return; for (const sp of [tag.back, tag.front]) { scene.remove(sp); sp.material.map.dispose(); sp.material.dispose(); } }
 // a named mob (name tag) shows its name while the crosshair is on it, as in Java
 function mobNameTag(e, x, y, z) {
-  if (!e.nameSprite || e.nameSprite.userData.text !== e.name) {
-    if (e.nameSprite) scene.remove(e.nameSprite);
-    const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif'; g.font = F; const w = Math.ceil(g.measureText(e.name).width) + 24; c.width = w; c.height = 60;
-    g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(e.name, 12, 32);
-    const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
-    e.nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true, fog: false })); e.nameSprite.userData = { text: e.name, w: w / 60 }; e.nameSprite.renderOrder = 6; scene.add(e.nameSprite);
-  }
-  const s = e.nameSprite, d = Math.hypot(camera.position.x - x, camera.position.y - y, camera.position.z - z);
-  s.visible = !e.deathT && d < 64 && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e;
-  s.position.set(x, y + e.h + 0.45, z); s.scale.set(s.userData.w * 0.32, 0.32, 1);
+  if (!e.nameTag || e.nameTag.text !== e.name) { dropNameTag(e.nameTag); e.nameTag = makeNameTag(e.name); }
+  placeNameTag(e.nameTag, x, y + e.h, z, !e.deathT && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e, false, typeof lightBright === 'function' ? lightBright(x, y + e.h, z) : 1);
 }
 // ---------- render update (interpolated) ----------
 function entityRender(alpha, now) {
@@ -923,7 +939,7 @@ function entityRender(alpha, now) {
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
-      if (e.name) mobNameTag(e, x, y, z); else if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite = null; }
+      if (e.name) mobNameTag(e, x, y, z); else if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; }
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

@@ -10,9 +10,7 @@ services:
     envVars:
       - key: WORLD
         value: world
-      - key: GOOGLE_CLIENT_ID   # Google 로그인 (README 참고), 비워 두면 로그인 없이
-        sync: false
-      - key: REQUIRE_LOGIN      # 1: Google 로그인한 사람만 접속
+      - key: REQUIRE_LOGIN      # 1: 닉네임·비밀번호로 로그인한 사람만 접속
         value: "0"
       - key: GITHUB_BACKUP_REPO # 세계를 백업할 저장소 (소유자/저장소) — README "세계 저장" 참고, 비워 두면 백업 안 함
         sync: false
