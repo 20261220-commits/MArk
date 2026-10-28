@@ -38,7 +38,8 @@ module.exports = async ({ ok, srv, b, lib }) => {
   // a zombie goes for a guest; a guest kills it
   await C.evaluate(() => { PL.health = 20; PL.mode = 'survival'; }); await A.evaluate(p => { W.time = 18000; const z = spawnMob('zombie', p[0] + 0.5, p[1], p[2] + 6); z.persistent = true; window.__z = z; PL.mode = 'creative'; }, pos);
   await A.waitForTimeout(8000); const hc = await Promise.all([B, C].map(hp)); ok(hc.some(h => h < 20), 'the runner\'s zombie hurts a guest', hc);
-  await B.evaluate(() => new Promise(r => { let i = 0; const f = () => { const q = ENT.find(z => z.remote && z.type === 'zombie' && !z.dead); if (q) hurtMob(q, 6, PL, 0, 0); if (++i < 6) setTimeout(f, 700); else r(); }; f(); }));
+  const zid = await A.evaluate(() => __z.mpid); // that zombie (dark caves spawn others at night)
+  await B.evaluate(id => new Promise(r => { let i = 0; const f = () => { const q = ENT.find(z => z.remote && z.rid === id && !z.dead); if (q) hurtMob(q, 6, PL, 0, 0); if (++i < 6) setTimeout(f, 700); else r(); }; f(); }), zid);
   await A.waitForTimeout(2500); ok(await A.evaluate(() => !!(__z.dead || __z.deathT)), 'a guest can kill the runner\'s zombie');
   const errs = [...A.errs, ...B.errs, ...C.errs]; ok(!errs.length, 'no page errors', errs);
 };

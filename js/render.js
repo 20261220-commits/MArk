@@ -103,7 +103,7 @@ W.onMesh = (c, m) => {
     if (old) { scene.remove(old); old.geometry.dispose(); c.mesh[k] = null; }
     if (!d.count) continue;
     const mesh = new THREE.Mesh(makeChunkGeo(d), mat);
-    mesh.position.set(c.cx * 16, 0, c.cz * 16); mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+    mesh.position.set(c.cx * 16, S.MINY, c.cz * 16); /* meshes are built in array rows: row 0 is y -64 */ mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
     scene.add(mesh); c.mesh[k] = mesh;
   }

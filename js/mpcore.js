@@ -74,7 +74,7 @@ function mpWorldCore(store, out) {
         if (auth.get(p.dim) !== from) return;
         for (const e of m.l || []) { const dk = chunkKey(m.dim, e[0], e[2]); entry(dk).then(c => { c.edits.push(e); if (c.edits.length > 20000) c.edits.splice(0, c.edits.length - 20000); touch(dk, c); }); }
         others(p, m, true); return;
-      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15); entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
+      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y + 64) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from y -64 */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone

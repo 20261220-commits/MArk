@@ -1,6 +1,8 @@
 // World: chunk storage/streaming, cross-chunk lighting, block updates, fluids,
 // random ticks and IndexedDB persistence.
-const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS, CVOL } = S;
+const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS, CVOL } = S; // (MINY, MAXY: items.js)
+// a block's place in a chunk's arrays: rows are world y - MINY (the 1.18 world starts at y -64)
+const BI = (x, y, z) => ((y - MINY) << 8) | ((z & 15) << 4) | (x & 15);
 const ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
 class Chunk {
@@ -10,7 +12,7 @@ class Chunk {
     this.tiles = new Map(); this.modified = false; this.dirty = true; this.ver = 0; this.meshing = false; this.mesh = null;
     this.mobs = d.mobs || null; this.edited = !!d.fromSave; // edited: blocks differ from generated terrain
     let y = CH - 1; scan: for (; y > 0; y--) { const o = y << 8; for (let i = 0; i < 256; i++) if (this.blocks[o + i]) break scan; }
-    this.maxY = y; // highest non-air layer: meshing and random ticks skip the empty sky above
+    this.maxY = y; // highest non-air row (array row, y - MINY): meshing and random ticks skip the empty sky above
   }
 }
 
@@ -28,16 +30,18 @@ function chunkAt(cx, cz) {
   const c = W.chunks.get(k); if (c) { W.last = c; W.lastKey = k; } return c;
 }
 function getBlock(x, y, z) {
-  if (y < 0) return 8; if (y >= CH) return 0;
+  if (y < MINY) return 8; if (y >= MAXY) return 0;
   const c = chunkAt(x >> 4, z >> 4); if (!c) return 0;
-  return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)];
+  return c.blocks[BI(x, y, z)];
 }
-function getMeta(x, y, z) { if (y < 0 || y >= CH) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.meta[(y << 8) | ((z & 15) << 4) | (x & 15)] : 0; }
-function getLight(x, y, z) { if (y >= CH) return 0xf0; if (y < 0) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.light[(y << 8) | ((z & 15) << 4) | (x & 15)] : 0xf0; }
+function getMeta(x, y, z) { if (y < MINY || y >= MAXY) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.meta[BI(x, y, z)] : 0; }
+function getLight(x, y, z) { if (y >= MAXY) return 0xf0; if (y < MINY) return 0; const c = chunkAt(x >> 4, z >> 4); return c ? c.light[BI(x, y, z)] : 0xf0; }
 function isLoaded(x, z) { return !!chunkAt(x >> 4, z >> 4); }
 function biomeAt(x, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.biome[((z & 15) << 4) | (x & 15)] : 1; }
 const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 variant (taiga hills -> taiga), for spawning rules
-function topY(x, z) { for (let y = CH - 1; y > 0; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return 0; }
+// the void: things below this die (Java: 64 below the bottom of the world; the Nether and the End start at y 0)
+const voidY = () => W.dim === 0 ? MINY - 64 : -64;
+function topY(x, z) { for (let y = MAXY - 1; y > MINY; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return MINY; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
   const m = (a, b) => { const c = chunkAt(a, b); if (c) c.dirty = c.urgent = true; }; // edits are remeshed first, on their own worker
@@ -55,12 +59,12 @@ function lightAdd(seeds, sh, flat) {
   while (h < q.length) {
     const x = q[h], y = q[h + 1], z = q[h + 2]; h += 3;
     const c = chunkAt(x >> 4, z >> 4); if (!c) continue;
-    const l = (c.light[(y << 8) | ((z & 15) << 4) | (x & 15)] >> sh) & 15; if (l <= 1) continue;
+    const l = (c.light[BI(x, y, z)] >> sh) & 15; if (l <= 1) continue;
     for (let k = 0; k < 6; k++) {
       const nx = x + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = y + (k === 2 ? 1 : k === 3 ? -1 : 0), nz = z + (k === 4 ? 1 : k === 5 ? -1 : 0);
-      if (ny < 0 || ny >= CH) continue;
+      if (ny < MINY || ny >= MAXY) continue;
       const nc = chunkAt(nx >> 4, nz >> 4); if (!nc) continue;
-      const ni = (ny << 8) | ((nz & 15) << 4) | (nx & 15), op = LOP[nc.blocks[ni]];
+      const ni = BI(nx, ny, nz), op = LOP[nc.blocks[ni]];
       if (op >= 15) continue;
       let nl = l - Math.max(1, op);
       if (sh && k === 3 && l === 15 && op === 0) nl = 15;
@@ -74,7 +78,7 @@ function lightAdd(seeds, sh, flat) {
 }
 function lightRemove(x, y, z, sh) {
   const c = chunkAt(x >> 4, z >> 4); if (!c) return [];
-  const i = (y << 8) | ((z & 15) << 4) | (x & 15);
+  const i = BI(x, y, z);
   const old = (c.light[i] >> sh) & 15;
   c.light[i] = sh ? c.light[i] & 0x0f : c.light[i] & 0xf0;
   const q = [x, y, z, old], re = [];
@@ -83,9 +87,9 @@ function lightRemove(x, y, z, sh) {
     const px = q[h], py = q[h + 1], pz = q[h + 2], l = q[h + 3]; h += 4;
     for (let k = 0; k < 6; k++) {
       const nx = px + (k === 0 ? 1 : k === 1 ? -1 : 0), ny = py + (k === 2 ? 1 : k === 3 ? -1 : 0), nz = pz + (k === 4 ? 1 : k === 5 ? -1 : 0);
-      if (ny < 0 || ny >= CH) continue;
+      if (ny < MINY || ny >= MAXY) continue;
       const nc = chunkAt(nx >> 4, nz >> 4); if (!nc) continue;
-      const ni = (ny << 8) | ((nz & 15) << 4) | (nx & 15), nl = (nc.light[ni] >> sh) & 15;
+      const ni = BI(nx, ny, nz), nl = (nc.light[ni] >> sh) & 15;
       if (nl && (nl < l || (sh && k === 3 && l === 15 && nl === 15))) {
         nc.light[ni] = sh ? nc.light[ni] & 0x0f : nc.light[ni] & 0xf0; markDirty(nx, nz);
         q.push(nx, ny, nz, nl);
@@ -100,7 +104,7 @@ function relight(x, y, z, oldId, newId, oldE = LEM[oldId], newE = LEM[newId]) {
   // block light (emission can depend on meta: lit candles)
   if (oldE || newE || LOP[oldId] !== LOP[newId]) {
     const re = lightRemove(x, y, z, 0);
-    const c = chunkAt(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15);
+    const c = chunkAt(x >> 4, z >> 4), i = BI(x, y, z);
     if (newE) { c.light[i] = (c.light[i] & 0xf0) | newE; re.push([x, y, z]); }
     else if (LOP[newId] < 15) for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) re.push([x + dx, y + dy, z + dz]);
     lightAdd(re, 0);
@@ -109,7 +113,7 @@ function relight(x, y, z, oldId, newId, oldE = LEM[oldId], newE = LEM[newId]) {
     const re = lightRemove(x, y, z, 4);
     if (LOP[newId] < 15) {
       for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) re.push([x + dx, y + dy, z + dz]);
-      if (y === CH - 1) { const c = chunkAt(x >> 4, z >> 4); const i = (y << 8) | ((z & 15) << 4) | (x & 15); c.light[i] |= 0xf0; re.push([x, y, z]); }
+      if (y === MAXY - 1) { const c = chunkAt(x >> 4, z >> 4); const i = BI(x, y, z); c.light[i] |= 0xf0; re.push([x, y, z]); }
     }
     lightAdd(re, 4);
   }
@@ -124,10 +128,10 @@ function stitchLight(c) {
       for (let k = 0; k < 16; k++) {
         const ax = dx === 1 ? 15 : dx === -1 ? 0 : k, az = dz === 1 ? 15 : dz === -1 ? 0 : k;
         const bx = dx === 1 ? 0 : dx === -1 ? 15 : k, bz = dz === 1 ? 0 : dz === -1 ? 15 : k;
-        for (let y = 0, top = Math.min(CH - 1, Math.max(c.maxY, n.maxY) + 1); y <= top; y++) {
-          const la = (c.light[(y << 8) | (az << 4) | ax] >> sh) & 15, lb = (n.light[(y << 8) | (bz << 4) | bx] >> sh) & 15;
-          if (la > lb + 1) seeds.push(x0 + ax, y, z0 + az);
-          else if (lb > la + 1) seeds.push((c.cx + dx) * 16 + bx, y, (c.cz + dz) * 16 + bz);
+        for (let r = 0, top = Math.min(CH - 1, Math.max(c.maxY, n.maxY) + 1); r <= top; r++) { // array rows; the seeds are world y
+          const la = (c.light[(r << 8) | (az << 4) | ax] >> sh) & 15, lb = (n.light[(r << 8) | (bz << 4) | bx] >> sh) & 15;
+          if (la > lb + 1) seeds.push(x0 + ax, r + MINY, z0 + az);
+          else if (lb > la + 1) seeds.push((c.cx + dx) * 16 + bx, r + MINY, (c.cz + dz) * 16 + bz);
         }
       }
     }
@@ -138,14 +142,14 @@ function stitchLight(c) {
 // ---------- block set & updates ----------
 const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 function setBlock(x, y, z, id, meta = 0, opts = {}) {
-  if (y < 0 || y >= CH) return false;
+  if (y < MINY || y >= MAXY) return false;
   const c = chunkAt(x >> 4, z >> 4); if (!c) return false;
-  const i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i], oldM = c.meta[i];
+  const i = BI(x, y, z), old = c.blocks[i], oldM = c.meta[i];
   if (!id && S.isWet(old, oldM) && !opts.dry) id = 27; // breaking a waterlogged block leaves its water behind
   if (old === id && oldM === meta) return false;
   c.blocks[i] = id; c.meta[i] = meta; c.modified = c.edited = true;
   if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta); // multiplayer: the host's world (and what a guest did) reaches the others
-  if (id && y > c.maxY) c.maxY = y;
+  if (id && y - MINY > c.maxY) c.maxY = y - MINY;
   if (old !== id && c.tiles.has(i) && !opts.keepTile) { const t = c.tiles.get(i); c.tiles.delete(i); if (W.onTileRemoved) W.onTileRemoved(x, y, z, t); }
   if (id === BID.oak_sign && !c.tiles.has(i)) c.tiles.set(i, { type: 'sign', lines: ['', '', '', ''] });
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
@@ -161,13 +165,13 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   }
   return true;
 }
-function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < 0 || y >= CH) return; const i = (y << 8) | ((z & 15) << 4) | (x & 15); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta, true); markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
+function setMeta(x, y, z, meta) { const c = chunkAt(x >> 4, z >> 4); if (!c || y < MINY || y >= MAXY) return; const i = BI(x, y, z); if (c.meta[i] === meta) return; const id = c.blocks[i], oe = S.emitOf(id, c.meta[i]); c.meta[i] = meta; c.modified = c.edited = true; if (MP.on && (MP.role === 'host' || (MP.local && !MP.applying))) mpBlockChanged(x, y, z, id, meta, true); markDirty(x, z); const ne = S.emitOf(id, meta); if (oe !== ne) relight(x, y, z, id, id, oe, ne); if (c.blocks[i] !== BID.redstone_wire) observerCheck(x, y, z); }
 // an observer facing (x,y,z) fires a short pulse whenever that block changes
 function observerCheck(x, y, z) {
   for (let k = 0; k < 6; k++) { const d = S.DIR6[k], ox = x - d[0], oy = y - d[1], oz = z - d[2]; if (getBlock(ox, oy, oz) === BID.observer && (getMeta(ox, oy, oz) & 7) === k && typeof observerFire === 'function') observerFire(ox, oy, oz); }
 }
-function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get((y << 8) | ((z & 15) << 4) | (x & 15)) : null; }
-function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set((y << 8) | ((z & 15) << 4) | (x & 15), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing' || t.type === 'campfire') c.hasFurnace = true; c.noTicking = false; }
+function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get(BI(x, y, z)) : null; }
+function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set(BI(x, y, z), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing' || t.type === 'campfire') c.hasFurnace = true; c.noTicking = false; }
 function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
 // support rules of the 1.17 lush-cave plants (plant codes 10+)
 const LUSH_SOIL = new Set([2, 3, 53, 57, 87, 203, 204, 205, 1049]); // grass, dirt, clay, farmland, moss, podzol, mycelium, coarse dirt, rooted dirt
@@ -198,7 +202,7 @@ function breakNaturally(x, y, z, b, m) {
   if (W.onDrop) { const d = blockDrops(b, m, null); W.onDrop(x, y, z, d.items, 0); }
 }
 function neighborUpdate(x, y, z) {
-  if (y < 0 || y >= CH) return;
+  if (y < MINY || y >= MAXY) return;
   const b = getBlock(x, y, z); if (!b) return;
   const m = getMeta(x, y, z), below = getBlock(x, y - 1, z), d = BLOCKS[b];
   if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : 30); return; }
@@ -289,8 +293,8 @@ function joinConnections(c) {
     for (const [ch, edgeX, edgeZ, dx, dz] of [[c, ox < 0 ? 0 : ox > 0 ? 15 : -1, oz < 0 ? 0 : oz > 0 ? 15 : -1, ox, oz], [n, ox < 0 ? 15 : ox > 0 ? 0 : -1, oz < 0 ? 15 : oz > 0 ? 0 : -1, -ox, -oz]]) {
       const top = Math.min(CH - 1, Math.max(ch.maxY || 0, 0) + 1); let touched = false;
       for (let k = 0; k < 16; k++) { const lx = edgeX >= 0 ? edgeX : k, lz = edgeZ >= 0 ? edgeZ : k;
-        for (let y = 1; y <= top; y++) { const i = (y << 8) | (lz << 4) | lx, b = ch.blocks[i], kind = BLOCKS[b] && BLOCKS[b].connect; if (!kind) continue;
-          const wx = ch.cx * 16 + lx, wz = ch.cz * 16 + lz, bit = dz < 0 ? 1 : dx > 0 ? 2 : dz > 0 ? 4 : 8, on = S.connectsTo(kind, getBlock(wx + dx, y, wz + dz), getMeta(wx + dx, y, wz + dz), dx);
+        for (let r = 1; r <= top; r++) { const i = (r << 8) | (lz << 4) | lx, b = ch.blocks[i], kind = BLOCKS[b] && BLOCKS[b].connect; if (!kind) continue;
+          const y = r + MINY, wx = ch.cx * 16 + lx, wz = ch.cz * 16 + lz, bit = dz < 0 ? 1 : dx > 0 ? 2 : dz > 0 ? 4 : 8, on = S.connectsTo(kind, getBlock(wx + dx, y, wz + dz), getMeta(wx + dx, y, wz + dz), dx);
           const m = ch.meta[i], nm = on ? m | bit : m & ~bit; if (nm !== m) { ch.meta[i] = nm; touched = true; } } }
       if (touched) ch.dirty = true;
     }
@@ -330,7 +334,7 @@ function fluidUpdate(x, y, z) {
   }
   // flow down
   const bl = getBlock(x, y - 1, z);
-  if (y > 0 && (bl === 0 || (REPL[bl] && !FLUID[bl]) || bl === other)) {
+  if (y > MINY && (bl === 0 || (REPL[bl] && !FLUID[bl]) || bl === other)) {
     if (bl === other) { setBlock(x, y - 1, z, water ? (getMeta(x, y - 1, z) === 0 ? BID.obsidian : BID.cobblestone) : BID.stone); return; }
     if (bl && W.onDrop && !FLUID[bl]) W.onDrop(x, y - 1, z, blockDrops(bl, 0, null).items, 0);
     setBlock(x, y - 1, z, b, 8); return;
@@ -357,7 +361,7 @@ function fluidUpdate(x, y, z) {
 }
 function fallCheck(x, y, z, b) {
   const below = getBlock(x, y - 1, z);
-  if (y > 0 && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { const m = getMeta(x, y, z); setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); }
+  if (y > MINY && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { const m = getMeta(x, y, z); setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); }
 }
 function tickScheduled() {
   W.tickN++;
@@ -382,7 +386,7 @@ function randomTicks(px, pz) {
     for (let s = 0, ns = (c.maxY >> 4) + 1, rts = gr('randomTickSpeed'); s < ns; s++) for (let k = 0; k < rts; k++) { // only sections that contain blocks
       const r = (Math.random() * 4096) | 0, i = (s << 12) | r, b = c.blocks[i];
       if (!b || !RANDOM_TICK[b]) continue;
-      const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
+      const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
       RANDOM_TICK[b](x, y, z, b, c.meta[i]);
     }
   }
@@ -424,7 +428,7 @@ for (const [sap, type] of [[BID.oak_sapling, 0], [BID.birch_sapling, 2], [BID.sp
 function growTreeAt(x, y, z, type) {
   const h = type === 3 || type === 4 ? 12 : 8;
   for (let k = 1; k <= h; k++) { const t = getBlock(x, y + k, z); if (t && !REPL[t] && !S.LEAF[t]) return false; }
-  if (y + h + 2 >= CH) return false;
+  if (y + h + 2 >= MAXY) return false;
   setBlock(x, y, z, 0, 0, { noUpdate: true });
   S.growTree((wx, wy, wz, id, m, force) => { const cur = getBlock(wx, wy, wz); if (force || cur === 0 || REPL[cur] && !FLUID[cur]) setBlock(wx, wy, wz, id, m, { noUpdate: true }); }, x, y, z, type, Math.random(), false);
   setBlock(x, y - 1, z, 3);
@@ -479,7 +483,7 @@ RANDOM_TICK[BID.budding_amethyst] = (x, y, z) => {
 // pointed dripstone (1.17): a stalactite tip under a fluid drips into a cauldron below; one fed by water through a dripstone block slowly grows
 const isTip = (x, y, z) => getBlock(x, y, z) === BID.pointed_dripstone && getMeta(x, y, z) === 0 && getBlock(x, y - 1, z) !== BID.pointed_dripstone;
 function dripSource(x, y, z) { // the fluid above the block this stalactite hangs from: [fluid id, root y]
-  let ry = y; while (ry < CH - 2 && getBlock(x, ry + 1, z) === BID.pointed_dripstone && getMeta(x, ry + 1, z) === 0) ry++;
+  let ry = y; while (ry < MAXY - 2 && getBlock(x, ry + 1, z) === BID.pointed_dripstone && getMeta(x, ry + 1, z) === 0) ry++;
   if (y - ry > 10) return null;
   const f = getBlock(x, ry + 2, z); return FLUID[f] && getMeta(x, ry + 2, z) === 0 ? [f, ry + 1] : null;
 }
@@ -488,7 +492,7 @@ RANDOM_TICK[BID.pointed_dripstone] = (x, y, z, b, m) => {
   const src = dripSource(x, y, z); if (!src) return;
   const [fl, root] = src;
   // fill a cauldron within 11 blocks below
-  if (Math.random() < (fl === 27 ? 0.17578125 : 0.05859375)) for (let cy = y - 1; cy > y - 12 && cy > 0; cy--) {
+  if (Math.random() < (fl === 27 ? 0.17578125 : 0.05859375)) for (let cy = y - 1; cy > y - 12 && cy > MINY; cy--) {
     const cb = getBlock(x, cy, z); if (cb === 0) continue;
     if (cb === BID.cauldron) { const cm = getMeta(x, cy, z), lv = cm & 3, k = (cm >> 2) & 3; if (fl === 27 && (lv === 0 || (k === 0 && lv < 3))) setMeta(x, cy, z, lv + 1); else if (fl === 28 && lv === 0) setMeta(x, cy, z, 3 | 4); }
     break;
@@ -571,10 +575,11 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
     else if (t.type) c.tiles.set(t.i, t);
   }
+  if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
-  if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
+  if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + ((i >> 8) + MINY) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c); signTiles(c);
   if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
@@ -593,7 +598,7 @@ function requestMesh(c, opts, urgent) {
   // only copy layers up to the tallest neighbour; everything above is open sky
   let top = 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) top = Math.max(top, chunkAt(c.cx + dx, c.cz + dz).maxY);
   const h = Math.min(CH, top + 2);
-  B.fill(8, 0, PA); L.fill(0, 0, PA); B.fill(0, (h + 1) * PA, (h + 2) * PA); L.fill(0xf0, (h + 1) * PA, (h + 2) * PA); // floor below y=0, sky layer above h
+  B.fill(8, 0, PA); L.fill(0, 0, PA); B.fill(0, (h + 1) * PA, (h + 2) * PA); L.fill(0xf0, (h + 1) * PA, (h + 2) * PA); // floor below the bottom row, sky layer above h (array rows)
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
     const n = chunkAt(c.cx + dx, c.cz + dz);
     const xa = dx < 0 ? 15 : 0, xb = dx > 0 ? 0 : 15, za = dz < 0 ? 15 : 0, zb = dz > 0 ? 0 : 15;
@@ -648,7 +653,7 @@ function rleEnc(a) { // keeps the element type: block ids are 16 bit, meta and l
 }
 function rleDec(b, len, T = Uint8Array) { const a = new T(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 // RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
-const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,my:m.my,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
 const savePending = new Map(), saveWaiters = new Map();
 saveWorker.onmessage = e => {
   const { k, rec } = e.data;
@@ -665,10 +670,10 @@ function saveChunk(c, unloading, sync) {
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }
-  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, my: MINY, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
   const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
   savePending.set(dk, (savePending.get(dk) || 0) + 1);
-  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
+  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, my: MINY, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
@@ -682,12 +687,24 @@ async function loadChunk(cx, cz) {
   if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
-  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(CVOL); out.set(src.subarray(0, n)); if (fill) out.fill(fill, n); return out; };
+  const tall = rec.my === MINY, rows = tall ? CH : Math.min(256, oldH); // saved since 1.18: the -64..319 rows; before: y 0..255
+  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(tall ? CVOL : 256 * 256); out.set(src.subarray(0, Math.min(n, out.length))); if (fill) out.fill(fill, n); return out; };
   // a record that can't be read (damaged storage, an interrupted write) is generated again instead of leaving a hole the
   // world waits on for ever
-  let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data'); }
+  let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data');
+    if (!tall) liftOld(d, dim, rows); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
   W.inbox.push(d);
+}
+// a chunk saved before 1.18 (rows were y 0..255) lifted into the -64..319 arrays: below y 0 the overworld gets its new
+// depths (deepslate, caves, deep ores; the old bedrock floor turns to deepslate, as when Java upgrades a world), the
+// containers move with their blocks, and the whole chunk is lit again
+function liftOld(d, dim, rows) {
+  const off = -MINY << 8, b = new Uint16Array(CVOL), m = new Uint8Array(CVOL);
+  b.set(d.blocks.subarray(0, rows * 256), off); m.set(d.meta.subarray(0, rows * 256), off);
+  if (dim === 0) S.deepFill(b, m, W.seed, d.cx, d.cz);
+  d.blocks = b; d.meta = m; d.light = new Uint8Array(CVOL); S.lightChunk(b, d.light, m);
+  d.tileList = d.tileList.map(([i, t]) => [i + off, t]); d.lifted = true; // saved again in the new layout
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first

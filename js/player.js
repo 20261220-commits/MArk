@@ -296,7 +296,7 @@ function survivalTick(inWater, inLava, eyeF) {
   // suffocation
   const hb = getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z));
   if (OPQ[hb] && SOLID[hb] && hb !== BID.powder_snow && W.tickN % 10 === 0) hurtPlayer(1, 'suffocate');
-  if (PL.y < -64) hurtPlayer(4, 'void');
+  if (PL.y < voidY()) hurtPlayer(4, 'void');
   // freezing (1.17): 140 ticks inside powder snow to freeze fully, thaws twice as fast; any leather armour piece or burning prevents it
   const canFreeze = !creative() && PL.fire <= 0 && !INV.armor.some(s => s && ITEMS[s.id].armor.mat === 'leather');
   PL.frozen = PL.inSnowBody && canFreeze ? Math.min(140, (PL.frozen || 0) + 1) : Math.max(0, (PL.frozen || 0) - 2);
@@ -333,7 +333,7 @@ function interactTick() {
       else {
         MINE.prog += need === 0 ? 1 : 1 / need; MINE.ticks++;
         R.hand.swing = Math.max(R.hand.swing, 0.01);
-        if (MINE.ticks % 4 === 1) { play('dig', { mat: soundMat(t.id), vol: 0.5 }); R.blockParticles(t.x, t.y, t.z, t.id, 1, lightBright(t.x + .5, t.y + 1, t.z + .5)); }
+        if (MINE.ticks % 4 === 1) { play('dig', { mat: soundMat(t.id), vol: 0.5 }); R.blockParticles(t.x, t.y, t.z, t.id, 1, lightBright(t.x + .5, t.y + 1, t.z + .5), t.m); } // the block's own variant (birch planks, spruce wood...)
         if (MINE.prog >= 1) { breakBlock(t.x, t.y, t.z); MINE.prog = 0; MINE.id = -1; MINE.cd = need === 0 ? 0 : 5; }
       }
     }
@@ -679,7 +679,7 @@ function boneMeal(x, y, z, id) {
 function placeCandle(t, c) {
   let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
   const tgt = getBlock(t.x, t.y, t.z); if (REPL[tgt] && !FLUID[tgt]) { x = t.x; y = t.y; z = t.z; }
-  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < 0 || y >= CH) return;
+  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < MINY || y >= MAXY) return;
   setBlock(x, y, z, ...S.candleBlock(c, 1, 0)); consume(); play('place', { mat: 'wool' }); swing();
 }
 function placeBlock(t, d) {
@@ -695,7 +695,7 @@ function placeBlock(t, d) {
   const sameSlab = m => !BLOCKS[id].slabv || (m >> 1) === vi;
   if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, slabFm || (BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0)); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
   if (id === BID.snow && tgt === BID.snow && (t.m & 7) < 7) { setBlock(t.x, t.y, t.z, BID.snow, t.m + 1); consume(); swing(); return; }
-  if (y < 0 || y >= CH) return;
+  if (y < MINY || y >= MAXY) return;
   const cur = getBlock(x, y, z); if (cur && !REPL[cur]) return;
   if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, slabFm || (BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0)); consume(); swing(); return; }
   const below = getBlock(x, y - 1, z), fd = facingDir();
@@ -821,7 +821,7 @@ function furnaceTick() {
 function chorusTeleport() {
   for (let k = 0; k < 16; k++) {
     const x = Math.floor(PL.x + (Math.random() - .5) * 16), z = Math.floor(PL.z + (Math.random() - .5) * 16); let y = Math.floor(PL.y + (Math.random() - .5) * 16);
-    while (y > 1 && !SOLID[getBlock(x, y - 1, z)]) y--;
+    while (y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)]) continue;
     PL.x = PL.px = x + .5; PL.y = PL.py = y; PL.z = PL.pz = z + .5; PL.fallDist = 0; play('teleport'); return;
   }

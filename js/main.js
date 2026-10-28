@@ -60,8 +60,8 @@ function debugOverlays(px, py, pz) {
   }
   if (UI.chunkBorders && !DBG.chunk) {
     const pts = [];
-    for (let i = 0; i <= 16; i += 2) for (const [x, z] of [[i, 0], [i, 16], [0, i], [16, i]]) pts.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, S.CH, z));
-    for (let y = 0; y <= S.CH; y += 2) for (const [a, b] of [[[0, 0], [16, 0]], [[16, 0], [16, 16]], [[16, 16], [0, 16]], [[0, 16], [0, 0]]]) pts.push(new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1]));
+    for (let i = 0; i <= 16; i += 2) for (const [x, z] of [[i, 0], [i, 16], [0, i], [16, i]]) pts.push(new THREE.Vector3(x, S.MINY, z), new THREE.Vector3(x, S.MAXY, z));
+    for (let y = S.MINY; y <= S.MAXY; y += 2) for (const [a, b] of [[[0, 0], [16, 0]], [[16, 0], [16, 16]], [[16, 16], [0, 16]], [[0, 16], [0, 0]]]) pts.push(new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1]));
     DBG.chunk = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.6 }));
     scene.add(DBG.chunk);
   }
@@ -240,7 +240,7 @@ function finishLoading() {
   if (W.needSpawnFix) {
     W.needSpawnFix = false;
     let x = Math.floor(PL.x), z = Math.floor(PL.z), y = topY(x, z);
-    while (y < CH - 2 && (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)])) y++;
+    while (y < MAXY - 2 && (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)])) y++;
     PL.y = y + 1; PL.py = PL.y; W.worldSpawn = [x, y + 1, z]; W.meta.spawn = W.worldSpawn;
     if (PL.mode !== 'creative') { /* fresh survival start: empty inventory like MC */ }
     chatMsg('세계에 오신 것을 환영합니다! E: 인벤토리 · T: 채팅 · /help: 명령어', '#ffff55');
@@ -435,8 +435,8 @@ function ambientParticles(dt, px, py, pz) {
     const bx = Math.floor(px), by = Math.floor(py), bz = Math.floor(pz);
     for (let x = bx - 12; x <= bx + 12; x++) for (let z = bz - 12; z <= bz + 12; z++) {
       const c = chunkAt(x >> 4, z >> 4); if (!c) continue;
-      for (let y = Math.max(0, by - 8); y <= Math.min(CH - 1, by + 8); y++) {
-        const i = (y << 8) | ((z & 15) << 4) | (x & 15), b = c.blocks[i];
+      for (let y = Math.max(MINY, by - 8); y <= Math.min(MAXY - 1, by + 8); y++) {
+        const i = BI(x, y, z), b = c.blocks[i];
         if (b === BID.torch || b === BID.lit_furnace) ambList.push(x, y, z, b, c.meta[i]);
       }
     }

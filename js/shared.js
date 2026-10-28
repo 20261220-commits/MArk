@@ -2,7 +2,8 @@
 // function is stringified into the Web Worker, so it may not touch outer scope.
 const SHARED = function () {
 'use strict';
-const CW = 16, CH = 256, SEA = 62, CVOL = CW * CW * CH; // 1.17 overworld height 0..255
+const CW = 16, CH0 = 256, SEA = 62, CVOL0 = CW * CW * CH0; // the generators build 1.17-style columns 0..255 (genTall lifts them into the 1.18 world)
+const MINY = -64, CH = 384, MAXY = MINY + CH, CVOL = CW * CW * CH; // 1.18 world height: y -64..319, kept in arrays at index y - MINY
 const ATL = 512, TPR = 32; // texture atlas: 32x32 tiles of 16px
 const RT = { AIR: 0, CUBE: 1, CUTOUT: 2, CROSS: 3, FLUID: 4, TORCH: 5, BOX: 6, TRANS: 7, CROP: 8, WIRE: 9, TBOX: 10 };
 const TOOL = { NONE: 0, PICK: 1, AXE: 2, SHOVEL: 3, HOE: 4, SWORD: 5, SHEARS: 6 };
@@ -1088,7 +1089,7 @@ function makeGen(seed) {
     if (JCAT[jb] === 14 && h > 72) h = 72 + Math.round((h - 72) / 4) * 4; // badlands: terraces up to the plateaus
     if (jb === 165) { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h += Math.min(40, (sp - 0.55) * 120); } // eroded badlands: hoodoos
     if (jb === 163 || jb === 164) h += Math.max(0, nD.n2(wx / 9, wz / 9)) * 6; // shattered savanna: jagged
-    h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
+    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
     return [h, BB[v], v];
   }
   // column: [height, biome]
@@ -1111,7 +1112,7 @@ function makeGen(seed) {
     // mushroom fields: rare islands far out at sea
     const mush = nX.n2(wx / 640 + 13.7, wz / 640 - 4.1), mk = cont < -0.08 ? smooth(0.8, 0.88, mush) : 0; // about 0.2% of the world, as in Java
     if (mk > 0) h = h + (SEA + 3 + hills * 4 - h) * mk;
-    h = Math.max(6, Math.min(CH - 6, Math.floor(h)));
+    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
     const hum = nH.fbm(wx / 900, wz / 900, 3) * 1.6;
     let b;
     if (h < SEA - 1) b = river ? BIO.RIVER : temp < -0.45 ? BIO.FROZEN_OCEAN : temp < -0.25 ? BIO.COLD_OCEAN : temp > 0.42 ? BIO.WARM_OCEAN : temp > 0.18 ? BIO.LUKEWARM_OCEAN : BIO.OCEAN;
@@ -1178,7 +1179,7 @@ function makeGen(seed) {
       }
       case BIO.MUSHROOM: if (h <= SEA + 1) v = K.mushroom_field_shore; break;
     }
-    if (add > 0) h = Math.min(CH - 6, h + Math.floor(add * fade));
+    if (add > 0) h = Math.min(CH0 - 6, h + Math.floor(add * fade));
     return [h, b, v];
   }
   return { column, nD, nX, biomes: BM };
@@ -1242,7 +1243,7 @@ function oreVein(blocks, R, id, size, y, repl) {
   for (let i = 0; i < size; i++) {
     const t = i / size, px = xa + (xb - xa) * t, py = ya + (yb - ya) * t, pz = za + (zb - za) * t, rr = ((Math.sin(Math.PI * t) + 1) * R() * size / 16 + 1) / 2, r2 = rr * rr;
     for (let bx = Math.max(0, Math.floor(px - rr)); bx <= Math.min(15, Math.floor(px + rr)); bx++)
-      for (let by = Math.max(1, Math.floor(py - rr)); by <= Math.min(CH - 2, Math.floor(py + rr)); by++)
+      for (let by = Math.max(1, Math.floor(py - rr)); by <= Math.min(CH0 - 2, Math.floor(py + rr)); by++)
         for (let bz = Math.max(0, Math.floor(pz - rr)); bz <= Math.min(15, Math.floor(pz + rr)); bz++) {
           const dx = bx + .5 - px, dy = by + .5 - py, dz = bz + .5 - pz; if (dx * dx + dy * dy + dz * dz >= r2) continue;
           const i2 = I(bx, by, bz); if (blocks[i2] === repl) blocks[i2] = id;
@@ -1251,8 +1252,8 @@ function oreVein(blocks, R, id, size, y, repl) {
 }
 // a stamp writes world coordinates into one chunk, ignoring everything outside it
 function makeStamp(blocks, meta, x0, z0) {
-  const st = (wx, y, wz, id, m) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return; const i = (y << 8) | (z << 4) | x; blocks[i] = id; meta[i] = m || 0; };
-  st.get = (wx, y, wz) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH) return -1; return blocks[(y << 8) | (z << 4) | x]; };
+  const st = (wx, y, wz, id, m) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH0) return; const i = (y << 8) | (z << 4) | x; blocks[i] = id; meta[i] = m || 0; };
+  st.get = (wx, y, wz) => { const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 0 || y >= CH0) return -1; return blocks[(y << 8) | (z << 4) | x]; };
   st.inside = (ax, az, bx, bz) => bx >= x0 && ax <= x0 + 15 && bz >= z0 && az <= z0 + 15;
   st.x0 = x0; st.z0 = z0;
   return st;
@@ -2307,7 +2308,7 @@ function netherDensityAt(seed, x, y, z) {
   const gy = y >> 3, fy = (y & 7) / 8; return g(gy) * (1 - fy) + g(gy + 1) * fy;
 }
 function genNether(seed, cx, cz) {
-  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256), tiles = [];
+  const blocks = new Uint16Array(CVOL0), meta = new Uint8Array(CVOL0), biome = new Uint8Array(256), tiles = [];
   const nA = makeNoise(seed + 101), nB = makeNoise(seed + 102), nb = makeNoise(seed + 103);
   const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x, R = rng(hash32(seed, cx, cz, 7));
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) biome[z * 16 + x] = netherBiome(nb, x0 + x, z0 + z);
@@ -2423,9 +2424,7 @@ function genNether(seed, cx, cz) {
   }
   stampNetherRuins(seed, st, cx, cz, tiles);
   fixConnections(blocks, meta);
-  const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light, meta);
-  return { blocks, meta, light, biome, tiles };
+  return { blocks, meta, biome, tiles };
 }
 // ---------- the End ----------
 const END_PILLARS = (() => { const out = []; for (let i = 0; i < 10; i++) { const a = 2 * (-Math.PI + Math.PI / 10 * i); out.push([Math.floor(42 * Math.cos(a)), Math.floor(42 * Math.sin(a)), 2 + ((i * 7) % 10) / 3 | 0, 76 + ((i * 7) % 10) * 3, ((i * 7) % 10) < 2]); } return out; })();
@@ -2464,7 +2463,7 @@ function stampEndCity(c, st, R, tiles) {
   for (let x = cx + 5; x < sx - 6; x++) { const y = by + h + Math.round((x - cx - 5) / (sx - 6 - cx - 5) * 4); st(x, y, sz, P); st(x, y, sz - 1, P); }
 }
 function genEnd(seed, cx, cz) {
-  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL), biome = new Uint8Array(256).fill(18), tiles = [];
+  const blocks = new Uint16Array(CVOL0), meta = new Uint8Array(CVOL0), biome = new Uint8Array(256).fill(18), tiles = [];
   const nA = makeNoise(seed + 201), nB = makeNoise(seed + 202);
   const x0 = cx * 16, z0 = cz * 16, I = (x, y, z) => (y << 8) | (z << 4) | x;
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -2517,9 +2516,7 @@ function genEnd(seed, cx, cz) {
   // arrival platform
   if (st.inside(98, -2, 102, 2)) for (let x = 98; x <= 102; x++) for (let z = -2; z <= 2; z++) { st(x, 48, z, 49); for (let y = 49; y <= 51; y++) st(x, y, z, 0); }
   fixConnections(blocks, meta);
-  const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light, meta);
-  return { blocks, meta, light, biome, tiles };
+  return { blocks, meta, biome, tiles };
 }
 // what a fence (1), pane (2), nether brick fence (3) or wall (4) joins: its own kind, full solid blocks, glass for
 // panes, and a fence gate whose bars run that way (FenceBlock / WallBlock.connectsTo)
@@ -2533,18 +2530,68 @@ function connectsTo(k, n, nm, dx) {
 // fences and panes generated by structures get their connection state here (inside the chunk)
 function fixConnections(blocks, meta) {
   const I = (x, y, z) => (y << 8) | (z << 4) | x;
-  for (let i = 0; i < CVOL; i++) {
+  for (let i = 0; i < CVOL0; i++) {
     const b = blocks[i], k = BLOCKS[b] && BLOCKS[b].connect; if (!k) continue;
     const x = i & 15, z = (i >> 4) & 15, y = i >> 8; let m = 0;
     [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dz], d) => { const ax = x + dx, az = z + dz; if (ax < 0 || az < 0 || ax > 15 || az > 15) return; const ni = I(ax, y, az); if (connectsTo(k, blocks[ni], meta[ni], dx)) m |= 1 << d; });
     meta[i] = (meta[i] & 0xf0) | m; // (the neighbouring chunks' side is joined up when both are loaded: joinConnections)
   }
 }
-function genChunk(seed, cx, cz, dim, exp) {
+// ---------- the 1.18 world: y -64..319 ----------
+// The 1.17-style generators make a 0..255 column; it is lifted into the tall arrays and, in the overworld, the new
+// depths below y 0 are made: deepslate with caves (cheese caverns, spaghetti and noodle tunnels), lava below -54,
+// 1.18's deep ores, tuff, and the bedrock floor at -64 (the old floor at y 0..4 becomes deepslate, as when Java
+// upgrades a world)
+const DEEP_N = new Map();
+function deepNoise(seed) { let n = DEEP_N.get(seed); if (!n) { n = [makeNoise(hash32(seed, 18, 1, 1)), makeNoise(hash32(seed, 18, 2, 2)), makeNoise(hash32(seed, 18, 3, 3)), makeNoise(hash32(seed, 18, 4, 4))]; if (DEEP_N.size > 4) DEEP_N.clear(); DEEP_N.set(seed, n); } return n; }
+const TI = (x, y, z) => ((y - MINY) << 8) | (z << 4) | x; // tall-array index of local x, z and world y
+// a cave at (x, y, z)? cheese (big rounded caverns), spaghetti (long thin tunnels), noodles (thinner still)
+function noiseCave(N, x, y, z) {
+  const [a, b, c, d] = N;
+  const ch = a.n3(x / 90, y / 45, z / 90) + 0.35 * a.n3(x / 30, y / 18, z / 30); if (ch > 0.62) return true;
+  const sp1 = b.n3(x / 48, y / 32, z / 48), sp2 = c.n3(x / 48 + 31.7, y / 32, z / 48 - 17.3); if (sp1 * sp1 + sp2 * sp2 < 0.0055) return true;
+  const nd1 = d.n3(x / 22, y / 18, z / 22), nd2 = d.n3(x / 22 + 91.3, y / 18 + 7.7, z / 22 - 55.1); return nd1 * nd1 + nd2 * nd2 < 0.0012 && y < 30;
+}
+function veinTall(blocks, R, id, size, y, x, z, repl) { // a blob of ore, as Java's OreFeature: along a line, spheres shrinking at the ends
+  const a = R() * Math.PI, x0 = x + Math.sin(a) * size / 8, x1 = x - Math.sin(a) * size / 8, z0 = z + Math.cos(a) * size / 8, z1 = z - Math.cos(a) * size / 8, y0 = y + R.int(3) - 1, y1 = y + R.int(3) - 1;
+  for (let i = 0; i < size; i++) { const f = i / size, cx = x0 + (x1 - x0) * f, cy = y0 + (y1 - y0) * f, cz = z0 + (z1 - z0) * f, r = ((Math.sin(f * Math.PI) + 1) * (R() * size / 16) + 1) / 2;
+    for (let bx = Math.floor(cx - r); bx <= Math.floor(cx + r); bx++) for (let by = Math.floor(cy - r); by <= Math.floor(cy + r); by++) for (let bz = Math.floor(cz - r); bz <= Math.floor(cz + r); bz++) {
+      if (bx < 0 || bz < 0 || bx > 15 || bz > 15 || by < MINY + 1 || by >= MAXY) continue; if ((bx + .5 - cx) ** 2 + (by + .5 - cy) ** 2 + (bz + .5 - cz) ** 2 > r * r) continue;
+      const i = TI(bx, by, bz), b = blocks[i]; if (repl(b)) blocks[i] = typeof id === 'function' ? id(b) : id; } }
+}
+// 1.18 ore heights: [ore, deepslate ore, tries per chunk, size, lowest y, highest y, triangle (peak in the middle) or uniform]
+const DEEP_ORES = [['diamond_ore', 'deepslate_diamond_ore', 7, 6, -80, 16, 1], ['redstone_ore', 'deepslate_redstone_ore', 6, 8, -64, 15, 0], ['redstone_ore', 'deepslate_redstone_ore', 8, 8, -96, -32, 1],
+  ['lapis_ore', 'deepslate_lapis_ore', 2, 7, -32, 32, 1], ['gold_ore', 'deepslate_gold_ore', 4, 9, -64, 32, 1], ['iron_ore', 'deepslate_iron_ore', 10, 9, -24, 56, 1], ['copper_ore', 'deepslate_copper_ore', 4, 10, -16, 112, 1]];
+function deepFill(blocks, meta, seed, cx, cz) {
+  const N = deepNoise(seed), R = rng(hash32(seed, cx, cz, 1818)), x0 = cx * 16, z0 = cz * 16, DS = BID.deepslate, BED = BID.bedrock, LAVA = 28, TUFF = BID.tuff;
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const wx = x0 + x, wz = z0 + z;
+    for (let y = MINY; y < 5; y++) { const i = TI(x, y, z);
+      if (y >= 0) { if (blocks[i] === BED) blocks[i] = DS; continue; } // the old bedrock floor
+      const floor = y === MINY || (y < MINY + 5 && R() < (MINY + 5 - y) / 5);
+      if (floor) { blocks[i] = BED; continue; }
+      blocks[i] = y > MINY + 4 && noiseCave(N, wx, y, wz) ? (y <= -55 ? LAVA : 0) : DS; meta[i] = 0; }
+  }
+  // tuff blobs and the deep ores
+  const deepOre = { [BID.stone]: 1, [DS]: 1, [TUFF]: 1 };
+  for (let k = 0; k < 2; k++) veinTall(blocks, R, TUFF, 30, MINY + 5 + R.int(60), R.int(16), R.int(16), b => b === DS);
+  for (const [o, d, n, size, lo, hi, tri] of DEEP_ORES) { const O = BID[o], D = BID[d];
+    for (let k = 0; k < n; k++) { const y = tri ? Math.round(lo + (R() + R()) / 2 * (hi - lo)) : lo + R.int(hi - lo + 1); if (y >= 0 || y <= MINY) continue; veinTall(blocks, R, b => b === DS || b === TUFF ? D : O, size, y, R.int(16), R.int(16), b => !!deepOre[b]); } }
+}
+function genTall(r, dim, seed, cx, cz) {
+  const off = (0 - MINY) << 8, blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
+  blocks.set(r.blocks, off); meta.set(r.meta, off);
+  if (dim === 0) deepFill(blocks, meta, seed, cx, cz);
+  for (const t of r.tiles) if (t.i != null) t.i += off;
+  const light = new Uint8Array(CVOL); lightChunk(blocks, light, meta);
+  return { blocks, meta, light, biome: r.biome, tiles: r.tiles };
+}
+function genChunk(seed, cx, cz, dim, exp) { return genTall(genChunk0(seed, cx, cz, dim, exp), dim, seed, cx, cz); }
+function genChunk0(seed, cx, cz, dim, exp) {
   if (dim === -1) return genNether(seed, cx, cz);
   if (dim === 1) return genEnd(seed, cx, cz);
   const G = makeGen(seed);
-  const blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
+  const blocks = new Uint16Array(CVOL0), meta = new Uint8Array(CVOL0);
   const biome = new Uint8Array(256), hgt = new Int16Array(18 * 18), bpad = new Uint8Array(18 * 18), vpad = new Uint8Array(18 * 18), vbio = new Uint8Array(256), K = BIOK;
   const x0 = cx * CW, z0 = cz * CW;
   for (let z = -1; z <= 16; z++) for (let x = -1; x <= 16; x++) { const c = G.column(x0 + x, z0 + z); hgt[(z + 1) * 18 + x + 1] = c[0]; bpad[(z + 1) * 18 + x + 1] = c[1]; vpad[(z + 1) * 18 + x + 1] = c[2]; }
@@ -2594,9 +2641,9 @@ function genChunk(seed, cx, cz, dim, exp) {
     const minX = Math.max(0, Math.floor(px - x0 - rh) - 1), maxX = Math.min(15, Math.floor(px - x0 + rh) + 1);
     const minZ = Math.max(0, Math.floor(pz - z0 - rh) - 1), maxZ = Math.min(15, Math.floor(pz - z0 + rh) + 1);
     if (minX > maxX || minZ > maxZ) return;
-    const minY = Math.max(1, Math.floor(py - rv) - 1), maxY = Math.min(CH - 8, Math.floor(py + rv) + 1);
+    const minY = Math.max(1, Math.floor(py - rv) - 1), maxY = Math.min(CH0 - 8, Math.floor(py + rv) + 1);
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) for (let y = maxY + 1; y >= minY - 1; y--) {
-      if (y < 0 || y >= CH) continue; const b = blocks[I(x, y, z)]; if (b === WATER || b === 52) return;
+      if (y < 0 || y >= CH0) continue; const b = blocks[I(x, y, z)]; if (b === WATER || b === 52) return;
     }
     for (let x = minX; x <= maxX; x++) {
       const dx = (x + x0 + 0.5 - px) / rh;
@@ -2608,7 +2655,7 @@ function genChunk(seed, cx, cz, dim, exp) {
           const i = I(x, y, z), b = blocks[i];
           if (b === 2) grass = true;
           if (!carvable(b)) continue;
-          if ((b === 9 || b === 10) && blocks[I(x, Math.min(CH - 1, y + 1), z)] === WATER) continue;
+          if ((b === 9 || b === 10) && blocks[I(x, Math.min(CH0 - 1, y + 1), z)] === WATER) continue;
           blocks[i] = y <= 10 ? LAVA : 0;
           if (grass && y > 0 && blocks[I(x, y - 1, z)] === 3) blocks[I(x, y - 1, z)] = 2;
         }
@@ -2634,7 +2681,7 @@ function genChunk(seed, cx, cz, dim, exp) {
       const rr = ((Math.sin(Math.PI * t) + 1) * R() * size / 16 + 1) / 2;
       const ax0 = Math.max(0, Math.floor(px - rr)), ax1 = Math.min(15, Math.floor(px + rr));
       const az0 = Math.max(0, Math.floor(pz - rr)), az1 = Math.min(15, Math.floor(pz + rr));
-      const ay0 = Math.max(1, Math.floor(py - rr)), ay1 = Math.min(CH - 1, Math.floor(py + rr));
+      const ay0 = Math.max(1, Math.floor(py - rr)), ay1 = Math.min(CH0 - 1, Math.floor(py + rr));
       if (ax0 > ax1 || az0 > az1 || ay0 > ay1) continue;
       const r2 = rr * rr;
       for (let bx = ax0; bx <= ax1; bx++) for (let by = ay0; by <= ay1; by++) for (let bz = az0; bz <= az1; bz++) {
@@ -2756,7 +2803,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   if (dripRegion) for (let i = 0; i < 10; i++) vein(14, 17, uni(0, 95));
   for (let a = 0, na = dripRegion ? 60 : 6; a < na; a++) {
     const x = R.int(16), z = R.int(16), y0 = 12 + R.int(40);
-    for (let y = y0; y < y0 + 20 && y < CH - 2; y++) {
+    for (let y = y0; y < y0 + 20 && y < CH0 - 2; y++) {
       if (blocks[I(x, y, z)] === 0 && blocks[I(x, y + 1, z)] === 1) {
         blocks[I(x, y + 1, z)] = 85; blocks[I(x, y, z)] = 86;
         if (R() < 0.5 && y > 2 && blocks[I(x, y - 1, z)] === 0) blocks[I(x, y - 1, z)] = 86;
@@ -2778,7 +2825,7 @@ function genChunk(seed, cx, cz, dim, exp) {
     const rocky = v => v === 1 || v === 3 || v === 2 || v === 91 || v === 92 || v === 93 || v === 75 || v === 76;
     for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) {
       if (Math.hypot(x - lx, z - lz) > rad) continue;
-      for (let y = Math.max(14, ly - 10); y < Math.min(CH - 8, ly + 10); y++) {
+      for (let y = Math.max(14, ly - 10); y < Math.min(CH0 - 8, ly + 10); y++) {
         const i = I(x, y, z); if (blocks[i] !== 0) continue;
         const below = blocks[I(x, y - 1, z)], above = blocks[I(x, y + 1, z)];
         if (rocky(below)) {
@@ -2813,7 +2860,7 @@ function genChunk(seed, cx, cz, dim, exp) {
   }
   // 7. surface features: trees (from this and neighbouring chunks), plants, snow
   const setT = (wx, y, wz, id, m, force) => {
-    const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 1 || y >= CH) return;
+    const x = wx - x0, z = wz - z0; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 1 || y >= CH0) return;
     const i2 = I(x, y, z), cur = blocks[i2];
     if (force || cur === 0 || cur === 22 || cur === 23 || cur === 24 || REPL[cur] && !FLUID[cur]) { blocks[i2] = id; meta[i2] = m || 0; }
   };
@@ -2855,18 +2902,18 @@ function genChunk(seed, cx, cz, dim, exp) {
   }
   if (vbio[8 * 16 + 8] >= K.giant_tree_taiga && vbio[8 * 16 + 8] <= K.giant_spruce_taiga_hills) for (let k = hash32(seed, cx, cz, 413) % 3; k > 0; k--) { // mossy cobblestone boulders
     const bx = 3 + hash32(seed, cx, cz, 414 + k) % 10, bz = 3 + hash32(seed, cx, cz, 420 + k) % 10, by = hgt[(bz + 1) * 18 + bx + 1];
-    for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) if (dx * dx + dy * dy * 1.5 + dz * dz <= 4.5 && by + dy < CH) blocks[I(bx + dx, by + dy, bz + dz)] = 48;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) if (dx * dx + dy * dy * 1.5 + dz * dz <= 4.5 && by + dy < CH0) blocks[I(bx + dx, by + dy, bz + dz)] = 48;
   }
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const h = hgt[(z + 1) * 18 + x + 1], b = biome[z * 16 + x], vb = vbio[z * 16 + x], top = blocks[I(x, h, z)], above = I(x, h + 1, z);
     if (vb === K.desert_lakes && top === 9 && x > 0 && z > 0 && x < 15 && z < 15 && G.nX.n2((x0 + x) / 13 + 3.1, (z0 + z) / 13) > 0.42 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([ax, az]) => hgt[(z + 1 + az) * 18 + x + 1 + ax] >= h)) { blocks[I(x, h, z)] = WATER; if (G.nX.n2((x0 + x) / 13 + 3.1, (z0 + z) / 13) > 0.55) blocks[I(x, h - 1, z)] = WATER; continue; } // desert lakes
-    if (vb === K.sunflower_plains && top === 2 && h + 2 < CH && !blocks[above] && !blocks[I(x, h + 2, z)] && hash32(seed, x0 + x, z0 + z, 409) % 100 < 6) { blocks[above] = 1087; meta[above] = 0; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = 8; continue; } // sunflowers
-    if ((top === 203 || top === 205) && h + 2 < CH && !blocks[above]) { const p = hash32(seed, x0 + x, z0 + z, 411) % 100; if (p < 6 && !blocks[I(x, h + 2, z)]) { blocks[above] = 1111; blocks[I(x, h + 2, z)] = 1111; meta[I(x, h + 2, z)] = 8; } else if (p < 14) blocks[above] = 30; else if (p < 15) blocks[above] = 106; continue; } // giant taiga floor: ferns, large ferns, brown mushrooms
+    if (vb === K.sunflower_plains && top === 2 && h + 2 < CH0 && !blocks[above] && !blocks[I(x, h + 2, z)] && hash32(seed, x0 + x, z0 + z, 409) % 100 < 6) { blocks[above] = 1087; meta[above] = 0; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = 8; continue; } // sunflowers
+    if ((top === 203 || top === 205) && h + 2 < CH0 && !blocks[above]) { const p = hash32(seed, x0 + x, z0 + z, 411) % 100; if (p < 6 && !blocks[I(x, h + 2, z)]) { blocks[above] = 1111; blocks[I(x, h + 2, z)] = 1111; meta[I(x, h + 2, z)] = 8; } else if (p < 14) blocks[above] = 30; else if (p < 15) blocks[above] = 106; continue; } // giant taiga floor: ferns, large ferns, brown mushrooms
     if (b === BIO.SWAMP && h < SEA && blocks[I(x, SEA, z)] === WATER && blocks[I(x, SEA + 1, z)] === 0 && R() < 0.05) blocks[I(x, SEA + 1, z)] = 221; // lily pads
-    if (h + 1 >= CH || blocks[above] !== 0) continue;
+    if (h + 1 >= CH0 || blocks[above] !== 0) continue;
     const v = R();
     // tall grass and large ferns (two blocks tall), chosen by hash so the rolls below stay the same
-    if (top === 2 && h + 2 < CH && !blocks[I(x, h + 2, z)]) {
+    if (top === 2 && h + 2 < CH0 && !blocks[I(x, h + 2, z)]) {
       const p = hash32(seed, x0 + x, z0 + z, 405) % 1000, fernB = b === BIO.TAIGA || b === BIO.SNOWY_TAIGA || b === BIO.JUNGLE;
       const rate = b === BIO.PLAINS || b === BIO.SAVANNA ? 25 : fernB ? 20 : b === BIO.FOREST || b === BIO.BIRCH || b === BIO.FLOWER_FOREST || b === BIO.SWAMP || b === BIO.DARK_FOREST ? 8 : b === BIO.MOUNTAINS ? 4 : 0;
       if (p < rate) { const id = fernB && p % 3 ? 1111 : 1110; blocks[above] = id; meta[above] = 0; blocks[I(x, h + 2, z)] = id; meta[I(x, h + 2, z)] = 8; continue; }
@@ -2881,18 +2928,18 @@ function genChunk(seed, cx, cz, dim, exp) {
       else if (b === BIO.SWAMP) { if (v < 0.06) blocks[above] = 29; else if (v < 0.07) blocks[above] = 107; else if (v < 0.075) { blocks[above] = 199; meta[above] = 7; } }
       else if (b === BIO.MOUNTAINS) { if (v < 0.05) blocks[above] = 29; }
       else if (b === BIO.TUNDRA) { if (v < 0.01) blocks[above] = 29; }
-      else if (b === BIO.FLOWER_FOREST) { if (v < 0.3) { const k = R.int(14); if (k < 4) blocks[above] = 31 + k; else if (k < 11) { blocks[above] = 199; meta[above] = k - 4; } else if (h + 2 < CH) { const f = R.int(4); blocks[above] = 1087; meta[above] = f; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = f | 8; } } else if (v < 0.36) blocks[above] = 29; }
-      else if (b === BIO.BAMBOO_JUNGLE) { if (v < 0.22) { const n = 4 + R.int(9); for (let k = 1; k <= n && h + k < CH; k++) { blocks[I(x, h + k, z)] = 1086; meta[I(x, h + k, z)] = k === n ? 2 : k === n - 1 ? 1 : 0; } } else if (v < 0.4) blocks[above] = 29; else if (v < 0.42) blocks[above] = 30; }
-      else if (b === BIO.PLAINS && v > 0.9985 && h + 2 < CH) { const f = R.int(2) * 2; blocks[above] = 1087; meta[above] = f; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = f | 8; }
+      else if (b === BIO.FLOWER_FOREST) { if (v < 0.3) { const k = R.int(14); if (k < 4) blocks[above] = 31 + k; else if (k < 11) { blocks[above] = 199; meta[above] = k - 4; } else if (h + 2 < CH0) { const f = R.int(4); blocks[above] = 1087; meta[above] = f; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = f | 8; } } else if (v < 0.36) blocks[above] = 29; }
+      else if (b === BIO.BAMBOO_JUNGLE) { if (v < 0.22) { const n = 4 + R.int(9); for (let k = 1; k <= n && h + k < CH0; k++) { blocks[I(x, h + k, z)] = 1086; meta[I(x, h + k, z)] = k === n ? 2 : k === n - 1 ? 1 : 0; } } else if (v < 0.4) blocks[above] = 29; else if (v < 0.42) blocks[above] = 30; }
+      else if (b === BIO.PLAINS && v > 0.9985 && h + 2 < CH0) { const f = R.int(2) * 2; blocks[above] = 1087; meta[above] = f; blocks[I(x, h + 2, z)] = 1087; meta[I(x, h + 2, z)] = f | 8; }
       else if (b === BIO.ICE_SPIKES && v < 0.007 && x > 1 && z > 1 && x < 14 && z < 14) { // packed ice spikes
         const tall = R() < 0.1, n = tall ? 20 + R.int(15) : 5 + R.int(8);
-        for (let k = 1; k <= n && h + k < CH - 1; k++) { blocks[I(x, h + k, z)] = 206; if (k < n * (tall ? 0.6 : 0.4)) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) blocks[I(x + dx, h + k, z + dz)] = 206; }
+        for (let k = 1; k <= n && h + k < CH0 - 1; k++) { blocks[I(x, h + k, z)] = 206; if (k < n * (tall ? 0.6 : 0.4)) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) blocks[I(x + dx, h + k, z + dz)] = 206; }
       }
     } else if (top === 204) { if (v < 0.01) blocks[above] = R() < 0.5 ? 106 : 107;
     } else if (b === BIO.BADLANDS && (top === 201 || top === 195 || top === 196)) {
-      if (v < 0.01) blocks[above] = 35; else if (v < 0.013 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH; k++) blocks[I(x, h + k, z)] = 37; }
+      if (v < 0.01) blocks[above] = 35; else if (v < 0.013 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0; k++) blocks[I(x, h + k, z)] = 37; }
     } else if (top === 9 && b === BIO.DESERT) {
-      if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH; k++) blocks[I(x, h + k, z)] = 37; }
+      if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0; k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
     }
     if ((top === 2 || top === 9 || top === 3) && h === SEA && R() < 0.25) {
@@ -2917,16 +2964,14 @@ function genChunk(seed, cx, cz, dim, exp) {
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const b = biome[z * 16 + x], cold = BIOMES[vbio[z * 16 + x]][4] <= 0.15 || (b === BIO.MOUNTAINS && hgt[(z + 1) * 18 + x + 1] > 95);
     if (!cold) continue;
-    for (let y = CH - 2; y > 0; y--) {
+    for (let y = CH0 - 2; y > 0; y--) {
       const id = blocks[I(x, y, z)]; if (id === 0) continue;
       if (OPQ[id] || id === 22 || id === 23 || id === 24) { if (blocks[I(x, y + 1, z)] === 0) blocks[I(x, y + 1, z)] = 51; }
       else if (REPL[id] && !FLUID[id] && OPQ[blocks[I(x, y - 1, z)]]) blocks[I(x, y, z)] = 51;
       break;
     }
   }
-  const light = new Uint8Array(CVOL);
-  lightChunk(blocks, light, meta);
-  return { blocks, meta, light, biome: vbio, tiles };
+  return { blocks, meta, biome: vbio, tiles };
 }
 // tree shapes; types 0 oak, 2 birch, 3 spruce
 function growTree(set, x, y, z, type, r, snowy) {
@@ -3629,7 +3674,7 @@ function assembleJigsaw(G, seed, start, maxDepth, x0, z0, useHeight, ignoreAir) 
   const y0 = useHeight ? H(x0, z0) : 33;
   const startP = { path: sPath, t: sT, rot: sRot, ox: cx, oy: y0, oz: cz, rigid: true, box: tplBox(sT, sRot, cx, y0, cz), depth: 0 };
   startP.box[4] += 16;
-  const pieces = [startP], globalReg = { box: [x0 - 80, 0, z0 - 80, x0 + 80, CH - 1, z0 + 80], used: [startP.box] };
+  const pieces = [startP], globalReg = { box: [x0 - 80, 0, z0 - 80, x0 + 80, CH0 - 1, z0 + 80], used: [startP.box] };
   startP.shape = globalReg; // each piece carries the free space it was placed in (Java's ShapedPoolStructurePiece)
   const queue = [startP];
   while (queue.length) {
@@ -3700,7 +3745,7 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
     if (name === 'dirt_path' && !p.rigid && G.column(wx, wz)[0] < SEA) { s = (p.planks || 'oak') + '_planks'; name = s; } // streets cross water on planks
     if (p.ignoreAir && (name === 'air' || name === 'cave_air')) continue;
     const wy = p.rigid ? p.oy + bl[k + 1] : H(wx, wz) + bl[k + 1];
-    if (wy < 1 || wy >= CH) continue;
+    if (wy < 1 || wy >= CH0) continue;
     const v = vanillaState(s, p.rot); if (!v) continue;
     st(wx, wy, wz, v[0], v[1]);
     if (nd && nd.loot && st.get(wx, wy, wz) >= 0) tiles.push({ t: 'chest', i: tl(wx, wy, wz), loot: rollVanillaLoot(R, nd.loot) });
@@ -3870,7 +3915,7 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

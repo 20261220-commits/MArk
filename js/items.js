@@ -1,6 +1,6 @@
 // Item registry, recipes, smelting and block drops (main thread).
 const S = SHARED();
-const { CH, BLOCKS, BID, RT, TOOL } = S;
+const { CH, MINY, MAXY, BLOCKS, BID, RT, TOOL } = S;
 
 const ITEMS = [];          // id -> def
 const IID = {};            // key -> id

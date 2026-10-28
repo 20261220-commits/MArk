@@ -446,7 +446,7 @@ function runCommand(cmd) {
       const key = (a[n] || '').replace('minecraft:', ''), vk = typeof VKEY !== 'undefined' && VKEY[key]; const id = vk ? vk[0] : BID[key] != null ? BID[key] : key === 'air' ? 0 : null, m = vk ? vk[1] : 0;
       if (id == null) return err('알 수 없는 블록: ' + a[n]);
       const [x0, y0, z0, x1 = x0, y1 = y0, z1 = z0] = p; const vol = (Math.abs(x1 - x0) + 1) * (Math.abs(y1 - y0) + 1) * (Math.abs(z1 - z0) + 1); if (vol > 32768) return err('영역이 너무 큽니다 (최대 32768 블록)');
-      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(255, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
+      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(MINY, Math.min(y0, y1)); y <= Math.min(MAXY - 1, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
       ok(c === 'fill' ? cnt + '개 블록을 채웠습니다' : '블록을 바꿨습니다'); break;
     }
     case 'say': case 'me': chatMsg((c === 'me' ? '* 플레이어 ' : '[플레이어] ') + a.join(' '), '#ffffff'); break;

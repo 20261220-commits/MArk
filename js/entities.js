@@ -13,7 +13,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
   for (let x = ax; x <= bx; x++) for (let z = az; z <= bz; z++) {
     if (!isLoaded(x, z)) { pushBox(x, ay, z, x + 1, by + 1, z + 1); continue; }
     for (let y = ay; y <= by; y++) {
-      if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      if (y < MINY) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
       if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); else if (id === BID.scaffolding && PHYS.scafTop && PHYS.feetY >= y + 1 - 1e-3) pushBox(x, y + 0.875, z, x + 1, y + 1, z + 1); continue; } // scaffolding: stand on top unless sneaking
       const bs = S.collide(id, getMeta(x, y, z));
@@ -448,7 +448,7 @@ function explode(x, y, z, power, fire) {
     while (f > 0) {
       const bx = Math.floor(px2), by = Math.floor(py2), bz = Math.floor(pz2), b = getBlock(bx, by, bz);
       if (b) f -= (resistance(b) + 0.3) * 0.3;
-      if (f > 0 && b && by > 0 && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
+      if (f > 0 && b && by > MINY && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
       px2 += dx * 0.3; py2 += dy * 0.3; pz2 += dz * 0.3; f -= 0.225;
     }
   }
@@ -578,7 +578,7 @@ function mobTick(e) {
   if (e.eff) effectTick(e);
   if (e.jockey && jockeyTick(e)) return; // a chicken or spider carrying a jockey
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
-  if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
+  if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < voidY()) removeEnt(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
@@ -639,7 +639,7 @@ function mobTick(e) {
   // fall damage
   if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 + (d.fallReduce || 0) && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3 - (d.fallReduce || 0)), null); e.fallY = null; }
   else if (e.vy < 0 && e.fallY == null) e.fallY = e.y; else if (inF) e.fallY = null;
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
   const hs = Math.hypot(e.vx, e.vz);
   e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
   // spawner/despawn fuse visual
@@ -663,7 +663,7 @@ function squidTick(e) {
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += dy * 0.1; }
   physMove(e, e.vx, e.vy, e.vz, 0);
   e.walk += 0.15 + Math.hypot(e.vx, e.vy, e.vz) * 4; e.walkAmt = 1;
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
@@ -715,7 +715,7 @@ function entityTick() {
           const left = INV.add(e.stack); if (left < e.stack.n) { statOf('picked', e.stack.id, e.stack.n - left); play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
         }
       }
-      if (e.y < -40) removeEnt(e);
+      if (e.y < voidY()) removeEnt(e);
     } else if (e.kind === 'falling') {
       e.vy -= 0.04; e.vy *= 0.98; physMove(e, 0, e.vy, 0);
       const drip = e.block === BID.pointed_dripstone;
@@ -772,7 +772,7 @@ function arrowTick(e) {
   }
   e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99;
   if (fluidAt(e.x, e.y, e.z)) { e.vx *= 0.6; e.vy *= 0.6; e.vz *= 0.6; }
-  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < -20 && !e.trident)) removeEnt(e);
+  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < voidY() && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
 function trySpawnHostile() {
@@ -805,7 +805,7 @@ function spawnAnimalsForChunk(c) {
   let types;
   if (S.isOceanBio(b) || b === S.BIO.RIVER) {
     const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
-    for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
+    for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[BI(x, y, z)] === 27 && c.blocks[BI(x, y + 1, z)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
   }
   if (b === S.BIO.MOUNTAINS) types = ['goat'];
@@ -814,8 +814,8 @@ function spawnAnimalsForChunk(c) {
   const t = types[R0.int(types.length)], n = 2 + R0.int(3);
   for (let i = 0; i < n; i++) {
     const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12);
-    let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--;
-    const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)];
+    let y = MAXY - 2; while (y > MINY + 1 && !SOLID[c.blocks[BI(x, y, z)]] && !FLUID[c.blocks[BI(x, y, z)]]) y--;
+    const g = c.blocks[BI(x, y, z)];
     if (g !== 2 && g !== 50 && g !== 3 && g !== 1 && g !== 51) continue;
     spawnMob(t, x + .5, y + 1, z + .5);
   }
@@ -867,7 +867,7 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
-    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = (t.i >> 8) + MINY, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }

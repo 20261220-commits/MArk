@@ -113,7 +113,7 @@ function axolotlAI(e, dist) {
     faceTo(e, e.goal[0], e.goal[1]);
     walkPhysics(e, gl > 0.5 ? gx / gl : 0, gl > 0.5 ? gz / gl : 0, 0.03);
   }
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
 }
 function axolotlAnim(e, P, now) {
   const swim = e.inWater && !(e.playDead > 0), t = now / 120 + e.id;
@@ -130,7 +130,7 @@ function trySpawnAxolotl() {
   if (W.dim !== 0 || countMobs(e => e.type === 'axolotl' && Math.hypot(e.x - PL.x, e.z - PL.z) < 64) >= 6) return;
   const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 32, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);
   if (!isLoaded(x, z)) return;
-  for (let y = S.SEA; y > 2; y--) {
+  for (let y = S.SEA; y > MINY + 2; y--) {
     if (getBlock(x, y, z) !== BID.water || getBlock(x, y - 1, z) !== BID.clay) continue;
     if (getLight(x, y, z) !== 0) return; // no sky light and no block light
     const n = 1 + ((Math.random() * 4) | 0), v = MOBDEF.axolotl.variant();
@@ -142,9 +142,9 @@ function trySpawnAxolotl() {
 function spawnWarmFish(c) {
   const b = S.BB[c.biome[8 * 16 + 8]]; if (b !== S.BIO.WARM_OCEAN && b !== S.BIO.LUKEWARM_OCEAN) return;
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 23)); if (R0() > 0.25) return;
-  if (R0() < 0.3) { for (let i = 0; i < 1 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(9); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('pufferfish', x + .5, y, z + .5); } return; }
+  if (R0() < 0.3) { for (let i = 0; i < 1 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(9); if (c.blocks[BI(x, y, z)] === 27) spawnMob('pufferfish', x + .5, y, z + .5); } return; }
   const v = R0.int(TFISH_COL.length);
-  for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
+  for (let i = 0; i < 4 + R0.int(5); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 52 + R0.int(8); if (c.blocks[BI(x, y, z)] === 27) spawnMob('tropical_fish', x + .5, y, z + .5, { variant: v }); }
 }
 // glow squid (1.17): dark water at y 30 and below
 function trySpawnGlowSquid() {

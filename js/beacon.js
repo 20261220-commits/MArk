@@ -12,7 +12,7 @@ function beaconLevels(x, y, z) {
 // the beam passes through glass and other see-through blocks; stained glass tints it
 function beaconBeam(x, y, z) {
   let col = [1, 1, 1], tinted = false;
-  for (let by = y + 1; by < CH; by++) {
+  for (let by = y + 1; by < MAXY; by++) {
     const b = getBlock(x, by, z); if (!b) continue;
     if (b === BID.stained_glass || b === BID.stained_glass_pane) { const c = DYE_RGB[getMeta(x, by, z) & 15]; col = tinted ? col.map((v, i) => (v + c[i]) / 2) : c; tinted = true; continue; }
     if (OPQ[b] && b !== BID.glass) return null;

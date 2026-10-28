@@ -41,10 +41,10 @@ function findPortalNear(cx, cz, rad) {
   let best = null, bd = Infinity;
   for (const c of W.chunks.values()) {
     const x0 = c.cx * 16, z0 = c.cz * 16; if (x0 + 16 < cx - rad || x0 > cx + rad || z0 + 16 < cz - rad || z0 > cz + rad) continue;
-    for (let y = 1; y <= c.maxY; y++) for (let i = 0; i < 256; i++) {
-      if (c.blocks[(y << 8) | i] !== BID.nether_portal) continue;
-      if (c.blocks[((y - 1) << 8) | i] === BID.nether_portal) continue; // bottom row only
-      const x = x0 + (i & 15), z = z0 + (i >> 4), d = (x - cx) ** 2 + (z - cz) ** 2 + (y - PL.y) ** 2 * 0.25;
+    for (let r = 1; r <= c.maxY; r++) for (let i = 0; i < 256; i++) { // array rows
+      if (c.blocks[(r << 8) | i] !== BID.nether_portal) continue;
+      if (c.blocks[((r - 1) << 8) | i] === BID.nether_portal) continue; // bottom row only
+      const y = r + MINY, x = x0 + (i & 15), z = z0 + (i >> 4), d = (x - cx) ** 2 + (z - cz) ** 2 + (y - PL.y) ** 2 * 0.25;
       if (d < bd) { bd = d; best = [x, y, z]; }
     }
   }
@@ -53,7 +53,7 @@ function findPortalNear(cx, cz, rad) {
 // Java-style portal placement: look for a flat spot with headroom near the target, else carve a platform
 function buildPortal(tx, ty, tz) {
   const fits = (x, y, z) => { for (let i = -1; i <= 2; i++) for (let k = -1; k <= 1; k++) { if (!SOLID[getBlock(x + i, y - 1, z + k)] || FLUID[getBlock(x + i, y - 1, z + k)]) return false; for (let h = 0; h < 4; h++) { const b = getBlock(x + i, y + h, z + k); if (b && !REPL[b] || FLUID[b]) return false; } } return true; };
-  const ymin = W.dim === -1 ? 32 : 4, ymax = W.dim === -1 ? 118 : CH - 8;
+  const ymin = W.dim === -1 ? 32 : W.dim === 1 ? 4 : MINY + 4, ymax = W.dim === -1 ? 118 : W.dim === 1 ? 248 : MAXY - 8;
   let spot = null;
   for (let r = 0; r <= 16 && !spot; r++) for (let dx = -r; dx <= r && !spot; dx++) for (let dz = -r; dz <= r && !spot; dz++) {
     if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;

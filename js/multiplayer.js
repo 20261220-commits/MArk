@@ -312,7 +312,7 @@ function mpGuestLoad(dim) {
 function mpTileChanged(x, y, z) { const t = getTile(x, y, z); if (t) mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(x >> 4, z >> 4), tile: JSON.parse(JSON.stringify(t)) }); }
 function mpApplyTile(m, from) {
   if (m.tile && m.tile._mp) delete m.tile._mp;
-  const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15);
+  const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = BI(m.x, m.y, m.z);
   if (c) { const old = c.tiles.get(i);
     if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k];
       // arrays are filled in place: an open screen's slots point at them
@@ -344,7 +344,7 @@ function mpTileEdit(c) {
 }
 function mpTileSlots(m, from) {
   if (!Array.isArray(m.ch)) return;
-  const c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15), t = c && c.tiles.get(i);
+  const c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = BI(m.x, m.y, m.z), t = c && c.tiles.get(i);
   const msg = tile => ({ t: 'tile', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile });
   if (!t || !Array.isArray(t.items)) { if (m.tile) { if (c) mpApplyTile(msg(m.tile), from); if (MP.server || !c) mpSend(msg(m.tile)); } return; } // not here to check: the guest's copy
   if (m.ch.some(([k, before]) => k < 0 || k >= t.items.length || !mpStEq(t.items[k], before))) { mpSend({ t: 'tilefix', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile: mpJ(t), ch: m.ch }, from); return; }
@@ -419,7 +419,7 @@ function mpApplyGuestSets(l) {
     try {
       const done = [];
       for (const m of here) { if (!BLOCKS[m.id] && m.id) continue; if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) continue; setMeta(m.x, m.y, m.z, m.m); }
-        else { if (getBlock(m.x, m.y, m.z) !== m.id) { const c = chunkAt(m.x >> 4, m.z >> 4); c.tiles.delete((m.y << 8) | ((m.z & 15) << 4) | (m.x & 15)); } // what was in it the guest already dropped
+        else { if (getBlock(m.x, m.y, m.z) !== m.id) { const c = chunkAt(m.x >> 4, m.z >> 4); c.tiles.delete(BI(m.x, m.y, m.z)); } // what was in it the guest already dropped
           setBlock(m.x, m.y, m.z, m.id, m.m, { noUpdate: true }); }
         done.push(m); }
       for (const m of done) {
@@ -446,11 +446,11 @@ async function mpServeChunk(m, from) {
   const dk = DIM_PREFIX[m.dim] + m.cx + ',' + m.cz, edits = (W.meta.mpEdits && W.meta.mpEdits[dk]) || null;
   const out = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits };
   const c = m.dim === W.dim && W.chunks.get(ckey(m.cx, m.cz));
-  if (c && c.edited) Object.assign(out, { b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), tl: serTiles(c), ch: CH });
+  if (c && c.edited) Object.assign(out, { b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), tl: serTiles(c), ch: CH, my: MINY });
   else {
     const key = W.id + ':' + dk, pend = saveDone(key); if (pend) await pend;
     const rec = await dbReq('chunks', 'readonly', st => st.get(key));
-    if (rec && rec.b && rec.v >= 3) Object.assign(out, { b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), tl: rec.t || [], ch: rec.ch || CH });
+    if (rec && rec.b && rec.v >= 3) Object.assign(out, { b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), tl: rec.t || [], ch: rec.ch || CH, my: rec.my });
     else out.none = true;
   }
   const pt = W.meta.mpTiles && W.meta.mpTiles[dk]; if (pt && out.tl) { const tl = out.tl.filter(([i]) => !(i in pt)); for (const i in pt) tl.push([+i, pt[i]]); out.tl = tl; } else if (pt) out.tiles = pt;
@@ -464,8 +464,10 @@ function mpGotChunk(m) {
   if (m.edits) mpEdits.set(key, m.edits); if (m.tiles) mpTileWait.set(key, m.tiles);
   const rm = m.it && typeof itemRemapFor === 'function' ? itemRemapFor(m.it) : null; if (rm) { remapItems(m.tl, rm); remapItems(m.mobs, rm); remapItems(m.tiles, rm); }
   if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs) W.pendingMobs.set(key, m.mobs); return; } // plain terrain (with its animals): generated here
-  const n = 256 * m.ch, dec = (s, T, fill) => { const a = rleDec(mpUnB64(s, T), n, T), out = new T(CVOL); out.set(a.subarray(0, Math.min(n, CVOL))); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] });
+  const tall = m.my === MINY, n = 256 * m.ch, dec = (s, T, fill) => { const a = rleDec(mpUnB64(s, T), n, T), out = new T(tall ? CVOL : 65536); out.set(a.subarray(0, Math.min(n, out.length))); if (fill) out.fill(fill, n); return out; };
+  const d = { cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] };
+  if (!tall) liftOld(d, m.dim, Math.min(256, m.ch)); // kept by a world from before 1.18
+  W.inbox.push(d);
 }
 function mpChunkLoaded(c) {
   const host = MP.role === 'host', dk = dkey(c.cx, c.cz);
@@ -623,7 +625,7 @@ function mpStoreChunk(c) {
   if (!c.modified) return; c.modified = false;
   const dk = dkey(c.cx, c.cz); W.saved.add(dk);
   const mobs = c.mobsFresh || W.chunks.get(c.key) !== c ? c.mobs || null : chunkKeep(c, false); c.mobsFresh = false; // a chunk still here: what stands in it now
-  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
+  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, my: MINY, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
   mpSend({ t: 'store', dk, rec });
 }
 function mpPdata() {
@@ -749,7 +751,7 @@ function mpVisualArrow(e) {
   if (!e.stuck) { const nx = e.x + e.vx, ny = e.y + e.vy, nz = e.z + e.vz;
     if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { if (e.visThrown) { removeEnt(e); return; } e.stuck = true; }
     else { e.x = nx; e.y = ny; e.z = nz; e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99; } }
-  if (e.age > (e.stuck ? 200 : 300) || e.y < -20) removeEnt(e);
+  if (e.age > (e.stuck ? 200 : 300) || e.y < voidY()) removeEnt(e);
 }
 // Explosion.explode's damage to a player (the same as for the one in whose world it went off)
 function mpBlastSelf(x, y, z, power) {
@@ -906,7 +908,7 @@ function mpSeatOf(p) {
   const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
   const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
   for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart' || e.kind === 'mob')) continue;
-    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id && fresh(e.mpRideAt), back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At));
+    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id, back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At)); // (the driver's claim lapses on its own after 1.5 s without word)
     if (!drv && !back) continue;
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
     const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands

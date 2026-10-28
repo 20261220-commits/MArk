@@ -128,7 +128,7 @@ function rsTick() {
     const done = new Set();
     for (const k of keys) {
       if (done.has(k)) continue;
-      const [x, y, z] = k.split(',').map(Number); if (!isLoaded(x, z) || y < 0 || y >= CH) continue;
+      const [x, y, z] = k.split(',').map(Number); if (!isLoaded(x, z) || y < MINY || y >= MAXY) continue;
       const b = getBlock(x, y, z);
       if (b === RSB.wire) { const ch = []; const net = updateNetwork(x, y, z, ch); for (const nk of net.keys()) done.add(nk); for (let i = 0; i < ch.length; i += 3) rsNotify(ch[i], ch[i + 1], ch[i + 2]); }
       else rsComponent(x, y, z, b);
@@ -215,7 +215,7 @@ function resolveMove(sx, sy, sz, dx, dy, dz, skip) {
   const moving = new Map(), breaks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z;
   const visit = (x, y, z, pushed) => {
     const k = K(x, y, z); if (moving.has(k) || skip.has(k)) return true;
-    if (y < 0 || y >= CH || !isLoaded(x, z)) return !pushed;
+    if (y < MINY || y >= MAXY || !isLoaded(x, z)) return !pushed;
     const id = getBlock(x, y, z);
     if (!id) return true;
     if (breaksOnPush(id)) { if (pushed) breaks.set(k, [x, y, z]); return true; }
