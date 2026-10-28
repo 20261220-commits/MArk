@@ -18,11 +18,11 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const fall = count();
     setBlock(X, Y + 2, Z, 0); schedule(X, Y + 1, Z, 5);
     for (let i = 0; i < 140; i++) { UI.paused = false; await wait(100); }
-    return { spread, after, fall, fallAfter: count(), col: getBlock(X, Y + 1, Z) };
+    return { spread, after, fall, fallAfter: count(), colWater: getBlock(X, Y + 1, Z) === BID.water };
   });
   ok(r.spread.n > 50 && r.spread.far === 7, 'a source spreads exactly 7 blocks over flat ground', r.spread);
   ok(r.after.n === 0, 'removing the source dries the whole flow', r.after);
-  ok(r.fall.n > 50 && r.fall.far <= 7, 'water poured from above spreads no further', r.fall);
-  ok(r.fallAfter.n === 0 && r.col !== BID.water, 'and dries up once its source is gone', r);
+  ok(r.fall.n > 50 && r.fall.far <= 8, 'water poured from above spreads 7 from where it lands (8 from below the source, as in Java)', r.fall);
+  ok(r.fallAfter.n === 0 && !r.colWater, 'and dries up once its source is gone', r);
   ok(!p.errs.length, 'no page errors', p.errs);
 };

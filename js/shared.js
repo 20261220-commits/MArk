@@ -3,7 +3,7 @@
 const SHARED = function () {
 'use strict';
 const CW = 16, CH0 = 256, SEA = 62, CVOL0 = CW * CW * CH0; // the generators build 1.17-style columns 0..255 (genTall lifts them into the 1.18 world)
-const MINY = -64, CH = 384, MAXY = MINY + CH, CVOL = CW * CW * CH; // 1.18 world height: y -64..319, kept in arrays at index y - MINY
+const MINY = 0, CH = 256, MAXY = MINY + CH, CVOL = CW * CW * CH; // 1.17 world height: y 0..255, kept in arrays at index y - MINY (the code still works for 1.18's -64..319)
 const ATL = 512, TPR = 32; // texture atlas: 32x32 tiles of 16px
 const RT = { AIR: 0, CUBE: 1, CUTOUT: 2, CROSS: 3, FLUID: 4, TORCH: 5, BOX: 6, TRANS: 7, CROP: 8, WIRE: 9, TBOX: 10 };
 const TOOL = { NONE: 0, PICK: 1, AXE: 2, SHOVEL: 3, HOE: 4, SWORD: 5, SHEARS: 6 };
@@ -2644,7 +2644,7 @@ function deepFill(blocks, meta, seed, cx, cz) {
 function genTall(r, dim, seed, cx, cz) {
   const off = (0 - MINY) << 8, blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
   blocks.set(r.blocks, off); meta.set(r.meta, off);
-  if (dim === 0) deepFill(blocks, meta, seed, cx, cz);
+  if (dim === 0 && MINY < 0) deepFill(blocks, meta, seed, cx, cz); // only a world reaching below y 0 has the 1.18 depths
   for (const t of r.tiles) if (t.i != null) t.i += off;
   const light = new Uint8Array(CVOL); lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome: r.biome, tiles: r.tiles };

@@ -1,7 +1,7 @@
 // World: chunk storage/streaming, cross-chunk lighting, block updates, fluids,
 // random ticks and IndexedDB persistence.
 const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS, CVOL } = S; // (MINY, MAXY: items.js)
-// a block's place in a chunk's arrays: rows are world y - MINY (the 1.18 world starts at y -64)
+// a block's place in a chunk's arrays: rows are world y - MINY (0 in 1.17; the code also handles 1.18's -64)
 const BI = (x, y, z) => ((y - MINY) << 8) | ((z & 15) << 4) | (x & 15);
 const ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
@@ -40,7 +40,7 @@ function isLoaded(x, z) { return !!chunkAt(x >> 4, z >> 4); }
 function biomeAt(x, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.biome[((z & 15) << 4) | (x & 15)] : 1; }
 const biomeBase = (x, z) => S.BB[biomeAt(x, z)]; // the base biome of a 1.17 variant (taiga hills -> taiga), for spawning rules
 // the void: things below this die (Java: 64 below the bottom of the world; the Nether and the End start at y 0)
-const voidY = () => W.dim === 0 ? MINY - 64 : -64;
+const voidY = () => Math.min(MINY, 0) - 64;
 function topY(x, z) { for (let y = MAXY - 1; y > MINY; y--) { const b = getBlock(x, y, z); if (b && LOP[b] > 0) return y; } return MINY; }
 function markDirty(x, z) {
   const cx = x >> 4, cz = z >> 4, lx = x & 15, lz = z & 15;
@@ -687,24 +687,26 @@ async function loadChunk(cx, cz) {
   if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
-  const tall = rec.my === MINY, rows = tall ? CH : Math.min(256, oldH); // saved since 1.18: the -64..319 rows; before: y 0..255
-  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a, out = new T(tall ? CVOL : 256 * 256); out.set(src.subarray(0, Math.min(n, out.length))); if (fill) out.fill(fill, n); return out; };
+  const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a; return src.subarray(0, n); };
   // a record that can't be read (damaged storage, an interrupted write) is generated again instead of leaving a hole the
   // world waits on for ever
   let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data');
-    if (!tall) liftOld(d, dim, rows); }
+    fitRows(d, rec.my || 0, oldH, dim); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
   W.inbox.push(d);
 }
-// a chunk saved before 1.18 (rows were y 0..255) lifted into the -64..319 arrays: below y 0 the overworld gets its new
-// depths (deepslate, caves, deep ores; the old bedrock floor turns to deepslate, as when Java upgrades a world), the
-// containers move with their blocks, and the whole chunk is lit again
-function liftOld(d, dim, rows) {
-  const off = -MINY << 8, b = new Uint16Array(CVOL), m = new Uint8Array(CVOL);
-  b.set(d.blocks.subarray(0, rows * 256), off); m.set(d.meta.subarray(0, rows * 256), off);
-  if (dim === 0) S.deepFill(b, m, W.seed, d.cx, d.cz);
+// a chunk saved with another world height (before 1.18: y 0..255, or 128 high; 1.18: y -64..319) put into this world's
+// rows: the shared heights are copied, rows above the save are sky, rows below it are the 1.18 depths (overworld) or
+// stone; a 1.18 save loses what was below y 0 and gets back the bedrock floor at y 0..4, as a 1.17 world has
+function fitRows(d, my, ch, dim) {
+  if (my === MINY && ch === CH && d.blocks.length === CVOL) return;
+  const b = new Uint16Array(CVOL), m = new Uint8Array(CVOL), lo = Math.max(my, MINY), hi = Math.min(my + ch, MAXY);
+  if (hi > lo) { const a = (lo - my) << 8, z = (hi - my) << 8, o = (lo - MINY) << 8; b.set(d.blocks.subarray(a, z), o); m.set(d.meta.subarray(a, z), o); }
+  if (my > MINY) { if (dim === 0) S.deepFill(b, m, W.seed, d.cx, d.cz); else b.fill(BID.stone, 0, (my - MINY) << 8); }
+  else if (my < MINY && dim === 0 && MINY === 0) { const R = S.rng(S.hash32(W.seed, d.cx, d.cz, 1717)); for (let i = 0; i < 256; i++) for (let y = 0; y < 5; y++) if (y === 0 || R() < (5 - y) / 5) { b[(y << 8) | i] = BID.bedrock; m[(y << 8) | i] = 0; } }
+  const shift = (my - MINY) << 8;
   d.blocks = b; d.meta = m; d.light = new Uint8Array(CVOL); S.lightChunk(b, d.light, m);
-  d.tileList = d.tileList.map(([i, t]) => [i + off, t]); d.lifted = true; // saved again in the new layout
+  d.tileList = d.tileList.map(([i, t]) => [i + shift, t]).filter(([i]) => i >= 0 && i < CVOL); d.lifted = true; // saved again in this layout
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first

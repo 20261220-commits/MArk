@@ -792,11 +792,11 @@ function trySpawnHostile() {
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
     if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
-    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // down to the bottom of the world
-    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
+    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : MINY + 1 + Math.floor(Math.random() * (top - MINY));
+    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
-    if (sky > 7 || blk > 0) continue; // 1.18: monsters only where no block light reaches
+    if (Math.max(sky, blk) > 7) continue; // 1.17: monsters spawn at light 7 or less
     if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
     const types = ['zombie', 'skeleton', 'creeper', 'spider'];
     const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);

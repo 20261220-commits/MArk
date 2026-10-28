@@ -55,7 +55,7 @@ function raycast(reach, fluids) {
   let best = null;
   for (let i = 0; i < 64; i++) {
     const id = getBlock(x, y, z);
-    if (id && (!FLUID[id] || (fluids && getMeta(x, y, z) === 0))) {
+    if (id && (!FLUID[id] || (fluids && (fluids === 'any' || getMeta(x, y, z) === 0)))) { // 'any': flowing water too (boats)
       const m = getMeta(x, y, z), boxes = FLUID[id] ? [[0, 0, 0, 16, 14, 16]] : (selShape(id, m) || [[0, 0, 0, 16, 16, 16]]);
       for (const b of boxes) {
         const h = rayBox(ox, oy, oz, dx, dy, dz, [x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16]);
@@ -79,8 +79,6 @@ function raycast(reach, fluids) {
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
-// caves & cliffs: from the build limit to the bottom of the world, landing alive (in water too)
-function fallLanded() { if (PL.fallDist > 0 && PL.fallFrom >= 319 && PL.y < -58.5 && typeof advGrant === 'function') setTimeout(() => { if (PL.health > 0) advGrant('adventure/fall_from_world_height'); }, 0); }
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
@@ -234,7 +232,7 @@ function playerTick() {
     const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
     PL.vx *= fr; PL.vz *= fr; PL.vy *= fr; PL.vy -= 0.02;
     if (PL.hitH && noCollision(PL.x + PL.vx, PL.y + 0.6, PL.z + PL.vz) && !fluidAt(PL.x, PL.y + 1.2, PL.z)) PL.vy = 0.3; // climb out of water onto a ledge
-    fallLanded(); PL.fallDist = 0;
+    PL.fallDist = 0;
   } else {
     const slipB = blockUnder(), sl = BLOCKS[slipB] && BLOCKS[slipB].slip, slip = PL.onGround ? (sl === 2 ? 0.989 : sl ? 0.98 : 0.6) : 1;
     const fr = slip * 0.91;
@@ -270,7 +268,6 @@ function playerTick() {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
       if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
-      fallLanded();
       PL.fallDist = 0;
     } else if (PL.y < oy) { if (!PL.fallDist) PL.fallFrom = oy; PL.fallDist += oy - PL.y; }
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
@@ -336,7 +333,8 @@ function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
   offhandTick();
   const held = PL.held();
-  TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
+  const boat = held && (ITEMS[held.id].boat || held.id === IID.oak_boat);
+  TARGET = raycast(boat ? Math.max(5, reach()) : reach(), boat ? 'any' : held && (held.id === IID.bucket || held.id === IID.glass_bottle || held.id === IID.lily_pad)); // a boat aims at any water, 5 blocks as in Java
   if (MINE.cd > 0) MINE.cd--;
   if (USE.placeCd > 0) USE.placeCd--;
   // mining
@@ -656,7 +654,7 @@ function useItem(first) {
         if (!tryLightPortal(px, py, pz)) { if (!SOLID[getBlock(px, py - 1, pz)] && !N6.some(([a, b2, c]) => BLOCKS[getBlock(px + a, py + b2, pz + c)].log)) return; setBlock(px, py, pz, BID.fire); }
         play(h.id === IID.fire_charge ? 'fireball' : 'ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return;
       }
-      if (h.id === IID.oak_boat) { const fl = FLUID[id] === 1; const bx = x + (fl ? 0 : t.nx) + .5, by = fl ? y + 0.9 : y + t.ny + (t.ny > 0 ? 0 : 0), bz = z + (fl ? 0 : t.nz) + .5; if (!fl && t.ny !== 1) return; placeBoat(bx, fl ? y + 0.88 : y + 1, bz, PL.yaw); consume(); swing(); return; }
+      if (h.id === IID.oak_boat) { if (useBoat(t, 'oak')) { consume(); swing(); } return; }
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
       if (h.id === IID.end_crystal) { if (placeEndCrystal(t)) { consume(); swing(); } return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
@@ -673,13 +671,28 @@ function useItem(first) {
       if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle || d.splash || d.lingering) { throwItem(h.id); return; }
       if (h.id === IID.fishing_rod) { useRod(); return; }
       if (d.cart) { placeMinecart(t, d); return; }
-      if (ITEMS[h.id].boat) { const fl = FLUID[id] === 1; if (!fl && t.ny !== 1) return; placeBoat(x + (fl ? 0 : t.nx) + .5, fl ? y + 0.88 : y + 1, z + (fl ? 0 : t.nz) + .5, PL.yaw, ITEMS[h.id].boat); consume(); swing(); return; }
+      if (ITEMS[h.id].boat) { if (useBoat(t, ITEMS[h.id].boat)) { consume(); swing(); } return; }
       if (d.place != null) { placeBlock(t, d); return; }
     }
   } else if (d && h.id === IID.fishing_rod) { useRod(); return; }
   else if (d && bottleUse(null, h)) return;
   else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle || d.splash || d.lingering)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
   else if (d && h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
+}
+// a boat goes where the player looks (Java): on the water's surface, or on the face that was hit, facing the player's
+// way, and only if it fits there without being inside a block
+function useBoat(t, wood) {
+  const [dx, dy, dz] = lookDir(), ey = PL.y + PL.eyeH;
+  let px = PL.x + dx * t.t, py = ey + dy * t.t, pz = PL.z + dz * t.t;
+  if (FLUID[t.id]) { let wy = t.y; while (FLUID[getBlock(t.x, wy + 1, t.z)] === 1) wy++; if (FLUID[t.id] !== 1) return false; py = wy + 0.88; } // floats on top of the column, never under it
+  else if (t.ny === 1) py = t.y + 1;
+  else if (t.ny === -1) return false;
+  const hw = FLUID[t.id] ? 0.25 : 0.6, cell = v => Math.floor(v); // on water only its middle must be free: the bank pushes it off
+  for (let bx = cell(px - hw); bx <= cell(px + hw); bx++) for (let by = cell(py + 0.05); by <= cell(py + 0.5); by++) for (let bz = cell(pz - hw); bz <= cell(pz + hw); bz++) {
+    const b = getBlock(bx, by, bz); if (b && SOLID[b] && !FLUID[b]) return false;
+  }
+  placeBoat(px, py, pz, PL.yaw, wood);
+  return true;
 }
 function throwItem(id) {
   const [dx, dy, dz] = lookDir();

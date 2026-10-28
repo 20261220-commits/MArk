@@ -2,13 +2,17 @@
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
+let GUI_S = 2; // the GUI scale (--s), kept here so drawing an icon never forces a style recalculation
+// HUD writes only when the value really changes (it is refreshed often but rarely differs)
+const setHtml = (el, h) => { if (el._h !== h) { el._h = h; el.innerHTML = h; } };
+const setStyle = (el, k, v) => { if (el.style[k] !== v) el.style[k] = v; };
 const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, dynLight: true, gui: 0, autoRes: true, showFps: false, coords: true, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
   R.rd = OPT.rd; R.fov = OPT.fov; R.gamma = OPT.gamma / 100; R.cloudsOn = OPT.clouds; setVolume(OPT.vol / 100);
   const s = OPT.gui || (innerWidth < 760 || innerHeight < 520 ? 1.5 : innerWidth > 1700 && innerHeight > 1000 ? 3 : 2);
-  document.documentElement.style.setProperty('--s', s);
+  document.documentElement.style.setProperty('--s', s); GUI_S = s;
   if (!OPT.autoRes) { R.pixelScale = 1; R.resize(); }
 }
 addEventListener('resize', () => applyOpt());
@@ -65,7 +69,7 @@ function applyGuiPack() {
 }
 function icon(id, n, d, e) {
   if (!id) return '';
-  const def = ITEMS[id], st = iconStyle(id, 16 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 2));
+  const def = ITEMS[id], st = iconStyle(id, 16 * GUI_S);
   let s = `<i class="ic" style="${st}"></i>`;
   if (e || (def && def.glint)) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
@@ -81,18 +85,16 @@ function buildHud() {
 let lastHeld = -2, heldNameT = 0;
 function renderHud(dt) {
   const surv = PL.mode === 'survival' || PL.mode === 'hardcore' || PL.mode === 'adventure';
-  $('bars').hidden = !surv; $('xpbar').hidden = !surv && PL.mode !== 'creative';
-  if (PL.mode === 'creative') $('xpbar').hidden = true;
-  $('hud').hidden = UI.hideHud || PL.mode === 'spectator' && false;
-  $('hotbar').hidden = PL.mode === 'spectator';
+  const xpHide = !surv || PL.mode === 'creative', hudHide = !!UI.hideHud, hbHide = PL.mode === 'spectator', hs0 = '' + surv + xpHide + hudHide + hbHide;
+  if (UI.hudState !== hs0) { UI.hudState = hs0; $('bars').hidden = !surv; $('xpbar').hidden = xpHide; $('hud').hidden = hudHide; $('hotbar').hidden = hbHide; } // DOM writes only on a change
   const h = PL.held(), hid = h ? h.id : 0;
   if (hid !== lastHeld) { lastHeld = hid; heldNameT = 2.5; $('heldName').textContent = hid ? itemName(hid) : ''; }
-  heldNameT -= dt; $('heldName').style.opacity = Math.max(0, Math.min(1, heldNameT));
-  $('hsel').style.transform = `translateX(calc(${INV.sel} * 20px * var(--s)))`;
+  heldNameT -= dt; setStyle($('heldName'), 'opacity', '' + Math.max(0, Math.min(1, Math.round(heldNameT * 20) / 20)));
+  setStyle($('hsel'), 'transform', `translateX(calc(${INV.sel} * 20px * var(--s)))`);
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; hs[i].innerHTML = s ? icon(s.id, s.n, s.d, s.e) : ''; }
+  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; setHtml(hs[i], s ? icon(s.id, s.n, s.d, s.e) : ''); }
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
@@ -100,15 +102,15 @@ function renderHud(dt) {
     const full = SPR_HUD[kind], halfS = kind === 'heart' ? SPR_HUD.half : SPR_HUD[kind + 'Half'];
     for (let i = 0; i < plMaxHp() / 2; i++) { const v = hp - i * 2; hearts.push(`<img src="${v >= 2 ? full : v === 1 ? halfS : SPR_HUD.empty}" class="${PL.health <= 4 ? 'shake' : ''}" style="--d:${(i * 37) % 7}">`); }
     if (PL.absorb > 0) { const ab = Math.ceil(PL.absorb); for (let i = 0; i < Math.ceil(ab / 2); i++) hearts.push(`<img src="${ab - i * 2 >= 2 ? SPR_HUD.gold : SPR_HUD.goldHalf}">`); }
-    $('hearts').innerHTML = hearts.join('');
+    setHtml($('hearts'), hearts.join(''));
     const hu = effLv(PL, 'hunger') ? 'hunger' : 'food';
     const fd = []; for (let i = 0; i < 10; i++) { const v = PL.food - i * 2; fd.push(`<img src="${v >= 2 ? SPR_HUD[hu] : v === 1 ? SPR_HUD[hu + 'Half'] : SPR_HUD[hu + 'Empty']}" class="${PL.sat <= 0 && PL.food < 20 && W.tickN % 2 ? 'jit' : ''}">`); }
-    $('food').innerHTML = fd.join('');
+    setHtml($('food'), fd.join(''));
     const [ap] = armorPoints(); const ar = [];
     if (ap > 0) for (let i = 0; i < 10; i++) { const v = ap - i * 2; ar.push(`<img src="${v >= 2 ? SPR_HUD.armor : v === 1 ? SPR_HUD.armorHalf : SPR_HUD.armorEmpty}">`); }
-    $('armorbar').innerHTML = ar.join('');
+    setHtml($('armorbar'), ar.join(''));
     const air = []; if (PL.air < 300) { const full = Math.floor(Math.max(0, PL.air) * 10 / 300), pop = Math.ceil(Math.max(0, PL.air) * 10 / 300) - full; for (let i = 0; i < full; i++) air.push(`<img src="${SPR_HUD.bubble}">`); if (pop) air.push(`<img src="${SPR_HUD.pop}">`); }
-    $('air').innerHTML = air.join('');
+    setHtml($('air'), air.join(''));
   }
   $('xpbar').firstElementChild.style.width = (PL.xpP * 100) + '%';
   $('xplvl').textContent = PL.level > 0 ? PL.level : '';
@@ -137,7 +139,7 @@ function renderDebug(dt, fps) {
   const P = typeof PERF !== 'undefined' ? PERF : null, ms = k => P && P.n ? (P[k] / P.n).toFixed(1) : '-';
   const perf = `틱 ${ms('tick')}ms · 청크 ${ms('stream')}+${ms('inbox')}ms · 렌더 ${ms('render')}ms`;
   if (P) { for (const k in P) P[k] = 0; }
-  el.textContent = `네모 대륙 1.18 (Java Edition 스타일)\n${fps} fps · ${perf} · 해상도 ${Math.round(R.pixelScale * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${(() => { const cb = W.dim === 0 ? S.caveBiomeAt(W.seed, bx, Math.floor(PL.y), bz, topY(bx, bz), W.exp) : -1; const b = cb >= 0 ? cb : biomeAt(bx, bz); return S.BIOMES[b][0] + ' (minecraft:' + S.BIOMES[b][8] + ')'; })()}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
+  el.textContent = `네모 대륙 1.17 (Java Edition 스타일)\n${fps} fps · ${perf} · 해상도 ${Math.round(R.pixelScale * R.basePR * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${(() => { const cb = W.dim === 0 ? S.caveBiomeAt(W.seed, bx, Math.floor(PL.y), bz, topY(bx, bz), W.exp) : -1; const b = cb >= 0 ? cb : biomeAt(bx, bz); return S.BIOMES[b][0] + ' (minecraft:' + S.BIOMES[b][8] + ')'; })()}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
 }
 
 // ---------- container screens ----------
@@ -283,7 +285,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(ACC.user.name)}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : '로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(ACC.user.name)}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : '로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {

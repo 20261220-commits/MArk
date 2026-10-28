@@ -242,7 +242,7 @@ function tradeTake(c) {
   const o = villagerOffers(c.e)[c.sel], p = c.items[0];
   p.n -= tradePrice(o); if (p.n <= 0) c.items[0] = null;
   o.uses++; if (o.ench) o.e = null; o.made = null; c.e.traded = true; // the villager keeps its job from now on
-  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade'); if (PL.y >= 319 && typeof advGrant === 'function') advGrant('adventure/trade_at_world_height'); stat('traded_with_villager'); if (c.e) c.e.rep = Math.min(150, (c.e.rep || 0) + 2); // trading gossip
+  play('trade'); spawnXP(PL.x, PL.y + 1, PL.z, 3 + Math.floor(Math.random() * 4)); UI.advance('trade'); stat('traded_with_villager'); if (c.e) c.e.rep = Math.min(150, (c.e.rep || 0) + 2); // trading gossip
   // refill the payment slot from the inventory, like Java does after a trade
   if (!c.items[0] && INV.count(o.a) > 0) { const n = Math.min(INV.count(o.a), maxStack(o.a)); INV.remove(o.a, n); c.items[0] = { id: o.a, n }; }
 }

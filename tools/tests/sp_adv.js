@@ -17,15 +17,9 @@ module.exports = async ({ ok, srv, b, lib }) => {
     // a bastion's own loot chest, opened for the first time; a chest someone placed doesn't count
     setBlock(X + 3, Y, Z + 3, BID.chest); setTile(X + 3, Y, Z + 3, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x: X + 3, y: Y, z: Z + 3 }); UI.closeScreen(); o.lootPlaced = advDone('nether/loot_bastion');
     setBlock(X + 5, Y, Z + 3, BID.chest); setTile(X + 5, Y, Z + 3, { type: 'chest', items: new Array(27).fill(null), lt: 'bastion_treasure' }); UI.openScreen('chest', { x: X + 5, y: Y, z: Z + 3 }); UI.closeScreen(); o.lootBastion = advDone('nether/loot_bastion'); o.ltGone = getTile(X + 5, Y, Z + 3).lt === undefined;
-    // 1.18: falling from the build limit to the bottom of the world, a jukebox in a meadow, a trade at the build limit; adventuring time takes the 1.18 biomes
+    // 1.17: new worlds use the 1.17 generator and the 1.17 advancements only
     o.gen = W.gen; o.atHasMeadow = ADVM['adventure/adventuring_time'].crit.includes('meadow');
-    const fx = X + 8, fz = Z + 8; for (let y = 318; y > -60; y--) { setBlock(fx, y, fz, 0); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) setBlock(fx + dx, y, fz + dz, BID.glass); } setBlock(fx, -61, fz, BID.water); setBlock(fx, -62, fz, BID.stone); setBlock(fx, -60, fz, 0);
-    setBlock(fx, -60, fz, BID.hay_block); setBlock(fx, -61, fz, BID.stone);
-    PL.mode = 'creative'; PL.x = fx + .5; PL.z = fz + .5; PL.y = 319.5; PL.vy = 0; PL.fallDist = 0; PL.onGround = false; PL.flying = false; PL.mode = 'survival'; PL.health = 20;
-    const dmg0 = hurtPlayer; hurtPlayer = function () {}; for (let i = 0; i < 400 && !(PL.onGround && PL.y < -50); i++) { UI.paused = false; PL.x = fx + .5; PL.z = fz + .5; await wait(20); } hurtPlayer = dmg0; await wait(50);
-    o.fellTo = PL.y; o.from = PL.fallFrom; o.caves = advDone('adventure/fall_from_world_height');
-    const bm = biomeAt(X - 4, Z), ch = chunkAt((X - 4) >> 4, Z >> 4); ch.biome.fill(S.BIOK.meadow); setBlock(X - 4, Y, Z, BID.jukebox); use('music_disc_cat', { x: X - 4, y: Y, z: Z, nx: 0, ny: 1, nz: 0 }); o.meadow = advDone('adventure/play_jukebox_in_meadows'); ch.biome.fill(bm);
-    o.ids = ['adventure/trade_at_world_height', 'adventure/fall_from_world_height', 'adventure/play_jukebox_in_meadows'].every(id => ADVM[id]);
+    o.ids = !['adventure/trade_at_world_height', 'adventure/fall_from_world_height', 'adventure/play_jukebox_in_meadows'].some(id => ADVM[id]); o.minY = S.MINY; o.maxY = S.MAXY;
     return o; });
   ok(!r.candleWax && r.honeycombWax, 'stacking candles is not "Wax On"; honeycomb on copper is', r);
   ok(r.uneasy && !r.sender, 'a ghast killed with a sword in the Overworld: "Uneasy Alliance" yes, "Return to Sender" no', r);
@@ -33,8 +27,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.killNoLoot, 'kills count with doMobLoot off');
   ok(!r.beaconFar && r.beaconNear, 'a beacon counts for players near it when it lights up', r);
   ok(!r.lootPlaced && r.lootBastion && r.ltGone, 'only a bastion\'s own loot chest counts, once', r);
-  ok(r.gen === 3 && r.atHasMeadow && r.ids, 'new worlds are 1.18 (gen 3) and have the 1.18 advancements', r);
-  ok(r.fellTo < -55 && r.caves, '"Caves & Cliffs": from the build limit to the bottom of the world', r);
-  ok(r.meadow, '"Sound of Music": a jukebox playing in a meadow', r);
+  ok(r.gen === 2 && !r.atHasMeadow && r.ids && r.minY === 0 && r.maxY === 256, 'new worlds are 1.17 (y 0..255, gen 2) without the 1.18 advancements', r);
   ok(!p.errs.length, 'no page errors', p.errs);
 };

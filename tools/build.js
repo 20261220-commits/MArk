@@ -1,4 +1,4 @@
-// Builds dist/nemo-1.18.html: one self-contained file (scripts, three.js and the
+// Builds dist/nemo-1.17.html: one self-contained file (scripts, three.js and the
 // pixel font inlined) that runs offline, e.g. opened straight from a Chromebook's Downloads.
 // Usage: node tools/build.js
 const fs = require('fs'), path = require('path');
@@ -10,6 +10,6 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => {
 });
 html = html.replace(/url\('(fonts\/[^']+\.woff2)'\)/g, (m, f) => `url('data:font/woff2;base64,${fs.readFileSync(path.join(root, f)).toString('base64')}')`);
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-const out = path.join(root, 'dist', 'nemo-1.18.html');
+const out = path.join(root, 'dist', 'nemo-1.17.html');
 fs.writeFileSync(out, html);
 console.log('wrote', path.relative(root, out), (fs.statSync(out).size / 1024).toFixed(0) + ' KB');

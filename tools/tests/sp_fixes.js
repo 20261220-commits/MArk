@@ -31,7 +31,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     setBlock(...parts.head, 0); setBlock(...parts.foot, 0); PL.inv = 0; hurtPlayer(100, 'kill'); respawn(); o.resp2 = { spawn: PL.spawn, at: [Math.floor(PL.x), Math.floor(PL.z)], ws: [W.worldSpawn[0], W.worldSpawn[2]] };
     // armour wears from a hit, an elytra doesn't
     PL.x = X + .5; PL.y = Y; PL.z = Z + .5; INV.armor = [{ id: IID.iron_helmet, n: 1 }, { id: IID.elytra, n: 1 }, null, null]; PL.inv = 0; PL.health = 20; hurtPlayer(8, 'mob'); o.wear = INV.armor.map(s => s && (s.d || 0));
-    // a furnace lights up where it stands (tile rows count from y -64)
+    // a furnace lights up where it stands (tile rows count from the bottom of the world)
     setBlock(X + 4, Y, Z - 5, BID.furnace); setTile(X + 4, Y, Z - 5, { ...newFurnace(), items: [{ id: IID.raw_iron, n: 2 }, { id: IID.coal, n: 1 }, null] }); await run(40);
     o.furnace = { here: BLOCKS[getBlock(X + 4, Y, Z - 5)].key, above: getBlock(X + 4, Y + 64, Z - 5) };
     // water spilt over a ledge dries up once its source is taken back (a dying level 8 used to turn into falling water)
@@ -43,7 +43,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     // sneaking onto the edge of a block in the air, still moving outward: you stay on it
     { const sx = X, sy = Y + 40, sz = Z + 20; setBlock(sx, sy - 1, sz, BID.stone); PL.x = sx + .5; PL.y = sy + 1.2; PL.z = sz + .5; PL.vx = PL.vy = PL.vz = 0; PL.onGround = false; PL.fallDist = 0; PL.yaw = 0; IN.sneak = true; IN.f = 1; await run(40); IN.f = 0; IN.sneak = false; o.edge = +(PL.y - sy).toFixed(2); PL.x = X + .5; PL.y = Y; PL.z = Z + .5; }
     // the build limit
-    const fl = []; const f0 = UI.flash; UI.flash = t => { fl.push(t); }; INV.slots[INV.sel] = { id: IID.stone, n: 4 }; PL.y = 318; TARGET = { type: 'block', x: X, y: 319, z: Z, id: BID.stone, m: 0, nx: 0, ny: 1, nz: 0, t: 2 }; setBlock(X, 319, Z, BID.stone); USE.placeCd = 0; useItem(true); UI.flash = f0; o.limit = fl; setBlock(X, 319, Z, 0);
+    const fl = []; const f0 = UI.flash; UI.flash = t => { fl.push(t); }; INV.slots[INV.sel] = { id: IID.stone, n: 4 }; PL.y = S.MAXY - 2; TARGET = { type: 'block', x: X, y: S.MAXY - 1, z: Z, id: BID.stone, m: 0, nx: 0, ny: 1, nz: 0, t: 2 }; setBlock(X, S.MAXY - 1, Z, BID.stone); USE.placeCd = 0; useItem(true); UI.flash = f0; o.limit = fl; o.maxY = S.MAXY; setBlock(X, S.MAXY - 1, Z, 0);
     return o; });
   ok(r.glassDrops.length === 0, 'glass, panes and stained panes drop nothing without silk touch', r.glassDrops);
   ok(!r.onCactus.includes('stick'), 'an item dropped on a cactus is destroyed', r.onCactus);
@@ -60,6 +60,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.water[0] > 5 && r.water[1] === 0, 'spilt water dries up when its source is gone', r.water);
   ok(r.lavaItem, 'an item thrown into lava burns');
   ok(r.edge === 0, 'sneaking onto a block edge in the air keeps you on it', r.edge);
-  ok(r.limit.some(t => /320/.test(t)), 'building at the top says the limit', r.limit);
+  ok(r.limit.some(t => t.includes(String(r.maxY))), 'building at the top says the limit', r.limit);
   ok(!p.errs.length, 'no page errors', p.errs);
 };

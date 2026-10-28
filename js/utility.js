@@ -124,6 +124,5 @@ function jukeboxUse(x, y, z, h) {
   if (!h || !ITEMS[h.id].disc) return false;
   t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
   UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z);
-  if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
   return true;
 }

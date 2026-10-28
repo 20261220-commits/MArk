@@ -12,10 +12,34 @@ const fog = new THREE.Fog(0x8ec5ff, 60, 100); scene.fog = fog;
 THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n\tvec3 fogRel = vec3( dot( viewMatrix[0].xyz, mvPosition.xyz ), dot( viewMatrix[1].xyz, mvPosition.xyz ), dot( viewMatrix[2].xyz, mvPosition.xyz ) );\n\tfogDepth = max( length( fogRel.xz ), abs( fogRel.y ) );\n#endif';
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 1000); camera.rotation.order = 'YXZ';
 R.renderer = renderer; R.scene = scene; R.camera = camera;
-R.pixelScale = 1; R.basePR = Math.min(window.devicePixelRatio || 1, 1);
+// sharp on high-density screens (Chromebooks are mostly 1.25-2x): up to 2 device pixels per CSS pixel; the automatic
+// resolution starts at 1x and climbs while the frame rate allows it, and drops again as soon as it doesn't
+R.basePR = Math.min(window.devicePixelRatio || 1, 2); R.pixelScale = 1 / R.basePR; R.resUp = 0;
 
 const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false; atlasTex.flipY = false;
+// mipmaps for the block atlas, so distant ground doesn't shimmer: each level halves every 16x16 tile on its own (the 2x2
+// boxes never cross a tile until a tile is one pixel), cut-out pixels (leaves, glass) keep their coverage, tinted pixels
+// (grass, leaves: alpha 240) keep their tint marker and see-through ones (water) their alpha. Up close stays pixel-sharp.
+function halveRGBA(src, size) {
+  const n = size >> 1, out = new Uint8ClampedArray(n * n * 4);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    let r = 0, g = 0, b = 0, a = 0, cnt = 0, tint = 0;
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const o = ((y * 2 + j) * size + x * 2 + i) * 4, al = src[o + 3]; if (al < 128) continue; r += src[o]; g += src[o + 1]; b += src[o + 2]; a += al; cnt++; if (al < 248) tint++; }
+    if (cnt < 2) continue; // mostly holes: a hole
+    const d = (y * n + x) * 4, av = a / cnt; out[d] = r / cnt; out[d + 1] = g / cnt; out[d + 2] = b / cnt; out[d + 3] = tint * 2 >= cnt ? Math.min(av, 240) : Math.max(av, 250);
+  }
+  return out;
+}
+function buildAtlasMips() {
+  if (!PACKPX.data) return; // the procedural fallback redraws the whole atlas as it animates: no mipmaps there
+  const mips = [atlasCanvas]; let src = AD, size = S.ATL;
+  while (size > 1) { const px = halveRGBA(src, size), n = size >> 1, c = document.createElement('canvas'); c.width = c.height = n; c.getContext('2d').putImageData(new ImageData(px, n, n), 0, 0); mips.push(c); src = px; size = n; }
+  atlasTex.mipmaps = mips; atlasTex.minFilter = THREE.NearestMipmapLinearFilter;
+  atlasTex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); // ground seen at a low angle stays sharp
+  atlasTex.needsUpdate = true;
+}
+R.buildAtlasMips = buildAtlasMips;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
   map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
@@ -208,7 +232,7 @@ const pMat = new THREE.ShaderMaterial({
 const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene.add(points);
 const parts = []; // {x,y,z,vx,vy,vz,life,size,u,v,r,g,b,grav}
 R.particles = parts;
-function spawnParticle(p) { if (parts.length >= PMAX) parts.shift(); parts.push(p); }
+function spawnParticle(p) { if (parts.length >= PMAX) parts[(Math.random() * PMAX) | 0] = p; else parts.push(p); } // a full pool: one replaced at random (shift() moved them all)
 // a loaded jar/pack's particle sprites (particle/*.png, 8x8 each) in a 16x16 sheet; each kind lists its frames as Java's particle json does
 const seq = (n, a, b) => { const r = []; for (let i = a; a <= b ? i <= b : i >= b; i += a <= b ? 1 : -1) r.push(n + '_' + i); return r; };
 const PKINDS = { smoke: seq('generic', 7, 0), portal: seq('generic', 0, 7), heart: ['heart'], angry: ['angry'], happy: ['glint'], note: ['note'], crit: ['critical_hit'], magic: ['enchanted_hit'],
@@ -245,19 +269,23 @@ function simpleParticle(x, y, z, col, opts = {}) {
     if (!['smoke', 'portal', 'effect', 'spell', 'explosion', 'big_smoke', 'spark'].includes(opts.kind)) { p.r = p.g = p.b = 1; if (opts.kind === 'note') { p.r = col[0]; p.g = col[1]; p.b = col[2]; } } } // most sprites carry their own colour
 }
 R.blockParticles = blockParticles; R.simpleParticle = simpleParticle;
+let pLastN = 0;
+const pAttrs = ['position', 'puv', 'psize', 'pcol'].map(k => pGeo.attributes[k]);
 function updateParticles(dt) {
   let n = 0;
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; }
+  for (let i = 0; i < parts.length;) { // one pass: move, drop the dead ones (swapped with the last: no splice), fill the buffers
+    const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
     if (p.fade) { const k = Math.min(1, Math.max(0, 1 - p.life / p.life0) * 1.6); p.r = p.c0[0] + (p.fade[0] - p.c0[0]) * k; p.g = p.c0[1] + (p.fade[1] - p.c0[1]) * k; p.b = p.c0[2] + (p.fade[2] - p.c0[2]) * k; } // firework fade: the colour shifts over its life
     p.vy -= 18 * p.grav * dt; p.vx *= 0.96; p.vz *= 0.96;
     const nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
     if (p.grav && SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { p.vy = 0; p.vx *= 0.5; p.vz *= 0.5; } else { p.x = nx; p.y = ny; p.z = nz; }
+    if (p.frames) { const f = p.frames[Math.min(p.frames.length - 1, Math.floor((1 - p.life / p.life0) * p.frames.length))]; p.u = f[0]; p.v = f[1]; }
+    pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b;
+    n++; i++;
   }
-  for (const p of parts) { if (p.frames) { const f = p.frames[Math.min(p.frames.length - 1, Math.floor((1 - p.life / p.life0) * p.frames.length))]; p.u = f[0]; p.v = f[1]; }
-    pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = p.z; pUV[n * 2] = p.u; pUV[n * 2 + 1] = p.v; pSize[n] = p.size; pCol[n * 3] = p.r; pCol[n * 3 + 1] = p.g; pCol[n * 3 + 2] = p.b; n++; }
-  pGeo.setDrawRange(0, n);
-  for (const k of ['position', 'puv', 'psize', 'pcol']) pGeo.attributes[k].needsUpdate = true;
+  if (!n && !pLastN) return; // nothing on screen before or now: no upload
+  pGeo.setDrawRange(0, n); pLastN = n;
+  for (const a of pAttrs) { a.updateRange.offset = 0; a.updateRange.count = n * a.itemSize; a.needsUpdate = true; } // only the live part goes to the GPU
 }
 
 // ---------- rain / snow (WorldRenderer.renderWeather: a textured quad per column around the camera, facing it) ----------
@@ -460,7 +488,10 @@ function stepAnimation(dt) {
   if (!PACKPX.data) { animateAtlas(0.1); atlasTex.needsUpdate = true; return; } // procedural fallback
   if (!animTiles.length) for (const k in PACKPX.anim) { const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' ? 2 : 1 }); }
   animIdx++;
-  for (const a of animTiles) { if (animIdx % a.slow) continue; a.data.set(animFrame(a.k, (animIdx / a.slow) | 0)); a.tex.needsUpdate = true; renderer.copyTextureToTexture(a.pos, a.tex, atlasTex); }
+  for (const a of animTiles) { if (animIdx % a.slow) continue; a.data.set(animFrame(a.k, (animIdx / a.slow) | 0)); a.tex.needsUpdate = true; renderer.copyTextureToTexture(a.pos, a.tex, atlasTex);
+    if (atlasTex.mipmaps && atlasTex.mipmaps.length) { // the same frame into the smaller levels (8, 4, 2, 1 pixels)
+      if (!a.mips) a.mips = [1, 2, 3, 4].map(l => { const n = 16 >> l; return { l, n, tex: new THREE.DataTexture(new Uint8Array(n * n * 4), n, n, THREE.RGBAFormat), pos: new THREE.Vector2(a.pos.x >> l, a.pos.y >> l) }; });
+      let src = a.data, size = 16; for (const m of a.mips) { const px = halveRGBA(src, size); m.tex.image.data.set(px); m.tex.needsUpdate = true; renderer.copyTextureToTexture(m.pos, m.tex, atlasTex, m.l); src = px; size = m.n; } } }
 }
 R.stepAnimation = stepAnimation;
 R.itemMesh = itemMesh; R.blockGeometry = blockGeometry; R.blockMaterial = blockMaterial; R.setMeshLight = setMeshLight; R.renderBlockIcons = renderBlockIcons;
@@ -592,7 +623,7 @@ function renderFrame(dt, eye, under) {
   moon.position.copy(camera.position).addScaledVector(sunDir, -300); moon.lookAt(camera.position);
   sun.material.opacity = moon.material.opacity = 1 - W.rain;
   stars.position.copy(camera.position); starMat.opacity = Math.max(0, 1 - day * 1.6) * (1 - W.rain); stars.rotation.z = ang;
-  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 192.33, camera.position.z); // 1.18 cloud height
+  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 128.33, camera.position.z); // 1.17 cloud height
   cloudTex.offset.set((camera.position.x / 768) * cloudTex.repeat.x + (W.time + (W.tickFrac || 0)) * 0.03 / 768 * cloudTex.repeat.x, (-camera.position.z / 768) * cloudTex.repeat.y); // clouds drift 0.03 blocks a tick, like Java
   { const tg = performance.now() / 1000; glintTex.offset.set((tg * 0.125) % 1, (tg * 0.0625) % 1); } // ~8 s per pass like Java
   if (R.moonPhases) { const ph = Math.floor(W.time / 24000) % 8; moonTex.offset.set((ph % 4) / 4, ph < 4 ? 0.5 : 0); }
