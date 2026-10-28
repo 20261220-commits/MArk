@@ -458,7 +458,7 @@ function ambientParticles(dt, px, py, pz) {
 function autoRes() {
   if (!OPT.autoRes || !W.active || UI.paused) return;
   const old = R.pixelScale;
-  const lo = 0.5 / R.basePR; // down to half the screen's CSS resolution on a struggling device, up to its full density
+  const lo = 0.5; // down to half the screen's CSS resolution on a struggling device, up to its full density
   // every change reallocates the frame buffer (a small hitch), so it climbs only after 3 steady seconds, in bigger steps
   if (fps < 40 && R.pixelScale > lo) { R.pixelScale = Math.max(lo, R.pixelScale - 0.1); R.resUp = 0; }
   else if (fps >= 57 && R.pixelScale < 1) { if (++R.resUp >= 3) { R.resUp = 0; R.pixelScale = Math.min(1, R.pixelScale + 0.125); } }
