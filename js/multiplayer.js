@@ -7,6 +7,7 @@
 // to guests (guests can hit them), container contents follow every click, the host's dropped items can be picked
 // up by guests, a guest's inventory is kept on their device per host world, and the host's mobs chase, hit and shoot
 // whichever player is nearest.
+const MP_SUMMON_KEYS = ['baby', 'variant', 'size', 'vtype', 'prof', 'persistent', 'playerMade', 'placed', 'charge', 'hp', 'trap'];
 const MP = { server: false, auth: {}, rolePending: false, queue: [], replaying: false, on: false, role: null, name: null, id: 0, link: null, peers: new Map(), local: false, applying: false, allowSpawn: false, nextId: 1, eid: 1, rtc: null, status: '' };
 const MP_NAME_KEY = 'nemo-mp-name', MP_ADDR_KEY = 'nemo-mp-addr';
 try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
@@ -184,7 +185,7 @@ function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
@@ -211,6 +212,10 @@ function mpHandle(m, from) {
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'proj': mpGotProj(m, from); return;
+    case 'deco': mpGotDeco(m, from); return;
+    case 'tie': if (host && [m.x, m.y, m.z].every(Number.isInteger) && FENCES.has(getBlock(m.x, m.y, m.z))) { const id = MP.server ? m.from : from; for (const e of ENT) if (e.leash && e.leash.p === id && !e.dead) e.leash = [m.x, m.y, m.z]; } return; // a guest ties up what it leads
+    case 'splash': mpGotSplash(m, from); return;
+    case 'fw': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) { MP.fwIn = true; try { launchRocket(+m.x, +m.y, +m.z, { fw: m.fw && typeof m.fw === 'object' ? m.fw : null }, false, Array.isArray(m.shot) && m.shot.length === 3 && m.shot.every(isFinite) ? m.shot.map(Number) : null); if (ROCKETS.length) ROCKETS[ROCKETS.length - 1].remote = true; } finally { MP.fwIn = false; } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return; // its stars hurt only what is here, the sender's mobs stay theirs
     case 'adv': if (!host || MP.server) { if (typeof m.id === 'string' && ADVM[m.id]) advGrant(m.id, m.crit == null ? undefined : String(m.crit)); } return;
     case 'boom': mpGotBoom(m, from); return;
     case 'primed': mpGotPrimed(m, from); return;
@@ -252,7 +257,8 @@ function mpHandle(m, from) {
     case 'cartitems': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead && q.kind === 'minecart'); if (e && e.items && Array.isArray(m.items)) { for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } e.loot = null; if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
     case 'cartset': if (host && Array.isArray(m.items)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { e.loot = null; for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
     case 'gear': if (host && Array.isArray(m.gear)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseGearChanged === 'function') { e.gear = [0, 1].map(i => m.gear[i] && ITEMS[m.gear[i].id] ? m.gear[i] : null); horseGearChanged(e); } } return;
-    case 'summon': if (host && MOBDEF[m.type] && m.type !== 'player' && isFinite(m.x) && isFinite(m.y) && isFinite(m.z)) spawnMob(m.type, +m.x, +m.y, +m.z); return;
+    case 'summon': if (host && MOBDEF[m.type] && m.type !== 'player' && isFinite(m.x) && isFinite(m.y) && isFinite(m.z)) { const o = m.o && typeof m.o === 'object' ? m.o : {}, e = spawnMob(m.type, +m.x, +m.y, +m.z, { baby: !!o.baby, variant: o.variant, size: +o.size || undefined, vtype: o.vtype, prof: o.prof });
+      if (e) { for (const k of MP_SUMMON_KEYS) if (k !== 'baby' && o[k] != null && typeof o[k] !== 'object') e[k] = k === 'hp' ? Math.max(1, Math.min(e.hp, +o[k] || e.hp)) : o[k]; if (o.baby) e.baby = 24000; } } return;
     case 'killall': if (host) for (const e of [...ENT]) if (e.kind === 'mob' && !e.dead && !e.remote && (!m.type || e.type === m.type)) removeEnt(e); return;
     case 'held': if (!host) { const h = INV.slots[INV.sel]; if ((h ? h.id : 0) === m.was) { INV.slots[INV.sel] = m.st && ITEMS[m.st.id] ? m.st : null; UI.hudDirty = true; } } return;
     case 'vehs': if (!host) mpMirrorVehicles(m.l); return;
@@ -498,7 +504,7 @@ function mpTick() {
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
     for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
-      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null]); }
+      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null, e.leash === 'player' ? { p: MP.id } : e.leash || 0]); }
     mpSend({ t: 'mobs', l }, p.id);
     mpSendVehicles(p);
     if (W.tickN % 4) continue;
@@ -512,13 +518,14 @@ function mpNewId() { return MP.server ? MP.id * 1000000 + MP.eid++ : MP.eid++; }
 // guests: the host's mobs as puppets that move where the host says
 function mpMirrorMobs(l) {
   const seen = new Set();
-  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor] of l) {
+  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor, leash] of l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob');
     if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared }); } finally { MP.allowSpawn = false; } e.remote = true; e.rid = id; e.persistent = true; e.yaw = yaw; }
     if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) e.hurt = 10; if (dying && !e.deathT) e.deathT = 1;
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
     if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+    e.leash = leash && (Array.isArray(leash) ? leash.length === 3 && leash.every(Number.isInteger) : leash.p != null) ? leash : null; // a lead: to a fence or to someone ({p: player id})
   }
   for (const e of ENT) if (e.remote && e.kind === 'mob' && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
@@ -700,7 +707,7 @@ function mpArrowAtPeer(e) {
 // someone else's arrow: just flies and sticks
 function mpVisualArrow(e) {
   if (!e.stuck) { const nx = e.x + e.vx, ny = e.y + e.vy, nz = e.z + e.vz;
-    if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) e.stuck = true;
+    if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { if (e.visThrown) { removeEnt(e); return; } e.stuck = true; }
     else { e.x = nx; e.y = ny; e.z = nz; e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99; } }
   if (e.age > (e.stuck ? 200 : 300) || e.y < -20) removeEnt(e);
 }
@@ -725,7 +732,44 @@ function mpGotPrimed(m, from) { // the runner's lit TNT, flashing here until it 
   MP.allowSpawn = true; try { const e = Ent('tnt', +m.x + .5, +m.y, +m.z + .5); e.kind = 'tnt'; e.fuse = 100000; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = e.vz = 0; e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse'); setTimeout(() => { if (!e.dead) removeEnt(e); }, Math.min(200, +m.fuse || 80) * 50); } finally { MP.allowSpawn = false; }
 }
 function mpGotProj(m, from) {
-  if (m.dim === W.dim && [m.x, m.y, m.z, m.vx, m.vy, m.vz].every(isFinite)) { const e = shootArrow(+m.x, +m.y, +m.z, +m.vx, +m.vy, +m.vz, null, 0); if (e) { e.visual = true; e.noPickup = true; if (m.k) { scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh); } } }
+  if (m.dim === W.dim && [m.x, m.y, m.z, m.vx, m.vy, m.vz].every(isFinite)) { const e = shootArrow(+m.x, +m.y, +m.z, +m.vx, +m.vy, +m.vz, null, 0); if (e) { e.visual = true; e.noPickup = true; if (m.k) { scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh); } else if (m.th && ITEMS[m.th]) { scene.remove(e.mesh); e.mesh = R.itemMesh(+m.th); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); e.visThrown = true; } } } // snowballs, eggs, pearls, potions: seen in flight
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+// ---------- item frames, paintings and armor stands: every copy follows whoever changed it ----------
+const MP_DECO = ['frame', 'painting', 'armor_stand'];
+function mpDecoSend(e, op) {
+  if (!MP.on || MP.decoIn || !W.active || MP.loading || !e) return;
+  const m = { t: 'deco', dim: W.dim, op, k: e.kind };
+  if (e.kind === 'armor_stand') Object.assign(m, { x: +e.x.toFixed(2), y: +e.y.toFixed(2), z: +e.z.toFixed(2), yaw: e.yaw, armor: e.armor }); else Object.assign(m, { ax: e.ax, ay: e.ay, az: e.az, f: e.f });
+  if (e.kind === 'frame') Object.assign(m, { glow: e.glow, item: e.item, rot: e.rot }); else if (e.kind === 'painting') m.motif = e.motif;
+  mpSend(m);
+}
+function mpGotDeco(m, from) { // a chunk not here yet brings its own decorations
+  const st = m.k === 'armor_stand', ok = MP_DECO.includes(m.k) && (st ? [m.x, m.y, m.z].every(isFinite) : [m.ax, m.ay, m.az].every(Number.isInteger) && S.DIR6[m.f]);
+  if (ok && m.dim === W.dim && isLoaded(Math.floor(st ? m.x : m.ax), Math.floor(st ? m.z : m.az))) { const e = ENT.find(o => o.kind === m.k && !o.dead && (st ? Math.abs(o.x - m.x) < 0.6 && Math.abs(o.z - m.z) < 0.6 && Math.abs(o.y - m.y) < 1.5 : o.ax === m.ax && o.ay === m.ay && o.az === m.az && o.f === m.f));
+    const good = s => s && typeof s === 'object' && ITEMS[s.id] ? s : null;
+    MP.decoIn = true; try {
+      if (m.op === 'del') { if (e) removeEnt(e); }
+      else if (m.k === 'frame') { const item = good(m.item), rot = (m.rot | 0) & 7; if (!e) spawnFrame(m.ax, m.ay, m.az, m.f, { glow: !!m.glow, item, rot }); else { e.item = item; e.rot = rot; frameRebuild(e); } }
+      else if (m.k === 'painting') { if (!e && PAINTINGS.some(p => p[0] === m.motif)) spawnPainting(m.ax, m.ay, m.az, m.f, m.motif); }
+      else { const armor = [0, 1, 2, 3].map(i => good(Array.isArray(m.armor) && m.armor[i])); if (!e) spawnArmorStand(+m.x, +m.y, +m.z, +m.yaw || 0, armor); else { e.armor = armor; scene.remove(e.mesh); e.mesh = standMesh(e); scene.add(e.mesh); } }
+      if (m.k === 'frame' && MP.role === 'host') rsNotify(m.ax, m.ay, m.az); // comparators read frames
+    } finally { MP.decoIn = false; } }
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+function mpDecoHook(e) { // a new decoration: its hits and its own removal (lost wall, fell out of the world) reach everyone
+  if (!e) return e; const hit = e.onHit, tick = e.tick;
+  e.onHit = function (q) { const r = hit.apply(this, arguments); mpDecoSend(q, q.dead ? 'del' : 'set'); return r; };
+  e.tick = function (q) { if (MP.on && MP.role === 'guest' && q.kind !== 'armor_stand') return; const r = tick.apply(this, arguments); if (q.dead) mpDecoSend(q, 'del'); return r; }; // a guest's frames follow the runner's
+  if (MP.act && !MP.decoIn) mpDecoSend(e, 'add');
+  return e;
+}
+// ---------- splash potions and lingering clouds reach every player (and the runner's mobs) ----------
+function mpGotSplash(m, from) {
+  if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) { MP.splashIn = true; try {
+    if (m.k === 'cloud') { if (POTION[m.type]) spawnCloud(+m.x, +m.y, +m.z, m.type, { r: Math.min(8, +m.r || 3), dur: Math.min(2400, +m.dur || 600), breath: !!m.breath, col: isFinite(m.col) ? +m.col : undefined }); }
+    else if (ITEMS[m.id] && ITEMS[m.id].splash) splashPotion(m.id, +m.x, +m.y, +m.z, m.dm != null ? ENT.find(q => !q.dead && q.kind === 'mob' && (q.remote ? q.rid : q.mpid) === m.dm) : null);
+  } finally { MP.splashIn = false; } }
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
 }
 function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stand
@@ -758,7 +802,7 @@ function mpPlaceTag(p, s, ps) {
   const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
   p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } }
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
@@ -799,7 +843,17 @@ function mpInstall() {
   const gt = gameTick; gameTick = function () { gt(); mpTick(); };
   const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
   const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
-  const sm = spawnMob; spawnMob = function () { if (MP.role === 'guest' && !MP.allowSpawn && MP.cmd) { const [type, x, y, z] = arguments; mpToAuth({ t: 'summon', type, x, y, z }); } const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) removeEnt(e); return e; }; // guests only show the host's mobs
+  const sm = spawnMob; spawnMob = function () { const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) { removeEnt(e); // guests only show the host's mobs
+      if (e && (MP.cmd || MP.act) && W.active && !MP.loading) { const [type, x, y, z] = arguments; queueMicrotask(() => { const o = {}; for (const k of MP_SUMMON_KEYS) if (e[k] != null && e[k] !== false) o[k] = e[k]; mpToAuth({ t: 'summon', type, x, y, z, o }); }); } } // a guest's egg, golem, crystal: the runner makes the real mob once the caller has set its fields
+    return e; };
+  for (const n of ['spawnFrame', 'spawnPainting', 'spawnArmorStand']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { return mpDecoHook(f.apply(this, arguments)); }; }
+  for (const n of ['frameUse', 'standUse']) { const f = window[n]; if (typeof f === 'function') window[n] = function (e) { const r = f.apply(this, arguments); mpDecoSend(e, e.dead ? 'del' : 'set'); return r; }; }
+  const spl = splashPotion; splashPotion = function (id, x, y, z, direct) { if (MP.on && !MP.splashIn && W.active) mpSend({ t: 'splash', dim: W.dim, id, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), dm: direct && direct !== PL ? (direct.remote ? direct.rid : direct.mpid) : null }); return spl.apply(this, arguments); };
+  const scl = spawnCloud; spawnCloud = function (x, y, z, type, o) { if (MP.on && !MP.splashIn && W.active) mpSend({ t: 'splash', k: 'cloud', dim: W.dim, x, y, z, type, r: o && o.r, dur: o && o.dur, breath: o && o.breath, col: o && o.col }); return scl.apply(this, arguments); };
+  const lr = launchRocket; launchRocket = function (x, y, z, st, rider, shot) { const r = lr.apply(this, arguments); if (MP.on && !rider && !MP.fwIn && W.active) mpSend({ t: 'fw', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), fw: st && st.fw || null, shot: shot || null }); return r; }; // everyone sees (and feels) a rocket
+  const i6 = items6Use; items6Use = function (t, h) { if (MP.role === 'guest' && h && h.id === IID.lead && t && t.type === 'block' && FENCES.has(t.id) && ENT.some(e => e.remote && e.leash && e.leash.p === MP.id)) { mpToAuth({ t: 'tie', x: t.x, y: t.y, z: t.z }); play('place', { mat: 'wool' }); swing(); return true; } return i6.apply(this, arguments); };
+  const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
+  for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
   const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
   mobTick = e => { MP.tickMob = e; if (!(e.love > 0)) e.loveBy = undefined; try { return mt2(e); } finally { MP.tickMob = null; } };
   // whatever a guest did through the runner (a kill, taming, breeding, a trade...) counts for that guest, not the runner
@@ -820,7 +874,7 @@ function mpInstall() {
     const pr = MP.proxy, r = ex.apply(this, arguments);
     if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
     return r; };
-  const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.thrown && !e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0 }); }); return e; };
+  const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0, th: e.thrown || 0 }); }); return e; };
   const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
@@ -897,12 +951,16 @@ function mpGotHit(m, att) {
 }
 // a guest's right click on one of the host's mobs (feeding, shearing, milking, dyeing, taming, naming...) happens on the
 // host, holding the guest's item; what the item becomes and anything handed over goes back to the guest
-function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return h.id !== IID.lead; }
+function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return !!e.leash || ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return true; }
+function mpLeashHolder(l) { // {p: id}: that player (yourself included) while in this world and dimension (a tab in the background still holds on)
+  if (!l || l.p == null) return null; if (l.p === MP.id) return PL;
+  const p = MP.peers.get(l.p); return p && p.s && p.s.dim === W.dim ? { x: +p.s.x, y: +p.s.y, z: +p.s.z, dead: !!p.s.dead } : null;
+}
 function mpRemoteUse(p, e, st, sneak) {
   const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
   INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
-  const love0 = e.love;
-  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; }
+  const love0 = e.love, l0 = e.leash; if (l0 && l0.p === p.id) e.leash = 'player'; // the guest's own lead, as the item code knows it
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; if (e.leash === 'player' && l0 !== 'player') e.leash = { p: p.id }; }
   finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
 }
 // the night passes when everyone in the world is asleep (the host decides, and wakes the guests)

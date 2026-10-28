@@ -1336,7 +1336,7 @@ const LOOT = {
   ruin_big: [['coal', 4], ['gold_ingot', 3], ['emerald', 2], ['golden_apple', 1], ['wheat', 4], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1], ['buried_treasure_map', 1]],
   fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
-function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
+function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
 function tplPos(t, tx, tz, r) { return r === 0 ? [tx, tz] : r === 1 ? [t.d - 1 - tz, tx] : r === 2 ? [t.w - 1 - tx, t.d - 1 - tz] : [tz, t.w - 1 - tx]; }
 function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
@@ -3750,7 +3750,7 @@ function stampFeature(st, p, R, x0, z0) {
 // a jar loot table rolled here: pools, weighted entries, counts, enchanting -> [slot, item key, count, extra]
 function rollVanillaLoot(R, name) {
   const tbl = STRUCTS.loot && STRUCTS.loot[name]; if (!tbl) { const k = LOOT_FALLBACK(name); return k ? rollLoot(R, k, 4 + R.int(5)) : []; }
-  const out = [], free = shuffled(R, [...Array(27).keys()]);
+  const out = [], free = shuffled(R, [...Array(27).keys()]); out.table = name;
   const num = v => typeof v === 'number' ? v : v && v.min != null ? v.min + R() * (v.max - v.min) : 1;
   for (const pool of tbl.pools || []) {
     const rolls = Math.floor(num(pool.rolls) + 0.0001);

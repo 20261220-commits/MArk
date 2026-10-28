@@ -4,7 +4,11 @@
   "description": "네모 대륙 1.17 — 게임 파일 제공 + 멀티플레이 서버 (의존성 없음)",
   "scripts": {
     "start": "node tools/server.js",
-    "build": "node tools/build.js"
+    "build": "node tools/build.js",
+    "check": "node tools/check.js",
+    "test": "node tools/tests/run.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }
