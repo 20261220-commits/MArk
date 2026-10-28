@@ -691,7 +691,7 @@ async function loadChunk(cx, cz) {
   // a record that can't be read (damaged storage, an interrupted write) is generated again instead of leaving a hole the
   // world waits on for ever
   let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data');
-    fitRows(d, rec.my || 0, oldH, dim); }
+    fitRows(d, rec.my || 0, oldH, dim); unshiftRows(d, dim); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
   W.inbox.push(d);
 }
@@ -706,6 +706,24 @@ function fitRows(d, my, ch, dim) {
   const shift = (my - MINY) << 8;
   d.blocks = b; d.meta = m; d.light = new Uint8Array(CVOL); S.lightChunk(b, d.light, m);
   d.tileList = d.tileList.map(([i, t]) => [i + shift, t]).filter(([i]) => i >= 0 && i < CVOL); d.lifted = true; // saved again in this layout
+}
+// a chunk that came back 64 blocks too high (a server once sent stored 1.18 chunks without their height; guests took
+// them for old 0..255 chunks and stored them back lifted): the overworld then has its deepslate layer at y 0..63, the
+// Nether its bedrock floor at y 64. Moved back down (the floor gets its bedrock back; the top 64 rows are sky).
+const DEEPISH = new Set();
+function unshiftRows(d, dim) {
+  if (dim === 1 || d.blocks.length !== CVOL) return false;
+  const B = d.blocks, row = y => (y - MINY) << 8, count = (y, f) => { let n = 0; for (let i = row(y), e = i + 256; i < e; i++) if (f(B[i])) n++; return n; };
+  if (!DEEPISH.size) for (const k of ['deepslate', 'cobbled_deepslate', 'tuff', 'deepslate_coal_ore', 'deepslate_iron_ore', 'deepslate_copper_ore', 'deepslate_gold_ore', 'deepslate_redstone_ore', 'deepslate_lapis_ore', 'deepslate_diamond_ore', 'deepslate_emerald_ore', 'lava']) if (BID[k] != null) DEEPISH.add(BID[k]);
+  const shifted = dim === -1 ? count(64, b => b === BID.bedrock) >= 240 && count(0, b => b === BID.bedrock) < 16
+    : (() => { let deep = 0, solid = 0; for (const y of [12, 24, 36, 48]) { deep += count(y, b => DEEPISH.has(b)); solid += count(y, b => b && b !== 27); } return solid >= 300 && deep >= solid * 0.8; })(); // real terrain is stone up there
+  if (!shifted) return false;
+  const sh = 64 << 8, b = new Uint16Array(CVOL), m = new Uint8Array(CVOL);
+  b.set(B.subarray(sh)); m.set(d.meta.subarray(sh));
+  if (dim === 0) for (let i = 0; i < 256; i++) { b[i] = BID.bedrock; m[i] = 0; } // the floor at -64 (it had been turned to deepslate)
+  d.blocks = b; d.meta = m; d.light = new Uint8Array(CVOL); S.lightChunk(b, d.light, m);
+  d.tileList = (d.tileList || []).map(([i, t]) => [i - sh, t]).filter(([i]) => i >= 0 && i < CVOL); d.lifted = true;
+  return true;
 }
 function unloadChunk(c) {
   if (W.onChunkUnloaded) W.onChunkUnloaded(c); // stores the chunk's animals first
