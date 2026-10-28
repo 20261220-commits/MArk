@@ -47,7 +47,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(await until(C, () => ENT.some(e => e.visThrown && !e.dead), null, 5000), 'a guest\'s snowball is seen in flight');
   // a lead: a guest leads the runner's cow, then ties it to a fence beside it
   const cw = await A.evaluate(() => { __cow.eff = {}; __cow.vx = __cow.vz = 0; return [__cow.x, __cow.y, __cow.z, __cow.mpid]; });
-  await B.evaluate(([x, y, z]) => { PL.x = x + 1.5; PL.y = y; PL.z = z; PL.flying = true; }, cw);
+  await B.evaluate(([x, y, z]) => { PL.x = x + 1.5; PL.y = y; PL.z = z; PL.mode = 'creative'; PL.flying = true; PL.vy = 0; }, cw);
   await until(A, ([x, y, z]) => [...MP.peers.values()].some(p => p.s && Math.hypot(p.s.x - x - 1.5, p.s.z - z) < 1), cw); await wait(500); // the runner knows where the guest stands
   await B.evaluate(id => { const c = ENT.find(e => e.remote && e.rid === id && !e.dead); INV.slots[INV.sel] = { id: IID.lead, n: 1 }; TARGET = { type: 'ent', e: c, t: 1 }; USE.placeCd = 0; useItem(true); }, cw[3]);
   ok(await until(A, () => !!(__cow.leash && __cow.leash.p != null)), 'a guest puts a lead on the runner\'s mob');
