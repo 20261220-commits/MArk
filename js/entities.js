@@ -61,7 +61,7 @@ function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Mat
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
-  const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv((l & 15) / 15);
+  const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv(Math.min(15, Math.max(l & 15, R.dynAt(x, y, z))) / 15);
   return Math.max(W.dim === -1 ? 0.28 : 0.06, Math.min(1, Math.max(sky, blk * 0.95)));
 }
 

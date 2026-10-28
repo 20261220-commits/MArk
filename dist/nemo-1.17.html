@@ -7214,17 +7214,20 @@ const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false; atlasTex.flipY = false;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 } }]);
+  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
-uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin;
+uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin; uniform vec4 uDyn[6];
 varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
   vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
-  float blk = curve(lt.y) * uFlick;
+  vec3 wp = (modelMatrix * vec4(position / 16.0 - vec3(1.0, 0.0, 1.0), 1.0)).xyz;
+  float dl = 0.0; // light carried by players (a torch in either hand) and lying on the ground: level minus the distance in blocks
+  for (int i = 0; i < 6; i++) { vec4 d = uDyn[i]; if (d.w > 0.0) { vec3 q = abs(wp - d.xyz); dl = max(dl, (d.w - (q.x + q.y + q.z)) / 15.0); } }
+  float blk = curve(max(lt.y, clamp(dl, 0.0, 1.0))) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
   c = max(c, vec3(uMin));
   vLight = min(c, vec3(1.0)) * lt.z;
@@ -7254,10 +7257,25 @@ void main(){
   gl_FragColor = vec4(t.rgb * vTint * vLight, t.a);
   #include <fog_fragment>
 }`;
+// ---------- dynamic light: torches, lanterns and the like held in either hand (yours and other players') or dropped ----------
+const DYN = Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0));
+function itemLum(id) {
+  const d = id && ITEMS[id]; if (!d) return 0;
+  if (id === IID.lava_bucket) return 15;
+  if (d.place == null) return 0;
+  if (d.place === BID.campfire) return 15; if (d.place === BID.soul_campfire) return 10; // lit when placed
+  return S.emitOf(d.place, d.pmeta || 0) || 0;
+}
+R.itemLum = itemLum; R.dyn = DYN;
+// the lights to use this frame: [x, y, z, level], brightest and nearest first
+R.setDynLights = list => { for (let i = 0; i < DYN.length; i++) { const l = list[i]; if (l) DYN[i].set(l[0], l[1], l[2], l[3]); else DYN[i].set(0, 0, 0, 0); } };
+// how bright a spot is from those lights (0..15), for entities and the held item
+R.dynAt = (x, y, z) => { let b = 0; for (const d of DYN) if (d.w > 0) b = Math.max(b, d.w - (Math.abs(x - d.x) + Math.abs(y - d.y) + Math.abs(z - d.z))); return b; };
 // opaque terrain never discards, so tile-based GPUs keep early depth rejection; cutout geometry has its own material
 const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS.replace('if (t.a < 0.5) discard;', ''), fog: true });
 const matCutout = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
 const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: TRANS_FS, fog: true, transparent: true, depthWrite: false, side: THREE.FrontSide });
+for (const m of [matOpaque, matCutout, matTrans]) m.uniforms.uDyn.value = DYN;
 matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
 
@@ -7871,7 +7889,7 @@ function fluidAt(x, y, z) { const b = getBlock(Math.floor(x), Math.floor(y), Mat
 function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
-  const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv((l & 15) / 15);
+  const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv(Math.min(15, Math.max(l & 15, R.dynAt(x, y, z))) / 15);
   return Math.max(W.dim === -1 ? 0.28 : 0.06, Math.min(1, Math.max(sky, blk * 0.95)));
 }
 
@@ -13794,7 +13812,7 @@ MOBDEF.panda.anim = (e, P) => {
 function llamaSpit(e, t) {
   const dx = t.x - e.x, dy = (t.y + (t.h || 1.6) * 0.6) - (e.y + 1.6), dz = t.z - e.z, d = Math.hypot(dx, dy, dz) || 1, v = 1.2;
   const s = shootArrow(e.x + dx / d * 0.6, e.y + 1.6, e.z + dz / d * 0.6, dx / d * v, dy / d * v + d * 0.015, dz / d * v, e, 0.8);
-  s.noPickup = true; s.age = 1170; s.mesh.scale.setScalar(0.3); s.mesh.material.color.set(0xf0f0e8);
+  s.noPickup = true; s.spit = true; s.age = 1170; s.mesh.scale.setScalar(0.3); s.mesh.material.color.set(0xf0f0e8);
   play('splash', { vol: 0.3, pitch: 1.6 });
 }
 function llamaExtras(e, dist) {
@@ -14567,6 +14585,17 @@ function selectTrade(i) {
 <script>/* js/effects.js */
 // Status effects (Java Edition): applied by potions, food, beacons, mobs and totems; milk clears them.
 // t.eff = { key: { lv, t } }, lv 0 = level I, t = ticks left. Works for the player and for mobs.
+// the swirl of particles around anyone with an effect: the effects' colours mixed, stronger ones counting more (Java)
+function effSwirlColor(eff) {
+  if (!eff) return null; let r = 0, g = 0, b = 0, n = 0;
+  for (const k in eff) { const d = EFF[k], e = eff[k]; if (!d || !e || k === 'glowing' || k === 'invisibility' || e.hide) continue; const c = parseInt(d[1].slice(1), 16), w = (e.lv || 0) + 1; r += ((c >> 16) & 255) * w; g += ((c >> 8) & 255) * w; b += (c & 255) * w; n += w; }
+  return n ? [+(r / n / 255).toFixed(2), +(g / n / 255).toFixed(2), +(b / n / 255).toFixed(2)] : null;
+}
+function effSwirl(x, y, z, h, col, dt) { if (Math.random() < dt * 8) R.simpleParticle(x + (Math.random() - .5) * 0.6, y + Math.random() * h, z + (Math.random() - .5) * 0.6, col, { kind: 'effect', size: 0.1, vy: 0.4, grav: 0, life: 0.8 }); }
+function effSwirls(dt, px, pz) { // mobs near you, and you yourself when seen from outside
+  for (const e of ENT) { if (e.kind !== 'mob' || e.dead || e.deathT || Math.abs(e.x - px) > 32 || Math.abs(e.z - pz) > 32) continue; const c = e.remote ? e.ec : effSwirlColor(e.eff); if (c) effSwirl(e.x, e.y, e.z, e.h, c, dt); }
+  if (typeof view !== 'undefined' && view !== 0 && !PL.dead) { const c = effSwirlColor(PL.eff); if (c) effSwirl(PL.x, PL.y, PL.z, 1.8, c, dt); }
+}
 const EFF = {
   speed: ['신속', '#7cafc6'], slowness: ['구속', '#5a6c81'], haste: ['성급함', '#d9c043'], mining_fatigue: ['채굴 피로', '#4a4217'],
   strength: ['힘', '#932423'], instant_health: ['즉시 회복', '#f82423'], instant_damage: ['즉시 피해', '#430a09'], jump_boost: ['점프 강화', '#22ff4c'],
@@ -15468,6 +15497,7 @@ function useRod() {
   swing();
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
+    if (b.hooked) { const h = b.hooked; if (!h.dead) { const dx = PL.x - h.x, dy = PL.y - h.y, dz = PL.z - h.z; fishPull(h, dx * 0.1, dy * 0.1 + Math.sqrt(Math.hypot(dx, dy, dz)) * 0.08, dz * 0.1); } removeEnt(b); damageItem(INV.slots, INV.sel, 5); return; } // a hooked mob is pulled in (Java: 5 durability)
     if (b.bite > 0) {
       const r = Math.min(0.9999, Math.random() + enchLv(PL.held(), 'luck_of_the_sea') * 0.021), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book', 'nautilus_shell'][Math.floor(Math.random() * 5)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
@@ -15492,7 +15522,10 @@ function fishHookMesh() { // the hook from the pack (a sprite), or a red float
   if (hook) { const t = new THREE.CanvasTexture(hook); t.magFilter = t.minFilter = THREE.NearestFilter; const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.5 })); m.scale.setScalar(0.5); return m; }
   return new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
 }
+function fishPull(h, vx, vy, vz) { h.vx = (h.vx || 0) + vx; h.vy = (h.vy || 0) + vy; h.vz = (h.vz || 0) + vz; }
 function bobberTick(e) {
+  if (e.hooked) { const h = e.hooked; if (h.dead || h.deathT) e.hooked = null; else { e.x = h.x; e.y = h.y + h.h * 0.8; e.z = h.z; e.vx = e.vy = e.vz = 0; const hd = PL.held(); if (!hd || hd.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e); return; } } // stuck in a mob, it rides along
+  if (!e.hooked && e.age > 2) for (const o of ENT) if (o.kind === 'mob' && !o.dead && !o.deathT && Math.abs(o.x - e.x) < o.w + 0.1 && Math.abs(o.z - e.z) < o.w + 0.1 && e.y > o.y - 0.1 && e.y < o.y + o.h) { e.hooked = o; play('hit', { vol: 0.4 }); return; }
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1;
   if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { kind: 'splash', size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
   else e.vy -= 0.04;
@@ -15650,7 +15683,7 @@ function grindHtml() {
 const $ = id => document.getElementById(id);
 const UI = { screen: null, menu: 'title', hudDirty: true, chatOpen: false, debug: false, hideHud: false, msgs: [] };
 const OPT_KEY = 'nemo-mc-117-options';
-const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, gui: 0, autoRes: true, showFps: false, coords: true, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
+const OPT = { fov: 70, rd: 6, sens: 100, gamma: 50, vol: 60, fancy: false, smooth: true, clouds: true, bob: true, dynLight: true, gui: 0, autoRes: true, showFps: false, coords: true, invertY: false, fullscreen: false, toggleSprint: false, toggleSneak: false, pauseOnBlur: true, skin: 'steve', mainHand: 'right' };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem(OPT_KEY)) || {}); } catch (e) {}
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) {} applyOpt(); }
 function applyOpt() {
@@ -15951,7 +15984,7 @@ function showMenu(name, data) {
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
-    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('coords', '좌표 표시')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
+    h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('dynLight', '손에 든 광원 빛')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('coords', '좌표 표시')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') {
@@ -17127,6 +17160,10 @@ function mpHandle(m, from) {
     case 'fx': if (!host && Array.isArray(m.l)) mpMirrorFx(m.l); return;
     case 'deflect': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'fireball'), p = MP.peers.get(from), d = Array.isArray(m.d) && m.d.length === 3 && m.d.every(isFinite) ? m.d : null; if (e && p && d) { e.ax = d[0] * 0.1; e.ay = d[1] * 0.1; e.az = d[2] * 0.1; e.vx = d[0]; e.vy = d[1]; e.vz = d[2]; e.owner = PL; e.guestOwner = p; } } return; // a guest bats a ghast's fireball back
     case 'bfx': mpGotBfx(m, from); return;
+    case 'pull': { const v = [m.vx, m.vy, m.vz].map(Number); if (!v.every(isFinite) || v.some(x => Math.abs(x) > 4)) return;
+      if (m.e != null) { if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e) { e.vx = (e.vx || 0) + v[0]; e.vy = (e.vy || 0) + v[1]; e.vz = (e.vz || 0) + v[2]; } } return; } // a guest's fishing rod pulls the runner's mob
+      if (m.tgt != null && m.tgt !== MP.id && mpRelay()) { mpSend({ ...m }, m.tgt); return; } // the host passes a guest's pull on
+      PL.vx += v[0]; PL.vy += v[1]; PL.vz += v[2]; return; } // someone reeled you in
     case 'snd': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite) && typeof m.n === 'string') { const d = Math.hypot(PL.x - m.x, PL.y - m.y, PL.z - m.z), o = m.o && typeof m.o === 'object' ? m.o : {}; if (d < 16) { MP.sndIn = true; try { play(m.n, { mat: o.mat, pitch: isFinite(o.pitch) ? +o.pitch : undefined, vol: (isFinite(o.vol) ? +o.vol : 1) * (1 - d / 16) }); } finally { MP.sndIn = false; } } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'bolt': if (!host && m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) mpBoltFx(+m.x, +m.y, +m.z); return;
     case 'strike': if (host && m.dim === W.dim && [m.x, m.y, m.z].every(Number.isInteger)) strikeLightning(m.x, m.y, m.z, !!m.rod); return;
@@ -17363,7 +17400,7 @@ function mpChunkLoaded(c) {
 
 // ---------- every tick: your state out; the host also sends the clock and nearby mobs ----------
 function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...), the bed's direction, fire, the block being dug, the hook and eye in the air
-  const ps = playerPoseInputs(0), o = { pr: ps.right, plf: ps.left, two: ps.two, chg: +(ps.charge || 0).toFixed(2), swl: ps.swingLeft ? 1 : 0, by: PSTATE.bedYaw || 0, lh: mainRight() ? 0 : 1, fire: PL.fire > 0 && !PL.inWater ? 1 : 0 };
+  const ps = playerPoseInputs(0), o = { pr: ps.right, plf: ps.left, two: ps.two, chg: +(ps.charge || 0).toFixed(2), swl: ps.swingLeft ? 1 : 0, by: PSTATE.bedYaw || 0, lh: mainRight() ? 0 : 1, fire: PL.fire > 0 && !PL.inWater ? 1 : 0 }, ec = effSwirlColor(PL.eff); if (ec) o.ec = ec;
   const t = TARGET; if (t && t.type === 'block' && MINE.prog > 0 && MINE.id === t.id && !creative()) o.mine = [t.x, t.y, t.z, Math.floor(MINE.prog * 10)];
   const fx = []; for (const e of ENT) if (!e.dead && !e.remote && (e.kind === 'bobber' || e.kind === 'eye') && fx.length < 2) fx.push([e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); if (fx.length) o.fx = fx;
   return o;
@@ -17430,7 +17467,7 @@ function mpMirrorMobs(l) {
     mpApplyMobVis(e, v);
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
     if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
-    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null; e.riderId = rider > 0 ? rider : rider === -1 ? 'runner' : 0;
     e.leash = leash && (Array.isArray(leash) ? leash.length === 3 && leash.every(Number.isInteger) : leash.p != null) ? leash : null; // a lead: to a fence or to someone ({p: player id})
   }
   for (const e of ENT) if (e.remote && e.kind === 'mob' && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
@@ -17448,13 +17485,13 @@ function mpPuppetTick(e) {
 const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name'];
 function mpMobVis(e) {
   const v = {}; for (const k of MP_MOBV) { const x = e[k]; if (x != null && x !== false && x !== 0 && (typeof x !== 'object')) v[k] = typeof x === 'number' ? +x.toFixed(2) : x; }
-  if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp);
+  if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp); const ec = effSwirlColor(e.eff); if (ec) v.ec = ec;
   return v;
 }
 function mpApplyMobVis(e, v) {
   const f0 = e.fuse || 0;
   for (const k of MP_MOBV) e[k] = v[k];
-  e.target = v.tgt ? PL : null; e.fire = v.fire ? 2 : 0; e.eff = v.glow ? { glowing: { t: 40, lv: 0 } } : null; if (v.hp != null && isFinite(v.hp)) e.hp = +v.hp;
+  e.target = v.tgt ? PL : null; e.fire = v.fire ? 2 : 0; e.ec = Array.isArray(v.ec) && v.ec.length === 3 ? v.ec : null; e.eff = v.glow ? { glowing: { t: 40, lv: 0 } } : null; if (v.hp != null && isFinite(v.hp)) e.hp = +v.hp;
   if (e.fuse > 0 && !f0) mpMobSound(e, 'fuse', 1);
 }
 function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z); if (d < 16) play(snd, { vol: vol * (1 - d / 16) }); }
@@ -17565,7 +17602,7 @@ function mpMirrorVehicles(l) {
       e.remote = true; e.rid = id; e.vTick = e.tick; e.tick = mpVehTick; e.onHit = () => mpToAuth({ t: 'vhit', e: id }); }
     e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw;
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
-    e.seat2Other = !!(rider2 && rider2 !== MP.id);
+    e.seat2Other = !!(rider2 && rider2 !== MP.id); e.riderId = rider > 0 ? rider : rider === -1 ? 'runner' : 0; e.seat2Id = rider2 > 0 ? rider2 : rider2 === -1 ? 'runner' : 0; // who sits where, for their figures
   }
   for (const e of ENT) if (e.remote && (e.kind === 'boat' || e.kind === 'minecart') && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
@@ -17582,7 +17619,7 @@ function mpRidden(e, m, from) {
   if (m.off) { if (e.mpRider === from) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } } return; }
   if (e.rider === PL || (e.mpRider && e.mpRider !== from && performance.now() - e.mpRideAt < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 1 }, from); return; } // one driver: whoever got on first
   if (e.mpRider2 === from) e.mpRider2 = 0;
-  e.mpRider = from; e.mpRideAt = performance.now(); e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null;
+  const far = e.mpRider !== from || Math.hypot(e.x - m.x, e.z - m.z) > 4; e.mpRider = from; e.mpRideAt = performance.now(); e.rtx = +m.x; e.rty = +m.y; e.rtz = +m.z; e.rtyaw = +m.yaw; if (far) { e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; } e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null; // followed smoothly between messages
   if (e.kind !== 'mob' && !e.mpTick0) { e.mpTick0 = e.tick; e.tick = mpRiddenTick; }
 }
 function mpRidden2(e, m, from) { // a boat's back seat
@@ -17590,7 +17627,7 @@ function mpRidden2(e, m, from) { // a boat's back seat
   if (e.kind !== 'boat' || e.mob || e.rider2 === PL || (e.mpRider2 && e.mpRider2 !== from && performance.now() - e.mpRider2At < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 2 }, from); return; }
   e.mpRider2 = from; e.mpRider2At = performance.now();
 }
-function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; } }
+function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
 
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
@@ -17703,7 +17740,7 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
 }
 
 const MP_SND_SKIP = new Set(['break', 'place', 'dig', 'step', 'pop', 'xp', 'levelup', 'hurt']); // sent another way, or only for you
-const MP_FX = { arrow: e => [e.stuck ? 1 : 0, e.trident ? 1 : 0, +e.vx.toFixed(2), +e.vy.toFixed(2), +e.vz.toFixed(2)], fireball: e => e.small ? 1 : 0, wskull: e => e.blue ? 1 : 0, bullet: () => 0, fang: e => e.mesh && e.mesh.visible ? 1 : 0, falling: e => [e.block, e.bmeta || 0] };
+const MP_FX = { arrow: e => [e.stuck ? 1 : 0, e.trident ? 1 : 0, +e.vx.toFixed(2), +e.vy.toFixed(2), +e.vz.toFixed(2), e.spit ? 1 : 0], fireball: e => e.small ? 1 : 0, wskull: e => e.blue ? 1 : 0, bullet: () => 0, fang: e => e.mesh && e.mesh.visible ? 1 : 0, falling: e => [e.block, e.bmeta || 0] };
 function mpMirrorFx(l) {
   const seen = new Set();
   for (const [id, k, x, y, z, s] of l) { if (![x, y, z].every(isFinite)) continue; seen.add(id); let e = ENT.find(q => q.kind === 'mpfx' && q.rid === id && !q.dead);
@@ -17713,7 +17750,7 @@ function mpMirrorFx(l) {
 }
 function mpFxMake(k, x, y, z, s) {
   let mesh = null;
-  if (k === 'arrow') mesh = Array.isArray(s) && s[1] ? R.itemMesh(IID.trident) : new THREE.Mesh(arrowGeo, arrowMat.clone());
+  if (k === 'arrow') { mesh = Array.isArray(s) && s[1] ? R.itemMesh(IID.trident) : new THREE.Mesh(arrowGeo, arrowMat.clone()); if (Array.isArray(s) && s[5]) { mesh.scale.setScalar(0.3); mesh.material.color.set(0xf0f0e8); } } // a llama's spit is a small white blob
   else if (k === 'fireball') { mesh = R.itemMesh(IID.fire_charge); mesh.scale.setScalar(s ? 0.3 : 1); }
   else if (k === 'wskull') mesh = new THREE.Mesh(skullGeo, new THREE.MeshBasicMaterial({ color: s ? 0x6a8aff : 0x2a2a2a }));
   else if (k === 'bullet') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8f0d0 }));
@@ -17784,6 +17821,17 @@ function mpPlaceTag(p, s, ps) {
   p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
 }
 function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
+function mpSeatOf(p) {
+  const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
+  const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
+  for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart' || e.kind === 'mob')) continue;
+    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id && fresh(e.mpRideAt), back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At));
+    if (!drv && !back) continue;
+    const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
+    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
+    return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
+  return null;
+}
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
@@ -17796,6 +17844,7 @@ function mpRender(dt) {
     const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
     p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
     if (Math.hypot(p.pos[0] - last[0], p.pos[2] - last[2]) > 8) p.hist = [[performance.now(), s.x, s.y, s.z]]; // a teleport: no sliding across the world
+    const seat = s.ride ? mpSeatOf(p) : null; if (seat) p.pos = seat; // riding: sat on the boat, cart or horse as it is drawn here, not floating beside it
     const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20, segT = a && b && b[0] > a[0] ? (b[0] - a[0]) / 50 : 0;
     p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
@@ -17814,7 +17863,7 @@ function mpRender(dt) {
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
-    mpPeerFx(p, s, light);
+    mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects
     const mn = Array.isArray(s.mine) && s.mine.length === 4 && s.mine.every(Number.isInteger) ? s.mine : null, mid = mn && getBlock(mn[0], mn[1], mn[2]); // the cracks in the block they dig
     if (mn && mid && (p.digT = (p.digT || 0) + dtT) > 4) { p.digT = 0; mpGotBfx({ dim: W.dim, x: mn[0], y: mn[1], z: mn[2], id: mid, m: getMeta(mn[0], mn[1], mn[2]), k: 'dig' }); }
     if (mn && mid) { if (!p.crack) { p.crack = new THREE.Mesh(R.crack.geometry, R.crack.material.clone()); scene.add(p.crack); } p.crack.geometry = crackGeometry(mid, getMeta(mn[0], mn[1], mn[2])); p.crack.position.set(mn[0] + .5, mn[1] + .5, mn[2] + .5); p.crack.scale.setScalar(1.002); p.crack.material.map = R.crackTexs[Math.max(0, Math.min(9, mn[3]))]; p.crack.visible = true; }
@@ -17849,6 +17898,13 @@ function mpInstall() {
   const sfg = spawnFang; spawnFang = function () { const e = sfg.apply(this, arguments); if (e && e.tick) { const t = e.tick; e.tick = function (q) { if (MP.role === 'host' && MP.peers.size) { const g = mpNearestGuest(q); if (g) return mpProxy(g, () => t(q)); } return t(q); }; } return e; };
   const ib = interactBlock; interactBlock = function (t, dry) { if (dry || !MP.on || !t || t.type !== 'block') return ib.apply(this, arguments); const j0 = JSON.stringify(getTile(t.x, t.y, t.z) || null), r = ib.apply(this, arguments);
     const j1 = JSON.stringify(getTile(t.x, t.y, t.z) || null); if (j1 !== j0 && j1 !== 'null' && !UI.screen) mpTileChanged(t.x, t.y, t.z); return r; }; // a record, a book, a cake bite changed in place: everyone gets it
+  const fpl = fishPull; fishPull = function (h, vx, vy, vz) { if (h.remote && h.kind === 'mob') { mpToAuth({ t: 'pull', e: h.rid, vx, vy, vz }); return; } return fpl.apply(this, arguments); }; // the runner's mob is pulled on the runner
+  const btk = bobberTick; bobberTick = function (e) { // a hook can catch another player too
+    if (MP.on && e.hookPeer != null) { const p = MP.peers.get(e.hookPeer); if (p && p.pos && p.s && !p.s.dead && p.s.dim === W.dim) { e.x = p.pos[0]; e.y = p.pos[1] + 1.4; e.z = p.pos[2]; const hd = PL.held(); if (!hd || hd.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e); return; } e.hookPeer = null; }
+    const r = btk.apply(this, arguments);
+    if (MP.on && !e.dead && !e.hooked && e.age > 2) for (const p of MP.peers.values()) { const q = p.pos, s = p.s; if (!q || !s || s.dead || s.dim !== W.dim || s.mode === 'spectator') continue; if (Math.abs(q[0] - e.x) < 0.4 && Math.abs(q[2] - e.z) < 0.4 && e.y > q[1] - 0.1 && e.y < q[1] + 1.8) { e.hookPeer = p.id; play('hit', { vol: 0.4 }); break; } }
+    return r; };
+  const urd = useRod; useRod = function () { const b = ENT.find(e => e.kind === 'bobber' && !e.dead); if (MP.on && b && b.hookPeer != null) { const p = MP.peers.get(b.hookPeer); if (p && p.pos) { const dx = PL.x - p.pos[0], dy = PL.y - p.pos[1], dz = PL.z - p.pos[2]; mpSend({ t: 'pull', tgt: p.id, vx: dx * 0.1, vy: dy * 0.1 + Math.sqrt(Math.hypot(dx, dy, dz)) * 0.08, vz: dz * 0.1 }, MP.server ? p.id : (MP.role === 'host' ? p.id : undefined)); } b.hookPeer = null; swing(); removeEnt(b); damageItem(INV.slots, INV.sel, 5); return; } return urd.apply(this, arguments); };
   const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
   for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
   const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
@@ -18493,6 +18549,7 @@ function frame(now) {
   { const [mh, oh] = handItems(); R.hand.glint = [mh && (mh.e || ITEMS[mh.id].glint), oh && (oh.e || ITEMS[oh.id].glint)]; R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
+  dynLights(px, py, pz); effSwirls(dt, px, pz);
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
@@ -18534,6 +18591,16 @@ function panoramaFrame(dt) {
   const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
   R.stepAnimation(dt);
   R.renderFrame(dt, camera.position, null); R.rd = rd;
+}
+// light carried around: a torch or lantern in either hand (yours, other players'), and glowing items on the ground (OptiFine-style dynamic light)
+function dynLights(px, py, pz) {
+  const L = [];
+  if (OPT.dynLight !== false) {
+    if (!PL.dead && !spectator()) { const [mh, oh] = handItems(), lv = Math.max(R.itemLum(mh && mh.id), R.itemLum(oh && oh.id)); if (lv) L.push([px, py + 1.2, pz, lv, 1e9]); }
+    if (typeof MP !== 'undefined' && MP.on) for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || !p.pos || !p.m || !p.m.visible) continue; const lv = Math.max(R.itemLum(s.held), R.itemLum(s.off)), d = Math.hypot(p.pos[0] - px, p.pos[2] - pz); if (lv && d < 48) L.push([p.pos[0], p.pos[1] + 1.2, p.pos[2], lv, 1e6 - d]); }
+    for (const e of ENT) if (e.kind === 'item' && !e.dead && e.stack) { const lv = R.itemLum(e.stack.id); if (!lv) continue; const d = Math.hypot(e.x - px, e.z - pz); if (d < 40) L.push([e.x, e.y + 0.3, e.z, lv, 1e3 - d]); }
+  }
+  L.sort((a, b) => b[4] - a[4]); R.setDynLights(L.map(l => l.slice(0, 4)));
 }
 // torch flames/smoke and lit furnaces near the player (light sources rescanned twice a second)
 let ambT = 0, ambList = [];

@@ -14,8 +14,14 @@ services:
         sync: false
       - key: REQUIRE_LOGIN      # 1: Google 로그인한 사람만 접속
         value: "0"
-    # 무료 플랜은 서버가 다시 시작될 때(재배포, 15분 동안 접속이 없어 잠들었다 깨어날 때) 파일이 지워져 세계가 사라집니다.
-    # 세계를 계속 남기려면 유료 플랜으로 바꾸고 아래 디스크와 WORLDS_DIR 의 주석을 푸세요.
+      - key: GITHUB_BACKUP_REPO # 세계를 백업할 저장소 (소유자/저장소) — README "세계 저장" 참고, 비워 두면 백업 안 함
+        sync: false
+      - key: GITHUB_TOKEN       # 그 저장소에 Contents 읽기·쓰기 권한이 있는 토큰
+        sync: false
+      - key: KEEP_AWAKE         # 1: 10분마다 자기 주소에 /ping 을 보내 무료 플랜에서 잠들지 않음
+        value: "1"
+    # 무료 플랜은 서버가 다시 시작될 때 파일이 지워집니다. GITHUB_BACKUP_REPO·GITHUB_TOKEN 을 넣으면 세계가 그 저장소에 백업되었다가 되살아납니다.
+    # 유료 플랜이라면 아래 디스크와 WORLDS_DIR 의 주석을 풀어도 됩니다.
     #   - key: WORLDS_DIR
     #     value: /var/data/worlds
     # disk:

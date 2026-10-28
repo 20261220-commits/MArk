@@ -20,6 +20,7 @@ const CFG = { server: process.env.SERVER_URL || '', googleClientId: process.env.
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
+  if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
   if (u === '/js/config.js' && (CFG.server || CFG.googleClientId)) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
   const f = path.join(root, path.normalize(u));
@@ -66,9 +67,11 @@ const WDIR = path.join(WORLDS, worldName), CDIR = path.join(WDIR, 'chunks');
 const state = { meta: null, time: 1000, rain: 0, thunder: false, players: {}, weatherT: 12000 + Math.random() * 168000 };
 const keys = new Set(), dirty = new Map(); let stateDirty = false;
 const fileOf = dk => path.join(CDIR, encodeURIComponent(dk) + '.json');
-try { Object.assign(state, JSON.parse(fs.readFileSync(path.join(WDIR, 'world.json'), 'utf8'))); for (const f of fs.readdirSync(CDIR)) if (f.endsWith('.json')) keys.add(decodeURIComponent(f.slice(0, -5))); console.log(`세계 "${worldName}" 불러옴 (시드 ${state.meta.seed}, 청크 ${keys.size}개)`); } catch (e) { state.meta = null; }
+function loadWorld() { try { Object.assign(state, JSON.parse(fs.readFileSync(path.join(WDIR, 'world.json'), 'utf8'))); for (const f of fs.readdirSync(CDIR)) if (f.endsWith('.json')) keys.add(decodeURIComponent(f.slice(0, -5))); console.log(`세계 "${worldName}" 불러옴 (시드 ${state.meta.seed}, 청크 ${keys.size}개)`); } catch (e) { state.meta = null; } }
+loadWorld();
+let changedSinceBackup = false;
 function saveWorld() {
-  if (!state.meta) return; fs.mkdirSync(CDIR, { recursive: true });
+  if (!state.meta) return; fs.mkdirSync(CDIR, { recursive: true }); if (dirty.size) changedSinceBackup = true;
   if (stateDirty) { fs.writeFileSync(path.join(WDIR, 'world.json'), JSON.stringify(state)); stateDirty = false; }
   for (const [dk, c] of dirty) fs.writeFileSync(fileOf(dk), JSON.stringify({ rec: c.rec, edits: c.edits, tiles: c.tiles }));
   dirty.clear();
@@ -78,7 +81,34 @@ const conns = new Map(); // id -> socket of a player in the server world
 const core = mpWorldCore(store, (id, o) => { const c = conns.get(id); if (c) c.send(JSON.stringify(o)); });
 setInterval(() => { core.tick(); }, 1000);
 setInterval(() => { stateDirty = true; saveWorld(); }, 5000);
-for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stateDirty = true; saveWorld(); process.exit(0); });
+// ---------- staying up: a backup that outlives a wiped disk, and a ping so a free host doesn't put the server to sleep ----------
+const { githubBackup } = require(path.join(__dirname, 'backup.js'));
+const BACKUP = process.env.GITHUB_BACKUP_REPO && process.env.GITHUB_TOKEN ? githubBackup({ repo: process.env.GITHUB_BACKUP_REPO, token: process.env.GITHUB_TOKEN, branch: process.env.GITHUB_BACKUP_BRANCH || 'world-backup', api: process.env.GITHUB_API_URL || undefined }) : null;
+function worldSnapshot() { // everything on disk: world.json and every chunk
+  stateDirty = true; saveWorld(); if (!state.meta) return null;
+  const chunks = {}; for (const dk of keys) { try { chunks[dk] = JSON.parse(fs.readFileSync(fileOf(dk), 'utf8')); } catch (e) {} }
+  return { v: 1, name: worldName, state: JSON.parse(fs.readFileSync(path.join(WDIR, 'world.json'), 'utf8')), chunks };
+}
+let backingUp = null;
+async function backupNow(why) {
+  if (!BACKUP || backingUp) return backingUp; const snap = worldSnapshot(); if (!snap) return;
+  backingUp = BACKUP.save(snap).then(n => { changedSinceBackup = false; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => console.log('세계 백업 실패: ' + e.message)).finally(() => { backingUp = null; });
+  return backingUp;
+}
+async function restoreIfEmpty() { // a fresh disk (a restart on a free host): bring the world back from the backup
+  if (!BACKUP || state.meta) return;
+  try { const snap = await BACKUP.load(); if (!snap || !snap.state || !snap.state.meta) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
+    fs.mkdirSync(CDIR, { recursive: true }); fs.writeFileSync(path.join(WDIR, 'world.json'), JSON.stringify(snap.state));
+    for (const [dk, c] of Object.entries(snap.chunks || {})) fs.writeFileSync(fileOf(dk), JSON.stringify(c));
+    loadWorld(); console.log('백업에서 세계를 되살렸습니다'); }
+  catch (e) { console.log('백업 불러오기 실패: ' + e.message); }
+}
+if (BACKUP) { setInterval(() => { if (changedSinceBackup) backupNow('10분마다'); }, 10 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
+// Render gives the service's own address; asking it for /ping every 10 minutes counts as a visit, so the free plan's
+// 15-minute sleep never comes (KEEP_AWAKE=0 turns this off; KEEP_AWAKE_URL sets the address on other hosts)
+const SELF_URL = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL || '';
+if (SELF_URL && !/^(0|false|no)$/i.test(process.env.KEEP_AWAKE || '')) setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/ping').catch(() => {}); }, 10 * 60 * 1000);
+for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stateDirty = true; saveWorld(); if (BACKUP && state.meta) { const t = setTimeout(() => process.exit(0), 25000); backupNow('서버 종료').finally(() => { clearTimeout(t); process.exit(0); }); } else process.exit(0); }); // a host gives some seconds before it stops the server
 
 // a Google sign-in sent with "join": checked with Google, so the player's things are kept by account
 async function verifyGoogle(tok) {
@@ -139,9 +169,9 @@ server.on('upgrade', (req, sock) => {
     if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
   });
 });
-server.listen(port, () => {
+restoreIfEmpty().then(() => server.listen(port, () => {
   const addrs = Object.values(os.networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal).map(a => a.address);
   console.log(`네모 대륙 서버: http://localhost:${port}` + addrs.map(a => `  ·  http://${a}:${port}`).join(''));
   console.log(`멀티플레이 주소: ws://${addrs[0] || 'localhost'}:${port}/mp`);
   console.log(state.meta ? `서버 세계: ${state.meta.name} — 아무 때나 접속해 플레이할 수 있습니다` : `서버 세계 "${worldName}" 없음 — 처음 접속한 플레이어가 새로 만들거나 자기 세계를 올릴 수 있습니다`);
-});
+}));

@@ -18,17 +18,20 @@ const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false; atlasTex.flipY = false;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 } }]);
+  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
-uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin;
+uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin; uniform vec4 uDyn[6];
 varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
   vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
   float sky = curve(lt.x * uSky);
-  float blk = curve(lt.y) * uFlick;
+  vec3 wp = (modelMatrix * vec4(position / 16.0 - vec3(1.0, 0.0, 1.0), 1.0)).xyz;
+  float dl = 0.0; // light carried by players (a torch in either hand) and lying on the ground: level minus the distance in blocks
+  for (int i = 0; i < 6; i++) { vec4 d = uDyn[i]; if (d.w > 0.0) { vec3 q = abs(wp - d.xyz); dl = max(dl, (d.w - (q.x + q.y + q.z)) / 15.0); } }
+  float blk = curve(max(lt.y, clamp(dl, 0.0, 1.0))) * uFlick;
   vec3 c = sky * uSkyCol + blk * vec3(1.0, 0.86, 0.66);
   c = max(c, vec3(uMin));
   vLight = min(c, vec3(1.0)) * lt.z;
@@ -58,10 +61,25 @@ void main(){
   gl_FragColor = vec4(t.rgb * vTint * vLight, t.a);
   #include <fog_fragment>
 }`;
+// ---------- dynamic light: torches, lanterns and the like held in either hand (yours and other players') or dropped ----------
+const DYN = Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0));
+function itemLum(id) {
+  const d = id && ITEMS[id]; if (!d) return 0;
+  if (id === IID.lava_bucket) return 15;
+  if (d.place == null) return 0;
+  if (d.place === BID.campfire) return 15; if (d.place === BID.soul_campfire) return 10; // lit when placed
+  return S.emitOf(d.place, d.pmeta || 0) || 0;
+}
+R.itemLum = itemLum; R.dyn = DYN;
+// the lights to use this frame: [x, y, z, level], brightest and nearest first
+R.setDynLights = list => { for (let i = 0; i < DYN.length; i++) { const l = list[i]; if (l) DYN[i].set(l[0], l[1], l[2], l[3]); else DYN[i].set(0, 0, 0, 0); } };
+// how bright a spot is from those lights (0..15), for entities and the held item
+R.dynAt = (x, y, z) => { let b = 0; for (const d of DYN) if (d.w > 0) b = Math.max(b, d.w - (Math.abs(x - d.x) + Math.abs(y - d.y) + Math.abs(z - d.z))); return b; };
 // opaque terrain never discards, so tile-based GPUs keep early depth rejection; cutout geometry has its own material
 const matOpaque = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS.replace('if (t.a < 0.5) discard;', ''), fog: true });
 const matCutout = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: CHUNK_FS, fog: true });
 const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexShader: CHUNK_VS, fragmentShader: TRANS_FS, fog: true, transparent: true, depthWrite: false, side: THREE.FrontSide });
+for (const m of [matOpaque, matCutout, matTrans]) m.uniforms.uDyn.value = DYN;
 matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
 
