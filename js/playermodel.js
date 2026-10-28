@@ -137,10 +137,10 @@ function heldTransform(id, left, isBlock) {
 // what each hand really holds (the off-hand use swaps items for a moment): [main hand, off hand]
 const handItems = () => { const off = typeof offItem === 'function' ? offItem() : INV.off; return [typeof OFF !== 'undefined' && OFF.swapped ? INV.off : PL.held(), off]; };
 const mainRight = () => typeof OPT === 'undefined' || OPT.mainHand !== 'left';
-function updateHeld(m, items, light) {
+function updateHeld(m, items, light, mr = mainRight()) { // mr: the main hand is the right one (another player's own setting)
   const ud = m.userData;
   items.forEach((st, k) => {
-    const rightArm = (k === 0) === mainRight(), id = st ? st.id : 0, gl = st && (st.e || ITEMS[id].glint), key = id + (rightArm ? 'r' : 'l') + (gl ? 'g' : '');
+    const rightArm = (k === 0) === mr, id = st ? st.id : 0, gl = st && (st.e || ITEMS[id].glint), key = id + (rightArm ? 'r' : 'l') + (gl ? 'g' : '');
     if (ud.heldKey[k] !== key) {
       ud.heldKey[k] = key; const old = ud.held[k]; if (old) { old.parent.remove(old); old.userData.item.material.dispose(); } ud.held[k] = null;
       if (id > 0) {
