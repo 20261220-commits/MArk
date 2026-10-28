@@ -13,7 +13,7 @@ function gatherBoxes(x0, y0, z0, x1, y1, z1) {
   for (let x = ax; x <= bx; x++) for (let z = az; z <= bz; z++) {
     if (!isLoaded(x, z)) { pushBox(x, ay, z, x + 1, by + 1, z + 1); continue; }
     for (let y = ay; y <= by; y++) {
-      if (y < 0) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
+      if (y < MINY) { pushBox(x, y, z, x + 1, y + 1, z + 1); continue; }
       const id = getBlock(x, y, z);
       if (!SOLID[id]) { if (id === BID.powder_snow && PHYS.snowSolid) pushBox(x, y, z, x + 1, y + 1, z + 1); else if (id === BID.scaffolding && PHYS.scafTop && PHYS.feetY >= y + 1 - 1e-3) pushBox(x, y + 0.875, z, x + 1, y + 1, z + 1); continue; } // scaffolding: stand on top unless sneaking
       const bs = S.collide(id, getMeta(x, y, z));
@@ -372,7 +372,7 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite.material.map.dispose(); e.nameSprite.material.dispose(); e.nameSprite = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+function removeEnt(e) { e.dead = true; if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -448,7 +448,7 @@ function explode(x, y, z, power, fire) {
     while (f > 0) {
       const bx = Math.floor(px2), by = Math.floor(py2), bz = Math.floor(pz2), b = getBlock(bx, by, bz);
       if (b) f -= (resistance(b) + 0.3) * 0.3;
-      if (f > 0 && b && by > 0 && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
+      if (f > 0 && b && by > MINY && !noGrief) broken.set(bx + ',' + by + ',' + bz, b);
       px2 += dx * 0.3; py2 += dy * 0.3; pz2 += dz * 0.3; f -= 0.225;
     }
   }
@@ -567,6 +567,11 @@ function mobTick(e) {
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
+  if (e.age % 10 === 0 && !(d.boss)) { // a cactus pricks what touches it (its sides are 1/16 in)
+    const x0 = Math.floor(e.x - e.w - 0.07), x1 = Math.floor(e.x + e.w + 0.07), z0 = Math.floor(e.z - e.w - 0.07), z1 = Math.floor(e.z + e.w + 0.07), y0 = Math.floor(e.y - 0.01), y1 = Math.floor(e.y + e.h);
+    let hit = false; for (let x = x0; x <= x1 && !hit; x++) for (let z = z0; z <= z1 && !hit; z++) for (let y = y0; y <= y1; y++) if (getBlock(x, y, z) === BID.cactus) { hit = true; break; }
+    if (hit) hurtMob(e, 1, null);
+  }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
@@ -578,7 +583,7 @@ function mobTick(e) {
   if (e.eff) effectTick(e);
   if (e.jockey && jockeyTick(e)) return; // a chicken or spider carrying a jockey
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
-  if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < -40) removeEnt(e); return; }
+  if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < voidY()) removeEnt(e); return; }
   // AI
   let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
@@ -639,7 +644,7 @@ function mobTick(e) {
   // fall damage
   if (e.onGround) { if (e.fallY != null && e.fallY - e.y > 3.5 + (d.fallReduce || 0) && !inF) hurtMob(e, Math.floor(e.fallY - e.y - 3 - (d.fallReduce || 0)), null); e.fallY = null; }
   else if (e.vy < 0 && e.fallY == null) e.fallY = e.y; else if (inF) e.fallY = null;
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
   const hs = Math.hypot(e.vx, e.vz);
   e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
   // spawner/despawn fuse visual
@@ -663,7 +668,7 @@ function squidTick(e) {
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += dy * 0.1; }
   physMove(e, e.vx, e.vy, e.vz, 0);
   e.walk += 0.15 + Math.hypot(e.vx, e.vy, e.vz) * 4; e.walkAmt = 1;
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
@@ -709,13 +714,17 @@ function entityTick() {
       if (e.pickup > 0) e.pickup--;
       if (e.kind === 'item') {
         if (e.age > 6000) { removeEnt(e); continue; }
+        { const bx = Math.floor(e.x), by = Math.floor(e.y + 0.05), bz = Math.floor(e.z), here = getBlock(bx, by, bz), r = 0.15, fx = e.x - bx, fz = e.z - bz;
+          const cac = here === BID.cactus || getBlock(bx, by - 1, bz) === BID.cactus && e.y - Math.floor(e.y) < 0.05 || (fx < r && getBlock(bx - 1, by, bz) === BID.cactus) || (fx > 1 - r && getBlock(bx + 1, by, bz) === BID.cactus) || (fz < r && getBlock(bx, by, bz - 1) === BID.cactus) || (fz > 1 - r && getBlock(bx, by, bz + 1) === BID.cactus);
+          const hot = (here === BID.lava || here === BID.fire || here === BID.soul_fire) && !/^netherite_|^ancient_debris$/.test(ITEMS[e.stack.id].key);
+          if (cac || hot) { if (hot) play('fizz', { vol: 0.3 }); removeEnt(e); continue; } } // a cactus destroys items; lava and fire burn them (not netherite)
         if ((e.age & 3) === 0 && e.onGround !== false) plateCheck(e);
         if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && same(o.stack, e.stack) && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
         if (e.pickup <= 0 && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.3 && e.y > PL.y - 0.8 && e.y < PL.y + 2.3 && Math.abs(PL.z - e.z) < 1.3) {
           const left = INV.add(e.stack); if (left < e.stack.n) { statOf('picked', e.stack.id, e.stack.n - left); play('pop', { vol: 0.5 }); e.stack.n = left; if (left <= 0) { removeEnt(e); continue; } }
         }
       }
-      if (e.y < -40) removeEnt(e);
+      if (e.y < voidY()) removeEnt(e);
     } else if (e.kind === 'falling') {
       e.vy -= 0.04; e.vy *= 0.98; physMove(e, 0, e.vy, 0);
       const drip = e.block === BID.pointed_dripstone;
@@ -772,7 +781,7 @@ function arrowTick(e) {
   }
   e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99;
   if (fluidAt(e.x, e.y, e.z)) { e.vx *= 0.6; e.vy *= 0.6; e.vz *= 0.6; }
-  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < -20 && !e.trident)) removeEnt(e);
+  if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < voidY() && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
 function trySpawnHostile() {
@@ -783,11 +792,11 @@ function trySpawnHostile() {
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
     if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
-    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
-    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
+    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // down to the bottom of the world
+    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
-    if (Math.max(sky, blk) > 7) continue;
+    if (sky > 7 || blk > 0) continue; // 1.18: monsters only where no block light reaches
     if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
     const types = ['zombie', 'skeleton', 'creeper', 'spider'];
     const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
@@ -805,18 +814,23 @@ function spawnAnimalsForChunk(c) {
   let types;
   if (S.isOceanBio(b) || b === S.BIO.RIVER) {
     const t = 'squid'; // glow squid live deep underground instead (trySpawnGlowSquid)
-    for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27 && c.blocks[((y + 1) << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
+    for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[BI(x, y, z)] === 27 && c.blocks[BI(x, y + 1, z)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
   }
-  if (b === S.BIO.MOUNTAINS) types = ['goat'];
+  const vk = S.BIOMES[c.biome[8 * 16 + 8]] && S.BIOMES[c.biome[8 * 16 + 8]][8]; // 1.18 mountain biomes have their own animals
+  if (vk === 'snowy_slopes' || vk === 'jagged_peaks' || vk === 'frozen_peaks') types = ['goat'];
+  else if (vk === 'meadow') types = ['donkey', 'rabbit', 'sheep'];
+  else if (vk === 'grove') types = ['wolf', 'rabbit', 'fox'];
+  else if (vk === 'stony_peaks') return;
+  else if (b === S.BIO.MOUNTAINS) types = ['goat'];
   else if (b === S.BIO.PLAINS || b === S.BIO.FOREST || b === S.BIO.BIRCH || b === S.BIO.TAIGA || b === S.BIO.SWAMP || b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA) types = ['pig', 'cow', 'sheep', 'chicken'];
   else return;
   const t = types[R0.int(types.length)], n = 2 + R0.int(3);
   for (let i = 0; i < n; i++) {
     const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12);
-    let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]] && !FLUID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--;
-    const g = c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)];
-    if (g !== 2 && g !== 50 && g !== 3 && g !== 1 && g !== 51) continue;
+    let y = MAXY - 2; while (y > MINY + 1 && !SOLID[c.blocks[BI(x, y, z)]] && !FLUID[c.blocks[BI(x, y, z)]]) y--;
+    const g = c.blocks[BI(x, y, z)];
+    if (g !== 2 && g !== 50 && g !== 3 && g !== 1 && g !== 51 && g !== BID.packed_ice) continue;
     spawnMob(t, x + .5, y + 1, z + .5);
   }
 }
@@ -826,7 +840,7 @@ function spawnerTick() {
     const c = chunkAt(cx, cz); if (!c) continue;
     for (const [i, t] of c.tiles) {
       if (t.type !== 'spawner') continue;
-      const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
+      const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
       if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
@@ -867,24 +881,40 @@ W.onChunkLoaded = (c, fresh) => {
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
   if (c.spawns) { // villagers, golems and crystals placed by structure generation
-    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = t.i >> 8, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
+    for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = (t.i >> 8) + MINY, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
     c.spawns = null; c.modified = true;
   }
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
 };
 
+// a name above a head, drawn as Java's EntityRenderer.renderLabelIfPresent does: 0.025 blocks a font pixel, so it keeps
+// its size at any distance; a faint plate (25% black) with faint text that shows through walls, and the text again in
+// full white where it can be seen. Sneaking leaves only the faint layer, and walls hide it too. It darkens in the dark.
+const TAG_PX = 6, TAG_F = (8 * TAG_PX) + 'px Galmuri11, sans-serif'; // canvas pixels a font pixel, the font a line tall
+function makeNameTag(text) {
+  const mk = (bg, a, through) => {
+    const c = document.createElement('canvas'), g = c.getContext('2d'), t = new THREE.CanvasTexture(c);
+    const draw = () => { g.font = TAG_F; const w = Math.ceil(g.measureText(text).width) + 2 * TAG_PX; c.width = w; c.height = 9 * TAG_PX; g.font = TAG_F;
+      if (bg) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, w, c.height); } g.fillStyle = `rgba(255,255,255,${a})`; g.textBaseline = 'middle'; g.fillText(text, TAG_PX, c.height / 2 + TAG_PX * 0.5); sp.userData.w = w / c.height; t.needsUpdate = true; };
+    t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData = { w: 1 };
+    draw(); if (document.fonts) document.fonts.load(TAG_F).then(draw).catch(() => {}); // the game's pixel font, once it has loaded
+    return sp;
+  };
+  const tag = { text, back: mk(true, 32 / 255, true), front: mk(false, 1, false) }; scene.add(tag.back, tag.front); return tag;
+}
+// y: the top of the head (the label sits 0.5 above it); far: how far off it can be seen (64, or 32 for a sneaking player)
+function placeNameTag(tag, x, y, z, show, sneak, light) {
+  const d2 = (camera.position.x - x) ** 2 + (camera.position.y - y) ** 2 + (camera.position.z - z) ** 2, lim = sneak ? 32 : 64;
+  const on = show && !UI.hideHud && d2 < lim * lim, H = 0.025 * 9;
+  for (const sp of [tag.back, tag.front]) { sp.position.set(x, y + 0.5 + H / 2, z); sp.scale.set(sp.userData.w * H, H, 1); sp.material.color.setScalar(light == null ? 1 : Math.max(0.25, light)); }
+  tag.back.visible = on; tag.back.material.depthTest = !!sneak; tag.front.visible = on && !sneak;
+}
+function dropNameTag(tag) { if (!tag) return; for (const sp of [tag.back, tag.front]) { scene.remove(sp); sp.material.map.dispose(); sp.material.dispose(); } }
 // a named mob (name tag) shows its name while the crosshair is on it, as in Java
 function mobNameTag(e, x, y, z) {
-  if (!e.nameSprite || e.nameSprite.userData.text !== e.name) {
-    if (e.nameSprite) scene.remove(e.nameSprite);
-    const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif'; g.font = F; const w = Math.ceil(g.measureText(e.name).width) + 24; c.width = w; c.height = 60;
-    g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(e.name, 12, 32);
-    const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false;
-    e.nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true, fog: false })); e.nameSprite.userData = { text: e.name, w: w / 60 }; e.nameSprite.renderOrder = 6; scene.add(e.nameSprite);
-  }
-  const s = e.nameSprite, d = Math.hypot(camera.position.x - x, camera.position.y - y, camera.position.z - z);
-  s.visible = !e.deathT && d < 64 && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e;
-  s.position.set(x, y + e.h + 0.45, z); s.scale.set(s.userData.w * 0.32, 0.32, 1);
+  if (!e.nameTag || e.nameTag.text !== e.name) { dropNameTag(e.nameTag); e.nameTag = makeNameTag(e.name); }
+  placeNameTag(e.nameTag, x, y + e.h, z, !e.deathT && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e, false, typeof lightBright === 'function' ? lightBright(x, y + e.h, z) : 1);
 }
 // ---------- render update (interpolated) ----------
 function entityRender(alpha, now) {
@@ -918,7 +948,7 @@ function entityRender(alpha, now) {
       const bb = e.def.glow || (e.eff && e.eff.glowing) ? Math.max(br, 0.9) : br;
       for (const m2 of e.mesh.userData.own) { if (!m2.color) continue; if (e.hurt > 0 || e.deathT) m2.color.setRGB(bb * 1.4, bb * 0.4, bb * 0.4); else if (flash) m2.color.setRGB(2, 2, 2); else if (e.charged) { const p = 0.85 + Math.sin(now / 120) * 0.3; m2.color.setRGB(bb * 0.7 * p, bb * 0.95 * p, bb * 1.7 * p); } else m2.color.setScalar(bb); }
       if (e.fuse > 0) e.mesh.scale.setScalar(1 + e.fuse / 30 * 0.15); else if (!e.baby) e.mesh.scale.setScalar(e.scale || e.def.scale || 1);
-      if (e.name) mobNameTag(e, x, y, z); else if (e.nameSprite) { scene.remove(e.nameSprite); e.nameSprite = null; }
+      if (e.name) mobNameTag(e, x, y, z); else if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; }
     } else if (e.kind === 'item') {
       e.mesh.position.set(x, y + 0.15 + Math.sin(now / 400 + e.spin) * 0.05, z); e.mesh.rotation.y = now / 1000 + e.spin;
       e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, br); });

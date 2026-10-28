@@ -79,11 +79,14 @@ function raycast(reach, fluids) {
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
+// caves & cliffs: from the build limit to the bottom of the world, landing alive (in water too)
+function fallLanded() { if (PL.fallDist > 0 && PL.fallFrom >= 319 && PL.y < -58.5 && typeof advGrant === 'function') setTimeout(() => { if (PL.health > 0) advGrant('adventure/fall_from_world_height'); }, 0); }
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
   if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
   if (dmg <= 0) return false;
+  if (PL.sleeping) wakeUp(); // being hurt wakes you
   if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
   if (shieldBlocks(dmg, cause, attacker, from)) return false;
   if (effLv(PL, 'fire_resistance') && (cause === 'fire' || cause === 'lava' || cause === 'burn')) return false;
@@ -91,7 +94,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   // the damage armour takes (Java: every source but those that bypass armour: falling, burning, drowning, starving,
   // magic, wither, suffocation, freezing, the void); each piece wears by a quarter of the damage before armour, at least 1
   if (ARMORED[cause]) {
-    for (let i = 0; i < 4; i++) if (INV.armor[i]) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4)));
+    for (let i = 0; i < 4; i++) if (INV.armor[i] && ITEMS[INV.armor[i].id].armor && !ITEMS[INV.armor[i].id].elytra) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4))); // armour only: an elytra wears by flying
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
     if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
@@ -128,7 +131,12 @@ function die(cause) {
   UI.showDeath('플레이어가 ' + (DEATH_MSG[cause] || '죽었습니다'));
 }
 function respawn() {
-  const sp = PL.spawn || W.worldSpawn;
+  if (PL.spawn && PL.spawnBed && PL.spawnDim === 0) { // a bed: there still, and somewhere to stand beside it (else the world spawn)
+    const [bx, by, bz] = PL.spawn, c = W.dim === 0 && chunkAt(bx >> 4, bz >> 4);
+    if (c && getBlock(bx, by - 1, bz) !== BID.red_bed) { PL.spawn = null; PL.spawnBed = false; UI.flash('집 침대가 없거나 막혀 있습니다'); }
+    else if (c) { const w = bedWakeSpot(bx, by - 1, bz); PL.respawnAt = [w[0] - .5, w[1], w[2] - .5]; }
+  }
+  const sp = PL.respawnAt || PL.spawn || W.worldSpawn; PL.respawnAt = null;
   if (PL.spawnDim === -1 && PL.spawn) { // a respawn anchor in the Nether
     PL.health = 20; PL.food = 20; PL.sat = 5; PL.exh = 0; PL.air = 300; PL.fire = 0; PL.fallDist = 0; PL.dead = false; PL.inv = 60; PL.vx = PL.vy = PL.vz = 0; UI.hudDirty = true;
     if (W.dim !== -1) switchDim(-1, sp[0] + .5, sp[1] + 1, sp[2] + .5, 'anchor'); else anchorArrive();
@@ -176,7 +184,14 @@ function playerTick() {
   if (PL.attackT < 1000) PL.attackT++;
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
-  if (PL.sleeping) { PL.sleeping = Math.min(101, PL.sleeping + 1); if (PL.sleeping > 100 && (typeof mpCanSkipNight !== 'function' || mpCanSkipNight())) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.sleeping = 0; PL.rest = 0; catGifts(); UI.flash('좋은 아침이에요!'); UI.advance('sleep'); } return; }
+  if (PL.sleeping) {
+    const b = PL.bedAt, tod = ((W.time % 24000) + 24000) % 24000;
+    if (IN.sneak || (b && getBlock(b[0], b[1], b[2]) !== BID.red_bed)) { wakeUp(); return; } // sneaking gets you out (and a bed that's gone)
+    if (PL.sleeping > 20 && tod > 23460 || (PL.sleeping > 20 && tod < 12542 && W.thunder < 0.5)) { wakeUp(); return; } // the night ended without you
+    PL.sleeping = Math.min(101, PL.sleeping + 1);
+    if (PL.sleeping > 100 && (typeof mpCanSkipNight !== 'function' || mpCanSkipNight())) { W.time = Math.ceil(W.time / 24000) * 24000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0; PL.rest = 0; wakeUp('좋은 아침이에요!'); catGifts(); UI.advance('sleep'); }
+    return;
+  }
   const spec = spectator();
   const feet = fluidAt(PL.x, PL.y + 0.05, PL.z), waist = fluidAt(PL.x, PL.y + 0.6, PL.z), eyeF = fluidAt(PL.x, PL.y + PL.eyeH, PL.z);
   const inWater = !spec && (feet === 1 || waist === 1), inLava = !spec && (feet === 2 || waist === 2);
@@ -219,7 +234,7 @@ function playerTick() {
     const fr = inWater ? 0.8 + ds * 0.035 : 0.5;
     PL.vx *= fr; PL.vz *= fr; PL.vy *= fr; PL.vy -= 0.02;
     if (PL.hitH && noCollision(PL.x + PL.vx, PL.y + 0.6, PL.z + PL.vz) && !fluidAt(PL.x, PL.y + 1.2, PL.z)) PL.vy = 0.3; // climb out of water onto a ledge
-    PL.fallDist = 0;
+    fallLanded(); PL.fallDist = 0;
   } else {
     const slipB = blockUnder(), sl = BLOCKS[slipB] && BLOCKS[slipB].slip, slip = PL.onGround ? (sl === 2 ? 0.989 : sl ? 0.98 : 0.6) : 1;
     const fr = slip * 0.91;
@@ -250,12 +265,14 @@ function playerTick() {
     if (web || snowB) { if (PL.vx) PL.vx = mx; if (PL.vz) PL.vz = mz; }
     if (ladder && PL.hitH) PL.vy = 0.2;
     if (PL.onGround && blockUnder() === BID.slime_block && !PL.sneaking && my < -0.1) { PL.vy = -my * 0.95; PL.fallDist = 0; } // slime blocks bounce
+    else if (PL.onGround && blockUnder() === BID.red_bed && !PL.sneaking && my < -0.1) { if (PL.fallDist > 3 && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * 0.5); if (dmg > 0) { hurtPlayer(dmg, 'fall'); play('hit'); } } PL.vy = -my * 0.66; PL.fallDist = 0; } // beds bounce and take half the fall
     else if (PL.onGround) {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
       if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      fallLanded();
       PL.fallDist = 0;
-    } else if (PL.y < oy) PL.fallDist += oy - PL.y;
+    } else if (PL.y < oy) { if (!PL.fallDist) PL.fallFrom = oy; PL.fallDist += oy - PL.y; }
     if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
     PL.vx *= fr; PL.vz *= fr;
   }
@@ -292,11 +309,11 @@ function survivalTick(inWater, inLava, eyeF) {
   inBlock(b => { if (b === BID.cactus) { hurtPlayer(1, 'cactus'); return true; } if (b === BID.fire) { PL.fire = Math.max(PL.fire, 160); if (W.tickN % 10 === 0) hurtPlayer(1, 'fire'); return true; } });
   if (PL.onGround && blockUnder() === BID.magma_block && !PL.sneaking && W.tickN % 20 === 0 && !enchLv(INV.armor[3], 'frost_walker')) hurtPlayer(1, 'fire');
   const around = (dx, dz) => getBlock(Math.floor(PL.x + dx), Math.floor(PL.y + 0.5), Math.floor(PL.z + dz)) === BID.cactus;
-  if (around(PL.w + 0.05, 0) || around(-PL.w - 0.05, 0) || around(0, PL.w + 0.05) || around(0, -PL.w - 0.05)) hurtPlayer(1, 'cactus');
+  if (around(PL.w + 0.08, 0) || around(-PL.w - 0.08, 0) || around(0, PL.w + 0.08) || around(0, -PL.w - 0.08) || (PL.onGround && blockUnder() === BID.cactus)) hurtPlayer(1, 'cactus'); // its sides are 1/16 in: touching them (or standing on it) hurts
   // suffocation
   const hb = getBlock(Math.floor(PL.x), Math.floor(PL.y + PL.eyeH), Math.floor(PL.z));
   if (OPQ[hb] && SOLID[hb] && hb !== BID.powder_snow && W.tickN % 10 === 0) hurtPlayer(1, 'suffocate');
-  if (PL.y < -64) hurtPlayer(4, 'void');
+  if (PL.y < voidY()) hurtPlayer(4, 'void');
   // freezing (1.17): 140 ticks inside powder snow to freeze fully, thaws twice as fast; any leather armour piece or burning prevents it
   const canFreeze = !creative() && PL.fire <= 0 && !INV.armor.some(s => s && ITEMS[s.id].armor.mat === 'leather');
   PL.frozen = PL.inSnowBody && canFreeze ? Math.min(140, (PL.frozen || 0) + 1) : Math.max(0, (PL.frozen || 0) - 2);
@@ -333,7 +350,7 @@ function interactTick() {
       else {
         MINE.prog += need === 0 ? 1 : 1 / need; MINE.ticks++;
         R.hand.swing = Math.max(R.hand.swing, 0.01);
-        if (MINE.ticks % 4 === 1) { play('dig', { mat: soundMat(t.id), vol: 0.5 }); R.blockParticles(t.x, t.y, t.z, t.id, 1, lightBright(t.x + .5, t.y + 1, t.z + .5)); }
+        if (MINE.ticks % 4 === 1) { play('dig', { mat: soundMat(t.id), vol: 0.5 }); R.blockParticles(t.x, t.y, t.z, t.id, 1, lightBright(t.x + .5, t.y + 1, t.z + .5), t.m); } // the block's own variant (birch planks, spruce wood...)
         if (MINE.prog >= 1) { breakBlock(t.x, t.y, t.z); MINE.prog = 0; MINE.id = -1; MINE.cd = need === 0 ? 0 : 5; }
       }
     }
@@ -516,13 +533,37 @@ function interactBlock(t, dry) {
   }
   return false;
 }
+// beds (Java's BedBlock / ServerPlayerEntity.trySleep): meta & 3 the facing, & 4 the head half
+function bedParts(x, y, z) { const m = getMeta(x, y, z), d = DIRS[m & 3], s = (m & 4) ? -1 : 1; const o = [x + d[0] * s, y, z + d[2] * s]; return m & 4 ? { head: [x, y, z], foot: o, f: m & 3 } : { head: o, foot: [x, y, z], f: m & 3 }; }
+// where someone getting out of a bed stands: a free spot around it with a floor (BedBlock.findWakeUpPosition), or on top
+function bedWakeSpot(x, y, z) {
+  const { head, foot } = bedParts(x, y, z), free = (cx, cy, cz) => !SOLID[getBlock(cx, cy, cz)] && !SOLID[getBlock(cx, cy + 1, cz)] && !FLUID[getBlock(cx, cy, cz)];
+  for (const [bx, by, bz] of [head, foot]) for (const dy of [0, -1, 1]) for (const [dx, dz] of [[0, -1], [-1, 0], [0, 1], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const cx = bx + dx, cy = by + dy, cz = bz + dz; if (getBlock(cx, cy, cz) === BID.red_bed) continue;
+    if (free(cx, cy, cz) && SOLID[getBlock(cx, cy - 1, cz)]) return [cx + .5, cy, cz + .5];
+  }
+  return [head[0] + .5, head[1] + 0.5625, head[2] + .5];
+}
 function trySleep(x, y, z) {
   if (W.dim !== 0) { setBlock(x, y, z, 0); explode(x + .5, y + .5, z + .5, 5, true); return; } // beds explode outside the Overworld
-  const t = ((W.time % 24000) + 24000) % 24000;
-  PL.spawn = [x, y + 1, z]; PL.spawnDim = 0; UI.flash('리스폰 지점이 설정되었습니다');
+  const { head, foot } = bedParts(x, y, z), t = ((W.time % 24000) + 24000) % 24000;
+  const near = ([bx, by, bz]) => Math.abs(PL.x - (bx + .5)) <= 3 && Math.abs(PL.y - by) <= 2 && Math.abs(PL.z - (bz + .5)) <= 3;
+  if (!near(head) && !near(foot)) { UI.flash('침대가 너무 멀리 있어 쉴 수 없습니다'); return; }
+  if (OPQ[getBlock(head[0], head[1] + 1, head[2])] && SOLID[getBlock(head[0], head[1] + 1, head[2])]) { UI.flash('침대가 막혀 있습니다'); return; }
+  const taken = ENT.some(e => e.kind === 'mob' && !e.dead && e.sleeping && Math.floor(e.x) === head[0] && Math.floor(e.z) === head[2] && Math.abs(e.y - head[1]) < 1.5) || (typeof MP !== 'undefined' && MP.on && [...MP.peers.values()].some(p => p.s && p.s.sleep && p.s.dim === W.dim && Math.floor(p.s.x) === head[0] && Math.floor(p.s.z) === head[2] && Math.abs(p.s.y - head[1]) < 1.5));
+  if (taken) { UI.flash('이 침대는 사용 중입니다'); return; }
+  const sp = [head[0], head[1] + 1, head[2]]; if (!PL.spawn || PL.spawnDim !== 0 || PL.spawn.join() !== sp.join()) UI.flash('리스폰 지점이 설정되었습니다');
+  PL.spawn = sp; PL.spawnDim = 0; PL.spawnBed = true;
   if (t < 12542 || t > 23460) { if (W.thunder < 0.5) { UI.flash('밤이나 뇌우 때만 잘 수 있어요'); return; } } // plain rain is not enough (Java)
-  if (ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - x) < 8 && Math.abs(e.y - y) < 5 && Math.abs(e.z - z) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
-  PL.sleeping = 1; PL.x = x + .5; PL.z = z + .5; PL.y = y + 0.6; PL.vx = PL.vy = PL.vz = 0; advGrant('adventure/sleep_in_bed'); stat('sleep_in_bed'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_rest = 0;
+  if (!creative() && ENT.some(e => e.kind === 'mob' && !e.dead && e.def.hostile && Math.abs(e.x - (head[0] + .5)) < 8 && Math.abs(e.y - head[1]) < 5 && Math.abs(e.z - (head[2] + .5)) < 8)) { UI.flash('주변에 몬스터가 있어 잠들 수 없어요'); return; }
+  if (PL.riding) dismount();
+  PL.sleeping = 1; PL.bedAt = head; PL.x = head[0] + .5; PL.z = head[2] + .5; PL.y = head[1] + 0.5625; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; advGrant('adventure/sleep_in_bed'); stat('sleep_in_bed'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_rest = 0;
+}
+// getting out: sneaking, being hurt, the bed going, or the morning coming while others are still up
+function wakeUp(msg) {
+  if (!PL.sleeping) return; const b = PL.bedAt; PL.sleeping = 0; PL.bedAt = null;
+  if (b && getBlock(b[0], b[1], b[2]) === BID.red_bed) { const w = bedWakeSpot(b[0], b[1], b[2]); PL.x = w[0]; PL.y = w[1]; PL.z = w[2]; } else PL.y = Math.max(PL.y, Math.floor(PL.y) + 0.6);
+  PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0; if (msg) UI.flash(msg);
 }
 const BLAST_OK = id => { const k = ITEMS[id].key; return k.startsWith('raw_') || k.endsWith('_ore') || k.startsWith('iron_') || k.startsWith('golden_') || k === 'ancient_debris'; };
 function newFurnace(kind) { return { type: 'furnace', kind: kind || null, items: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 }; }
@@ -679,7 +720,7 @@ function boneMeal(x, y, z, id) {
 function placeCandle(t, c) {
   let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
   const tgt = getBlock(t.x, t.y, t.z); if (REPL[tgt] && !FLUID[tgt]) { x = t.x; y = t.y; z = t.z; }
-  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < 0 || y >= CH) return;
+  const cur = getBlock(x, y, z); if ((cur && !REPL[cur]) || FLUID[cur] === 2 || !supportedBy(getBlock(x, y - 1, z)) || y < MINY || y >= MAXY) return;
   setBlock(x, y, z, ...S.candleBlock(c, 1, 0)); consume(); play('place', { mat: 'wool' }); swing();
 }
 function placeBlock(t, d) {
@@ -695,14 +736,14 @@ function placeBlock(t, d) {
   const sameSlab = m => !BLOCKS[id].slabv || (m >> 1) === vi;
   if (d.block && slabFull && tgt === id && sameSlab(t.m) && ((t.ny === 1 && !(t.m & 1)) || (t.ny === -1 && (t.m & 1)))) { setBlock(t.x, t.y, t.z, slabFull, slabFm || (BLOCKS[id].wax && (t.m & BLOCKS[id].wax) ? 1 : 0)); consume(); play('place', { mat: soundMat(id) }); swing(); return; }
   if (id === BID.snow && tgt === BID.snow && (t.m & 7) < 7) { setBlock(t.x, t.y, t.z, BID.snow, t.m + 1); consume(); swing(); return; }
-  if (y < 0 || y >= CH) return;
+  if (y < MINY || y >= MAXY) { if (y >= MAXY) UI.flash('건축 높이 제한은 ' + MAXY + '입니다'); return; }
   const cur = getBlock(x, y, z); if (cur && !REPL[cur]) return;
   if (cur === id && slabFull && sameSlab(getMeta(x, y, z))) { setBlock(x, y, z, slabFull, slabFm || (BLOCKS[id].wax && (getMeta(x, y, z) & BLOCKS[id].wax) ? 1 : 0)); consume(); swing(); return; }
   const below = getBlock(x, y - 1, z), fd = facingDir();
   const b = BLOCKS[id];
   // placement rules
   if (b.plant) {
-    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : b.plant === 11 ? OPQ[getBlock(x, y + 1, z)] : b.plant >= 15 ? true : OPQ[below]; // 11: hangs under a block (spore blossom, hanging roots) // 15+: sea plants, checked by oceanPlace
+    const ok = b.plant === 1 ? (below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block) : b.plant === 2 ? (below === 9 || below === 3 || below === 2 || below === BID.red_sand || below === BID.terracotta || below === BID.stained_terracotta || below === BID.podzol || below === BID.coarse_dirt) : b.plant === 3 ? (below === id || ((below === 2 || below === 3 || below === 9 || below === BID.red_sand || below === BID.podzol || below === BID.coarse_dirt || below === BID.moss_block || below === BID.rooted_dirt) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27))) : b.plant === 4 ? (below === id || below === 9 || below === BID.red_sand) : b.plant === 5 ? below === BID.farmland : b.plant === 7 ? (OPQ[below] || below === BID.soul_sand) : b.plant === 8 ? below === BID.soul_sand : b.plant === 9 ? below === 27 : b.plant === 11 ? OPQ[getBlock(x, y + 1, z)] : b.plant >= 15 ? true : OPQ[below]; // 11: hangs under a block (spore blossom, hanging roots) // 15+: sea plants, checked by oceanPlace
     if (!ok) return;
     if (id === BID.cactus && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)])) return;
   }
@@ -745,7 +786,7 @@ function placeBlock(t, d) {
   }
   if (id === BID.red_bed) {
     const dir = DIRS[fd], hx = x + dir[0], hz = z + dir[2], hb = getBlock(hx, y, hz);
-    if ((hb && !REPL[hb]) || !SOLID[below] || !SOLID[getBlock(hx, y - 1, hz)]) return;
+    if ((hb && !REPL[hb]) || entityBlocks(x, y, z) || entityBlocks(hx, y, hz)) return; // (no floor needed, as in Java)
     setBlock(x, y, z, id, fd | (meta & 0xf0), { noUpdate: true }); setBlock(hx, y, hz, id, fd | 4 | (meta & 0xf0));
     consume(); play('place', { mat: 'wool' }); swing(); return;
   }
@@ -813,7 +854,7 @@ function furnaceTick() {
     if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= cookT) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
     else if (t.cook > 0) t.cook = Math.max(0, t.cook - 2);
     const lit = t.burn > 0;
-    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
+    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
   }
 }
 
@@ -821,7 +862,7 @@ function furnaceTick() {
 function chorusTeleport() {
   for (let k = 0; k < 16; k++) {
     const x = Math.floor(PL.x + (Math.random() - .5) * 16), z = Math.floor(PL.z + (Math.random() - .5) * 16); let y = Math.floor(PL.y + (Math.random() - .5) * 16);
-    while (y > 1 && !SOLID[getBlock(x, y - 1, z)]) y--;
+    while (y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)]) continue;
     PL.x = PL.px = x + .5; PL.y = PL.py = y; PL.z = PL.pz = z + .5; PL.fallDist = 0; play('teleport'); return;
   }

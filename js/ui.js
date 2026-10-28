@@ -137,7 +137,7 @@ function renderDebug(dt, fps) {
   const P = typeof PERF !== 'undefined' ? PERF : null, ms = k => P && P.n ? (P[k] / P.n).toFixed(1) : '-';
   const perf = `틱 ${ms('tick')}ms · 청크 ${ms('stream')}+${ms('inbox')}ms · 렌더 ${ms('render')}ms`;
   if (P) { for (const k in P) P[k] = 0; }
-  el.textContent = `네모 대륙 1.17 (Java Edition 스타일)\n${fps} fps · ${perf} · 해상도 ${Math.round(R.pixelScale * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${(() => { const cb = W.dim === 0 ? S.caveBiomeAt(W.seed, bx, Math.floor(PL.y), bz, topY(bx, bz), W.exp) : -1; const b = cb >= 0 ? cb : biomeAt(bx, bz); return S.BIOMES[b][0] + ' (minecraft:' + S.BIOMES[b][8] + ')'; })()}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
+  el.textContent = `네모 대륙 1.18 (Java Edition 스타일)\n${fps} fps · ${perf} · 해상도 ${Math.round(R.pixelScale * 100)}% · 렌더 거리 ${R.rd}\n청크: ${W.chunks.size} 로드 · ${meshed} 렌더 · 대기 ${W.pending.size}\n엔티티: ${ENT.length} · 파티클 ${R.particles.length}\n\nXYZ: ${PL.x.toFixed(3)} / ${PL.y.toFixed(5)} / ${PL.z.toFixed(3)}\n블록: ${bx} ${by} ${bz}\n청크: ${bx & 15} ${by} ${bz & 15} in ${bx >> 4} ${bz >> 4}\n방향: ${facing} (${(((-PL.yaw * 180 / Math.PI) % 360 + 540) % 360 - 180).toFixed(1)} / ${(-PL.pitch * 180 / Math.PI).toFixed(1)})\n바이옴: ${(() => { const cb = W.dim === 0 ? S.caveBiomeAt(W.seed, bx, Math.floor(PL.y), bz, topY(bx, bz), W.exp) : -1; const b = cb >= 0 ? cb : biomeAt(bx, bz); return S.BIOMES[b][0] + ' (minecraft:' + S.BIOMES[b][8] + ')'; })()}\n밝기: ${Math.max(l & 15, (l >> 4) - skyDarken())} (하늘 ${l >> 4}, 블록 ${l & 15})\n시간: ${Math.floor(((W.time % 24000) + 24000) % 24000)} (${Math.floor(W.time / 24000)}일차)${W.rain > 0.5 ? ' · 비' : ''}${t}`;
 }
 
 // ---------- container screens ----------
@@ -245,7 +245,7 @@ function markDrag() {
 function screenDown(e) {
   e.preventDefault();
   const el = e.target.closest('.sl');
-  if (!el) { if (!e.target.closest('.panel') && INV.cursor) { const c = INV.cursor; if (e.button === 2) { dropItem(PL.x, PL.y + 1.3, PL.z, c.id, 1, lookDir().map(v => v * 0.3), 40, c.d); c.n--; if (!c.n) INV.cursor = null; } else { dropStack(PL.x, PL.y + 1.3, PL.z, c, lookDir().map(v => v * 0.3), 40); INV.cursor = null; } UI.renderScreen(); } return; }
+  if (!el) { if (!e.target.closest('.panel') && INV.cursor) { const c = INV.cursor; if (e.button === 2) { dropItem(PL.x, PL.y + 1.3, PL.z, c.id, 1, lookDir().map(v => v * 0.3), 40, c.d, c); c.n--; if (!c.n) INV.cursor = null; } else { dropStack(PL.x, PL.y + 1.3, PL.z, c, lookDir().map(v => v * 0.3), 40); INV.cursor = null; } UI.renderScreen(); } return; }
   if (el.dataset.trash) { INV.cursor = null; UI.renderScreen(); return; }
   if (el.dataset.c) { const id = +el.dataset.c; if (INV.cursor) INV.cursor = null; else if (e.shiftKey) { const k = INV.slots.findIndex((s, i) => i < 9 && !s); INV.slots[k >= 0 ? k : INV.sel] = { id, n: maxStack(id) }; } else INV.cursor = { id, n: e.button === 2 ? 1 : maxStack(id) }; UI.hudDirty = true; UI.renderScreen(); return; }
   const i = +el.dataset.i, now = performance.now();
@@ -283,7 +283,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.17 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc">${ACC.user.picture ? `<img src="${ACC.user.picture.replace(/"/g, '')}" referrerpolicy="no-referrer" alt="">` : ''}<span>${ACC.user.name.replace(/</g, '&lt;')}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : 'Google 로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.17 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(ACC.user.name)}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : '로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -296,7 +296,7 @@ function showMenu(name, data) {
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}${btn('실험 기능(동굴과 절벽): ' + (c.exp ? '켜짐' : '꺼짐'), 'cexp')}<p class="muted">켜면 무성한 동굴이 생성됩니다 (1.17 실험용 데이터 팩)</p><label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
   } else if (name === 'account') {
-    h = `<h2>Google 로그인</h2><p class="muted">로그인하면 이름이 Google 계정 이름이 되고, 로그인을 확인하는 서버에서는 인벤토리와 위치가 계정에 저장되어 다른 사람이 같은 이름으로 들어올 수 없습니다.</p><div id="gsiBtn"></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('돌아가기', 'title')}</div>`;
+    h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
     const cur = { steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브';
     h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}${localStorage.getItem(SKIN_KEY) ? btn((OPT.skin === 'custom' ? '▶ ' : '') + '내 스킨', 'skinset_custom') : ''}${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}${btn('완료', 'title')}</div></div><p class="muted">지금 스킨: ${cur} · 멀티플레이에서 다른 플레이어에게도 이 스킨이 보입니다</p>`;
@@ -353,7 +353,8 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
   else if (a === 'skins') showMenu('skins');
-  else if (a === 'account') { showMenu('account'); accShowButton(); }
+  else if (a === 'account') showMenu('account');
+  else if (a === 'acclogin') accLogin();
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }
@@ -446,7 +447,7 @@ function runCommand(cmd) {
       const key = (a[n] || '').replace('minecraft:', ''), vk = typeof VKEY !== 'undefined' && VKEY[key]; const id = vk ? vk[0] : BID[key] != null ? BID[key] : key === 'air' ? 0 : null, m = vk ? vk[1] : 0;
       if (id == null) return err('알 수 없는 블록: ' + a[n]);
       const [x0, y0, z0, x1 = x0, y1 = y0, z1 = z0] = p; const vol = (Math.abs(x1 - x0) + 1) * (Math.abs(y1 - y0) + 1) * (Math.abs(z1 - z0) + 1); if (vol > 32768) return err('영역이 너무 큽니다 (최대 32768 블록)');
-      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(0, Math.min(y0, y1)); y <= Math.min(255, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
+      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(MINY, Math.min(y0, y1)); y <= Math.min(MAXY - 1, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
       ok(c === 'fill' ? cnt + '개 블록을 채웠습니다' : '블록을 바꿨습니다'); break;
     }
     case 'say': case 'me': chatMsg((c === 'me' ? '* 플레이어 ' : '[플레이어] ') + a.join(' '), '#ffffff'); break;
@@ -458,7 +459,7 @@ function runCommand(cmd) {
     case 'seed': ok('시드: ' + W.seed); break;
     case 'difficulty': { const d = { peaceful: 0, easy: 1, normal: 2, hard: 3 }[a[0]] ?? +a[0]; if (!(d >= 0 && d <= 3)) return err('0-3 사이로 입력하세요'); PL.difficulty = d; if (d === 0) for (const e of ENT) if (e.kind === 'mob' && e.def.hostile) removeEnt(e); ok('난이도: ' + DIFF_NAME[d]); break; }
     case 'xp': case 'experience': { const r = a[0] === 'add' || a[0] === 'give' ? a.slice(1).filter(v => !v.startsWith('@')) : a; const v = Math.max(0, parseInt(r[0]) || 0); if (/l$/i.test(r[0] || '') || r[1] === 'levels') { PL.level += v; UI.hudDirty = true; ok('레벨 ' + v + ' 추가'); } else { addXP(v); ok('경험치 ' + v + ' 추가'); } break; }
-    case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; ok('스폰 지점을 설정했습니다'); break;
+    case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; PL.spawnBed = false; ok('스폰 지점을 설정했습니다'); break;
     case 'clear': INV.slots.fill(null); INV.armor.fill(null); UI.hudDirty = true; ok('인벤토리를 비웠습니다'); break;
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
     default: err('알 수 없는 명령어입니다. /help 를 입력하세요');

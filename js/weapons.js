@@ -73,7 +73,7 @@ function tridentHit(e, o) {
 function tridentTick(e) {
   const st = e.trident; if (!st) return false;
   const loyal = st && e.owner === PL ? enchLv(st, 'loyalty') : 0;
-  if ((e.stuck || e.hitDone || e.y < -10) && loyal) {
+  if ((e.stuck || e.hitDone || e.y < voidY() + 54) && loyal) {
     const dx = PL.x - e.x, dy = PL.y + 1.2 - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz) || 1, sp = 0.05 * loyal + 0.3;
     e.stuck = false; e.x += dx / d * sp; e.y += dy / d * sp; e.z += dz / d * sp; e.vx = e.vy = e.vz = 0;
     if (d < 1.2) { tridentPickup(e); }

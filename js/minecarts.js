@@ -220,7 +220,7 @@ function cartTick(e) {
   if (e.ctype === 'tnt' && e.fuse > 0) { if (--e.fuse <= 0) { tntCartExplode(e); return; } if (e.age % 2) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.6, 0.6, 0.6], { kind: 'smoke', size: 0.12, vy: 0.4, grav: -0.02, life: 0.5 }); }
   if (e.ctype === 'furnace' && e.fuel > 0) { e.fuel--; if (e.age % 3 === 0) R.simpleParticle(e.x, e.y + 1.1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.25, vy: 0.5, grav: -0.04, life: 1 }); }
   if (e.ctype === 'hopper' && e.age % 4 === 0) cartTransfer(e);
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
 }
 // hopper minecarts take items from above (hoppers under the track empty chest and hopper minecarts: see hopperTick)
 function cartTransfer(e) {

@@ -92,7 +92,7 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
@@ -128,7 +128,7 @@ async function mpHostStart(kind) {
   MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
-  mpInstall(); mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpInstall(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
   chatMsg(MP.roomCode ? `멀티플레이가 열렸습니다 · 방 코드 ${MP.roomCode} — 친구는 타이틀 → 멀티플레이 목록에서 "${MP.name}님의 세계"를 누르면 들어와요` : '멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
@@ -160,14 +160,13 @@ function mpHostStore() {
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
 async function mpJoinWs(url, room) {
-  if (typeof accFresh === 'function') await accFresh(); // a signed-in player's sign-in, renewed if it ran out
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
-  mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null });
+  mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
   if (!MP.on) return;
@@ -200,7 +199,7 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': mpSend({ t: 'join', name: MP.name, skin: mpSkin(), google: typeof accToken === 'function' ? accToken() : null }); return;
+    case 'created': mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
@@ -279,7 +278,7 @@ function mpHandle(m, from) {
     case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) mpRidden(e, m, from); } return;
     case 'tame': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseTame === 'function' && e.owner !== 'player') horseTame(e); } return;
     case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.sleeping = 0; PL.rest = 0; UI.flash('좋은 아침이에요!'); } return;
+    case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.rest = 0; wakeUp('좋은 아침이에요!'); } return;
   }
 }
 // a guest becomes a visitor in the host's world: same seed, nothing saved locally
@@ -312,7 +311,7 @@ function mpGuestLoad(dim) {
 function mpTileChanged(x, y, z) { const t = getTile(x, y, z); if (t) mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(x >> 4, z >> 4), tile: JSON.parse(JSON.stringify(t)) }); }
 function mpApplyTile(m, from) {
   if (m.tile && m.tile._mp) delete m.tile._mp;
-  const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15);
+  const host = MP.role === 'host', c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = BI(m.x, m.y, m.z);
   if (c) { const old = c.tiles.get(i);
     if (old) { for (const k of Object.keys(old)) if (!(k in m.tile)) delete old[k];
       // arrays are filled in place: an open screen's slots point at them
@@ -344,7 +343,7 @@ function mpTileEdit(c) {
 }
 function mpTileSlots(m, from) {
   if (!Array.isArray(m.ch)) return;
-  const c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = (m.y << 8) | ((m.z & 15) << 4) | (m.x & 15), t = c && c.tiles.get(i);
+  const c = m.dim === W.dim && chunkAt(m.x >> 4, m.z >> 4), i = BI(m.x, m.y, m.z), t = c && c.tiles.get(i);
   const msg = tile => ({ t: 'tile', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile });
   if (!t || !Array.isArray(t.items)) { if (m.tile) { if (c) mpApplyTile(msg(m.tile), from); if (MP.server || !c) mpSend(msg(m.tile)); } return; } // not here to check: the guest's copy
   if (m.ch.some(([k, before]) => k < 0 || k >= t.items.length || !mpStEq(t.items[k], before))) { mpSend({ t: 'tilefix', x: m.x, y: m.y, z: m.z, dim: m.dim, dk: m.dk, tile: mpJ(t), ch: m.ch }, from); return; }
@@ -419,7 +418,7 @@ function mpApplyGuestSets(l) {
     try {
       const done = [];
       for (const m of here) { if (!BLOCKS[m.id] && m.id) continue; if (m.mo) { if (getBlock(m.x, m.y, m.z) !== m.id) continue; setMeta(m.x, m.y, m.z, m.m); }
-        else { if (getBlock(m.x, m.y, m.z) !== m.id) { const c = chunkAt(m.x >> 4, m.z >> 4); c.tiles.delete((m.y << 8) | ((m.z & 15) << 4) | (m.x & 15)); } // what was in it the guest already dropped
+        else { if (getBlock(m.x, m.y, m.z) !== m.id) { const c = chunkAt(m.x >> 4, m.z >> 4); c.tiles.delete(BI(m.x, m.y, m.z)); } // what was in it the guest already dropped
           setBlock(m.x, m.y, m.z, m.id, m.m, { noUpdate: true }); }
         done.push(m); }
       for (const m of done) {
@@ -446,11 +445,11 @@ async function mpServeChunk(m, from) {
   const dk = DIM_PREFIX[m.dim] + m.cx + ',' + m.cz, edits = (W.meta.mpEdits && W.meta.mpEdits[dk]) || null;
   const out = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits };
   const c = m.dim === W.dim && W.chunks.get(ckey(m.cx, m.cz));
-  if (c && c.edited) Object.assign(out, { b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), tl: serTiles(c), ch: CH });
+  if (c && c.edited) Object.assign(out, { b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), tl: serTiles(c), ch: CH, my: MINY });
   else {
     const key = W.id + ':' + dk, pend = saveDone(key); if (pend) await pend;
     const rec = await dbReq('chunks', 'readonly', st => st.get(key));
-    if (rec && rec.b && rec.v >= 3) Object.assign(out, { b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), tl: rec.t || [], ch: rec.ch || CH });
+    if (rec && rec.b && rec.v >= 3) Object.assign(out, { b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), tl: rec.t || [], ch: rec.ch || CH, my: rec.my });
     else out.none = true;
   }
   const pt = W.meta.mpTiles && W.meta.mpTiles[dk]; if (pt && out.tl) { const tl = out.tl.filter(([i]) => !(i in pt)); for (const i in pt) tl.push([+i, pt[i]]); out.tl = tl; } else if (pt) out.tiles = pt;
@@ -464,8 +463,10 @@ function mpGotChunk(m) {
   if (m.edits) mpEdits.set(key, m.edits); if (m.tiles) mpTileWait.set(key, m.tiles);
   const rm = m.it && typeof itemRemapFor === 'function' ? itemRemapFor(m.it) : null; if (rm) { remapItems(m.tl, rm); remapItems(m.mobs, rm); remapItems(m.tiles, rm); }
   if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs) W.pendingMobs.set(key, m.mobs); return; } // plain terrain (with its animals): generated here
-  const n = 256 * m.ch, dec = (s, T, fill) => { const a = rleDec(mpUnB64(s, T), n, T), out = new T(CVOL); out.set(a.subarray(0, Math.min(n, CVOL))); if (fill) out.fill(fill, n); return out; };
-  W.inbox.push({ cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] });
+  const tall = m.my === MINY, n = 256 * m.ch, dec = (s, T, fill) => { const a = rleDec(mpUnB64(s, T), n, T), out = new T(tall ? CVOL : 65536); out.set(a.subarray(0, Math.min(n, out.length))); if (fill) out.fill(fill, n); return out; };
+  const d = { cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array, 0xf0), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] };
+  if (!tall) liftOld(d, m.dim, Math.min(256, m.ch)); // kept by a world from before 1.18
+  W.inbox.push(d);
 }
 function mpChunkLoaded(c) {
   const host = MP.role === 'host', dk = dkey(c.cx, c.cz);
@@ -490,7 +491,7 @@ function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -517,7 +518,7 @@ function mpTick() {
   if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
     if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
     for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; if (t._mp) delete t._mp; /* an older version kept this inside the tile */ const j = JSON.stringify(t); if (MP_TSENT.get(t) === j) continue; MP_TSENT.set(t, j);
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
   }
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
@@ -623,11 +624,11 @@ function mpStoreChunk(c) {
   if (!c.modified) return; c.modified = false;
   const dk = dkey(c.cx, c.cz); W.saved.add(dk);
   const mobs = c.mobsFresh || W.chunks.get(c.key) !== c ? c.mobs || null : chunkKeep(c, false); c.mobsFresh = false; // a chunk still here: what stands in it now
-  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
+  const rec = c.edited ? { v: 3, it: ITEM_TABLE, ch: CH, my: MINY, b: mpB64(rleEnc(c.blocks)), m: mpB64(rleEnc(c.meta)), l: mpB64(rleEnc(c.light)), bio: Array.from(c.biome), t: serTiles(c), mobs } : { v: 2, it: ITEM_TABLE, mobs };
   mpSend({ t: 'store', dk, rec });
 }
 function mpPdata() {
-  offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim', 'spawnBed']) s[k] = PL[k];
   const pend = [INV.cursor, ...INV.craft2, ...INV.craft3].filter(st => st && st.n > 0); // in your hands or a crafting grid: yours too
   return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }
@@ -749,7 +750,7 @@ function mpVisualArrow(e) {
   if (!e.stuck) { const nx = e.x + e.vx, ny = e.y + e.vy, nz = e.z + e.vz;
     if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { if (e.visThrown) { removeEnt(e); return; } e.stuck = true; }
     else { e.x = nx; e.y = ny; e.z = nz; e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99; } }
-  if (e.age > (e.stuck ? 200 : 300) || e.y < -20) removeEnt(e);
+  if (e.age > (e.stuck ? 200 : 300) || e.y < voidY()) removeEnt(e);
 }
 // Explosion.explode's damage to a player (the same as for the one in whose world it went off)
 function mpBlastSelf(x, y, z, power) {
@@ -886,27 +887,19 @@ function mpAvatar(p) {
   const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
-  // the name above the head as Java draws it: white text on a faint dark plate, bright where it can be seen and dim
-  // through walls (the dim one is hidden while the player sneaks)
-  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '44px Galmuri11, sans-serif';
-  const draw = () => { g.font = F; const w = Math.ceil(g.measureText(p.name).width) + 24; c.width = w; c.height = 60; g.font = F; g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, w, 60); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(p.name, 12, 32); if (p.tags) for (const t of p.tags) t.userData.w = w / 60; };
-  draw(); if (document.fonts) document.fonts.load(F).then(() => { draw(); t.needsUpdate = true; }).catch(() => {}); // the game's pixel font, once it has loaded
-  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; const w = c.width;
-  const mk = (through) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: !through, depthWrite: false, transparent: true, opacity: through ? 0.3 : 1, fog: false })); sp.renderOrder = through ? 5 : 6; sp.userData.w = w / 60; return sp; };
-  p.tags = [mk(true), mk(false)]; p.m = m; p.pos = null; scene.add(m, ...p.tags); return m;
+  p.tag = makeNameTag(p.name); p.m = m; p.pos = null; scene.add(m); return m; // the name above the head, as Java draws it (entities.js)
 }
 const MP_HURT = new THREE.Color(1, 0.6, 0.6);
-function mpPlaceTag(p, s, ps) {
-  const y = p.pos[1] + (ps.sleep ? 0.6 : ps.swim || ps.gliding ? 0.9 : ps.sneak ? 1.85 : 2.05) + 0.25, d = Math.hypot(camera.position.x - p.pos[0], camera.position.y - y, camera.position.z - p.pos[2]);
-  const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
-  p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
+function mpPlaceTag(p, s, ps, light) { // Java: the player's height + 0.5 (1.8 standing, 1.5 sneaking, 0.6 swimming or gliding, 0.2 in bed); none while invisible
+  const h = ps.sleep ? 0.2 : ps.swim || ps.gliding ? 0.6 : ps.sneak ? 1.5 : 1.8;
+  placeNameTag(p.tag, p.pos[0], p.pos[1] + h, p.pos[2], !s.dead && !s.inv && !(s.mode === 'spectator' && PL.mode !== 'spectator'), ps.sneak, light);
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); dropNameTag(p.tag); p.tag = null; p.m = null; } } // the figure's own materials (textures and shapes are shared)
 function mpSeatOf(p) {
   const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
   const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
   for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart' || e.kind === 'mob')) continue;
-    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id && fresh(e.mpRideAt), back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At));
+    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id, back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At)); // (the driver's claim lapses on its own after 1.5 s without word)
     if (!drv && !back) continue;
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
     const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
@@ -916,7 +909,7 @@ function mpSeatOf(p) {
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
-    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; for (const t of p.tags) t.visible = false; } mpDropPeerFx(p); continue; }
+    const s = p.s; if (!s || s.dim !== W.dim || performance.now() - p.at > 5000) { if (p.m) { p.m.visible = false; p.tag.back.visible = p.tag.front.visible = false; } mpDropPeerFx(p); continue; }
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
     // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
@@ -937,10 +930,11 @@ function mpRender(dt) {
     const spd = Math.min(1, (p.spd || 0) * 4); st.limbD += (spd - st.limbD) * Math.min(1, 0.4 * dtT); st.limb += st.limbD * dtT;
     st.lean += ((swim ? 1 : 0) - st.lean) * Math.min(1, 0.18 * dtT);
     ps.headYaw = glide || swim ? 0 : -wrapA(s.yaw - st.bodyYaw);
-    m.visible = !s.dead; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
-    mpPlaceTag(p, s, ps);
+    const ghost = s.mode === 'spectator' && PL.mode !== 'spectator'; // spectators are seen only by other spectators
+    m.visible = !s.dead && !ghost; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
-    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); }
+    mpPlaceTag(p, s, ps, light);
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
@@ -1122,7 +1116,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
+  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}
@@ -1197,7 +1191,7 @@ async function mpAction(a) {
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 2, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 3, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const n = await mpUpload(ad.value.trim()); say(`올렸습니다 (청크 ${n}개). 이제 타이틀 → 멀티플레이 → 서버에 접속으로 누구나 들어올 수 있습니다.`); }
     else if (a === 'mp_answer') { say('답장 코드를 만드는 중...'); MP.role = 'guest'; MP.on = true; mpInstall(); const code = await mpAnswerInvite(codeIn); $('mpOut').value = code; $('mpOut').select(); say('답장 코드를 호스트에게 보내세요. 호스트가 넣으면 연결됩니다.'); }

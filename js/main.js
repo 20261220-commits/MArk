@@ -60,8 +60,8 @@ function debugOverlays(px, py, pz) {
   }
   if (UI.chunkBorders && !DBG.chunk) {
     const pts = [];
-    for (let i = 0; i <= 16; i += 2) for (const [x, z] of [[i, 0], [i, 16], [0, i], [16, i]]) pts.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, S.CH, z));
-    for (let y = 0; y <= S.CH; y += 2) for (const [a, b] of [[[0, 0], [16, 0]], [[16, 0], [16, 16]], [[16, 16], [0, 16]], [[0, 16], [0, 0]]]) pts.push(new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1]));
+    for (let i = 0; i <= 16; i += 2) for (const [x, z] of [[i, 0], [i, 16], [0, i], [16, i]]) pts.push(new THREE.Vector3(x, S.MINY, z), new THREE.Vector3(x, S.MAXY, z));
+    for (let y = S.MINY; y <= S.MAXY; y += 2) for (const [a, b] of [[[0, 0], [16, 0]], [[16, 0], [16, 16]], [[16, 16], [0, 16]], [[0, 16], [0, 0]]]) pts.push(new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1]));
     DBG.chunk = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.6 }));
     scene.add(DBG.chunk);
   }
@@ -89,7 +89,7 @@ addEventListener('keydown', e => {
     if (e.code === 'Escape' || (e.code === 'KeyE' && UI.screen !== 'adv') || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; } /* the advancements screen closes with L or Esc only, as in Java */
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
-    if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
+    if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d, s); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
   }
   if (UI.menu) { if (e.code === 'Escape' && UI.menu === 'pause') resumeGame(); else if (e.code === 'Escape' && (UI.menu === 'options' || UI.menu === 'controls')) showMenu(UI.paused && W.active ? 'pause' : 'title'); return; }
@@ -168,7 +168,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 2, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 3, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -177,7 +177,7 @@ function findSpawn(seed) {
   for (let r = 0; r < 2048; r += 16) for (let a = 0; a < Math.max(1, r / 4); a++) {
     const ang = a / Math.max(1, r / 4) * Math.PI * 2, x = Math.round(Math.cos(ang) * r), z = Math.round(Math.sin(ang) * r);
     const [h, b] = g.column(x, z);
-    if (h > S.SEA + 1 && h < 95 && !S.isOceanBio(b) && b !== S.BIO.RIVER) return [x, h + 1, z];
+    if (h > S.SEA + 1 && h < 120 && !S.isOceanBio(b) && b !== S.BIO.RIVER) return [x, h + 1, z];
   }
   return [0, 100, 0];
 }
@@ -195,7 +195,7 @@ async function startWorld(id, meta) {
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null; INV.craft2.fill(null); INV.craft3.fill(null); W.pendGive = [];
-  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
+  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, spawnBed: false, bedAt: null, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
@@ -240,7 +240,7 @@ function finishLoading() {
   if (W.needSpawnFix) {
     W.needSpawnFix = false;
     let x = Math.floor(PL.x), z = Math.floor(PL.z), y = topY(x, z);
-    while (y < CH - 2 && (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)])) y++;
+    while (y < MAXY - 2 && (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)])) y++;
     PL.y = y + 1; PL.py = PL.y; W.worldSpawn = [x, y + 1, z]; W.meta.spawn = W.worldSpawn;
     if (PL.mode !== 'creative') { /* fresh survival start: empty inventory like MC */ }
     chatMsg('세계에 오신 것을 환영합니다! E: 인벤토리 · T: 채팅 · /help: 명령어', '#ffff55');
@@ -251,7 +251,7 @@ function finishLoading() {
 function saveWorldMeta() {
   if (!W.active || !W.meta || W.meta.remote) return;
   offUnswap();
-  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim', 'spawnBed']) s[k] = PL[k];
   // what is in your hands or in a crafting / work grid at that moment is yours too: given back when the world loads
   const pend = [INV.cursor, ...INV.craft2, ...INV.craft3, ...(UI.screen && GUI.ctx && Array.isArray(GUI.ctx.items) && !GUI.ctx.tile && GUI.ctx.x == null && !GUI.ctx.cart && !GUI.ctx.horse ? GUI.ctx.items : [])].filter(st => st && st.n > 0);
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null };
@@ -387,7 +387,7 @@ function frame(now) {
   // overlays & HUD
   $('ovWater').hidden = eyeB !== 'water'; $('ovSnow').hidden = !PL.inSnow;
   $('ovHurt').style.opacity = PL.hurtT > 0 ? PL.hurtT / 10 * 0.5 : (PL.health <= 4 && PL.mode !== 'creative' ? 0.25 + 0.1 * Math.sin(now / 200) : 0);
-  $('ovSleep').style.opacity = PL.sleeping ? Math.min(1, PL.sleeping / 60) : 0;
+  $('ovSleep').style.opacity = PL.sleeping ? Math.min(1, PL.sleeping / 60) : 0; $('sleepTip').hidden = !PL.sleeping || UI.hideHud;
   $('ovSpy').hidden = USE.kind !== 'spy';
   $('ovFire').hidden = !(PL.fire > 0 && PL.mode !== 'creative' && !PL.dead);
   $('cross').hidden = view !== 0 || USE.kind === 'spy';
@@ -401,7 +401,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 2; S.setGenVersion(2); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 3; S.setGenVersion(3); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }
@@ -435,8 +435,8 @@ function ambientParticles(dt, px, py, pz) {
     const bx = Math.floor(px), by = Math.floor(py), bz = Math.floor(pz);
     for (let x = bx - 12; x <= bx + 12; x++) for (let z = bz - 12; z <= bz + 12; z++) {
       const c = chunkAt(x >> 4, z >> 4); if (!c) continue;
-      for (let y = Math.max(0, by - 8); y <= Math.min(CH - 1, by + 8); y++) {
-        const i = (y << 8) | ((z & 15) << 4) | (x & 15), b = c.blocks[i];
+      for (let y = Math.max(MINY, by - 8); y <= Math.min(MAXY - 1, by + 8); y++) {
+        const i = BI(x, y, z), b = c.blocks[i];
         if (b === BID.torch || b === BID.lit_furnace) ambList.push(x, y, z, b, c.meta[i]);
       }
     }

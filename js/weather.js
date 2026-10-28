@@ -7,7 +7,7 @@ const RODS = new Set();
 function rodTrack(x, y, z, on) { const k = x + ',' + y + ',' + z; if (on) RODS.add(k); else RODS.delete(k); }
 function rodScan(c) {
   const b = c.blocks, m = c.meta;
-  for (let i = 0; i < b.length; i++) if (b[i] === BID.chain && S.isRod(b[i], m[i])) RODS.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15)));
+  for (let i = 0; i < b.length; i++) if (b[i] === BID.chain && S.isRod(b[i], m[i])) RODS.add((c.cx * 16 + (i & 15)) + ',' + ((i >> 8) + MINY) + ',' + (c.cz * 16 + ((i >> 4) & 15)));
 }
 function rodUnload(c) { for (const k of RODS) { const [x, , z] = k.split(',').map(Number); if (x >> 4 === c.cx && z >> 4 === c.cz) RODS.delete(k); } }
 // the closest rod open to the sky within 128 blocks takes the strike (Java's lightning rod search radius)

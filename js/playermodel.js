@@ -256,7 +256,7 @@ function updatePlayerModel(dt, x, y, z, visible) {
   const m = PLM.model; if (!m || !m.userData.mc) return; m.visible = visible; if (!visible) return;
   const st = m.userData.st, dtT = dt * 20, s = playerPoseInputs(dt);
   PSTATE.glideT = s.gliding ? PSTATE.glideT + dtT : 0;
-  if (s.sleep) { const bx = Math.floor(PL.x), by = Math.floor(PL.y - 0.6), bz = Math.floor(PL.z); const f = getMeta(bx, by, bz) & 3; PSTATE.bedYaw = -f * Math.PI / 2; s.bedYaw = PSTATE.bedYaw; }
+  if (s.sleep) { const bx = Math.floor(PL.x), by = Math.floor(PL.y - 0.3), bz = Math.floor(PL.z); const f = getMeta(bx, by, bz) & 3; PSTATE.bedYaw = -f * Math.PI / 2; s.bedYaw = PSTATE.bedYaw; }
   st.deathT = PL.dead ? Math.min(20, st.deathT + dtT) : 0;
   const mvx = PL.x - PL.px, mvz = PL.z - PL.pz;
   if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = PL.yaw;

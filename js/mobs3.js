@@ -220,11 +220,11 @@ function trySpawnAmbient() {
 function spawnExtraForChunk(c) {
   const R0 = S.rng(S.hash32(W.seed, c.cx, c.cz, 19)), b = S.BB[c.biome[8 * 16 + 8]];
   if ((b === S.BIO.TAIGA || b === S.BIO.SNOWY_TAIGA || b === S.BIO.FOREST) && R0() < 0.03) {
-    for (let i = 0; i < 2 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12); let y = CH - 2; while (y > 1 && !SOLID[c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]]) y--; if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 2) spawnMob('wolf', x + .5, y + 1, z + .5); }
+    for (let i = 0; i < 2 + R0.int(3); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12); let y = MAXY - 2; while (y > MINY + 1 && !SOLID[c.blocks[BI(x, y, z)]]) y--; if (c.blocks[BI(x, y, z)] === 2) spawnMob('wolf', x + .5, y + 1, z + .5); }
   }
   if ((S.isOceanBio(b) || b === S.BIO.RIVER) && R0() < 0.08) {
     const t = b === S.BIO.RIVER || b === S.BIO.FROZEN_OCEAN || b === S.BIO.COLD_OCEAN ? 'salmon' : 'cod';
-    for (let i = 0; i < 3 + R0.int(4); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(10); if (c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] === 27) spawnMob(t, x + .5, y, z + .5); }
+    for (let i = 0; i < 3 + R0.int(4); i++) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 50 + R0.int(10); if (c.blocks[BI(x, y, z)] === 27) spawnMob(t, x + .5, y, z + .5); }
   }
 }
 // ---------- OptiFine custom night sky (optifine/sky/world0/nightbox.png) ----------

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>네모 대륙 1.17</title>
-<meta name="description" content="마인크래프트 자바 에디션 1.17 스타일의 브라우저 복셀 샌드박스 게임">
+<title>네모 대륙 1.18</title>
+<meta name="description" content="마인크래프트 자바 에디션 1.18 스타일의 브라우저 복셀 샌드박스 게임">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23866043'/%3E%3Crect width='16' height='5' fill='%235d9e3a'/%3E%3C/svg%3E">
 <style>
 @font-face{font-family:'Galmuri11';src:url('fonts/Galmuri11-Bold.woff2') format('woff2');font-weight:400 700;font-display:swap}
@@ -79,6 +79,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #raidbar .bb{height:calc(5*var(--px));background:#3a0a0a;border:var(--px) solid #1a0000;margin-top:var(--px)}
 #raidbar .bb i{display:block;height:100%;background:linear-gradient(#ff6a6a,#c01818)}
 #ovSleep{background:#000;opacity:0}
+#sleepTip{position:fixed;left:50%;bottom:22%;transform:translateX(-50%);color:#fff;text-shadow:2px 2px #3f3f3f;font-size:calc(8 * var(--px));pointer-events:none;z-index:6}
 #ovSpy{background:radial-gradient(circle at center,transparent 0,transparent 32vmin,#000 32.4vmin)}
 #ovFire{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}
 /* ---------- screens (GUI) ---------- */
@@ -171,10 +172,8 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 .titleSide .mb{width:min(calc(96 * var(--px)),calc(50vw - 100 * var(--px) - max(8px, 4vw) - 8px));min-width:0;font-size:calc(7 * var(--px));white-space:nowrap;overflow:hidden}
 .titleSide .titleDoll{max-width:100%}
 .titleSide .acc{display:flex;align-items:center;gap:calc(3 * var(--px));font-size:calc(6.5 * var(--px));max-width:calc(110 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.titleSide .acc img{width:calc(10 * var(--px));height:calc(10 * var(--px));border-radius:50%}
 .skinRow{display:flex;gap:calc(4 * var(--px));align-items:center;justify-content:center}
 .skinRow .titleDoll{width:min(24vw,200px);height:min(40vh,280px)}
-#gsiBtn{min-height:44px;display:flex;justify-content:center;margin:calc(4 * var(--px)) 0}
 @media (max-aspect-ratio:1/1){.titleSide{display:none}}
 #menu h2{font-weight:400;font-size:calc(8 * var(--px));margin:0 0 calc(6 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .mb{display:block;width:min(calc(200 * var(--px)),90vw);height:calc(20 * var(--px));font:inherit;font-size:calc(8 * var(--px));color:#e0e0e0;text-shadow:var(--px) var(--px) 0 #383838;background:#6f6f6f var(--stoneTex);background-size:calc(32 * var(--px));background-blend-mode:multiply;border:var(--px) solid #000;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-2 * var(--px)) 0 #555;cursor:pointer;padding:0 calc(4 * var(--px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -300,7 +299,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
     <div id="hotbar"></div>
   </div>
 </div>
-<div class="ov" id="ovSleep"></div>
+<div class="ov" id="ovSleep"></div><div id="sleepTip" hidden>웅크리기(Shift)를 누르면 침대에서 나갑니다</div>
 <div id="touch" hidden>
   <div id="joy"><div id="knob"></div></div>
   <button class="tb" id="tJump" type="button">점프</button>

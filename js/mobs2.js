@@ -188,7 +188,7 @@ function boatTick(e) {
   const fr = inW || deep ? 0.9 : under === BID.ice ? 0.98 : 0.5;
   e.vx *= fr; e.vz *= fr; e.vy *= 0.98;
   if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y + 0.18; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
-  if (e.y < -40) removeEnt(e);
+  if (e.y < voidY()) removeEnt(e);
 }
 function boatRender(e, x, y, z, br) {
   e.mesh.position.set(x, y - 0.95, z);
@@ -320,7 +320,7 @@ function endermanAI(e, dist) {
 function endermanTeleport(e, cx = e.x, cz = e.z) {
   for (let k = 0; k < 16; k++) {
     const x = Math.floor(cx + (Math.random() - .5) * 32), z = Math.floor(cz + (Math.random() - .5) * 32); if (!isLoaded(x, z)) continue;
-    let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
+    let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || FLUID[getBlock(x, y, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)]) continue;
     for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.3, grav: 0 });
     e.x = e.px = x + .5; e.y = e.py = y; e.z = e.pz = z + .5; e.path = null; play('teleport', { vol: 0.5 }); return true;

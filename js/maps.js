@@ -41,10 +41,10 @@ function palIndex(m, c) {
 // the surface seen from above: first block that is not air or a small plant; water shaded by depth, land by slope
 function surfaceAt(x, z) {
   const c = chunkAt(x >> 4, z >> 4); if (!c) return null;
-  let y = Math.min(CH - 1, c.maxY + 1);
-  while (y > 0) { const b = getBlock(x, y, z); if (b && RTYPE[b] !== RT.CROSS && RTYPE[b] !== RT.CROP && RTYPE[b] !== RT.TORCH && RTYPE[b] !== RT.WIRE) break; y--; }
+  let y = Math.min(MAXY - 1, c.maxY + 1 + MINY); // maxY is an array row
+  while (y > MINY) { const b = getBlock(x, y, z); if (b && RTYPE[b] !== RT.CROSS && RTYPE[b] !== RT.CROP && RTYPE[b] !== RT.TORCH && RTYPE[b] !== RT.WIRE) break; y--; }
   const b = getBlock(x, y, z); let depth = 0;
-  if (b === BID.water || S.isWet(b, getMeta(x, y, z))) { let d = y; while (d > 0 && (getBlock(x, d, z) === BID.water || S.isWet(getBlock(x, d, z), getMeta(x, d, z)))) d--; depth = y - d; }
+  if (b === BID.water || S.isWet(b, getMeta(x, y, z))) { let d = y; while (d > MINY && (getBlock(x, d, z) === BID.water || S.isWet(getBlock(x, d, z), getMeta(x, d, z)))) d--; depth = y - d; }
   return { y, b: depth ? BID.water : b, m: getMeta(x, y, z), depth };
 }
 // fill in the part of the map around the player (a few rows per call)

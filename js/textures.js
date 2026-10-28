@@ -793,7 +793,8 @@ const crackCanvases = [];
   for (let k = 0; k < 8; k++) { const pt = [[7.5 + (r() - .5) * 2, 7.5 + (r() - .5) * 2]]; let a = r() * Math.PI * 2; for (let i = 0; i < 10; i++) { a += (r() - .5) * 1.3; const l = pt[pt.length - 1]; pt.push([l[0] + Math.cos(a) * 1.2, l[1] + Math.sin(a) * 1.2]); } paths.push(pt); }
   for (let st = 1; st <= 10; st++) {
     const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
-    for (const pt of paths) { const n = Math.ceil(pt.length * st / 10); for (let i = 0; i < n; i++) { g.fillStyle = i % 2 ? 'rgba(0,0,0,.55)' : 'rgba(30,30,30,.65)'; g.fillRect(Math.floor(pt[i][0]), Math.floor(pt[i][1]), 1, 1); } }
+    // drawn as Java's are: the overlay doubles what is under it times its own grey, so dark grey cracks darken the block and lighter edges brighten it (black would punch black holes)
+    for (const pt of paths) { const n = Math.ceil(pt.length * st / 10); for (let i = 0; i < n; i++) { const x = Math.floor(pt[i][0]), y = Math.floor(pt[i][1]); g.fillStyle = 'rgb(46,46,46)'; g.fillRect(x, y, 1, 1); if (i % 3 === 1) { g.fillStyle = 'rgb(150,150,150)'; g.fillRect(x + 1, y, 1, 1); } } }
     crackCanvases.push(c);
   }
 })();

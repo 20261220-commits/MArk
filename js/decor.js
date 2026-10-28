@@ -89,7 +89,7 @@ function standMesh(e) {
 function spawnArmorStand(x, y, z, yaw, armor) {
   const e = Ent('armor_stand', x, y, z); e.kind = 'armor_stand'; e.hittable = true; e.w = 0.25; e.h = 1.975; e.yaw = yaw; e.armor = armor || [null, null, null, null];
   e.mesh = standMesh(e);
-  e.tick = se => { se.vy -= 0.04; physMove(se, 0, se.vy, 0); if (se.onGround) se.vy = 0; if (se.y < -40) removeEnt(se); };
+  e.tick = se => { se.vy -= 0.04; physMove(se, 0, se.vy, 0); if (se.onGround) se.vy = 0; if (se.y < voidY()) removeEnt(se); };
   e.render = (se, rx, ry, rz, br) => { se.mesh.position.set(rx, ry, rz); se.mesh.rotation.y = se.yaw;
     if (se.mesh.userData.mats) { for (const m of se.mesh.userData.mats) { m.color.setScalar(br); if (m.userData.col) m.color.multiply(m.userData.col); } return; }
     se.mesh.traverse(o => { if (o.isMesh) o.material.color.setHex(o.userData.c).multiplyScalar(br); }); };

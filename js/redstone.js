@@ -128,7 +128,7 @@ function rsTick() {
     const done = new Set();
     for (const k of keys) {
       if (done.has(k)) continue;
-      const [x, y, z] = k.split(',').map(Number); if (!isLoaded(x, z) || y < 0 || y >= CH) continue;
+      const [x, y, z] = k.split(',').map(Number); if (!isLoaded(x, z) || y < MINY || y >= MAXY) continue;
       const b = getBlock(x, y, z);
       if (b === RSB.wire) { const ch = []; const net = updateNetwork(x, y, z, ch); for (const nk of net.keys()) done.add(nk); for (let i = 0; i < ch.length; i += 3) rsNotify(ch[i], ch[i + 1], ch[i + 2]); }
       else rsComponent(x, y, z, b);
@@ -215,7 +215,7 @@ function resolveMove(sx, sy, sz, dx, dy, dz, skip) {
   const moving = new Map(), breaks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z;
   const visit = (x, y, z, pushed) => {
     const k = K(x, y, z); if (moving.has(k) || skip.has(k)) return true;
-    if (y < 0 || y >= CH || !isLoaded(x, z)) return !pushed;
+    if (y < MINY || y >= MAXY || !isLoaded(x, z)) return !pushed;
     const id = getBlock(x, y, z);
     if (!id) return true;
     if (breaksOnPush(id)) { if (pushed) breaks.set(k, [x, y, z]); return true; }
@@ -339,7 +339,7 @@ function dispense(x, y, z, b, m) {
   else if (id === BID.tnt) { primeTNT(fx, fy, fz); take(); }
   else if (id === IID.flint_and_steel) { if (!fb && SOLID[getBlock(fx, fy - 1, fz)]) setBlock(fx, fy, fz, BID.fire); }
   else if (id === IID.bone_meal) { if (boneMeal(fx, fy, fz, fb)) take(); }
-  else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); }
+  else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d, st); }
   play('click');
 }
 // put a stack into a container tile (furnace: input slot only); returns true when it fit completely
@@ -352,7 +352,7 @@ function insertItem(t, st, slots) {
 // hoppers move one item every 8 ticks: pull from above (container or dropped items), push into the container below
 function hopperTick(c, i, t) {
   if (--t.cd > 0) return; t.cd = 8;
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
   const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
@@ -370,7 +370,7 @@ function tileTick() {
     let any = false;
     for (const [i, t] of c.tiles) {
       if (t.type === 'hopper') { any = true; hopperTick(c, i, t); }
-      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
+      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
     }
     if (!any) c.noTicking = true; // re-armed by setTile
   }

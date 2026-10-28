@@ -6,7 +6,7 @@ const newCampfire = () => ({ type: 'campfire', items: [null, null, null, null], 
 const campfireFood = id => SMELT[id] && ITEMS[id].food && ITEMS[SMELT[id][0]].food;
 const cfMeshes = new Map(); // "x,y,z" -> { ver, meshes }
 function campfireTick(c, i, t) {
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
   for (let k = 0; k < 4; k++) {
     const st = t.items[k]; if (!st) continue;
     if (!lit) continue;
@@ -123,5 +123,7 @@ function jukeboxUse(x, y, z, h) {
   if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); return true; }
   if (!h || !ITEMS[h.id].disc) return false;
   t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
-  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z); return true;
+  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z);
+  if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
+  return true;
 }

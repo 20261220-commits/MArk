@@ -35,12 +35,12 @@ function brewTick(c, i, t) {
     if (--t.time <= 0) {
       for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1, brewed: 1 }; } // brewed: picked up -> advancement
       ing.n--; if (!ing.n) t.items[3] = null; t.fuel--; c.modified = c.edited = true;
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.5 });
     }
   }
   const bits = (t.items[0] ? 1 : 0) | (t.items[1] ? 2 : 0) | (t.items[2] ? 4 : 0);
-  if (c.blocks[i] === BID.brewing_stand && c.meta[i] !== bits) setMeta(c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + ((i >> 4) & 15), bits);
+  if (c.blocks[i] === BID.brewing_stand && c.meta[i] !== bits) setMeta(c.cx * 16 + (i & 15), (i >> 8) + MINY, c.cz * 16 + ((i >> 4) & 15), bits);
 }
 
 // ---------- applying potion effects ----------

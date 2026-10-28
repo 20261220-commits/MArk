@@ -14,15 +14,15 @@ const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a)
 const WORLDS = path.resolve(process.env.WORLDS_DIR || path.join(root, 'worlds'));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
 
-// SERVER_URL and GOOGLE_CLIENT_ID (environment) reach the game as js/config.js; REQUIRE_LOGIN=1 lets only players
-// signed in with Google into the server world
-const CFG = { server: process.env.SERVER_URL || '', googleClientId: process.env.GOOGLE_CLIENT_ID || '' }, REQUIRE_LOGIN = /^(1|true|yes)$/i.test(process.env.REQUIRE_LOGIN || '');
+// SERVER_URL (environment) reaches the game as js/config.js; REQUIRE_LOGIN=1 lets only players logged in with a
+// nickname and password into the server world
+const CFG = { server: process.env.SERVER_URL || '' }, REQUIRE_LOGIN = /^(1|true|yes)$/i.test(process.env.REQUIRE_LOGIN || '');
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
   if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
-  if (u === '/js/config.js' && (CFG.server || CFG.googleClientId)) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
+  if (u === '/js/config.js' && CFG.server) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
   const f = path.join(root, path.normalize(u));
   if (!f.startsWith(root + path.sep) || f.startsWith(WORLDS + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(d); /* no-cache: a new version shows on the next visit */ });
@@ -110,13 +110,6 @@ const SELF_URL = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL |
 if (SELF_URL && !/^(0|false|no)$/i.test(process.env.KEEP_AWAKE || '')) setInterval(() => { fetch(SELF_URL.replace(/\/$/, '') + '/ping').catch(() => {}); }, 10 * 60 * 1000);
 for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stateDirty = true; saveWorld(); if (BACKUP && state.meta) { const t = setTimeout(() => process.exit(0), 25000); backupNow('서버 종료').finally(() => { clearTimeout(t); process.exit(0); }); } else process.exit(0); }); // a host gives some seconds before it stops the server
 
-// a Google sign-in sent with "join": checked with Google, so the player's things are kept by account
-async function verifyGoogle(tok) {
-  if (!tok || !CFG.googleClientId || typeof fetch !== 'function') return null;
-  try { const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(tok)); if (!r.ok) return null; const c = await r.json();
-    if (c.aud !== CFG.googleClientId || +c.exp * 1000 < Date.now() || !c.sub) return null; return { sub: c.sub, name: c.name || c.given_name || String(c.email || '').split('@')[0], email: c.email || '' }; }
-  catch (e) { return null; }
-}
 // ---------- rooms of a player's own world: one host, any number of guests, found by a short code ----------
 const rooms = new Map(); let nextId = 1;
 const CODE_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
@@ -133,16 +126,11 @@ server.on('upgrade', (req, sock) => {
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
     if (wp) {
-      if (c.waiting) { c.waiting.push(m); return; }
       if (m.t !== 'join') { core.message(id, m); return; }
-      // the sign-in is checked before anything else from this player is taken
-      c.waiting = []; const tok = m.google; delete m.google;
-      verifyGoogle(tok).then(acc => {
-        if (acc) { m.account = acc.sub; m.name = acc.name.replace(/\s+/g, '').slice(0, 16) || m.name; }
-        const q = c.waiting; c.waiting = null;
-        if (REQUIRE_LOGIN && !acc) { c.send(JSON.stringify({ t: 'error', msg: '이 서버는 Google 로그인이 필요합니다 (타이틀 → Google 로그인)' })); return; }
-        core.message(id, m); for (const x of q) core.message(id, x);
-      });
+      // a server that wants everyone logged in (REQUIRE_LOGIN=1): no nickname-and-password, no entry. The password itself
+      // is checked by the world (js/mpcore.js)
+      if (REQUIRE_LOGIN && !(m.login && m.login.cred)) { c.send(JSON.stringify({ t: 'error', msg: '이 서버는 로그인이 필요합니다 (타이틀 → 로그인)' })); return; }
+      core.message(id, m);
       return;
     }
     if (!role) { // the first message says who this is
