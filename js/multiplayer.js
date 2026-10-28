@@ -508,6 +508,7 @@ function mpGotChunk(m) {
   const n = 256 * m.ch, dec = (s, T) => rleDec(mpUnB64(s, T), n, T).subarray(0, n);
   const d = { cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] };
   fitRows(d, m.my || 0, m.ch, m.dim); // saved with another world height (before 1.18, or by a 1.18 game)
+  if (unshiftRows(d, m.dim) && m.tiles) { const tl = {}; for (const i in m.tiles) { const j = +i - (64 << 8); if (j >= 0) tl[j] = m.tiles[i]; } m.tiles = tl; mpTileWait.set(key, tl); } // one stored 64 blocks too high: moved back down
   W.inbox.push(d);
 }
 function mpChunkLoaded(c) {
