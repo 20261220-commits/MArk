@@ -122,19 +122,20 @@ function makeChunkGeo(d) {
   return g;
 }
 W.onMesh = (c, m) => {
-  if (!c.mesh) c.mesh = { o: null, c: null, t: null };
-  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans]]) {
+  if (!c.mesh) c.mesh = { o: null, c: null, t: null, d: null };
+  for (const [k, d, mat] of [['o', m.o, matOpaque], ['c', m.c, matCutout], ['t', m.t, matTrans], ['d', m.d, matOpaque]]) {
     const old = c.mesh[k];
     if (old) { scene.remove(old); old.geometry.dispose(); c.mesh[k] = null; }
     if (!d.count) continue;
     const mesh = new THREE.Mesh(makeChunkGeo(d), mat);
     mesh.position.set(c.cx * 16, S.MINY, c.cz * 16); /* meshes are built in array rows: row 0 is y -64 */ mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     if (k === 't') mesh.renderOrder = 2; else if (k === 'c') mesh.renderOrder = 1;
+    if (k === 'd') mesh.visible = R.deepShown(c); // deep cave faces: only where they can be seen (main.js)
     scene.add(mesh); c.mesh[k] = mesh;
   }
   c.mesh.ver = c.ver;
 };
-W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
+W.onChunkUnloaded = c => { if (c.mesh) for (const k of ['o', 'c', 't', 'd']) if (c.mesh[k]) { scene.remove(c.mesh[k]); c.mesh[k].geometry.dispose(); } c.mesh = null; if (R.onChunkUnloaded) R.onChunkUnloaded(c); };
 R.clearChunks = () => { for (const c of W.chunks.values()) W.onChunkUnloaded(c); };
 
 // ---------- sky ----------
@@ -583,7 +584,8 @@ R.rd = 6; R.fov = 70; R.fovMul = 1;
 function fogCull() {
   const cx = camera.position.x, cz = camera.position.z, lim = (fog.far + 1) ** 2;
   for (const c of W.chunks.values()) { if (!c.mesh) continue; const x0 = c.cx * 16, z0 = c.cz * 16, dx = cx < x0 ? x0 - cx : cx > x0 + 16 ? cx - x0 - 16 : 0, dz = cz < z0 ? z0 - cz : cz > z0 + 16 ? cz - z0 - 16 : 0, v = dx * dx + dz * dz <= lim;
-    for (const k of ['o', 'c', 't']) if (c.mesh[k]) c.mesh[k].visible = v; }
+    for (const k of ['o', 'c', 't']) if (c.mesh[k]) c.mesh[k].visible = v;
+    if (c.mesh.d) c.mesh.d.visible = v && R.deepShown(c); }
 }
 function resize() {
   const w = innerWidth, h = innerHeight;

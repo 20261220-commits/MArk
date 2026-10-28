@@ -231,6 +231,7 @@ function neighborUpdate(x, y, z) {
   if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.red_bed) { const f = m & 3, dir = DIRS[f], s = (m & 4) ? -1 : 1; if (getBlock(x + dir[0] * s, y, z + dir[2] * s) !== b) setBlock(x, y, z, 0); return; }
   if (b === BID.farmland && SOLID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] === RT.CUBE) { setBlock(x, y, z, 3); return; }
+  if (b === BID.dirt_path && SOLID[getBlock(x, y + 1, z)] && !FLUID[getBlock(x, y + 1, z)] && RTYPE[getBlock(x, y + 1, z)] !== RT.CROSS) { setBlock(x, y, z, 3); if (W.onPathToDirt) W.onPathToDirt(x, y, z); return; } // a solid block on a path turns it to dirt
   // pointed dripstone: meta 0 hangs (needs the block above), meta 1 stands (needs the block below); an unsupported stalactite falls
   if (b === BID.pointed_dripstone) {
     if (m === 0) { const up = getBlock(x, y + 1, z); if (!OPQ[up] && !(up === b && getMeta(x, y + 1, z) === 0)) { setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); } }

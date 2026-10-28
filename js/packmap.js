@@ -242,7 +242,12 @@ function packBuild(load, extraTiles = [], extraItems = []) {
       // turned half round: the entity texture has the pillow at the top, the block mesher wants the head end at the bottom
       const rot = (sx, sy) => { const t = new Uint8Array(16 * 16 * 4); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const s = ((sy + 15 - y) * W + sx + 15 - x) * 4, d = (y * 16 + x) * 4; for (let c = 0; c < 4; c++) t[d + c] = P[s + c]; } return t; };
       const side = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = ((6 + x) * W + r) * 4, d = ((3 + r) * 16 + x) * 4; for (let k = 0; k < 4; k++) side[d + k] = P[s + k]; side[d + 3] = 255; }
-      out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28)); out.tiles['bed_side' + sfx] = put(side);
+      // the mattress's sides and ends (Java's bed model: a 16x16x6 box per half, laid flat): rows 3..8 of a tile, the bottom
+      // of the mattress (the texture's first column / row) at the bottom; along the bed the head end comes first
+      const strip = (sx, sy, w, h, vert) => { const t = new Uint8Array(16 * 16 * 4); for (let r = 0; r < 6; r++) for (let x = 0; x < 16; x++) { const s = vert ? ((sy + x) * W + sx + r) * 4 : ((sy + r) * W + sx + x) * 4, d = ((8 - r) * 16 + x) * 4; for (let k = 0; k < 4; k++) t[d + k] = P[s + k]; t[d + 3] = 255; } return t; };
+      out.tiles['bed_head' + sfx] = put(rot(6, 6)); out.tiles['bed_foot' + sfx] = put(rot(6, 28));
+      out.tiles['bed_side' + sfx] = put(strip(0, 6, 6, 16, true)); out.tiles['bed_sidef' + sfx] = put(strip(0, 28, 6, 16, true));
+      out.tiles['bed_endh' + sfx] = put(strip(6, 0, 16, 6, false)); out.tiles['bed_endf' + sfx] = put(strip(22, 22, 16, 6, false));
     }
   }
   { // tiles Java draws from entity / particle / item textures: nearest-neighbour scaled into 16x16

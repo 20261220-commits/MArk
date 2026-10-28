@@ -1,7 +1,7 @@
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 4; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon
+const UPACK = { name: null }, UPACK_VER = 5; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }

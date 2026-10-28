@@ -340,22 +340,25 @@ function updateCamera(alpha, dt) {
 }
 
 // worker results also re-fill the job queue immediately (not only once per frame)
-W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, 2); };
+W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, 2); };
 // ---------- frame ----------
 let last = performance.now(), acc = 0, fpsN = 0, fpsT = 0, fps = 60;
 const PERF = { inbox: 0, stream: 0, tick: 0, ents: 0, render: 0, hud: 0, n: 0 };
 const PERFMAX = {}; const pf = (k, t0) => { const d = performance.now() - t0; PERF[k] += d; if (!(PERFMAX[k] >= d)) PERFMAX[k] = d; };
-// cave culling: while the player is above ground, faces deep in pitch-dark caves aren't built (they can't be seen from
-// there). Going underground (or back up) for a moment and a half rebuilds the loaded chunks, nearest first.
-const CAVE = { on: true, want: true, since: 0 };
+// cave culling: each chunk keeps its deep cave faces (no sky light reaches them) in a mesh of their own, drawn only in
+// the chunks around the player, or everywhere while the player is underground (switching is just showing a mesh)
+const CAVE = { under: false, want: false, since: 0, pcx: 1e9, pcz: 1e9 };
+R.deepShown = c => CAVE.under || (Math.abs(c.cx - CAVE.pcx) <= 1 && Math.abs(c.cz - CAVE.pcz) <= 1); // (the chunk around the player and its neighbours: cave mouths up close)
 function caveCull() {
-  if (!W.active || W.pano) return false;
-  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH);
-  const want = !spectator() && ((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
-  const now = performance.now();
+  if (!W.active) return;
+  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH), now = performance.now();
+  const want = !!W.pano ? false : spectator() || !((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
   if (want !== CAVE.want) { CAVE.want = want; CAVE.since = now; }
-  if (CAVE.on !== want && now - CAVE.since > 1500) { CAVE.on = want; for (const c of W.chunks.values()) c.dirty = true; }
-  return CAVE.on;
+  const under = want !== CAVE.under && (want || now - CAVE.since > 500) ? want : CAVE.under; // going down: at once; coming up: after half a second
+  const pcx = x >> 4, pcz = z >> 4;
+  if (under === CAVE.under && pcx === CAVE.pcx && pcz === CAVE.pcz) return;
+  CAVE.under = under; CAVE.pcx = pcx; CAVE.pcz = pcz;
+  for (const c of W.chunks.values()) if (c.mesh && c.mesh.d) c.mesh.d.visible = R.deepShown(c);
 }
 function frame(now) {
   requestAnimationFrame(frame);
@@ -365,7 +368,7 @@ function frame(now) {
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
-  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
+  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0); caveCull();
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;

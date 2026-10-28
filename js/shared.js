@@ -30,7 +30,9 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
     ['trapped_chest_side', 'trapped_chest_top', 'trapped_chest_front', 'chipped_anvil_top', 'damaged_anvil_top', 'quartz_pillar', 'quartz_pillar_top', 'polished_basalt_side', 'polished_basalt_top',
      'stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_warped_stem', 'stripped_warped_stem_top', 'deepslate_emerald_ore', 'tall_grass_bottom', 'tall_grass_top', 'large_fern_bottom', 'large_fern_top',
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
-  .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']));
+  .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']))
+  // beds from the jar's entity textures: the foot half's long side and each half's outer end (bed_side is the head half's side)
+  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]));
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -3222,7 +3224,7 @@ Buf.prototype.out = function (flip) {
 function meshChunk(B, M, L, bio, opts) {
   const fancy = opts.fancy, smoothL = opts.smooth;
   // opaque (no alpha test), cutout (alpha-tested: leaves, plants, glass, doors) and translucent buffers
-  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = []; // Wt: water, drawn before the other translucent blocks
+  const O = new Buf(), Cu = new Buf(), Tr = new Buf(), Wt = new Buf(), Dp = new Buf(), oFlip = [], cFlip = [], tFlip = [], wFlip = [], dFlip = []; // Dp: deep cave faces (cave culling) // Wt: water, drawn before the other translucent blocks
   // biome tint per inner column, 3x3 blended
   const tint = new Uint8Array(256 * 3 * 3); // [grass, foliage, water] rgb
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -3301,11 +3303,12 @@ function meshChunk(B, M, L, bio, opts) {
     return t;
   }
   function logRot(id, meta, f) { if (!LOGAX[id] || !meta) return 0; if (meta === 1) return (f === 2 || f === 3 || f === 4 || f === 5) ? 1 : 0; return (f === 0 || f === 1 || f === 2 || f === 3) ? 1 : 0; }
-  // cave culling (opts.cullDark, while the player is above ground): a cube face looking into air that no sky light
-  // reaches, more than 8 below its column's top, can't be seen from up there (caves are closed; sky light runs ~15 blocks
-  // in from an opening); skipping those is a third or more of the terrain's triangles with the 1.18 caves
+  // cave culling: an opaque cube face looking into air that no sky light reaches, more than 8 below its column's top,
+  // can't be seen from above ground (caves are closed; sky light runs ~15 blocks in from an opening). Those go in their
+  // own mesh, drawn only near the player or while the player is underground: a third or more of the terrain's
+  // triangles with the 1.18 caves
   let colTop = null;
-  if (opts.cullDark) { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
+  { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
   for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const pi = pidx(x, y, z), id = B[pi]; if (!id) continue;
     const rt = RTYPE[id], meta = fix6(id, M[pi]);
@@ -3313,11 +3316,11 @@ function meshChunk(B, M, L, bio, opts) {
     setTint(TINT[id], x, z, meta);
     if (rt === RT.CUBE || rt === RT.CUTOUT || rt === RT.TRANS) {
       const leaves = LEAF[id] === 1, trans = rt === RT.TRANS, cut = rt === RT.CUTOUT && !(leaves && !fancy);
-      const buf = trans ? Tr : cut ? Cu : O, fl = trans ? tFlip : cut ? cFlip : oFlip;
+      const buf0 = trans ? Tr : cut ? Cu : O, fl0 = trans ? tFlip : cut ? cFlip : oFlip;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
         if (OPQ[nb]) continue;
-        if (colTop && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x] && !trans) continue; // no sky light, deep: out of sight from above
+        const deep = buf0 === O && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x], buf = deep ? Dp : buf0, fl = deep ? dFlip : fl0; // no sky light, deep: out of sight from above
         const F = FACES[f];
         if (nb === id && (SELFCULL[id] || (leaves && !fancy)) && (!HASV[id] || M[ni] === meta)) continue;
         if (trans && nb && RTYPE[nb] === RT.CUBE) continue;
@@ -3531,8 +3534,12 @@ function meshChunk(B, M, L, bio, opts) {
           if (f === 2) { tile = T[(head ? 'bed_head' : 'bed_foot') + sfx]; rot = [2, 3, 0, 1][fac]; u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
           else if (f === 3) { tile = T.oak_planks; }
           else if (bi > 0) tile = T.oak_planks;
-          else { tile = T['bed_side' + sfx]; v0 = 3; v1 = 9; }
-        } else if (DOOR[id]) { const dw = id === 96 ? (meta >> 4) & 7 : 0; tile = dw ? T[WOOD8[dw][0] + (meta & 8 ? '_door_top' : '_door_bottom')] : meta & 8 ? FT[id * 4 + 1] : FT[id * 4]; if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = id === 96 ? T[WOOD8[dw][0] + '_planks'] : FT[id * 4]; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
+          else { // the mattress: long sides run from the head end (tile column 0) to the foot end; each half has its outer end
+            const d = DIRS[fac], along = F.n[0] * d[0] + F.n[2] * d[2]; v0 = 3; v1 = 9;
+            if (along === 0) { tile = T[(head ? 'bed_side' : 'bed_sidef') + sfx]; const eu = [[0, 0, -1], [0, 0, 1], null, null, [1, 0, 0], [-1, 0, 0]][f], toHead = eu[0] * d[0] + eu[2] * d[2]; if (toHead > 0) { u0 = 16; u1 = 0; } else { u0 = 0; u1 = 16; } }
+            else tile = T[(along > 0 ? 'bed_endh' : 'bed_endf') + sfx];
+          }
+        } else if (DOOR[id]) { const dw = id === 96 ? (meta >> 4) & 7 : 0; tile = id === 96 ? T[WOOD8[dw][0] + (meta & 8 ? '_door_top' : '_door_bottom')] : meta & 8 ? FT[id * 4 + 1] : FT[id * 4]; /* oak too: its block lists only the bottom texture */ if (F.n[1]) { u0 = 0; u1 = 3; v0 = 0; v1 = 16; tile = id === 96 ? T[WOOD8[dw][0] + '_planks'] : FT[id * 4]; } else if ((bx[3] - bx[0]) < 16 && F.n[0] === 0) { u0 = 0; u1 = 3; } else if ((bx[5] - bx[2]) < 16 && F.n[2] === 0) { u0 = 0; u1 = 3; } else { u0 = 0; u1 = 16; } }
         else if (id === 97) { u0 = 0; u1 = 16; v0 = 0; v1 = 16; }
         else if (id === 99 || id === 244) { // lantern pixels
           if (bi === 0) { if (F.n[1]) { u0 = 0; u1 = 6; v0 = 9; v1 = 15; } else { u0 = 0; u1 = 6; v0 = 2; v1 = 9; } }
@@ -3633,7 +3640,7 @@ function meshChunk(B, M, L, bio, opts) {
   // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
   // water drawn over ice darkened whole rows of a frozen ocean
   for (let i = 0; i < Tr.n; i++) { if (Wt.n * 3 + 3 >= Wt.pos.length) Wt.grow(); const n = Wt.n++; Wt.pos.set(Tr.pos.subarray(i * 3, i * 3 + 3), n * 3); Wt.uv.set(Tr.uv.subarray(i * 2, i * 2 + 2), n * 2); Wt.lt.set(Tr.lt.subarray(i * 4, i * 4 + 4), n * 4); Wt.col.set(Tr.col.subarray(i * 4, i * 4 + 4), n * 4); }
-  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)) };
+  return { o: O.out(oFlip), c: Cu.out(cFlip), t: Wt.out(wFlip.concat(tFlip)), d: Dp.out(dFlip) };
 }
 
 // ---------- Mojang structure templates (only when the player has loaded a client.jar: see structnbt.js) ----------
@@ -4040,8 +4047,8 @@ function workerMain(S) {
     else if (m.type === 'mesh') {
       const r = S.meshChunk(m.B, m.M, m.L, m.bio, m.opts);
       const tr = [m.B.buffer, m.M.buffer, m.L.buffer];
-      for (const k of ['o', 'c', 't']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
-      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, B: m.B, M: m.M, L: m.L }, tr);
+      for (const k of ['o', 'c', 't', 'd']) tr.push(r[k].pos.buffer, r[k].uv.buffer, r[k].lt.buffer, r[k].col.buffer, r[k].idx.buffer);
+      self.postMessage({ type: 'mesh', id: m.id, cx: m.cx, cz: m.cz, ver: m.ver, o: r.o, c: r.c, t: r.t, d: r.d, B: m.B, M: m.M, L: m.L }, tr);
     }
   };
 }
