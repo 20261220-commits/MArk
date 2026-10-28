@@ -783,11 +783,11 @@ function trySpawnHostile() {
     const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
     if (!isLoaded(x, z)) continue;
     if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
-    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : 1 + Math.floor(Math.random() * top);
-    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) < 8 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
+    const top = topY(x, z); const y = Math.random() < 0.5 ? top + 1 : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // down to the bottom of the world
+    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
-    if (Math.max(sky, blk) > 7) continue;
+    if (sky > 7 || blk > 0) continue; // 1.18: monsters only where no block light reaches
     if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
     const types = ['zombie', 'skeleton', 'creeper', 'spider'];
     const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
@@ -808,7 +808,12 @@ function spawnAnimalsForChunk(c) {
     for (let i = 2 + R0.int(3); i > 0; i--) { const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12), y = 46 + R0.int(12); if (c.blocks[BI(x, y, z)] === 27 && c.blocks[BI(x, y + 1, z)] === 27) spawnMob(t, x + .5, y, z + .5); }
     return;
   }
-  if (b === S.BIO.MOUNTAINS) types = ['goat'];
+  const vk = S.BIOMES[c.biome[8 * 16 + 8]] && S.BIOMES[c.biome[8 * 16 + 8]][8]; // 1.18 mountain biomes have their own animals
+  if (vk === 'snowy_slopes' || vk === 'jagged_peaks' || vk === 'frozen_peaks') types = ['goat'];
+  else if (vk === 'meadow') types = ['donkey', 'rabbit', 'sheep'];
+  else if (vk === 'grove') types = ['wolf', 'rabbit', 'fox'];
+  else if (vk === 'stony_peaks') return;
+  else if (b === S.BIO.MOUNTAINS) types = ['goat'];
   else if (b === S.BIO.PLAINS || b === S.BIO.FOREST || b === S.BIO.BIRCH || b === S.BIO.TAIGA || b === S.BIO.SWAMP || b === S.BIO.SNOWY_TAIGA || b === S.BIO.TUNDRA) types = ['pig', 'cow', 'sheep', 'chicken'];
   else return;
   const t = types[R0.int(types.length)], n = 2 + R0.int(3);
@@ -816,7 +821,7 @@ function spawnAnimalsForChunk(c) {
     const x = c.cx * 16 + 2 + R0.int(12), z = c.cz * 16 + 2 + R0.int(12);
     let y = MAXY - 2; while (y > MINY + 1 && !SOLID[c.blocks[BI(x, y, z)]] && !FLUID[c.blocks[BI(x, y, z)]]) y--;
     const g = c.blocks[BI(x, y, z)];
-    if (g !== 2 && g !== 50 && g !== 3 && g !== 1 && g !== 51) continue;
+    if (g !== 2 && g !== 50 && g !== 3 && g !== 1 && g !== 51 && g !== BID.packed_ice) continue;
     spawnMob(t, x + .5, y + 1, z + .5);
   }
 }

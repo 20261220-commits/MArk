@@ -1,5 +1,5 @@
 {
-  "name": "nemo-1.17",
+  "name": "nemo-1.18",
   "private": true,
   "description": "네모 대륙 1.17 — 게임 파일 제공 + 멀티플레이 서버 (의존성 없음)",
   "scripts": {

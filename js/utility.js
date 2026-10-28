@@ -123,5 +123,7 @@ function jukeboxUse(x, y, z, h) {
   if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); return true; }
   if (!h || !ITEMS[h.id].disc) return false;
   t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
-  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z); return true;
+  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z);
+  if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
+  return true;
 }

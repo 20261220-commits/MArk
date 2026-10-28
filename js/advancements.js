@@ -6,6 +6,8 @@ const ALL_FOODS = 'apple mushroom_stew bread porkchop cooked_porkchop golden_app
 const ALL_BREED = 'horse donkey mule sheep cow mooshroom pig chicken wolf ocelot rabbit llama cat panda fox bee hoglin strider goat axolotl turtle'.split(' ');
 const ALL_CATS = 'tabby black red siamese british_shorthair calico persian ragdoll white jellie all_black'.split(' ');
 const ADV_BIOMES = 'birch_forest_hills river swamp desert wooded_hills giant_tree_taiga_hills snowy_taiga badlands forest stone_shore snowy_tundra taiga_hills snowy_mountains wooded_badlands_plateau savanna plains frozen_river giant_tree_taiga snowy_beach jungle_hills jungle_edge mushroom_field_shore mountains desert_hills jungle beach savanna_plateau snowy_taiga_hills badlands_plateau dark_forest taiga birch_forest mushroom_fields wooded_mountains warm_ocean lukewarm_ocean cold_ocean deep_lukewarm_ocean deep_cold_ocean deep_frozen_ocean bamboo_jungle bamboo_jungle_hills'.split(' ');
+// 1.18 worlds have the new list (our keys keep the 1.17 names: snowy_tundra is snowy plains, mountains windswept hills...)
+const ADV_BIOMES18 = 'beach snowy_beach tall_birch_forest desert forest flower_forest birch_forest dark_forest savanna savanna_plateau shattered_savanna swamp river frozen_river ocean deep_ocean cold_ocean deep_cold_ocean lukewarm_ocean deep_lukewarm_ocean warm_ocean deep_frozen_ocean frozen_ocean snowy_tundra plains sunflower_plains stone_shore mushroom_fields ice_spikes jungle jungle_edge bamboo_jungle taiga snowy_taiga giant_tree_taiga giant_spruce_taiga mountains wooded_mountains gravelly_mountains badlands eroded_badlands wooded_badlands_plateau meadow grove snowy_slopes jagged_peaks frozen_peaks stony_peaks dripstone_caves lush_caves'.split(' ');
 const NETHER_BIOMES = 'nether_wastes soul_sand_valley warped_forest crimson_forest basalt_deltas'.split(' ');
 const ALL_POTIONS = 'speed slowness strength jump_boost regeneration fire_resistance water_breathing invisibility night_vision weakness poison slow_falling resistance'.split(' ');
 const ALL_EFFECTS = 'speed slowness strength jump_boost regeneration fire_resistance water_breathing invisibility night_vision weakness poison wither haste mining_fatigue levitation glowing absorption hunger nausea resistance slow_falling conduit_power dolphins_grace blindness bad_omen hero_of_the_village'.split(' ');
@@ -65,6 +67,9 @@ const ADV2 = [
   ['adventure/spyglass_at_parrot', 'adventure/root', 'spyglass', 't', 0, 0, '새인가?', '망원경으로 앵무새를 바라보세요', ['spyglass_at_parrot']],
   ['adventure/kill_a_mob', 'adventure/root', 'iron_sword', 't', 0, 0, '몬스터 사냥꾼', '적대적 몬스터를 죽이세요', KILL_ALL, 1],
   ['adventure/trade', 'adventure/root', 'emerald', 't', 0, 0, '훌륭한 거래군요!', '주민과 거래하세요', ['traded']],
+  ['adventure/trade_at_world_height', 'adventure/trade', 'emerald', 't', 0, 0, '별 상인', '건축 높이 제한에서 주민과 거래하세요', ['trade_at_world_height']],
+  ['adventure/fall_from_world_height', 'adventure/root', 'water_bucket', 't', 0, 0, '동굴과 절벽', '세계 꼭대기(건축 높이 제한)에서 세계 바닥까지 자유 낙하하고 살아남으세요', ['fall_from_world_height']],
+  ['adventure/play_jukebox_in_meadows', 'adventure/sleep_in_bed', 'jukebox', 't', 0, 0, '음악의 소리', '목초지를 주크박스의 음악 소리로 활기차게 만드세요', ['play_jukebox_in_meadows']],
   ['adventure/honey_block_slide', 'adventure/root', 'honey_block', 't', 0, 0, '달콤함에 몸을 맡기다', '꿀 블록을 향해 점프해 낙하를 멈추세요', ['honey_block_slide']],
   ['adventure/ol_betsy', 'adventure/root', 'crossbow', 't', 0, 0, '부러진 화살', '쇠뇌를 쏘세요', ['shot_crossbow']],
   ['adventure/lightning_rod_with_villager_no_fire', 'adventure/root', 'lightning_rod', 't', 0, 0, '번개 멈춰!', '주민의 감전 사고를 화재 없이 막으세요', ['lightning_rod_with_villager_no_fire']],
@@ -106,6 +111,7 @@ const ADV2 = [
 ];
 const ADVM = {}; for (const a of ADV2) ADVM[a[0]] = { id: a[0], parent: a[1], icon: a[2], frame: a[3], hidden: !!a[4], xp: a[5], name: a[6], desc: a[7], crit: a[8], any: !!a[9], tab: a[0].split('/')[0], kids: [] };
 for (const a of Object.values(ADVM)) if (a.parent) ADVM[a.parent].kids.push(a.id);
+{ const at = ADVM['adventure/adventuring_time']; Object.defineProperty(at, 'crit', { get: () => ((UI.menu === 'advview' && ADVUI.view ? ADVUI.view.gen : W.gen) || 1) >= 3 ? ADV_BIOMES18 : ADV_BIOMES }); } // which biomes count depends on the world's generator
 
 // ---------- progress ----------
 const advState = () => { if (UI.menu === 'advview' && ADVUI.view) return ADVUI.view.adv2 || {}; /* a saved world's, looked at from the title screen */ if (!W.meta) return null; if (!W.meta.adv2 || typeof W.meta.adv2 !== 'object') W.meta.adv2 = {}; const s = W.meta.adv2; if (W.meta.adv && !W.meta.advMigrated) { migrateOldAdv(s); W.meta.advMigrated = true; } return s; };
@@ -211,7 +217,7 @@ function advScan() {
   // places
   const x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z);
   if (W.dim === 0) {
-    const key = biomeKey(biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
+    const cb = S.caveBiomeAt(W.seed, x, y, z, topY(x, z), W.exp), key = biomeKey(cb >= 0 ? cb : biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
     for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30 && advInStruct('stronghold')) advGrant('story/follow_ender_eye');
   } else if (W.dim === -1) {
     const b = biomeAt(x, z), key = { 13: 'nether_wastes', 14: 'crimson_forest', 15: 'warped_forest', 16: 'soul_sand_valley', 17: 'basalt_deltas' }[b]; if (key) advGrant('nether/explore_nether', key);

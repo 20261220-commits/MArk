@@ -592,7 +592,7 @@ function renderFrame(dt, eye, under) {
   moon.position.copy(camera.position).addScaledVector(sunDir, -300); moon.lookAt(camera.position);
   sun.material.opacity = moon.material.opacity = 1 - W.rain;
   stars.position.copy(camera.position); starMat.opacity = Math.max(0, 1 - day * 1.6) * (1 - W.rain); stars.rotation.z = ang;
-  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 128.33, camera.position.z); // 1.17 cloud height
+  clouds.visible = R.cloudsOn && !under; clouds.position.set(camera.position.x, 192.33, camera.position.z); // 1.18 cloud height
   cloudTex.offset.set((camera.position.x / 768) * cloudTex.repeat.x + (W.time + (W.tickFrac || 0)) * 0.03 / 768 * cloudTex.repeat.x, (-camera.position.z / 768) * cloudTex.repeat.y); // clouds drift 0.03 blocks a tick, like Java
   { const tg = performance.now() / 1000; glintTex.offset.set((tg * 0.125) % 1, (tg * 0.0625) % 1); } // ~8 s per pass like Java
   if (R.moonPhases) { const ph = Math.floor(W.time / 24000) % 8; moonTex.offset.set((ph % 4) / 4, ph < 4 ? 0.5 : 0); }
