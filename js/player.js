@@ -55,7 +55,7 @@ function raycast(reach, fluids) {
   let best = null;
   for (let i = 0; i < 64; i++) {
     const id = getBlock(x, y, z);
-    if (id && (!FLUID[id] || (fluids && getMeta(x, y, z) === 0))) {
+    if (id && (!FLUID[id] || (fluids && (fluids === 'any' || getMeta(x, y, z) === 0)))) { // 'any': flowing water too (boats)
       const m = getMeta(x, y, z), boxes = FLUID[id] ? [[0, 0, 0, 16, 14, 16]] : (selShape(id, m) || [[0, 0, 0, 16, 16, 16]]);
       for (const b of boxes) {
         const h = rayBox(ox, oy, oz, dx, dy, dz, [x + b[0] / 16, y + b[1] / 16, z + b[2] / 16, x + b[3] / 16, y + b[4] / 16, z + b[5] / 16]);
@@ -252,8 +252,8 @@ function playerTick() {
     if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
-    // sneak edge protection
-    if (PL.sneaking && PL.onGround) {
+    // sneak edge protection (Java's clipAtLedge: on the ground, or less than a step above it, as when landing or hopping)
+    if (PL.sneaking && (PL.onGround || ((PL.fallDist || 0) < 0.6 && !noCollision(PL.x, PL.y + (PL.fallDist || 0) - 0.6, PL.z)))) {
       const step = 0.05;
       while (mx !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z)) mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step;
       while (mz !== 0 && noCollision(PL.x, PL.y - 0.6, PL.z + mz)) mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step;
@@ -336,7 +336,8 @@ function reach() { return creative() ? 5 : 4.5; }
 function interactTick() {
   offhandTick();
   const held = PL.held();
-  TARGET = raycast(reach(), held && (held.id === IID.bucket || held.id === IID.glass_bottle || ITEMS[held.id].boat || held.id === IID.oak_boat || held.id === IID.lily_pad));
+  const boat = held && (ITEMS[held.id].boat || held.id === IID.oak_boat);
+  TARGET = raycast(boat ? Math.max(5, reach()) : reach(), boat ? 'any' : held && (held.id === IID.bucket || held.id === IID.glass_bottle || held.id === IID.lily_pad)); // a boat aims at any water, 5 blocks as in Java
   if (MINE.cd > 0) MINE.cd--;
   if (USE.placeCd > 0) USE.placeCd--;
   // mining
@@ -656,7 +657,7 @@ function useItem(first) {
         if (!tryLightPortal(px, py, pz)) { if (!SOLID[getBlock(px, py - 1, pz)] && !N6.some(([a, b2, c]) => BLOCKS[getBlock(px + a, py + b2, pz + c)].log)) return; setBlock(px, py, pz, BID.fire); }
         play(h.id === IID.fire_charge ? 'fireball' : 'ignite'); if (h.id === IID.fire_charge) consume(); else damageItem(INV.slots, INV.sel, 1); swing(); return;
       }
-      if (h.id === IID.oak_boat) { const fl = FLUID[id] === 1; const bx = x + (fl ? 0 : t.nx) + .5, by = fl ? y + 0.9 : y + t.ny + (t.ny > 0 ? 0 : 0), bz = z + (fl ? 0 : t.nz) + .5; if (!fl && t.ny !== 1) return; placeBoat(bx, fl ? y + 0.88 : y + 1, bz, PL.yaw); consume(); swing(); return; }
+      if (h.id === IID.oak_boat) { if (useBoat(t, 'oak')) { consume(); swing(); } return; }
       if (h.id === IID.ender_pearl) { throwItem(h.id); USE.placeCd = 20; return; }
       if (h.id === IID.end_crystal) { if (placeEndCrystal(t)) { consume(); swing(); } return; }
       if (h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
@@ -673,13 +674,28 @@ function useItem(first) {
       if (h.id === IID.snowball || h.id === IID.egg || h.id === IID.experience_bottle || d.splash || d.lingering) { throwItem(h.id); return; }
       if (h.id === IID.fishing_rod) { useRod(); return; }
       if (d.cart) { placeMinecart(t, d); return; }
-      if (ITEMS[h.id].boat) { const fl = FLUID[id] === 1; if (!fl && t.ny !== 1) return; placeBoat(x + (fl ? 0 : t.nx) + .5, fl ? y + 0.88 : y + 1, z + (fl ? 0 : t.nz) + .5, PL.yaw, ITEMS[h.id].boat); consume(); swing(); return; }
+      if (ITEMS[h.id].boat) { if (useBoat(t, ITEMS[h.id].boat)) { consume(); swing(); } return; }
       if (d.place != null) { placeBlock(t, d); return; }
     }
   } else if (d && h.id === IID.fishing_rod) { useRod(); return; }
   else if (d && bottleUse(null, h)) return;
   else if (d && (h.id === IID.snowball || h.id === IID.egg || h.id === IID.ender_pearl || h.id === IID.experience_bottle || d.splash || d.lingering)) { throwItem(h.id); USE.placeCd = h.id === IID.ender_pearl ? 20 : 4; return; }
   else if (d && h.id === IID.ender_eye) { if (throwEye()) consume(); swing(); return; }
+}
+// a boat goes where the player looks (Java): on the water's surface, or on the face that was hit, facing the player's
+// way, and only if it fits there without being inside a block
+function useBoat(t, wood) {
+  const [dx, dy, dz] = lookDir(), ey = PL.y + PL.eyeH;
+  let px = PL.x + dx * t.t, py = ey + dy * t.t, pz = PL.z + dz * t.t;
+  if (FLUID[t.id]) { let wy = t.y; while (FLUID[getBlock(t.x, wy + 1, t.z)] === 1) wy++; if (FLUID[t.id] !== 1) return false; py = wy + 0.88; } // floats on top of the column, never under it
+  else if (t.ny === 1) py = t.y + 1;
+  else if (t.ny === -1) return false;
+  const hw = FLUID[t.id] ? 0.25 : 0.6, cell = v => Math.floor(v); // on water only its middle must be free: the bank pushes it off
+  for (let bx = cell(px - hw); bx <= cell(px + hw); bx++) for (let by = cell(py + 0.05); by <= cell(py + 0.5); by++) for (let bz = cell(pz - hw); bz <= cell(pz + hw); bz++) {
+    const b = getBlock(bx, by, bz); if (b && SOLID[b] && !FLUID[b]) return false;
+  }
+  placeBoat(px, py, pz, PL.yaw, wood);
+  return true;
 }
 function throwItem(id) {
   const [dx, dy, dz] = lookDir();

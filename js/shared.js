@@ -2872,8 +2872,14 @@ function genChunk0(seed, cx, cz, dim, exp) {
       const base = ['spine_1', 'spine_2', 'spine_3', 'spine_4', 'skull_1', 'skull_2', 'skull_3', 'skull_4'][R.int(8)], t = STRUCTS.t['fossil/' + base], rot = R.int(4), fy = 15 + R.int(30);
       const c = [[0, 0], [t.s[0] - 1, t.s[2] - 1]].map(([a, b]) => tplXZ(a, b, rot)), mnx = Math.min(c[0][0], c[1][0]), mxx = Math.max(c[0][0], c[1][0]), mnz = Math.min(c[0][1], c[1][1]), mxz = Math.max(c[0][1], c[1][1]);
       const ox = x0 + R.int(Math.max(1, 16 - (mxx - mnx))) - mnx, oz = z0 + R.int(Math.max(1, 16 - (mxz - mnz))) - mnz, st0 = makeStamp(blocks, meta, x0, z0); // inside this chunk
-      stampSingle(st0, 'fossil/' + base, ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 995) % 10 === 0 ? null : s2 });
-      stampSingle(st0, 'fossil/' + base + '_coal', ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 997) % 10 !== 0 ? null : s2 });
+      // Java's FossilFeature: not where more than 4 of the box's corners are open (a cave), and never into air or water
+      const open = b => b === 0 || b === WATER || b === LAVA; let oc = 0;
+      for (const cx of [ox + mnx, ox + mxx]) for (const cz of [oz + mnz, oz + mxz]) for (const cy of [fy, fy + t.s[1] - 1]) { const b = st0.get(cx, cy, cz); if (b >= 0 && open(b)) oc++; }
+      if (oc <= 4) {
+        const solidAt = (x, y, z) => { const b = st0.get(x, y, z); return b > 0 && !open(b); };
+        stampSingle(st0, 'fossil/' + base, ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 995) % 10 === 0 || !solidAt(x, y, z) ? null : s2 });
+        stampSingle(st0, 'fossil/' + base + '_coal', ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 997) % 10 !== 0 || !solidAt(x, y, z) ? null : s2 });
+      }
     } else if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64)) {
       const fx = 4 + R.int(8), fz = 4 + R.int(8), fy = 15 + R.int(30), ax = R() < 0.5, len = 3 + R.int(3);
       const bone = (a, y, b, m) => { const x = ax ? fx + a : fx + b, z = ax ? fz + b : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 2) return; const i2 = I(x, y, z); if (!blocks[i2] || blocks[i2] === WATER || blocks[i2] === LAVA) return; blocks[i2] = R() < 0.1 ? (y < 8 ? BID.deepslate_coal_ore : 13) : BID.bone_block; meta[i2] = R() < 0.1 ? 0 : m; };

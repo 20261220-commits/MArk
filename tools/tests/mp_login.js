@@ -43,5 +43,14 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await A2.evaluate(() => { addEffect(PL, 'invisibility', 400, 0); }); await B.waitForTimeout(1200);
   const inv = await tag(); await A2.evaluate(() => { clearEffects(PL); });
   ok(inv && !inv.back && !inv.front, 'an invisible player has no name tag', inv);
+  // a bed in multiplayer: a guest lies down at night and gets up again by sneaking (while the other player is still up)
+  await B.evaluate(() => { mpSend({ t: 'timeset', time: 18000 }); }); await B.waitForTimeout(2500);
+  const bed = await B.evaluate(async p => { const wait = ms => new Promise(r => setTimeout(r, ms)); PL.mode = 'survival'; PL.flying = false; PL.x = p[0] + .5; PL.y = p[1]; PL.z = p[2] - 1.5; PL.vx = PL.vy = PL.vz = 0;
+    MP.local = true; setBlock(p[0] + 2, p[1], p[2] - 2, BID.red_bed, 1, { noUpdate: true }); setBlock(p[0] + 3, p[1], p[2] - 2, BID.red_bed, 1 | 4); MP.local = false;
+    for (const e of ENT) if (e.kind === 'mob' && e.def && e.def.hostile) removeEnt(e);
+    const t = ((W.time % 24000) + 24000) % 24000; trySleep(p[0] + 2, p[1], p[2] - 2); const slept = !!PL.sleeping;
+    await wait(2500); const still = !!PL.sleeping; IN.sneak = true; await wait(1500); IN.sneak = false; await wait(300);
+    return { t, slept, still, after: !!PL.sleeping, y: +PL.y.toFixed(2) }; }, pos);
+  ok(bed.slept && bed.still && !bed.after, 'multiplayer: lying in bed at night, and getting up by sneaking', bed);
   for (const P of [A, B, A2]) ok(!P.errs.length, 'no page errors', P.errs);
 };

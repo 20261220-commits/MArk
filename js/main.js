@@ -458,8 +458,11 @@ function ambientParticles(dt, px, py, pz) {
 function autoRes() {
   if (!OPT.autoRes || !W.active || UI.paused) return;
   const old = R.pixelScale;
-  if (fps < 40 && R.pixelScale > 0.5) R.pixelScale = Math.max(0.5, R.pixelScale - 0.1);
-  else if (fps >= 57 && R.pixelScale < 1) R.pixelScale = Math.min(1, R.pixelScale + 0.05);
+  const lo = 0.5 / R.basePR; // down to half the screen's CSS resolution on a struggling device, up to its full density
+  // every change reallocates the frame buffer (a small hitch), so it climbs only after 3 steady seconds, in bigger steps
+  if (fps < 40 && R.pixelScale > lo) { R.pixelScale = Math.max(lo, R.pixelScale - 0.1); R.resUp = 0; }
+  else if (fps >= 57 && R.pixelScale < 1) { if (++R.resUp >= 3) { R.resUp = 0; R.pixelScale = Math.min(1, R.pixelScale + 0.125); } }
+  else R.resUp = 0;
   if (old !== R.pixelScale) R.resize();
 }
 
@@ -477,7 +480,7 @@ function javaItemModels() {
 (async function boot() {
   applyOpt();
   if (await loadPack()) {
-    atlasTex.needsUpdate = true;
+    atlasTex.needsUpdate = true; R.buildAtlasMips();
     for (const k in PACKPX.items) { const id = IID[k]; if (id != null && ITEMS[id].block) ITEMS[id].sprite = k; } // block items drawn flat in Java (doors, torches...)
   }
   javaItemModels();
@@ -497,4 +500,8 @@ function javaItemModels() {
   showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF, PERFMAX };
+  // offline play: sw.js keeps the game's files so it opens again without internet; worlds stay in IndexedDB, and asking
+  // for persistent storage keeps the browser from clearing them when the disk gets full
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/\/dist\//.test(location.pathname)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();

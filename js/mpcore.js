@@ -31,6 +31,7 @@ function mpWorldCore(store, out) {
   const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
   const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
   const prefix = dim => ({ '-1': 'n', 1: 'e' }[dim] || '');
+  const tmy = () => S.meta && S.meta.my != null ? +S.meta.my : -64; // the bottom row of the world's tile indices (worlds made before this was kept are 1.18's -64)
   const chunkKey = (dim, x, z) => prefix(dim) + (x >> 4) + ',' + (z >> 4);
   const send = (p, o) => out(p.id, o);
   const others = (p, o, sameDim) => { for (const q of players.values()) if (q !== p && q.joined && (!sameDim || q.dim === p.dim)) out(q.id, o); };
@@ -59,7 +60,7 @@ function mpWorldCore(store, out) {
     switch (m.t) {
       case 'create': // a new world, or the start of an upload of an existing one
         if (S.meta) { send(p, { t: 'error', msg: '이 서버에는 이미 세계가 있습니다' }); return; }
-        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, gen: +m.meta.gen || 1, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
+        S.meta = { name: String(m.meta.name || '서버 세계').slice(0, 40), seed: m.meta.seed, gen: +m.meta.gen || 1, exp: m.meta.exp !== false, mode: m.meta.mode === 'creative' ? 'creative' : 'survival', my: m.meta.my != null ? +m.meta.my : -64, diff: +m.meta.diff || 2, cheats: !!m.meta.cheats, spawn: m.meta.spawn || null, gamerules: m.meta.gamerules || {}, shared: m.meta.shared || {} };
         S.time = +m.meta.time || 1000; S.rain = 0; store.saveState(); store.log(`새 세계 "${S.meta.name}" (시드 ${S.meta.seed})`); send(p, { t: 'created' }); return;
       case 'join': {
         if (!S.meta) { send(p, { t: 'noworld' }); return; }
@@ -96,8 +97,8 @@ function mpWorldCore(store, out) {
       case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
-        entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null };
-          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+        entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null, tmy: tmy() };
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, my: c.rec.my, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
           send(p, o); }); return; }
       case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
       case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;
@@ -109,7 +110,7 @@ function mpWorldCore(store, out) {
         if (auth.get(p.dim) !== from) return;
         for (const e of m.l || []) { const dk = chunkKey(m.dim, e[0], e[2]); entry(dk).then(c => { c.edits.push(e); if (c.edits.length > 20000) c.edits.splice(0, c.edits.length - 20000); touch(dk, c); }); }
         others(p, m, true); return;
-      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y + 64) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from y -64 */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
+      case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
