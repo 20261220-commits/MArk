@@ -340,11 +340,23 @@ function updateCamera(alpha, dt) {
 }
 
 // worker results also re-fill the job queue immediately (not only once per frame)
-W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, 2); };
+W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, 2); };
 // ---------- frame ----------
 let last = performance.now(), acc = 0, fpsN = 0, fpsT = 0, fps = 60;
 const PERF = { inbox: 0, stream: 0, tick: 0, ents: 0, render: 0, hud: 0, n: 0 };
 const PERFMAX = {}; const pf = (k, t0) => { const d = performance.now() - t0; PERF[k] += d; if (!(PERFMAX[k] >= d)) PERFMAX[k] = d; };
+// cave culling: while the player is above ground, faces deep in pitch-dark caves aren't built (they can't be seen from
+// there). Going underground (or back up) for a moment and a half rebuilds the loaded chunks, nearest first.
+const CAVE = { on: true, want: true, since: 0 };
+function caveCull() {
+  if (!W.active || W.pano) return false;
+  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH);
+  const want = !spectator() && ((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
+  const now = performance.now();
+  if (want !== CAVE.want) { CAVE.want = want; CAVE.since = now; }
+  if (CAVE.on !== want && now - CAVE.since > 1500) { CAVE.on = want; for (const c of W.chunks.values()) c.dirty = true; }
+  return CAVE.on;
+}
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -353,7 +365,7 @@ function frame(now) {
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
-  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
+  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;

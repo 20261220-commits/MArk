@@ -3637,6 +3637,11 @@ function meshChunk(B, M, L, bio, opts) {
     return t;
   }
   function logRot(id, meta, f) { if (!LOGAX[id] || !meta) return 0; if (meta === 1) return (f === 2 || f === 3 || f === 4 || f === 5) ? 1 : 0; return (f === 0 || f === 1 || f === 2 || f === 3) ? 1 : 0; }
+  // cave culling (opts.cullDark, while the player is above ground): a cube face looking into air that no sky light
+  // reaches, more than 8 below its column's top, can't be seen from up there (caves are closed; sky light runs ~15 blocks
+  // in from an opening); skipping those is a third or more of the terrain's triangles with the 1.18 caves
+  let colTop = null;
+  if (opts.cullDark) { colTop = new Int16Array(256); for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let t = maxY; while (t > 0 && !OPQ[B[pidx(x, t, z)]]) t--; colTop[z * 16 + x] = t - 8; } }
   for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const pi = pidx(x, y, z), id = B[pi]; if (!id) continue;
     const rt = RTYPE[id], meta = fix6(id, M[pi]);
@@ -3648,6 +3653,7 @@ function meshChunk(B, M, L, bio, opts) {
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f], nb = B[ni];
         if (OPQ[nb]) continue;
+        if (colTop && (L[ni] >> 4) === 0 && y < colTop[z * 16 + x] && !trans) continue; // no sky light, deep: out of sight from above
         const F = FACES[f];
         if (nb === id && (SELFCULL[id] || (leaves && !fancy)) && (!HASV[id] || M[ni] === meta)) continue;
         if (trans && nb && RTYPE[nb] === RT.CUBE) continue;
@@ -18891,11 +18897,23 @@ function updateCamera(alpha, dt) {
 }
 
 // worker results also re-fill the job queue immediately (not only once per frame)
-W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, 2); };
+W.pump = () => { if (!W.active) return; processInbox(2, 2); streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, 2); };
 // ---------- frame ----------
 let last = performance.now(), acc = 0, fpsN = 0, fpsT = 0, fps = 60;
 const PERF = { inbox: 0, stream: 0, tick: 0, ents: 0, render: 0, hud: 0, n: 0 };
 const PERFMAX = {}; const pf = (k, t0) => { const d = performance.now() - t0; PERF[k] += d; if (!(PERFMAX[k] >= d)) PERFMAX[k] = d; };
+// cave culling: while the player is above ground, faces deep in pitch-dark caves aren't built (they can't be seen from
+// there). Going underground (or back up) for a moment and a half rebuilds the loaded chunks, nearest first.
+const CAVE = { on: true, want: true, since: 0 };
+function caveCull() {
+  if (!W.active || W.pano) return false;
+  const x = Math.floor(PL.x), z = Math.floor(PL.z), ey = Math.floor(PL.y + PL.eyeH);
+  const want = !spectator() && ((getLight(x, ey, z) >> 4) >= 8 || PL.y >= topY(x, z) - 3);
+  const now = performance.now();
+  if (want !== CAVE.want) { CAVE.want = want; CAVE.since = now; }
+  if (CAVE.on !== want && now - CAVE.since > 1500) { CAVE.on = want; for (const c of W.chunks.values()) c.dirty = true; }
+  return CAVE.on;
+}
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -18904,7 +18922,7 @@ function frame(now) {
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
   processInbox(UI.menu === 'loading' ? 30 : 3, UI.menu === 'loading' ? 50 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
-  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
+  streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth, cullDark: caveCull() }, UI.menu === 'loading' ? 8 : 3); pf('stream', t0);
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
