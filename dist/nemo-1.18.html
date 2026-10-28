@@ -6912,7 +6912,7 @@ function fluidUpdate(x, y, z) {
       expect = best + drop;
       if (water && sources >= 2) { const bl = getBlock(x, y - 1, z); if (SOLID[bl] || (bl === 27 && getMeta(x, y - 1, z) === 0)) expect = 0; }
     }
-    if (expect >= 8 && expect !== 8) { setBlock(x, y, z, 0); return; }
+    if (expect >= 8 && above !== b) { setBlock(x, y, z, 0); return; } // only fluid right above makes falling (level 8): a flow's last block must dry up, not turn into a new source
     const nm = expect === 8 ? 8 : expect;
     if (nm !== m) { setBlock(x, y, z, b, nm); return; }
     lvl = nm & 7; falling = nm === 8;
@@ -18961,6 +18961,10 @@ function javaItemModels() {
   showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF, PERFMAX };
+  // offline play: sw.js keeps the game's files so it opens again without internet; worlds stay in IndexedDB, and asking
+  // for persistent storage keeps the browser from clearing them when the disk gets full
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/\/dist\//.test(location.pathname)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();
 
 </script>

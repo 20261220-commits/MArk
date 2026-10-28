@@ -497,4 +497,8 @@ function javaItemModels() {
   showMenu('title'); startPanorama();
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF, PERFMAX };
+  // offline play: sw.js keeps the game's files so it opens again without internet; worlds stay in IndexedDB, and asking
+  // for persistent storage keeps the browser from clearing them when the disk gets full
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/\/dist\//.test(location.pathname)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();
