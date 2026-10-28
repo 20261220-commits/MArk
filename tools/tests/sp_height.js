@@ -1,27 +1,33 @@
-// 1.17 world height (y 0..255): new worlds stand on a bedrock floor at y 0; chunks saved by the 1.18 version (y -64..319)
-// or by the old 128-high version load into it
+// 1.18 world height (y -64..319): chunks saved by the older versions (y 0..255, or the first 128-high version) load
+// into it with their blocks and chests in place and the new depths below y 0
 module.exports = async ({ ok, srv, b, lib }) => {
-  const p = await lib.page(b, srv); await lib.newWorld(p, 'creative', '1717');
+  const p = await lib.page(b, srv); await lib.newWorld(p, 'creative', '1818');
   const r = await p.evaluate(() => {
     const o = { minY: S.MINY, maxY: S.MAXY, gen: W.gen };
-    const x = Math.floor(PL.x), z = Math.floor(PL.z); o.floor = getBlock(x, 0, z) === BID.bedrock; o.top = topY(x, z);
-    // a 1.18 save: rows from y -64, 384 high
-    const n18 = 256 * 384, b18 = new Uint16Array(n18), m18 = new Uint8Array(n18), at = (y, i) => ((y + 64) << 8) | i;
-    b18[at(-30, 5)] = BID.deepslate; b18[at(10, 5)] = BID.diamond_block; b18[at(300, 5)] = BID.glass;
-    const d = { cx: 0, cz: 0, blocks: b18, meta: m18, light: new Uint8Array(n18), biome: new Uint8Array(256), tileList: [[at(10, 7), { type: 'chest', items: [] }], [at(-20, 7), { type: 'x' }]] };
-    fitRows(d, -64, 384, 0);
-    o.from18 = { len: d.blocks.length === S.CVOL, diamond: d.blocks[(10 << 8) | 5] === BID.diamond_block, floor: d.blocks[5] === BID.bedrock, tiles: d.tileList.map(([i]) => i), glassGone: !d.blocks.includes(BID.glass) };
-    // the old 128-high version: rows from y 0, 128 high; the rest is sky
-    const b12 = new Uint16Array(256 * 128); b12[(100 << 8) | 3] = BID.gold_block;
-    const d2 = { cx: 0, cz: 0, blocks: b12, meta: new Uint8Array(256 * 128), light: new Uint8Array(256 * 128), biome: new Uint8Array(256), tileList: [] };
-    fitRows(d2, 0, 128, 0);
-    o.from128 = { len: d2.blocks.length === S.CVOL, gold: d2.blocks[(100 << 8) | 3] === BID.gold_block, sky: d2.blocks[(200 << 8) | 3] === 0 };
+    // a save from before 1.18: rows from y 0, 256 high
+    const n = 256 * 256, b0 = new Uint16Array(n), m0 = new Uint8Array(n);
+    b0[(10 << 8) | 5] = BID.diamond_block; b0[(250 << 8) | 5] = BID.glass; b0[5] = BID.bedrock;
+    const d = { cx: 0, cz: 0, blocks: b0, meta: m0, light: new Uint8Array(n), biome: new Uint8Array(256), tileList: [[(10 << 8) | 7, { type: 'chest', items: [] }]] };
+    fitRows(d, 0, 256, 0);
+    const at = (y, i) => ((y - S.MINY) << 8) | i;
+    o.old = { len: d.blocks.length === S.CVOL, diamond: d.blocks[at(10, 5)] === BID.diamond_block, glass: d.blocks[at(250, 5)] === BID.glass,
+      deep: d.blocks[at(-30, 9)] !== 0 || d.blocks[at(-31, 9)] !== 0, floor: d.blocks[at(-64, 9)] === BID.bedrock, oldFloor: d.blocks[at(0, 5)] !== BID.bedrock, tile: d.tileList[0][0] === at(10, 7) };
+    // the first version: 128 high, the rest is sky
+    const b1 = new Uint16Array(256 * 128); b1[(100 << 8) | 3] = BID.gold_block;
+    const d1 = { cx: 0, cz: 0, blocks: b1, meta: new Uint8Array(256 * 128), light: new Uint8Array(256 * 128), biome: new Uint8Array(256), tileList: [] };
+    fitRows(d1, 0, 128, 0);
+    o.v128 = { gold: d1.blocks[at(100, 3)] === BID.gold_block, sky: d1.blocks[at(200, 3)] === 0 };
+    // a Nether chunk from before 1.18: nothing is made below y 0
+    const b2 = new Uint16Array(n); b2[(5 << 8) | 1] = BID.netherrack;
+    const d2 = { cx: 0, cz: 0, blocks: b2, meta: new Uint8Array(n), light: new Uint8Array(n), biome: new Uint8Array(256), tileList: [] };
+    fitRows(d2, 0, 256, -1);
+    o.nether = { rack: d2.blocks[at(5, 1)] === BID.netherrack, below: d2.blocks.subarray(0, 64 << 8).every(v => v === 0) };
     return o;
   });
-  ok(r.minY === 0 && r.maxY === 256 && r.gen === 2, 'the world is 1.17: y 0..255, the 1.17 generator', r);
-  ok(r.floor && r.top > 40 && r.top < 200, 'new terrain stands on the bedrock floor at y 0', r);
-  ok(r.from18.len && r.from18.diamond && r.from18.floor && r.from18.glassGone, 'a 1.18 save loads: y 0..255 kept, bedrock floor back, nothing outside the height', r.from18);
-  ok(r.from18.tiles.length === 1 && r.from18.tiles[0] === ((10 << 8) | 7), 'its chests move with their blocks', r.from18.tiles);
-  ok(r.from128.len && r.from128.gold && r.from128.sky, 'a save from the 128-high version loads too', r.from128);
+  ok(r.minY === -64 && r.maxY === 320 && r.gen === 3, 'the world is 1.18: y -64..319, the 1.18 generator', r);
+  ok(r.old.len && r.old.diamond && r.old.glass && r.old.tile, 'an older save keeps its blocks and chests at the same heights', r.old);
+  ok(r.old.deep && r.old.floor && r.old.oldFloor, 'below y 0 it gets the 1.18 depths; the old bedrock floor turns to deepslate', r.old);
+  ok(r.v128.gold && r.v128.sky, 'a save from the 128-high version loads too', r.v128);
+  ok(r.nether.rack && r.nether.below, 'an old Nether chunk gets nothing below y 0', r.nether);
   ok(!p.errs.length, 'no page errors', p.errs);
 };

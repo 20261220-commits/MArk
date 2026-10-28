@@ -1,7 +1,7 @@
 // World: chunk storage/streaming, cross-chunk lighting, block updates, fluids,
 // random ticks and IndexedDB persistence.
 const { OPQ, LOP, LEM, SOLID, FLUID, REPL, RTYPE, DIRS, CVOL } = S; // (MINY, MAXY: items.js)
-// a block's place in a chunk's arrays: rows are world y - MINY (0 in 1.17; the code also handles 1.18's -64)
+// a block's place in a chunk's arrays: rows are world y - MINY (the 1.18 world starts at y -64)
 const BI = (x, y, z) => ((y - MINY) << 8) | ((z & 15) << 4) | (x & 15);
 const ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
@@ -695,15 +695,14 @@ async function loadChunk(cx, cz) {
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
   W.inbox.push(d);
 }
-// a chunk saved with another world height (before 1.18: y 0..255, or 128 high; 1.18: y -64..319) put into this world's
-// rows: the shared heights are copied, rows above the save are sky, rows below it are the 1.18 depths (overworld) or
-// stone; a 1.18 save loses what was below y 0 and gets back the bedrock floor at y 0..4, as a 1.17 world has
+// a chunk saved with another world height (before 1.18: y 0..255, or 128 high) put into this world's rows (-64..319):
+// the shared heights are copied, rows above the save are sky, and below it the overworld gets its 1.18 depths
+// (deepslate, caves, deep ores; the old bedrock floor turns to deepslate, as when Java upgrades a world)
 function fitRows(d, my, ch, dim) {
   if (my === MINY && ch === CH && d.blocks.length === CVOL) return;
   const b = new Uint16Array(CVOL), m = new Uint8Array(CVOL), lo = Math.max(my, MINY), hi = Math.min(my + ch, MAXY);
   if (hi > lo) { const a = (lo - my) << 8, z = (hi - my) << 8, o = (lo - MINY) << 8; b.set(d.blocks.subarray(a, z), o); m.set(d.meta.subarray(a, z), o); }
-  if (my > MINY) { if (dim === 0) S.deepFill(b, m, W.seed, d.cx, d.cz); else b.fill(BID.stone, 0, (my - MINY) << 8); }
-  else if (my < MINY && dim === 0 && MINY === 0) { const R = S.rng(S.hash32(W.seed, d.cx, d.cz, 1717)); for (let i = 0; i < 256; i++) for (let y = 0; y < 5; y++) if (y === 0 || R() < (5 - y) / 5) { b[(y << 8) | i] = BID.bedrock; m[(y << 8) | i] = 0; } }
+  if (my > MINY && dim === 0) S.deepFill(b, m, W.seed, d.cx, d.cz); // the overworld's 1.18 depths below an older save; other dimensions stay open there
   const shift = (my - MINY) << 8;
   d.blocks = b; d.meta = m; d.light = new Uint8Array(CVOL); S.lightChunk(b, d.light, m);
   d.tileList = d.tileList.map(([i, t]) => [i + shift, t]).filter(([i]) => i >= 0 && i < CVOL); d.lifted = true; // saved again in this layout
