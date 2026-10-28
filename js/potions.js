@@ -60,7 +60,7 @@ function potionBurst(x, y, z, col, n = 24) {
 function splashPotion(id, x, y, z, direct) {
   const d = ITEMS[id], P = POTION[d.potion];
   play('break', { mat: 'glass' }); potionBurst(x, y, z, P.col, 40);
-  const targets = ENT.filter(e => e.kind === 'mob' && !e.dead && !e.deathT);
+  const targets = ENT.filter(e => e.kind === 'mob' && !e.dead && !e.deathT && !e.remote); // another runner's mobs are its own to change
   if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {
     const ty = t === PL ? PL.y + 0.9 : t.y + t.h / 2, dist = Math.hypot(t.x - x, ty - y, t.z - z);
@@ -81,7 +81,7 @@ function cloudTick(e) {
   const c = [((e.col >> 16) & 255) / 255, ((e.col >> 8) & 255) / 255, (e.col & 255) / 255];
   if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { kind: 'effect', size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
   if (e.age % 5) return;
-  const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT); if (!PL.dead && !spectator()) targets.push(PL);
+  const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT && !o.remote); if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {
     if (Math.hypot(t.x - e.x, t.z - e.z) > e.r || Math.abs(t.y - e.y) > 1.5) continue;
     const last = e.hitT.get(t.id || 'pl'); if (last != null && e.age - last < 20) continue; // each entity at most once a second

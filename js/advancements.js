@@ -186,6 +186,15 @@ function advNetherTravel(from, to) {
   if (from === 0 && to === -1) W.meta.netherIn = [PL.x, PL.z];
   if (from === -1 && to === 0 && W.meta.netherIn) { if (Math.hypot(PL.x - W.meta.netherIn[0], PL.z - W.meta.netherIn[1]) >= 7000) advGrant('nether/fast_travel'); W.meta.netherIn = null; }
 }
+// standing in a structure: its building blocks right around the player (under the feet or at the sides), on top of the
+// structure's own position check (Java tests the structure's pieces; this keeps a player walking past outside from counting)
+const ADV_STRUCT = { stronghold: ['stone_bricks', 'mossy_stone_bricks', 'cracked_stone_bricks', 'chiseled_stone_bricks', 'iron_bars', 'end_portal_frame', 'stone_brick_stairs', 'stone_brick_slab', 'bookshelf'],
+  fortress: ['nether_bricks', 'nether_brick_fence', 'nether_brick_stairs', 'nether_brick_slab', 'nether_wart'], bastion: ['polished_blackstone_bricks', 'cracked_polished_blackstone_bricks', 'blackstone', 'polished_blackstone', 'gilded_blackstone', 'chiseled_polished_blackstone', 'polished_blackstone_brick_stairs', 'polished_blackstone_brick_slab', 'blackstone_stairs', 'basalt', 'polished_basalt', 'gold_block'],
+  end_city: ['purpur_block', 'purpur_pillar', 'purpur_stairs', 'purpur_slab', 'end_stone_bricks', 'end_rod'] };
+const ADV_STRUCT_ID = {}; for (const k in ADV_STRUCT) ADV_STRUCT_ID[k] = new Set(ADV_STRUCT[k].map(n => BID[n]).filter(v => v != null));
+function advInStruct(kind) { const set = ADV_STRUCT_ID[kind], x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z); let n = 0;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = -1; dy <= 2; dy++) if (set.has(getBlock(x + dx, y + dy, z + dz))) n++;
+  return n >= 3; }
 // once a second: what the player carries, where they are, which effects they have
 const ADV_INV = { 'story/root': 'crafting_table', 'story/upgrade_tools': 'stone_pickaxe', 'story/smelt_iron': 'iron_ingot', 'story/lava_bucket': 'lava_bucket', 'story/iron_tools': 'iron_pickaxe', 'story/form_obsidian': 'obsidian', 'story/mine_diamond': 'diamond', 'nether/get_wither_skull': 'wither_skeleton_skull', 'nether/obtain_ancient_debris': 'ancient_debris', 'nether/obtain_blaze_rod': 'blaze_rod', 'nether/obtain_crying_obsidian': 'crying_obsidian', 'end/dragon_breath': 'dragon_breath', 'end/dragon_egg': 'dragon_egg', 'end/elytra': 'elytra', 'husbandry/obtain_netherite_hoe': 'netherite_hoe' };
 function advScan() {
@@ -203,16 +212,16 @@ function advScan() {
   const x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z);
   if (W.dim === 0) {
     const key = biomeKey(biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
-    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30) advGrant('story/follow_ender_eye');
+    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30 && advInStruct('stronghold')) advGrant('story/follow_ender_eye');
   } else if (W.dim === -1) {
     const b = biomeAt(x, z), key = { 13: 'nether_wastes', 14: 'crimson_forest', 15: 'warped_forest', 16: 'soul_sand_valley', 17: 'basalt_deltas' }[b]; if (key) advGrant('nether/explore_nether', key);
     const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4) advGrant('nether/find_fortress'); }
+    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4 && advInStruct('fortress')) advGrant('nether/find_fortress'); }
     const bx = Math.floor((x >> 4) / S.BREG), bz = Math.floor((z >> 4) / S.BREG);
-    for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40) advGrant('nether/find_bastion'); }
+    for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40 && advInStruct('bastion')) advGrant('nether/find_bastion'); }
   } else if (W.dim === 1) {
     const nA = S.makeNoise(W.seed + 201), nB = S.makeNoise(W.seed + 202), rx = Math.floor((x >> 4) / 20), rz = Math.floor((z >> 4) / 20);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c && Math.abs(x - c.x) < 24 && Math.abs(z - c.z) < 24) advGrant('end/find_end_city'); }
+    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c && Math.abs(x - c.x) < 24 && Math.abs(z - c.z) < 24 && advInStruct('end_city')) advGrant('end/find_end_city'); }
   }
   // levitation: 50 blocks up while levitating
   if (eff.levitation) { if (PL.levStart == null) PL.levStart = PL.y; else if (PL.y - PL.levStart >= 50) advGrant('end/levitate'); } else PL.levStart = null;
@@ -293,7 +302,8 @@ advScan = function () {
   const open0 = UI.openScreen;
   UI.openScreen = (type, ctx) => {
     open0(type, ctx); if (type === 'chest') stat('open_chest'); if (type === 'trade') stat('talked_to_villager');
-    if (type === 'chest' && W.dim === -1 && ctx && ctx.x != null) { const bx = Math.floor((ctx.x >> 4) / S.BREG), bz = Math.floor((ctx.z >> 4) / S.BREG); for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(ctx.x - o.x) < 40 && Math.abs(ctx.z - o.z) < 40) advGrant('nether/loot_bastion', 'loot_bastion_other'); } }
+    // PlayerGeneratesContainerLoot: the first opening of a chest the world made with a bastion loot table
+    if (type === 'chest' && ctx && ctx.x != null) { const t = getTile(ctx.x, ctx.y, ctx.z); if (t && t.lt) { const lt = String(t.lt); delete t.lt; if (/bastion/.test(lt)) advGrant('nether/loot_bastion', /treasure/.test(lt) ? 'loot_bastion_treasure' : /hoglin|stable/.test(lt) ? 'loot_bastion_hoglin_stable' : /bridge/.test(lt) ? 'loot_bastion_bridge' : 'loot_bastion_other'); } }
   };
 }
 

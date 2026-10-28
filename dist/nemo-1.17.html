@@ -1674,7 +1674,7 @@ const LOOT = {
   ruin_big: [['coal', 4], ['gold_ingot', 3], ['emerald', 2], ['golden_apple', 1], ['wheat', 4], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1], ['buried_treasure_map', 1]],
   fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
-function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
+function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
 function tplPos(t, tx, tz, r) { return r === 0 ? [tx, tz] : r === 1 ? [t.d - 1 - tz, tx] : r === 2 ? [t.w - 1 - tx, t.d - 1 - tz] : [tz, t.w - 1 - tx]; }
 function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
@@ -4088,7 +4088,7 @@ function stampFeature(st, p, R, x0, z0) {
 // a jar loot table rolled here: pools, weighted entries, counts, enchanting -> [slot, item key, count, extra]
 function rollVanillaLoot(R, name) {
   const tbl = STRUCTS.loot && STRUCTS.loot[name]; if (!tbl) { const k = LOOT_FALLBACK(name); return k ? rollLoot(R, k, 4 + R.int(5)) : []; }
-  const out = [], free = shuffled(R, [...Array(27).keys()]);
+  const out = [], free = shuffled(R, [...Array(27).keys()]); out.table = name;
   const num = v => typeof v === 'number' ? v : v && v.min != null ? v.min + R() * (v.max - v.min) : 1;
   for (const pool of tbl.pools || []) {
     const rolls = Math.floor(num(pool.rolls) + 0.0001);
@@ -7007,7 +7007,7 @@ function addChunk(cx, cz, d, tiles) {
   W.chunks.set(c.key, c); W.lastKey = -1;
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
-    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); c.tiles.set(t.i, { type: 'chest', items }); }
+    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); const tile = { type: 'chest', items }; if (t.loot.table) tile.lt = t.loot.table; c.tiles.set(t.i, tile); }
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
@@ -10625,7 +10625,7 @@ function potionBurst(x, y, z, col, n = 24) {
 function splashPotion(id, x, y, z, direct) {
   const d = ITEMS[id], P = POTION[d.potion];
   play('break', { mat: 'glass' }); potionBurst(x, y, z, P.col, 40);
-  const targets = ENT.filter(e => e.kind === 'mob' && !e.dead && !e.deathT);
+  const targets = ENT.filter(e => e.kind === 'mob' && !e.dead && !e.deathT && !e.remote); // another runner's mobs are its own to change
   if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {
     const ty = t === PL ? PL.y + 0.9 : t.y + t.h / 2, dist = Math.hypot(t.x - x, ty - y, t.z - z);
@@ -10646,7 +10646,7 @@ function cloudTick(e) {
   const c = [((e.col >> 16) & 255) / 255, ((e.col >> 8) & 255) / 255, (e.col & 255) / 255];
   if (Math.hypot(PL.x - e.x, PL.z - e.z) < 48) for (let i = 0; i < Math.ceil(e.r * 2); i++) { const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * e.r; R.simpleParticle(e.x + Math.cos(a) * rr, e.y + 0.1, e.z + Math.sin(a) * rr, c, { kind: 'effect', size: 0.1, vx: 1e-4, vy: 0.15, vz: 1e-4, grav: 0, life: 0.8 }); }
   if (e.age % 5) return;
-  const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT); if (!PL.dead && !spectator()) targets.push(PL);
+  const targets = ENT.filter(o => o.kind === 'mob' && !o.dead && !o.deathT && !o.remote); if (!PL.dead && !spectator()) targets.push(PL);
   for (const t of targets) {
     if (Math.hypot(t.x - e.x, t.z - e.z) > e.r || Math.abs(t.y - e.y) > 1.5) continue;
     const last = e.hitT.get(t.id || 'pl'); if (last != null && e.age - last < 20) continue; // each entity at most once a second
@@ -10720,8 +10720,9 @@ function beaconTick() {
   for (const k of BEACONS) {
     const [x, y, z] = k.split(',').map(Number), t = getTile(x, y, z) || {};
     const lv = beaconLevels(x, y, z), col = lv ? beaconBeam(x, y, z) : null;
-    t.levels = col ? lv : 0;
-    if (col && Math.hypot(PL.x - x, PL.z - z) < 12 && Math.abs(PL.y - y) < 12) { advGrant('nether/create_beacon'); if (lv >= 4) advGrant('nether/create_full_beacon'); }
+    const was = t.levels || 0; t.levels = col ? lv : 0;
+    // ConstructBeaconTrigger: when the beacon lights up or gains a level, for players within 10 blocks around it and 5 up / 9 down
+    if (t.levels > was && Math.abs(PL.x - (x + .5)) <= 10.5 && Math.abs(PL.z - (z + .5)) <= 10.5 && PL.y >= y - 9 && PL.y <= y + 6) { advGrant('nether/create_beacon'); if (t.levels >= 4) advGrant('nether/create_full_beacon'); }
     let m = beamMeshes.get(k);
     if (col && !m) { m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(...col), transparent: true, opacity: 0.55, depthWrite: false, fog: false })); m.position.set(x + .5, y + 1, z + .5); scene.add(m); beamMeshes.set(k, m); }
     else if (!col && m) { scene.remove(m); m.material.dispose(); beamMeshes.delete(k); }
@@ -13493,7 +13494,7 @@ function rocketExplode(r) {
   play('explode', { vol: Math.max(0.05, (big ? 0.6 : 0.4) * (1 - dist / 96)), pitch: big ? 1.3 : 1.7 });
   const dmg = 5 + 2 * r.stars.length; // stars hurt what is close
   if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
-  for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+  if (!r.remote) for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
 }
 function rocketTick() {
   for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { kind: 'spark', size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
@@ -13537,15 +13538,21 @@ function fireworkBoost() {
 // ---------- leads ----------
 const LEASH_OK = e => e.kind === 'mob' && !e.dead && !e.def.hostile && !e.def.boss && e.type !== 'villager' && e.type !== 'wandering_trader';
 const FENCES = new Set([BID.oak_fence, BID.nether_brick_fence, BID.fence2]);
+// where a lead goes: a fence post, you, or (multiplayer) another player
+function leashAnchor(e) {
+  if (Array.isArray(e.leash)) return [e.leash[0] + .5, e.leash[1] + .6, e.leash[2] + .5];
+  const w = e.leash === 'player' ? PL : typeof mpLeashHolder === 'function' ? mpLeashHolder(e.leash) : null;
+  return w && !w.dead ? [w.x, w.y + 1, w.z] : null;
+}
 function leashTick() {
   for (const e of ENT) {
     if (!e.leash) { if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } continue; }
-    const fence = Array.isArray(e.leash) ? e.leash : null;
-    if (e.dead || (fence && !FENCES.has(getBlock(...fence))) || (!fence && PL.dead)) { unleash(e, true); continue; }
-    const ax = fence ? fence[0] + .5 : PL.x, ay = fence ? fence[1] + .6 : PL.y + 1, az = fence ? fence[2] + .5 : PL.z;
-    const dx = ax - e.x, dy = ay - (e.y + e.h * 0.6), dz = az - e.z, d = Math.hypot(dx, dy, dz);
-    if (d > 10) { unleash(e, true); continue; }
-    if (d > 4) { const k = (d - 4) * 0.02; e.vx += dx / d * k; e.vz += dz / d * k; if (dy > 1 && e.onGround) e.vy = 0.3; e.goal = null; }
+    const fence = Array.isArray(e.leash) ? e.leash : null, a = leashAnchor(e);
+    if (e.remote) { if (!a || e.dead) { if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } continue; } } // another runner's mob: only the line shows here
+    else if (e.dead || (fence && !FENCES.has(getBlock(...fence))) || !a) { unleash(e, true); continue; }
+    const [ax, ay, az] = a, dx = ax - e.x, dy = ay - (e.y + e.h * 0.6), dz = az - e.z, d = Math.hypot(dx, dy, dz);
+    if (!e.remote) { if (d > 10) { unleash(e, true); continue; }
+      if (d > 4) { const k = (d - 4) * 0.02; e.vx += dx / d * k; e.vz += dz / d * k; if (dy > 1 && e.onGround) e.vy = 0.3; e.goal = null; } }
     if (!e.leashLine) { e.leashLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x6a4a24 })); scene.add(e.leashLine); }
     const p = e.leashLine.geometry.attributes.position; p.setXYZ(0, e.x, e.y + e.h * 0.6, e.z); p.setXYZ(1, ax, ay, az); p.needsUpdate = true; e.leashLine.geometry.computeBoundingSphere();
   }
@@ -16311,6 +16318,15 @@ function advNetherTravel(from, to) {
   if (from === 0 && to === -1) W.meta.netherIn = [PL.x, PL.z];
   if (from === -1 && to === 0 && W.meta.netherIn) { if (Math.hypot(PL.x - W.meta.netherIn[0], PL.z - W.meta.netherIn[1]) >= 7000) advGrant('nether/fast_travel'); W.meta.netherIn = null; }
 }
+// standing in a structure: its building blocks right around the player (under the feet or at the sides), on top of the
+// structure's own position check (Java tests the structure's pieces; this keeps a player walking past outside from counting)
+const ADV_STRUCT = { stronghold: ['stone_bricks', 'mossy_stone_bricks', 'cracked_stone_bricks', 'chiseled_stone_bricks', 'iron_bars', 'end_portal_frame', 'stone_brick_stairs', 'stone_brick_slab', 'bookshelf'],
+  fortress: ['nether_bricks', 'nether_brick_fence', 'nether_brick_stairs', 'nether_brick_slab', 'nether_wart'], bastion: ['polished_blackstone_bricks', 'cracked_polished_blackstone_bricks', 'blackstone', 'polished_blackstone', 'gilded_blackstone', 'chiseled_polished_blackstone', 'polished_blackstone_brick_stairs', 'polished_blackstone_brick_slab', 'blackstone_stairs', 'basalt', 'polished_basalt', 'gold_block'],
+  end_city: ['purpur_block', 'purpur_pillar', 'purpur_stairs', 'purpur_slab', 'end_stone_bricks', 'end_rod'] };
+const ADV_STRUCT_ID = {}; for (const k in ADV_STRUCT) ADV_STRUCT_ID[k] = new Set(ADV_STRUCT[k].map(n => BID[n]).filter(v => v != null));
+function advInStruct(kind) { const set = ADV_STRUCT_ID[kind], x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z); let n = 0;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = -1; dy <= 2; dy++) if (set.has(getBlock(x + dx, y + dy, z + dz))) n++;
+  return n >= 3; }
 // once a second: what the player carries, where they are, which effects they have
 const ADV_INV = { 'story/root': 'crafting_table', 'story/upgrade_tools': 'stone_pickaxe', 'story/smelt_iron': 'iron_ingot', 'story/lava_bucket': 'lava_bucket', 'story/iron_tools': 'iron_pickaxe', 'story/form_obsidian': 'obsidian', 'story/mine_diamond': 'diamond', 'nether/get_wither_skull': 'wither_skeleton_skull', 'nether/obtain_ancient_debris': 'ancient_debris', 'nether/obtain_blaze_rod': 'blaze_rod', 'nether/obtain_crying_obsidian': 'crying_obsidian', 'end/dragon_breath': 'dragon_breath', 'end/dragon_egg': 'dragon_egg', 'end/elytra': 'elytra', 'husbandry/obtain_netherite_hoe': 'netherite_hoe' };
 function advScan() {
@@ -16328,16 +16344,16 @@ function advScan() {
   const x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z);
   if (W.dim === 0) {
     const key = biomeKey(biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
-    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30) advGrant('story/follow_ender_eye');
+    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30 && advInStruct('stronghold')) advGrant('story/follow_ender_eye');
   } else if (W.dim === -1) {
     const b = biomeAt(x, z), key = { 13: 'nether_wastes', 14: 'crimson_forest', 15: 'warped_forest', 16: 'soul_sand_valley', 17: 'basalt_deltas' }[b]; if (key) advGrant('nether/explore_nether', key);
     const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4) advGrant('nether/find_fortress'); }
+    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4 && advInStruct('fortress')) advGrant('nether/find_fortress'); }
     const bx = Math.floor((x >> 4) / S.BREG), bz = Math.floor((z >> 4) / S.BREG);
-    for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40) advGrant('nether/find_bastion'); }
+    for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40 && advInStruct('bastion')) advGrant('nether/find_bastion'); }
   } else if (W.dim === 1) {
     const nA = S.makeNoise(W.seed + 201), nB = S.makeNoise(W.seed + 202), rx = Math.floor((x >> 4) / 20), rz = Math.floor((z >> 4) / 20);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c && Math.abs(x - c.x) < 24 && Math.abs(z - c.z) < 24) advGrant('end/find_end_city'); }
+    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const c = S.endCityAt(W.seed, i, j, nA, nB); if (c && Math.abs(x - c.x) < 24 && Math.abs(z - c.z) < 24 && advInStruct('end_city')) advGrant('end/find_end_city'); }
   }
   // levitation: 50 blocks up while levitating
   if (eff.levitation) { if (PL.levStart == null) PL.levStart = PL.y; else if (PL.y - PL.levStart >= 50) advGrant('end/levitate'); } else PL.levStart = null;
@@ -16418,7 +16434,8 @@ advScan = function () {
   const open0 = UI.openScreen;
   UI.openScreen = (type, ctx) => {
     open0(type, ctx); if (type === 'chest') stat('open_chest'); if (type === 'trade') stat('talked_to_villager');
-    if (type === 'chest' && W.dim === -1 && ctx && ctx.x != null) { const bx = Math.floor((ctx.x >> 4) / S.BREG), bz = Math.floor((ctx.z >> 4) / S.BREG); for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(ctx.x - o.x) < 40 && Math.abs(ctx.z - o.z) < 40) advGrant('nether/loot_bastion', 'loot_bastion_other'); } }
+    // PlayerGeneratesContainerLoot: the first opening of a chest the world made with a bastion loot table
+    if (type === 'chest' && ctx && ctx.x != null) { const t = getTile(ctx.x, ctx.y, ctx.z); if (t && t.lt) { const lt = String(t.lt); delete t.lt; if (/bastion/.test(lt)) advGrant('nether/loot_bastion', /treasure/.test(lt) ? 'loot_bastion_treasure' : /hoglin|stable/.test(lt) ? 'loot_bastion_hoglin_stable' : /bridge/.test(lt) ? 'loot_bastion_bridge' : 'loot_bastion_other'); } }
   };
 }
 
@@ -16854,6 +16871,7 @@ if (typeof module !== 'undefined') module.exports = { mpWorldCore };
 // to guests (guests can hit them), container contents follow every click, the host's dropped items can be picked
 // up by guests, a guest's inventory is kept on their device per host world, and the host's mobs chase, hit and shoot
 // whichever player is nearest.
+const MP_SUMMON_KEYS = ['baby', 'variant', 'size', 'vtype', 'prof', 'persistent', 'playerMade', 'placed', 'charge', 'hp', 'trap'];
 const MP = { server: false, auth: {}, rolePending: false, queue: [], replaying: false, on: false, role: null, name: null, id: 0, link: null, peers: new Map(), local: false, applying: false, allowSpawn: false, nextId: 1, eid: 1, rtc: null, status: '' };
 const MP_NAME_KEY = 'nemo-mp-name', MP_ADDR_KEY = 'nemo-mp-addr';
 try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
@@ -17031,7 +17049,7 @@ function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
@@ -17058,6 +17076,10 @@ function mpHandle(m, from) {
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'proj': mpGotProj(m, from); return;
+    case 'deco': mpGotDeco(m, from); return;
+    case 'tie': if (host && [m.x, m.y, m.z].every(Number.isInteger) && FENCES.has(getBlock(m.x, m.y, m.z))) { const id = MP.server ? m.from : from; for (const e of ENT) if (e.leash && e.leash.p === id && !e.dead) e.leash = [m.x, m.y, m.z]; } return; // a guest ties up what it leads
+    case 'splash': mpGotSplash(m, from); return;
+    case 'fw': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) { MP.fwIn = true; try { launchRocket(+m.x, +m.y, +m.z, { fw: m.fw && typeof m.fw === 'object' ? m.fw : null }, false, Array.isArray(m.shot) && m.shot.length === 3 && m.shot.every(isFinite) ? m.shot.map(Number) : null); if (ROCKETS.length) ROCKETS[ROCKETS.length - 1].remote = true; } finally { MP.fwIn = false; } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return; // its stars hurt only what is here, the sender's mobs stay theirs
     case 'adv': if (!host || MP.server) { if (typeof m.id === 'string' && ADVM[m.id]) advGrant(m.id, m.crit == null ? undefined : String(m.crit)); } return;
     case 'boom': mpGotBoom(m, from); return;
     case 'primed': mpGotPrimed(m, from); return;
@@ -17099,7 +17121,8 @@ function mpHandle(m, from) {
     case 'cartitems': if (!host) { const e = ENT.find(q => q.remote && q.rid === m.e && !q.dead && q.kind === 'minecart'); if (e && e.items && Array.isArray(m.items)) { for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } e.loot = null; if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
     case 'cartset': if (host && Array.isArray(m.items)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'minecart' && q.items); if (e) { e.loot = null; for (let i = 0; i < e.items.length; i++) { const st = m.items[i]; e.items[i] = st && ITEMS[st.id] ? st : null; } if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen(); } } return;
     case 'gear': if (host && Array.isArray(m.gear)) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseGearChanged === 'function') { e.gear = [0, 1].map(i => m.gear[i] && ITEMS[m.gear[i].id] ? m.gear[i] : null); horseGearChanged(e); } } return;
-    case 'summon': if (host && MOBDEF[m.type] && m.type !== 'player' && isFinite(m.x) && isFinite(m.y) && isFinite(m.z)) spawnMob(m.type, +m.x, +m.y, +m.z); return;
+    case 'summon': if (host && MOBDEF[m.type] && m.type !== 'player' && isFinite(m.x) && isFinite(m.y) && isFinite(m.z)) { const o = m.o && typeof m.o === 'object' ? m.o : {}, e = spawnMob(m.type, +m.x, +m.y, +m.z, { baby: !!o.baby, variant: o.variant, size: +o.size || undefined, vtype: o.vtype, prof: o.prof });
+      if (e) { for (const k of MP_SUMMON_KEYS) if (k !== 'baby' && o[k] != null && typeof o[k] !== 'object') e[k] = k === 'hp' ? Math.max(1, Math.min(e.hp, +o[k] || e.hp)) : o[k]; if (o.baby) e.baby = 24000; } } return;
     case 'killall': if (host) for (const e of [...ENT]) if (e.kind === 'mob' && !e.dead && !e.remote && (!m.type || e.type === m.type)) removeEnt(e); return;
     case 'held': if (!host) { const h = INV.slots[INV.sel]; if ((h ? h.id : 0) === m.was) { INV.slots[INV.sel] = m.st && ITEMS[m.st.id] ? m.st : null; UI.hudDirty = true; } } return;
     case 'vehs': if (!host) mpMirrorVehicles(m.l); return;
@@ -17345,7 +17368,7 @@ function mpTick() {
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
     for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
-      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null]); }
+      l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null, e.leash === 'player' ? { p: MP.id } : e.leash || 0]); }
     mpSend({ t: 'mobs', l }, p.id);
     mpSendVehicles(p);
     if (W.tickN % 4) continue;
@@ -17359,13 +17382,14 @@ function mpNewId() { return MP.server ? MP.id * 1000000 + MP.eid++ : MP.eid++; }
 // guests: the host's mobs as puppets that move where the host says
 function mpMirrorMobs(l) {
   const seen = new Set();
-  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor] of l) {
+  for (const [id, type, x, y, z, yaw, baby, hurt, variant, size, vtype, prof, sheared, dying, saddle, tame, chest, spd, jumpS, rider, harmor, leash] of l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob');
     if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared }); } finally { MP.allowSpawn = false; } e.remote = true; e.rid = id; e.persistent = true; e.yaw = yaw; }
     if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) e.hurt = 10; if (dying && !e.deathT) e.deathT = 1;
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
     if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+    e.leash = leash && (Array.isArray(leash) ? leash.length === 3 && leash.every(Number.isInteger) : leash.p != null) ? leash : null; // a lead: to a fence or to someone ({p: player id})
   }
   for (const e of ENT) if (e.remote && e.kind === 'mob' && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
@@ -17547,7 +17571,7 @@ function mpArrowAtPeer(e) {
 // someone else's arrow: just flies and sticks
 function mpVisualArrow(e) {
   if (!e.stuck) { const nx = e.x + e.vx, ny = e.y + e.vy, nz = e.z + e.vz;
-    if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) e.stuck = true;
+    if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) { if (e.visThrown) { removeEnt(e); return; } e.stuck = true; }
     else { e.x = nx; e.y = ny; e.z = nz; e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99; } }
   if (e.age > (e.stuck ? 200 : 300) || e.y < -20) removeEnt(e);
 }
@@ -17572,7 +17596,44 @@ function mpGotPrimed(m, from) { // the runner's lit TNT, flashing here until it 
   MP.allowSpawn = true; try { const e = Ent('tnt', +m.x + .5, +m.y, +m.z + .5); e.kind = 'tnt'; e.fuse = 100000; e.w = 0.49; e.h = 0.98; e.vy = 0.2; e.vx = e.vz = 0; e.mesh = new THREE.Mesh(R.blockGeometry(BID.tnt), R.blockMaterial()); addEnt(e); play('fuse'); setTimeout(() => { if (!e.dead) removeEnt(e); }, Math.min(200, +m.fuse || 80) * 50); } finally { MP.allowSpawn = false; }
 }
 function mpGotProj(m, from) {
-  if (m.dim === W.dim && [m.x, m.y, m.z, m.vx, m.vy, m.vz].every(isFinite)) { const e = shootArrow(+m.x, +m.y, +m.z, +m.vx, +m.vy, +m.vz, null, 0); if (e) { e.visual = true; e.noPickup = true; if (m.k) { scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh); } } }
+  if (m.dim === W.dim && [m.x, m.y, m.z, m.vx, m.vy, m.vz].every(isFinite)) { const e = shootArrow(+m.x, +m.y, +m.z, +m.vx, +m.vy, +m.vz, null, 0); if (e) { e.visual = true; e.noPickup = true; if (m.k) { scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh); } else if (m.th && ITEMS[m.th]) { scene.remove(e.mesh); e.mesh = R.itemMesh(+m.th); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); e.visThrown = true; } } } // snowballs, eggs, pearls, potions: seen in flight
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+// ---------- item frames, paintings and armor stands: every copy follows whoever changed it ----------
+const MP_DECO = ['frame', 'painting', 'armor_stand'];
+function mpDecoSend(e, op) {
+  if (!MP.on || MP.decoIn || !W.active || MP.loading || !e) return;
+  const m = { t: 'deco', dim: W.dim, op, k: e.kind };
+  if (e.kind === 'armor_stand') Object.assign(m, { x: +e.x.toFixed(2), y: +e.y.toFixed(2), z: +e.z.toFixed(2), yaw: e.yaw, armor: e.armor }); else Object.assign(m, { ax: e.ax, ay: e.ay, az: e.az, f: e.f });
+  if (e.kind === 'frame') Object.assign(m, { glow: e.glow, item: e.item, rot: e.rot }); else if (e.kind === 'painting') m.motif = e.motif;
+  mpSend(m);
+}
+function mpGotDeco(m, from) { // a chunk not here yet brings its own decorations
+  const st = m.k === 'armor_stand', ok = MP_DECO.includes(m.k) && (st ? [m.x, m.y, m.z].every(isFinite) : [m.ax, m.ay, m.az].every(Number.isInteger) && S.DIR6[m.f]);
+  if (ok && m.dim === W.dim && isLoaded(Math.floor(st ? m.x : m.ax), Math.floor(st ? m.z : m.az))) { const e = ENT.find(o => o.kind === m.k && !o.dead && (st ? Math.abs(o.x - m.x) < 0.6 && Math.abs(o.z - m.z) < 0.6 && Math.abs(o.y - m.y) < 1.5 : o.ax === m.ax && o.ay === m.ay && o.az === m.az && o.f === m.f));
+    const good = s => s && typeof s === 'object' && ITEMS[s.id] ? s : null;
+    MP.decoIn = true; try {
+      if (m.op === 'del') { if (e) removeEnt(e); }
+      else if (m.k === 'frame') { const item = good(m.item), rot = (m.rot | 0) & 7; if (!e) spawnFrame(m.ax, m.ay, m.az, m.f, { glow: !!m.glow, item, rot }); else { e.item = item; e.rot = rot; frameRebuild(e); } }
+      else if (m.k === 'painting') { if (!e && PAINTINGS.some(p => p[0] === m.motif)) spawnPainting(m.ax, m.ay, m.az, m.f, m.motif); }
+      else { const armor = [0, 1, 2, 3].map(i => good(Array.isArray(m.armor) && m.armor[i])); if (!e) spawnArmorStand(+m.x, +m.y, +m.z, +m.yaw || 0, armor); else { e.armor = armor; scene.remove(e.mesh); e.mesh = standMesh(e); scene.add(e.mesh); } }
+      if (m.k === 'frame' && MP.role === 'host') rsNotify(m.ax, m.ay, m.az); // comparators read frames
+    } finally { MP.decoIn = false; } }
+  if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
+}
+function mpDecoHook(e) { // a new decoration: its hits and its own removal (lost wall, fell out of the world) reach everyone
+  if (!e) return e; const hit = e.onHit, tick = e.tick;
+  e.onHit = function (q) { const r = hit.apply(this, arguments); mpDecoSend(q, q.dead ? 'del' : 'set'); return r; };
+  e.tick = function (q) { if (MP.on && MP.role === 'guest' && q.kind !== 'armor_stand') return; const r = tick.apply(this, arguments); if (q.dead) mpDecoSend(q, 'del'); return r; }; // a guest's frames follow the runner's
+  if (MP.act && !MP.decoIn) mpDecoSend(e, 'add');
+  return e;
+}
+// ---------- splash potions and lingering clouds reach every player (and the runner's mobs) ----------
+function mpGotSplash(m, from) {
+  if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) { MP.splashIn = true; try {
+    if (m.k === 'cloud') { if (POTION[m.type]) spawnCloud(+m.x, +m.y, +m.z, m.type, { r: Math.min(8, +m.r || 3), dur: Math.min(2400, +m.dur || 600), breath: !!m.breath, col: isFinite(m.col) ? +m.col : undefined }); }
+    else if (ITEMS[m.id] && ITEMS[m.id].splash) splashPotion(m.id, +m.x, +m.y, +m.z, m.dm != null ? ENT.find(q => !q.dead && q.kind === 'mob' && (q.remote ? q.rid : q.mpid) === m.dm) : null);
+  } finally { MP.splashIn = false; } }
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
 }
 function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stand
@@ -17605,7 +17666,7 @@ function mpPlaceTag(p, s, ps) {
   const k = 0.32 * Math.max(1, d / 10); // a little larger far away, so a name can still be read across a field
   p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
 }
-function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } }
+function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
@@ -17646,7 +17707,17 @@ function mpInstall() {
   const gt = gameTick; gameTick = function () { gt(); mpTick(); };
   const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
   const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
-  const sm = spawnMob; spawnMob = function () { if (MP.role === 'guest' && !MP.allowSpawn && MP.cmd) { const [type, x, y, z] = arguments; mpToAuth({ t: 'summon', type, x, y, z }); } const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) removeEnt(e); return e; }; // guests only show the host's mobs
+  const sm = spawnMob; spawnMob = function () { const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) { removeEnt(e); // guests only show the host's mobs
+      if (e && (MP.cmd || MP.act) && W.active && !MP.loading) { const [type, x, y, z] = arguments; queueMicrotask(() => { const o = {}; for (const k of MP_SUMMON_KEYS) if (e[k] != null && e[k] !== false) o[k] = e[k]; mpToAuth({ t: 'summon', type, x, y, z, o }); }); } } // a guest's egg, golem, crystal: the runner makes the real mob once the caller has set its fields
+    return e; };
+  for (const n of ['spawnFrame', 'spawnPainting', 'spawnArmorStand']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { return mpDecoHook(f.apply(this, arguments)); }; }
+  for (const n of ['frameUse', 'standUse']) { const f = window[n]; if (typeof f === 'function') window[n] = function (e) { const r = f.apply(this, arguments); mpDecoSend(e, e.dead ? 'del' : 'set'); return r; }; }
+  const spl = splashPotion; splashPotion = function (id, x, y, z, direct) { if (MP.on && !MP.splashIn && W.active) mpSend({ t: 'splash', dim: W.dim, id, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), dm: direct && direct !== PL ? (direct.remote ? direct.rid : direct.mpid) : null }); return spl.apply(this, arguments); };
+  const scl = spawnCloud; spawnCloud = function (x, y, z, type, o) { if (MP.on && !MP.splashIn && W.active) mpSend({ t: 'splash', k: 'cloud', dim: W.dim, x, y, z, type, r: o && o.r, dur: o && o.dur, breath: o && o.breath, col: o && o.col }); return scl.apply(this, arguments); };
+  const lr = launchRocket; launchRocket = function (x, y, z, st, rider, shot) { const r = lr.apply(this, arguments); if (MP.on && !rider && !MP.fwIn && W.active) mpSend({ t: 'fw', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), fw: st && st.fw || null, shot: shot || null }); return r; }; // everyone sees (and feels) a rocket
+  const i6 = items6Use; items6Use = function (t, h) { if (MP.role === 'guest' && h && h.id === IID.lead && t && t.type === 'block' && FENCES.has(t.id) && ENT.some(e => e.remote && e.leash && e.leash.p === MP.id)) { mpToAuth({ t: 'tie', x: t.x, y: t.y, z: t.z }); play('place', { mat: 'wool' }); swing(); return true; } return i6.apply(this, arguments); };
+  const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
+  for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
   const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
   mobTick = e => { MP.tickMob = e; if (!(e.love > 0)) e.loveBy = undefined; try { return mt2(e); } finally { MP.tickMob = null; } };
   // whatever a guest did through the runner (a kill, taming, breeding, a trade...) counts for that guest, not the runner
@@ -17667,7 +17738,7 @@ function mpInstall() {
     const pr = MP.proxy, r = ex.apply(this, arguments);
     if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
     return r; };
-  const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.thrown && !e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0 }); }); return e; };
+  const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0, th: e.thrown || 0 }); }); return e; };
   const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
@@ -17744,12 +17815,16 @@ function mpGotHit(m, att) {
 }
 // a guest's right click on one of the host's mobs (feeding, shearing, milking, dyeing, taming, naming...) happens on the
 // host, holding the guest's item; what the item becomes and anything handed over goes back to the guest
-function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return h.id !== IID.lead; }
+function mpRemoteUsable(e) { const h = PL.held(); if (e.type === 'villager' || e.type === 'wandering_trader') return false; if (!h) return !!e.leash || ['wolf', 'cat', 'parrot', 'fox'].includes(e.type); return true; }
+function mpLeashHolder(l) { // {p: id}: that player (yourself included) while in this world and dimension (a tab in the background still holds on)
+  if (!l || l.p == null) return null; if (l.p === MP.id) return PL;
+  const p = MP.peers.get(l.p); return p && p.s && p.s.dim === W.dim ? { x: +p.s.x, y: +p.s.y, z: +p.s.z, dead: !!p.s.dead } : null;
+}
 function mpRemoteUse(p, e, st, sneak) {
   const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
   INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
-  const love0 = e.love;
-  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; }
+  const love0 = e.love, l0 = e.leash; if (l0 && l0.p === p.id) e.leash = 'player'; // the guest's own lead, as the item code knows it
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; if (e.leash === 'player' && l0 !== 'player') e.leash = { p: p.id }; }
   finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
 }
 // the night passes when everyone in the world is asleep (the host decides, and wakes the guests)
@@ -17995,7 +18070,7 @@ addEventListener('keydown', e => {
   if (/^F([1-9]|1[0-2])$/.test(code) || code === 'Tab') e.preventDefault(); // also stops the top-row keys navigating away
   if (code === 'F11') { toggleFullscreen(); return; }
   if (UI.screen) {
-    if (e.code === 'Escape' || e.code === 'KeyE' || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; }
+    if (e.code === 'Escape' || (e.code === 'KeyE' && UI.screen !== 'adv') || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; } /* the advancements screen closes with L or Esc only, as in Java */
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }

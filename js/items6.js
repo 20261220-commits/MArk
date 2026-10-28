@@ -146,7 +146,7 @@ function rocketExplode(r) {
   play('explode', { vol: Math.max(0.05, (big ? 0.6 : 0.4) * (1 - dist / 96)), pitch: big ? 1.3 : 1.7 });
   const dmg = 5 + 2 * r.stars.length; // stars hurt what is close
   if (dist < 5 && !creative()) hurtPlayer(Math.max(1, Math.round(dmg * (1 - dist / 5))), 'firework');
-  for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
+  if (!r.remote) for (const e of ENT) if (e.kind === 'mob' && !e.dead) { const d = Math.hypot(e.x - r.x, e.y - r.y, e.z - r.z); if (d < 5) hurtMob(e, Math.max(1, Math.round(dmg * (1 - d / 5))), PL); }
 }
 function rocketTick() {
   for (let i = SPARKS.length - 1; i >= 0; i--) { const s = SPARKS[i]; if (s.t > W.tickN) continue; SPARKS.splice(i, 1); R.simpleParticle(s.x, s.y, s.z, s.col, { kind: 'spark', size: s.tw ? 0.16 : 0.11, vx: 0.01, vy: -0.3, vz: 0.01, grav: 0.1, life: 0.6 }); if (s.tw && Math.random() < 0.08) play('pop', { vol: 0.15, pitch: 1.8 }); }
@@ -190,15 +190,21 @@ function fireworkBoost() {
 // ---------- leads ----------
 const LEASH_OK = e => e.kind === 'mob' && !e.dead && !e.def.hostile && !e.def.boss && e.type !== 'villager' && e.type !== 'wandering_trader';
 const FENCES = new Set([BID.oak_fence, BID.nether_brick_fence, BID.fence2]);
+// where a lead goes: a fence post, you, or (multiplayer) another player
+function leashAnchor(e) {
+  if (Array.isArray(e.leash)) return [e.leash[0] + .5, e.leash[1] + .6, e.leash[2] + .5];
+  const w = e.leash === 'player' ? PL : typeof mpLeashHolder === 'function' ? mpLeashHolder(e.leash) : null;
+  return w && !w.dead ? [w.x, w.y + 1, w.z] : null;
+}
 function leashTick() {
   for (const e of ENT) {
     if (!e.leash) { if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } continue; }
-    const fence = Array.isArray(e.leash) ? e.leash : null;
-    if (e.dead || (fence && !FENCES.has(getBlock(...fence))) || (!fence && PL.dead)) { unleash(e, true); continue; }
-    const ax = fence ? fence[0] + .5 : PL.x, ay = fence ? fence[1] + .6 : PL.y + 1, az = fence ? fence[2] + .5 : PL.z;
-    const dx = ax - e.x, dy = ay - (e.y + e.h * 0.6), dz = az - e.z, d = Math.hypot(dx, dy, dz);
-    if (d > 10) { unleash(e, true); continue; }
-    if (d > 4) { const k = (d - 4) * 0.02; e.vx += dx / d * k; e.vz += dz / d * k; if (dy > 1 && e.onGround) e.vy = 0.3; e.goal = null; }
+    const fence = Array.isArray(e.leash) ? e.leash : null, a = leashAnchor(e);
+    if (e.remote) { if (!a || e.dead) { if (e.leashLine) { scene.remove(e.leashLine); e.leashLine = null; } continue; } } // another runner's mob: only the line shows here
+    else if (e.dead || (fence && !FENCES.has(getBlock(...fence))) || !a) { unleash(e, true); continue; }
+    const [ax, ay, az] = a, dx = ax - e.x, dy = ay - (e.y + e.h * 0.6), dz = az - e.z, d = Math.hypot(dx, dy, dz);
+    if (!e.remote) { if (d > 10) { unleash(e, true); continue; }
+      if (d > 4) { const k = (d - 4) * 0.02; e.vx += dx / d * k; e.vz += dz / d * k; if (dy > 1 && e.onGround) e.vy = 0.3; e.goal = null; } }
     if (!e.leashLine) { e.leashLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x6a4a24 })); scene.add(e.leashLine); }
     const p = e.leashLine.geometry.attributes.position; p.setXYZ(0, e.x, e.y + e.h * 0.6, e.z); p.setXYZ(1, ax, ay, az); p.needsUpdate = true; e.leashLine.geometry.computeBoundingSphere();
   }

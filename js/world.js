@@ -564,7 +564,7 @@ function addChunk(cx, cz, d, tiles) {
   W.chunks.set(c.key, c); W.lastKey = -1;
   const pm = W.pendingMobs.get(c.key); if (pm) { W.pendingMobs.delete(c.key); c.mobs = pm; d.fromSave = true; }
   if (tiles) for (const t of tiles) {
-    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); c.tiles.set(t.i, { type: 'chest', items }); }
+    if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); const tile = { type: 'chest', items }; if (t.loot.table) tile.lt = t.loot.table; c.tiles.set(t.i, tile); }
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
