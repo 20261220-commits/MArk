@@ -211,9 +211,9 @@ function neighborUpdate(x, y, z) {
     let ok = true;
     if (d.plant >= 10) ok = plantOK(b, x, y, z, m);
     else if (d.plant === 1) ok = below === 2 || below === 3 || below === BID.farmland || below === BID.moss_block;
-    else if (d.plant === 2) ok = below === 9 || below === 3 || below === 2;
-    else if (d.plant === 3) { ok = below === b || ((below === 2 || below === 3 || below === 9) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27)); }
-    else if (d.plant === 4) { ok = (below === b || below === 9) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
+    else if (d.plant === 2) ok = below === 9 || below === 3 || below === 2 || below === BID.red_sand || below === BID.terracotta || below === BID.stained_terracotta || below === BID.podzol || below === BID.coarse_dirt; // dead bush
+    else if (d.plant === 3) { ok = below === b || ((below === 2 || below === 3 || below === 9 || below === BID.red_sand || below === BID.podzol || below === BID.coarse_dirt || below === BID.moss_block || below === BID.rooted_dirt) && N6.some(([dx, dy, dz]) => !dy && getBlock(x + dx, y - 1, z + dz) === 27)); }
+    else if (d.plant === 4) { ok = (below === b || below === 9 || below === BID.red_sand) && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)]); }
     else if (d.plant === 5) {
       ok = below === BID.farmland;
       if (ok && b === BID.stem && (m & 16)) { const dd = DIRS[(m >> 5) & 3]; if (getBlock(x + dd[0], y, z + dd[2]) !== (m & 8 ? BID.melon : BID.pumpkin)) setMeta(x, y, z, (m & 8) | 7); } // the fruit was taken

@@ -567,6 +567,11 @@ function mobTick(e) {
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
+  if (e.age % 10 === 0 && !(d.boss)) { // a cactus pricks what touches it (its sides are 1/16 in)
+    const x0 = Math.floor(e.x - e.w - 0.07), x1 = Math.floor(e.x + e.w + 0.07), z0 = Math.floor(e.z - e.w - 0.07), z1 = Math.floor(e.z + e.w + 0.07), y0 = Math.floor(e.y - 0.01), y1 = Math.floor(e.y + e.h);
+    let hit = false; for (let x = x0; x <= x1 && !hit; x++) for (let z = z0; z <= z1 && !hit; z++) for (let y = y0; y <= y1; y++) if (getBlock(x, y, z) === BID.cactus) { hit = true; break; }
+    if (hit) hurtMob(e, 1, null);
+  }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
@@ -709,6 +714,10 @@ function entityTick() {
       if (e.pickup > 0) e.pickup--;
       if (e.kind === 'item') {
         if (e.age > 6000) { removeEnt(e); continue; }
+        { const bx = Math.floor(e.x), by = Math.floor(e.y + 0.05), bz = Math.floor(e.z), here = getBlock(bx, by, bz), r = 0.15, fx = e.x - bx, fz = e.z - bz;
+          const cac = here === BID.cactus || getBlock(bx, by - 1, bz) === BID.cactus && e.y - Math.floor(e.y) < 0.05 || (fx < r && getBlock(bx - 1, by, bz) === BID.cactus) || (fx > 1 - r && getBlock(bx + 1, by, bz) === BID.cactus) || (fz < r && getBlock(bx, by, bz - 1) === BID.cactus) || (fz > 1 - r && getBlock(bx, by, bz + 1) === BID.cactus);
+          const hot = (here === BID.lava || here === BID.fire || here === BID.soul_fire) && !/^netherite_|^ancient_debris$/.test(ITEMS[e.stack.id].key);
+          if (cac || hot) { if (hot) play('fizz', { vol: 0.3 }); removeEnt(e); continue; } } // a cactus destroys items; lava and fire burn them (not netherite)
         if ((e.age & 3) === 0 && e.onGround !== false) plateCheck(e);
         if (e.age % 10 === 0) for (const o of ENT) if (o !== e && !o.dead && o.kind === 'item' && o.stack.id === e.stack.id && o.stack.d == null && e.stack.d == null && same(o.stack, e.stack) && Math.abs(o.x - e.x) < 1 && Math.abs(o.y - e.y) < .5 && Math.abs(o.z - e.z) < 1 && o.stack.n + e.stack.n <= maxStack(e.stack.id)) { e.stack.n += o.stack.n; removeEnt(o); }
         if (e.pickup <= 0 && !PL.dead && PL.mode !== 'spectator' && Math.abs(PL.x - e.x) < 1.3 && e.y > PL.y - 0.8 && e.y < PL.y + 2.3 && Math.abs(PL.z - e.z) < 1.3) {

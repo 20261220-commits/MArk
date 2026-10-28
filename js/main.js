@@ -89,7 +89,7 @@ addEventListener('keydown', e => {
     if (e.code === 'Escape' || (e.code === 'KeyE' && UI.screen !== 'adv') || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; } /* the advancements screen closes with L or Esc only, as in Java */
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
-    if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
+    if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d, s); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
   }
   if (UI.menu) { if (e.code === 'Escape' && UI.menu === 'pause') resumeGame(); else if (e.code === 'Escape' && (UI.menu === 'options' || UI.menu === 'controls')) showMenu(UI.paused && W.active ? 'pause' : 'title'); return; }
@@ -195,7 +195,7 @@ async function startWorld(id, meta) {
   const p = meta.player;
   W.worldSpawn = meta.spawn || findSpawn(meta.seed); meta.spawn = W.worldSpawn;
   INV.slots = new Array(36).fill(null); INV.armor = new Array(4).fill(null); INV.sel = 0; INV.cursor = null; INV.off = null; INV.craft2.fill(null); INV.craft3.fill(null); W.pendGive = [];
-  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
+  Object.assign(PL, { vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fallDist: 0, fire: 0, dead: false, flying: false, spawn: null, spawnDim: 0, spawnBed: false, bedAt: null, sleeping: 0, absorb: 0, eff: {}, rest: 0, inv: 40, ender: new Array(27).fill(null) });
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
@@ -251,7 +251,7 @@ function finishLoading() {
 function saveWorldMeta() {
   if (!W.active || !W.meta || W.meta.remote) return;
   offUnswap();
-  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'difficulty', 'absorb', 'dead', 'eff', 'rest', 'spawnDim', 'spawnBed']) s[k] = PL[k];
   // what is in your hands or in a crafting / work grid at that moment is yours too: given back when the world loads
   const pend = [INV.cursor, ...INV.craft2, ...INV.craft3, ...(UI.screen && GUI.ctx && Array.isArray(GUI.ctx.items) && !GUI.ctx.tile && GUI.ctx.x == null && !GUI.ctx.cart && !GUI.ctx.horse ? GUI.ctx.items : [])].filter(st => st && st.n > 0);
   W.meta.player = { s, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null };
@@ -387,7 +387,7 @@ function frame(now) {
   // overlays & HUD
   $('ovWater').hidden = eyeB !== 'water'; $('ovSnow').hidden = !PL.inSnow;
   $('ovHurt').style.opacity = PL.hurtT > 0 ? PL.hurtT / 10 * 0.5 : (PL.health <= 4 && PL.mode !== 'creative' ? 0.25 + 0.1 * Math.sin(now / 200) : 0);
-  $('ovSleep').style.opacity = PL.sleeping ? Math.min(1, PL.sleeping / 60) : 0;
+  $('ovSleep').style.opacity = PL.sleeping ? Math.min(1, PL.sleeping / 60) : 0; $('sleepTip').hidden = !PL.sleeping || UI.hideHud;
   $('ovSpy').hidden = USE.kind !== 'spy';
   $('ovFire').hidden = !(PL.fire > 0 && PL.mode !== 'creative' && !PL.dead);
   $('cross').hidden = view !== 0 || USE.kind === 'spy';

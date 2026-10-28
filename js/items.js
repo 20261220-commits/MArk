@@ -657,7 +657,7 @@ function blockDrops(b, meta, stack) {
       if (Math.random() < 0.02) add('stick', ri(1, 2));
       if (b === BID.oak_leaves && Math.random() < 0.005) add('apple');
       break;
-    case 'glass': break;
+    case 'glass': case 'glass_pane': case 'stained_glass': case 'stained_glass_pane': break; // glass breaks into nothing without silk touch (tinted glass drops itself)
     case 'short_grass': case 'fern': if (shears) add(b); else if (Math.random() < 0.125) add('wheat_seeds'); break;
     case 'dead_bush': if (shears) add(b); else add('stick', ri(0, 2)); break;
     case 'gravel': if (Math.random() < 0.1) add('flint'); else add('gravel'); break;

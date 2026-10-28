@@ -278,7 +278,7 @@ function mpHandle(m, from) {
     case 'ride': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead); if (e) mpRidden(e, m, from); } return;
     case 'tame': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e && typeof horseTame === 'function' && e.owner !== 'player') horseTame(e); } return;
     case 'sys': chatMsg(String(m.text).slice(0, 256), /^#[0-9a-f]{3,6}$/i.test(m.c || '') ? m.c : '#ffffff'); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.sleeping = 0; PL.rest = 0; UI.flash('좋은 아침이에요!'); } return;
+    case 'wake': if ((!host || MP.server) && PL.sleeping) { PL.rest = 0; wakeUp('좋은 아침이에요!'); } return;
   }
 }
 // a guest becomes a visitor in the host's world: same seed, nothing saved locally
@@ -628,7 +628,7 @@ function mpStoreChunk(c) {
   mpSend({ t: 'store', dk, rec });
 }
 function mpPdata() {
-  offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim']) s[k] = PL[k];
+  offUnswap(); const s = {}; for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'health', 'food', 'sat', 'exh', 'air', 'level', 'xpP', 'xpTotal', 'mode', 'flying', 'spawn', 'fire', 'absorb', 'dead', 'eff', 'rest', 'spawnDim', 'spawnBed']) s[k] = PL[k];
   const pend = [INV.cursor, ...INV.craft2, ...INV.craft3].filter(st => st && st.n > 0); // in your hands or a crafting grid: yours too
   return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }

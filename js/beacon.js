@@ -20,7 +20,7 @@ function beaconBeam(x, y, z) {
   return col;
 }
 const DYE_RGB = [[0.98, 1, 1], [0.98, 0.5, 0.11], [0.78, 0.31, 0.74], [0.23, 0.7, 0.85], [1, 0.85, 0.24], [0.5, 0.78, 0.12], [0.95, 0.55, 0.67], [0.28, 0.31, 0.32], [0.62, 0.62, 0.59], [0.09, 0.61, 0.61], [0.54, 0.2, 0.72], [0.24, 0.27, 0.67], [0.51, 0.33, 0.2], [0.37, 0.49, 0.09], [0.69, 0.18, 0.15], [0.11, 0.11, 0.13]];
-const beamMeshes = new Map(), beamGeo = new THREE.BoxGeometry(0.4, 256, 0.4); beamGeo.translate(0, 128, 0);
+const beamMeshes = new Map(), beamGeo = new THREE.BoxGeometry(0.4, 384, 0.4); beamGeo.translate(0, 192, 0); /* up past the 1.18 build limit */
 function beaconTick() {
   for (const [k, m] of beamMeshes) if (!BEACONS.has(k)) { scene.remove(m); m.material.dispose(); beamMeshes.delete(k); }
   for (const k of BEACONS) {

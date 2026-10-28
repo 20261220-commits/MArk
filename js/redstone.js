@@ -339,7 +339,7 @@ function dispense(x, y, z, b, m) {
   else if (id === BID.tnt) { primeTNT(fx, fy, fz); take(); }
   else if (id === IID.flint_and_steel) { if (!fb && SOLID[getBlock(fx, fy - 1, fz)]) setBlock(fx, fy, fz, BID.fire); }
   else if (id === IID.bone_meal) { if (boneMeal(fx, fy, fz, fb)) take(); }
-  else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); }
+  else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d, st); }
   play('click');
 }
 // put a stack into a container tile (furnace: input slot only); returns true when it fit completely

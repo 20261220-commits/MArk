@@ -245,7 +245,7 @@ function markDrag() {
 function screenDown(e) {
   e.preventDefault();
   const el = e.target.closest('.sl');
-  if (!el) { if (!e.target.closest('.panel') && INV.cursor) { const c = INV.cursor; if (e.button === 2) { dropItem(PL.x, PL.y + 1.3, PL.z, c.id, 1, lookDir().map(v => v * 0.3), 40, c.d); c.n--; if (!c.n) INV.cursor = null; } else { dropStack(PL.x, PL.y + 1.3, PL.z, c, lookDir().map(v => v * 0.3), 40); INV.cursor = null; } UI.renderScreen(); } return; }
+  if (!el) { if (!e.target.closest('.panel') && INV.cursor) { const c = INV.cursor; if (e.button === 2) { dropItem(PL.x, PL.y + 1.3, PL.z, c.id, 1, lookDir().map(v => v * 0.3), 40, c.d, c); c.n--; if (!c.n) INV.cursor = null; } else { dropStack(PL.x, PL.y + 1.3, PL.z, c, lookDir().map(v => v * 0.3), 40); INV.cursor = null; } UI.renderScreen(); } return; }
   if (el.dataset.trash) { INV.cursor = null; UI.renderScreen(); return; }
   if (el.dataset.c) { const id = +el.dataset.c; if (INV.cursor) INV.cursor = null; else if (e.shiftKey) { const k = INV.slots.findIndex((s, i) => i < 9 && !s); INV.slots[k >= 0 ? k : INV.sel] = { id, n: maxStack(id) }; } else INV.cursor = { id, n: e.button === 2 ? 1 : maxStack(id) }; UI.hudDirty = true; UI.renderScreen(); return; }
   const i = +el.dataset.i, now = performance.now();
@@ -459,7 +459,7 @@ function runCommand(cmd) {
     case 'seed': ok('시드: ' + W.seed); break;
     case 'difficulty': { const d = { peaceful: 0, easy: 1, normal: 2, hard: 3 }[a[0]] ?? +a[0]; if (!(d >= 0 && d <= 3)) return err('0-3 사이로 입력하세요'); PL.difficulty = d; if (d === 0) for (const e of ENT) if (e.kind === 'mob' && e.def.hostile) removeEnt(e); ok('난이도: ' + DIFF_NAME[d]); break; }
     case 'xp': case 'experience': { const r = a[0] === 'add' || a[0] === 'give' ? a.slice(1).filter(v => !v.startsWith('@')) : a; const v = Math.max(0, parseInt(r[0]) || 0); if (/l$/i.test(r[0] || '') || r[1] === 'levels') { PL.level += v; UI.hudDirty = true; ok('레벨 ' + v + ' 추가'); } else { addXP(v); ok('경험치 ' + v + ' 추가'); } break; }
-    case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; ok('스폰 지점을 설정했습니다'); break;
+    case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; PL.spawnBed = false; ok('스폰 지점을 설정했습니다'); break;
     case 'clear': INV.slots.fill(null); INV.armor.fill(null); UI.hudDirty = true; ok('인벤토리를 비웠습니다'); break;
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
     default: err('알 수 없는 명령어입니다. /help 를 입력하세요');

@@ -619,6 +619,8 @@ const MODEL_ELS = {
     [[2, 7, 5], [4, 13, 11], null, { n: ['grindstone_pivot', 6, 0, 8, 6], s: ['grindstone_pivot', 6, 0, 8, 6], w: ['grindstone_pivot', 0, 0, 6, 6], u: ['grindstone_pivot', 8, 0, 10, 6], d: ['grindstone_pivot', 8, 0, 10, 6] }],
     [[4, 4, 2], [12, 16, 14], null, { n: ['grindstone_round', 0, 0, 8, 12], e: ['grindstone_side', 0, 0, 12, 12], s: ['grindstone_round', 0, 0, 8, 12], w: ['grindstone_side', 0, 0, 12, 12], u: ['grindstone_round', 0, 0, 8, 12], d: ['grindstone_round', 0, 0, 8, 12] }]],
 };
+// room for a generated cactus block: nothing solid on its four sides (a 1.17-style 256-row column, x and z inside the chunk)
+function cactusRoom(blocks, x, y, z) { for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = blocks[(y << 8) | ((z + dz) << 4) | (x + dx)]; if (n && SOLID[n]) return false; } return true; }
 function shapes(id, meta) {
   meta = fix6(id, meta); id = SHAPE_AS[id] || id;
   switch (id) {
@@ -769,6 +771,7 @@ function collide(id, meta) {
   if (id === 1051) return [[0, 0, 0, 16, 8, 16]];
   if (id === 1088) return meta & 4 ? [] : meta & 1 ? [[6, 0, 0, 10, 24, 16]] : [[0, 0, 6, 16, 24, 10]]; // closed gates are fence height
   if (id === 95) return [[0, 0, 0, 16, 9, 16]];
+  if (id === 37) return [[1, 0, 1, 15, 15, 15]]; // cactus: a sixteenth in on every side, so what touches it gets pricked
   if (id === 138) return [[0, 0, 0, 16, 14, 16]]; // soul sand slows by sinking you slightly
   if (id === 128) return [[0, 0, 0, 16, 2, 16]];
   if (id === 221) return [[0, 0, 0, 16, 1.5, 16]];
@@ -3031,9 +3034,9 @@ function genChunk0(seed, cx, cz, dim, exp) {
       }
     } else if (top === 204) { if (v < 0.01) blocks[above] = R() < 0.5 ? 106 : 107;
     } else if (b === BIO.BADLANDS && (top === 201 || top === 195 || top === 196)) {
-      if (v < 0.01) blocks[above] = 35; else if (v < 0.013 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0; k++) blocks[I(x, h + k, z)] = 37; }
+      if (v < 0.01) blocks[above] = 35; else if (v < 0.013 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0 && cactusRoom(blocks, x, h + k, z); k++) blocks[I(x, h + k, z)] = 37; }
     } else if (top === 9 && b === BIO.DESERT) {
-      if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0; k++) blocks[I(x, h + k, z)] = 37; }
+      if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0 && cactusRoom(blocks, x, h + k, z); k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
     }
     if ((top === 2 || top === 9 || top === 3) && h === SEA && R() < 0.25) {
@@ -3740,7 +3743,7 @@ function poolEls(pool) {
   if (POOL_ALIAS[pool]) els = keys.filter(k => POOL_ALIAS[pool].some(p => k === p || ((p.endsWith('_') || p.endsWith('/')) && k.startsWith(p) && !k.slice(p.length).includes('/'))));
   else { els = under(pool + '/'); if (!els.length && STRUCTS.t[pool]) els = [pool]; if (!els.length) els = keys.filter(k => k.startsWith(pool + '_') && !k.slice(pool.length).includes('/')); } // stage_0 -> stage_0_0, stage_0_1...
   const dm = /^village\/([a-z]+)\/(?:zombie\/)?decor$/.exec(pool); if (dm && !els.length) els = under('village/' + dm[1] + '/'); // lamp posts and the like sit in the type's own folder
-  r = els.map(k => [k, 1]);
+  r = els.map(k => [k, /\/villagers\/(unemployed|nitwit|baby)$/.test(k) ? (k.endsWith('unemployed') ? 10 : 1) : 1]); // Java's villager pools: unemployed 10, nitwit 1, baby 1
   const fl = VILLAGE_FEATURES[pool.replace('/zombie/', '/')]; if (fl) for (const [f, w] of fl) r.push(['feature:' + f, w * Math.max(1, els.length >> 1)]); // trees, hay piles... (Java's feature elements)
   if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
   else if (/decor$/.test(pool)) r.push([null, els.length * 3]);
@@ -3882,7 +3885,8 @@ function stampFeature(st, p, R, x0, z0) {
   for (let k = 0; k < (f === 'cactus' ? 6 : 24); k++) { // random patches around the spot
     const wx = x + r.int(7) - 3, wz = z + r.int(7) - 3, gy = ground(wx, wz); if (gy < 0) continue;
     const below = st.get(wx, gy - 1, wz);
-    if (f === 'cactus') { if (below !== 12 && below !== BID.sand) continue; const hh = 1 + r.int(3); for (let i = 0; i < hh; i++) put(wx, gy + i, wz, 'cactus'); }
+    if (f === 'cactus') { if (below !== BID.red_sand && below !== BID.sand) continue; const hh = 1 + r.int(3); // a cactus only stands where nothing solid is beside it (else it pops off at the first block update)
+      for (let i = 0; i < hh; i++) { if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const n = st.get(wx + dx, gy + i, wz + dz); return n !== 0 && n !== -1 && SOLID[n]; })) break; put(wx, gy + i, wz, 'cactus'); } }
     else { if (below !== BID.grass_block && below !== 3) continue; put(wx, gy, wz, plants[r.int(plants.length)]); }
   }
 }
