@@ -8827,7 +8827,7 @@ function spawnerTick() {
     const c = chunkAt(cx, cz); if (!c) continue;
     for (const [i, t] of c.tiles) {
       if (t.type !== 'spawner') continue;
-      const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
+      const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
       if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
@@ -9303,7 +9303,7 @@ function insertItem(t, st, slots) {
 // hoppers move one item every 8 ticks: pull from above (container or dropped items), push into the container below
 function hopperTick(c, i, t) {
   if (--t.cd > 0) return; t.cd = 8;
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
   const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
@@ -9321,7 +9321,7 @@ function tileTick() {
     let any = false;
     for (const [i, t] of c.tiles) {
       if (t.type === 'hopper') { any = true; hopperTick(c, i, t); }
-      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
+      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
     }
     if (!any) c.noTicking = true; // re-armed by setTile
   }
@@ -10427,7 +10427,7 @@ const RODS = new Set();
 function rodTrack(x, y, z, on) { const k = x + ',' + y + ',' + z; if (on) RODS.add(k); else RODS.delete(k); }
 function rodScan(c) {
   const b = c.blocks, m = c.meta;
-  for (let i = 0; i < b.length; i++) if (b[i] === BID.chain && S.isRod(b[i], m[i])) RODS.add((c.cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (c.cz * 16 + ((i >> 4) & 15)));
+  for (let i = 0; i < b.length; i++) if (b[i] === BID.chain && S.isRod(b[i], m[i])) RODS.add((c.cx * 16 + (i & 15)) + ',' + ((i >> 8) + MINY) + ',' + (c.cz * 16 + ((i >> 4) & 15)));
 }
 function rodUnload(c) { for (const k of RODS) { const [x, , z] = k.split(',').map(Number); if (x >> 4 === c.cx && z >> 4 === c.cz) RODS.delete(k); } }
 // the closest rod open to the sky within 128 blocks takes the strike (Java's lightning rod search radius)
@@ -10821,12 +10821,12 @@ function brewTick(c, i, t) {
     if (--t.time <= 0) {
       for (let k = 0; k < 3; k++) { const r = brewResult(t.items[k], ik); if (r != null) t.items[k] = { id: r, n: 1, brewed: 1 }; } // brewed: picked up -> advancement
       ing.n--; if (!ing.n) t.items[3] = null; t.fuel--; c.modified = c.edited = true;
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.5 });
     }
   }
   const bits = (t.items[0] ? 1 : 0) | (t.items[1] ? 2 : 0) | (t.items[2] ? 4 : 0);
-  if (c.blocks[i] === BID.brewing_stand && c.meta[i] !== bits) setMeta(c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + ((i >> 4) & 15), bits);
+  if (c.blocks[i] === BID.brewing_stand && c.meta[i] !== bits) setMeta(c.cx * 16 + (i & 15), (i >> 8) + MINY, c.cz * 16 + ((i >> 4) & 15), bits);
 }
 
 // ---------- applying potion effects ----------
@@ -11092,7 +11092,7 @@ const newCampfire = () => ({ type: 'campfire', items: [null, null, null, null], 
 const campfireFood = id => SMELT[id] && ITEMS[id].food && ITEMS[SMELT[id][0]].food;
 const cfMeshes = new Map(); // "x,y,z" -> { ver, meshes }
 function campfireTick(c, i, t) {
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
   for (let k = 0; k < 4; k++) {
     const st = t.items[k]; if (!st) continue;
     if (!lit) continue;
@@ -13648,7 +13648,7 @@ function signTick() {
     if (!c.tiles || Math.abs(c.cx * 16 + 8 - PL.x) > 64 || Math.abs(c.cz * 16 + 8 - PL.z) > 64) continue;
     for (const [i, t] of c.tiles) {
       if (t.type !== 'sign') continue;
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
       if (getBlock(x, y, z) !== SIGN) continue;
       seen.add(k); const s = SIGNS.get(k), m = getMeta(x, y, z), v = (t.v || 0) * 64 + m;
       if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(o.material.map === atlasTex || !t.glow ? Math.max(0.25, lightBright(x + .5, y + .5, z + .5)) : b); }); } continue; }
@@ -15712,7 +15712,7 @@ function furnaceTick() {
     if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= cookT) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
     else if (t.cook > 0) t.cook = Math.max(0, t.cook - 2);
     const lit = t.burn > 0;
-    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
+    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
   }
 }
 
@@ -17711,7 +17711,7 @@ function mpTick() {
   if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
     if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
     for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; if (t._mp) delete t._mp; /* an older version kept this inside the tile */ const j = JSON.stringify(t); if (MP_TSENT.get(t) === j) continue; MP_TSENT.set(t, j);
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
   }
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5

@@ -854,7 +854,7 @@ function furnaceTick() {
     if (t.burn > 0 && canOut) { t.cook++; if (t.cook >= cookT) { t.cook = 0; inp.n--; if (inp.n <= 0) t.items[0] = null; if (out) out.n++; else t.items[2] = { id: r[0], n: 1 }; t.xp += r[1]; c.modified = c.edited = true; } }
     else if (t.cook > 0) t.cook = Math.max(0, t.cook - 2);
     const lit = t.burn > 0;
-    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
+    if (lit !== wasLit) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); const b = c.blocks[i]; if (b === BID.furnace || b === BID.lit_furnace) setBlock(x, y, z, lit ? BID.lit_furnace : BID.furnace, c.meta[i], { keepTile: true }); else setMeta(x, y, z, lit ? c.meta[i] | 4 : c.meta[i] & ~4); }
   }
 }
 

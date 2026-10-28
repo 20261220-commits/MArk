@@ -518,7 +518,7 @@ function mpTick() {
   if (W.tickN % 10 === 0 && here.length) for (const c of W.chunks.values()) {
     if (!c.hasFurnace || !here.some(p => Math.abs(c.cx * 16 + 8 - p.s.x) < 40 && Math.abs(c.cz * 16 + 8 - p.s.z) < 40)) continue;
     for (const [i, t] of c.tiles) { if (t.type !== 'furnace' && t.type !== 'brewing' && t.type !== 'campfire') continue; if (t._mp) delete t._mp; /* an older version kept this inside the tile */ const j = JSON.stringify(t); if (MP_TSENT.get(t) === j) continue; MP_TSENT.set(t, j);
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15); mpSend({ t: 'tile', x, y, z, dim: W.dim, dk: dkey(c.cx, c.cz), tile: JSON.parse(j) }); }
   }
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5

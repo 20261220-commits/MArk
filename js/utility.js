@@ -6,7 +6,7 @@ const newCampfire = () => ({ type: 'campfire', items: [null, null, null, null], 
 const campfireFood = id => SMELT[id] && ITEMS[id].food && ITEMS[SMELT[id][0]].food;
 const cfMeshes = new Map(); // "x,y,z" -> { ver, meshes }
 function campfireTick(c, i, t) {
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), b = c.blocks[i], m = c.meta[i], lit = !!(m & 4);
   for (let k = 0; k < 4; k++) {
     const st = t.items[k]; if (!st) continue;
     if (!lit) continue;

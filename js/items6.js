@@ -77,7 +77,7 @@ function signTick() {
     if (!c.tiles || Math.abs(c.cx * 16 + 8 - PL.x) > 64 || Math.abs(c.cz * 16 + 8 - PL.z) > 64) continue;
     for (const [i, t] of c.tiles) {
       if (t.type !== 'sign') continue;
-      const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
+      const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), k = x + ',' + y + ',' + z;
       if (getBlock(x, y, z) !== SIGN) continue;
       seen.add(k); const s = SIGNS.get(k), m = getMeta(x, y, z), v = (t.v || 0) * 64 + m;
       if (s && s.v === v) { if (W.tickN % 20 === 0) { const b = t.glow ? 1 : Math.max(0.25, lightBright(x + .5, y + .5, z + .5)); s.mesh.traverse(o => { if (o.isMesh) o.material.color.setScalar(o.material.map === atlasTex || !t.glow ? Math.max(0.25, lightBright(x + .5, y + .5, z + .5)) : b); }); } continue; }

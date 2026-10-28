@@ -352,7 +352,7 @@ function insertItem(t, st, slots) {
 // hoppers move one item every 8 ticks: pull from above (container or dropped items), push into the container below
 function hopperTick(c, i, t) {
   if (--t.cd > 0) return; t.cd = 8;
-  const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15);
+  const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
   const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
@@ -370,7 +370,7 @@ function tileTick() {
     let any = false;
     for (const [i, t] of c.tiles) {
       if (t.type === 'hopper') { any = true; hopperTick(c, i, t); }
-      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = i >> 8, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
+      else if (t.type === 'daylight') { any = true; if (day) { const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15), m = c.meta[i], sky = getLight(x, y + 1, z) >> 4, f = W.dim ? 0 : Math.max(0, Math.cos(celestial() * Math.PI * 2)) * (1 - W.rain * 0.4); let v = Math.round(sky * Math.min(1, f * 1.4)); if (m & 16) v = 15 - v; if ((m & 15) !== v) { setMeta(x, y, z, (m & 16) | v); rsNotify(x, y, z); } } }
     }
     if (!any) c.noTicking = true; // re-armed by setTile
   }

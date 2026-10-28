@@ -840,7 +840,7 @@ function spawnerTick() {
     const c = chunkAt(cx, cz); if (!c) continue;
     for (const [i, t] of c.tiles) {
       if (t.type !== 'spawner') continue;
-      const x = cx * 16 + (i & 15), y = i >> 8, z = cz * 16 + ((i >> 4) & 15);
+      const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
       if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
       if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
       if (--t.delay > 0) continue;
