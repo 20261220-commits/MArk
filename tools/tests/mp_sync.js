@@ -52,9 +52,10 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await B.evaluate(id => { const c = ENT.find(e => e.remote && e.rid === id && !e.dead); INV.slots[INV.sel] = { id: IID.lead, n: 1 }; TARGET = { type: 'ent', e: c, t: 1 }; USE.placeCd = 0; useItem(true); }, cw[3]);
   ok(await until(A, () => !!(__cow.leash && __cow.leash.p != null)), 'a guest puts a lead on the runner\'s mob');
   ok(await until(C, id => ENT.some(e => e.remote && e.rid === id && e.leash && e.leashLine), cw[3]), 'the other guest sees the lead');
-  await B.evaluate(([x, y, z]) => { PL.x = x + 8.5; }, cw);
-  ok(await until(A, ([x]) => __cow.x > x + 1, cw), 'the mob follows the guest holding it');
-  const fx = Math.floor(cw[0]) + 6, fy = Math.floor(cw[1]), fz = Math.floor(cw[2]) + 2;
+  const cl = await A.evaluate(() => [__cow.x, __cow.y, __cow.z]); // where it is now (cows wander)
+  await B.evaluate(([x, y, z]) => { PL.x = x + 7; PL.y = y; PL.z = z; PL.vy = 0; }, cl);
+  ok(await until(A, ([x]) => __cow.x > x + 1, cl), 'the mob follows the guest holding it');
+  const fx = Math.floor(cl[0]) + 5, fy = Math.floor(cl[1]), fz = Math.floor(cl[2]) + 2;
   await A.evaluate(([x, y, z]) => { MP.local = true; setBlock(x, y, z, BID.oak_fence); MP.local = false; }, [fx, fy, fz]); await wait(1500);
   await B.evaluate(([x, y, z]) => { INV.slots[INV.sel] = { id: IID.lead, n: 1 }; TARGET = { type: 'block', x, y, z, nx: 1, ny: 0, nz: 0, id: BID.oak_fence, m: 0, t: 2 }; USE.placeCd = 0; useItem(true); }, [fx, fy, fz]);
   ok(await until(A, () => Array.isArray(__cow.leash)), 'and the guest ties it to a fence', await A.evaluate(() => [JSON.stringify(__cow.leash), __cow.x, __cow.y, __cow.z, JSON.stringify([...MP.peers.values()].map(p => p.s && [p.id, p.s.x, p.s.y, p.s.z]))]));
