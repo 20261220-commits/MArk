@@ -14,7 +14,7 @@ const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 1000); camera.rotation.o
 R.renderer = renderer; R.scene = scene; R.camera = camera;
 // sharp on high-density screens (Chromebooks are mostly 1.25-2x): up to 2 device pixels per CSS pixel; the automatic
 // resolution starts at 1x and climbs while the frame rate allows it, and drops again as soon as it doesn't
-R.basePR = Math.min(window.devicePixelRatio || 1, 2); R.pixelScale = 1 / R.basePR; R.resUp = 0;
+R.basePR = Math.min(window.devicePixelRatio || 1, 1); R.pixelScale = 1; R.resUp = 0; // 1x: rendering at 2x on high-density screens made the game lag (and the resolution kept switching)
 
 const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false; atlasTex.flipY = false;
@@ -32,6 +32,7 @@ function halveRGBA(src, size) {
   return out;
 }
 function buildAtlasMips() {
+  if (!R.atlasMips) return; // off: the averaged levels broke the tint and cut-out markers far away (grass, leaves, glass looked wrong)
   if (!PACKPX.data) return; // the procedural fallback redraws the whole atlas as it animates: no mipmaps there
   const mips = [atlasCanvas]; let src = AD, size = S.ATL;
   while (size > 1) { const px = halveRGBA(src, size), n = size >> 1, c = document.createElement('canvas'); c.width = c.height = n; c.getContext('2d').putImageData(new ImageData(px, n, n), 0, 0); mips.push(c); src = px; size = n; }
