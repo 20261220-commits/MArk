@@ -63,4 +63,24 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await A.evaluate(([X, Y, Z]) => { MP.local = true; setBlock(X + 2, Y, Z - 4, BID.oak_door, 0); setBlock(X + 2, Y + 1, Z - 4, BID.oak_door, 8); MP.local = false; }, pos); await wait(1500);
   await B.evaluate(([X, Y, Z]) => { PL.x = X + 2.5; PL.z = Z - 2.5; INV.slots[INV.sel] = null; TARGET = { type: 'block', x: X + 2, y: Y, z: Z - 4, nx: 0, ny: 0, nz: 1, id: BID.oak_door, m: 0, t: 2 }; USE.placeCd = 0; useItem(true); }, pos);
   ok(await until(C, () => __snd.length > 0, null, 8000), 'a door someone opens is heard nearby', await C.evaluate(() => __snd));
+  // potion swirls: a mob's effects and a player's show on the others' screens
+  await A.evaluate(() => { addEffect(__nc, 'speed', 600, 1); });
+  ok(await until(B, id => ENT.some(e => e.remote && e.rid === id && Array.isArray(e.ec)), cowId), 'a mob\'s potion swirl shows for the guests');
+  await B.evaluate(() => addEffect(PL, 'regeneration', 600, 0));
+  ok(await until(A, new Function(`const p = ${peerOf('밥')}; return !!(p && p.s && Array.isArray(p.s.ec));`)), 'a player\'s potion swirl shows for the others');
+  // a guest's fishing rod hooks the runner's mob and reels it in
+  const cz0 = await A.evaluate(([X, Y, Z]) => { __nc.x = X + .5; __nc.z = Z - 5.5; __nc.vx = __nc.vz = 0; __nc.panic = 0; return __nc.z; }, pos); await wait(1500);
+  await B.evaluate(([X, Y, Z]) => { PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.yaw = 0; PL.pitch = 0.12; INV.slots[INV.sel] = { id: IID.fishing_rod, n: 1, d: 0 }; useRod(); }, pos);
+  ok(await until(B, () => ENT.some(e => e.kind === 'bobber' && e.hooked), null, 6000), 'a guest\'s hook catches the runner\'s mob');
+  await B.evaluate(() => useRod());
+  ok(await until(A, z0 => __nc.z > z0 + 0.8, cz0, 6000), 'and reeling in pulls it toward the guest', await A.evaluate(() => __nc.z));
+  // riding: a guest's boat on water, and the guest sits in it on the others' screens
+  await A.evaluate(([X, Y, Z]) => { MP.local = true; for (let a = -3; a <= 3; a++) for (let c = 2; c <= 7; c++) setBlock(X + a, Y - 1, Z + c, BID.water); MP.local = false; }, pos); await wait(2000);
+  await B.evaluate(([X, Y, Z]) => { PL.x = X + .5; PL.z = Z + 1.2; PL.y = Y; placeBoat(X + .5, Y - 0.1, Z + 4.5, 0, 'oak'); }, pos);
+  ok(await until(B, () => ENT.some(e => e.kind === 'boat' && e.remote && !e.dead), null, 8000), 'a guest\'s boat appears');
+  await B.evaluate(() => { const bt = ENT.find(e => e.kind === 'boat' && e.remote && !e.dead); mount(bt); MP.testHold = setInterval(() => { IN.f = 1; IN.s = 0.6; }, 20); });
+  await wait(2500);
+  const seat = await A.evaluate(new Function(`const p = ${peerOf('밥')}; const bt = ENT.find(e => e.kind === 'boat' && !e.dead); if (!p || !p.pos || !bt) return null; return +Math.hypot(p.pos[0] - bt.mesh.position.x, p.pos[2] - bt.mesh.position.z).toFixed(2);`));
+  ok(seat !== null && seat < 0.3, 'a guest steering a boat is drawn sitting in it on the runner\'s screen', seat);
+  await B.evaluate(() => { clearInterval(MP.testHold); IN.f = 0; IN.s = 0; dismount(); });
 };

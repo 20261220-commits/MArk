@@ -241,6 +241,10 @@ function mpHandle(m, from) {
     case 'fx': if (!host && Array.isArray(m.l)) mpMirrorFx(m.l); return;
     case 'deflect': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'fireball'), p = MP.peers.get(from), d = Array.isArray(m.d) && m.d.length === 3 && m.d.every(isFinite) ? m.d : null; if (e && p && d) { e.ax = d[0] * 0.1; e.ay = d[1] * 0.1; e.az = d[2] * 0.1; e.vx = d[0]; e.vy = d[1]; e.vz = d[2]; e.owner = PL; e.guestOwner = p; } } return; // a guest bats a ghast's fireball back
     case 'bfx': mpGotBfx(m, from); return;
+    case 'pull': { const v = [m.vx, m.vy, m.vz].map(Number); if (!v.every(isFinite) || v.some(x => Math.abs(x) > 4)) return;
+      if (m.e != null) { if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e) { e.vx = (e.vx || 0) + v[0]; e.vy = (e.vy || 0) + v[1]; e.vz = (e.vz || 0) + v[2]; } } return; } // a guest's fishing rod pulls the runner's mob
+      if (m.tgt != null && m.tgt !== MP.id && mpRelay()) { mpSend({ ...m }, m.tgt); return; } // the host passes a guest's pull on
+      PL.vx += v[0]; PL.vy += v[1]; PL.vz += v[2]; return; } // someone reeled you in
     case 'snd': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite) && typeof m.n === 'string') { const d = Math.hypot(PL.x - m.x, PL.y - m.y, PL.z - m.z), o = m.o && typeof m.o === 'object' ? m.o : {}; if (d < 16) { MP.sndIn = true; try { play(m.n, { mat: o.mat, pitch: isFinite(o.pitch) ? +o.pitch : undefined, vol: (isFinite(o.vol) ? +o.vol : 1) * (1 - d / 16) }); } finally { MP.sndIn = false; } } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'bolt': if (!host && m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) mpBoltFx(+m.x, +m.y, +m.z); return;
     case 'strike': if (host && m.dim === W.dim && [m.x, m.y, m.z].every(Number.isInteger)) strikeLightning(m.x, m.y, m.z, !!m.rod); return;
@@ -477,7 +481,7 @@ function mpChunkLoaded(c) {
 
 // ---------- every tick: your state out; the host also sends the clock and nearby mobs ----------
 function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...), the bed's direction, fire, the block being dug, the hook and eye in the air
-  const ps = playerPoseInputs(0), o = { pr: ps.right, plf: ps.left, two: ps.two, chg: +(ps.charge || 0).toFixed(2), swl: ps.swingLeft ? 1 : 0, by: PSTATE.bedYaw || 0, lh: mainRight() ? 0 : 1, fire: PL.fire > 0 && !PL.inWater ? 1 : 0 };
+  const ps = playerPoseInputs(0), o = { pr: ps.right, plf: ps.left, two: ps.two, chg: +(ps.charge || 0).toFixed(2), swl: ps.swingLeft ? 1 : 0, by: PSTATE.bedYaw || 0, lh: mainRight() ? 0 : 1, fire: PL.fire > 0 && !PL.inWater ? 1 : 0 }, ec = effSwirlColor(PL.eff); if (ec) o.ec = ec;
   const t = TARGET; if (t && t.type === 'block' && MINE.prog > 0 && MINE.id === t.id && !creative()) o.mine = [t.x, t.y, t.z, Math.floor(MINE.prog * 10)];
   const fx = []; for (const e of ENT) if (!e.dead && !e.remote && (e.kind === 'bobber' || e.kind === 'eye') && fx.length < 2) fx.push([e.kind, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2)]); if (fx.length) o.fx = fx;
   return o;
@@ -544,7 +548,7 @@ function mpMirrorMobs(l) {
     mpApplyMobVis(e, v);
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
     if (saddle != null) { const ch = !!saddle !== !!e.saddle || !!chest !== !!e.chest || (harmor || null) !== (e.harmor || null); e.harmor = harmor || null; e.saddle = !!saddle; e.chest = !!chest; if (tame) e.owner = 'player'; if (spd) e.spd = spd; if (jumpS) e.jumpS = jumpS; if (ch && typeof horseParts === 'function' && e.gear) horseParts(e); }
-    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
+    if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null; e.riderId = rider > 0 ? rider : rider === -1 ? 'runner' : 0;
     e.leash = leash && (Array.isArray(leash) ? leash.length === 3 && leash.every(Number.isInteger) : leash.p != null) ? leash : null; // a lead: to a fence or to someone ({p: player id})
   }
   for (const e of ENT) if (e.remote && e.kind === 'mob' && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
@@ -562,13 +566,13 @@ function mpPuppetTick(e) {
 const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name'];
 function mpMobVis(e) {
   const v = {}; for (const k of MP_MOBV) { const x = e[k]; if (x != null && x !== false && x !== 0 && (typeof x !== 'object')) v[k] = typeof x === 'number' ? +x.toFixed(2) : x; }
-  if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp);
+  if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp); const ec = effSwirlColor(e.eff); if (ec) v.ec = ec;
   return v;
 }
 function mpApplyMobVis(e, v) {
   const f0 = e.fuse || 0;
   for (const k of MP_MOBV) e[k] = v[k];
-  e.target = v.tgt ? PL : null; e.fire = v.fire ? 2 : 0; e.eff = v.glow ? { glowing: { t: 40, lv: 0 } } : null; if (v.hp != null && isFinite(v.hp)) e.hp = +v.hp;
+  e.target = v.tgt ? PL : null; e.fire = v.fire ? 2 : 0; e.ec = Array.isArray(v.ec) && v.ec.length === 3 ? v.ec : null; e.eff = v.glow ? { glowing: { t: 40, lv: 0 } } : null; if (v.hp != null && isFinite(v.hp)) e.hp = +v.hp;
   if (e.fuse > 0 && !f0) mpMobSound(e, 'fuse', 1);
 }
 function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z); if (d < 16) play(snd, { vol: vol * (1 - d / 16) }); }
@@ -679,7 +683,7 @@ function mpMirrorVehicles(l) {
       e.remote = true; e.rid = id; e.vTick = e.tick; e.tick = mpVehTick; e.onHit = () => mpToAuth({ t: 'vhit', e: id }); }
     e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw;
     if (e.rider !== PL) e.rider = rider && rider !== MP.id ? 'other' : null;
-    e.seat2Other = !!(rider2 && rider2 !== MP.id);
+    e.seat2Other = !!(rider2 && rider2 !== MP.id); e.riderId = rider > 0 ? rider : rider === -1 ? 'runner' : 0; e.seat2Id = rider2 > 0 ? rider2 : rider2 === -1 ? 'runner' : 0; // who sits where, for their figures
   }
   for (const e of ENT) if (e.remote && (e.kind === 'boat' || e.kind === 'minecart') && !e.dead && !seen.has(e.rid)) { if (PL.riding === e) dismount(); removeEnt(e); }
 }
@@ -696,7 +700,7 @@ function mpRidden(e, m, from) {
   if (m.off) { if (e.mpRider === from) { e.mpRider = 0; if (e.mpTick0) { e.tick = e.mpTick0; e.mpTick0 = null; } } return; }
   if (e.rider === PL || (e.mpRider && e.mpRider !== from && performance.now() - e.mpRideAt < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 1 }, from); return; } // one driver: whoever got on first
   if (e.mpRider2 === from) e.mpRider2 = 0;
-  e.mpRider = from; e.mpRideAt = performance.now(); e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null;
+  const far = e.mpRider !== from || Math.hypot(e.x - m.x, e.z - m.z) > 4; e.mpRider = from; e.mpRideAt = performance.now(); e.rtx = +m.x; e.rty = +m.y; e.rtz = +m.z; e.rtyaw = +m.yaw; if (far) { e.x = +m.x; e.y = +m.y; e.z = +m.z; e.yaw = +m.yaw; } e.vx = +m.vx || 0; e.vz = +m.vz || 0; e.vy = 0; e.fallY = null; // followed smoothly between messages
   if (e.kind !== 'mob' && !e.mpTick0) { e.mpTick0 = e.tick; e.tick = mpRiddenTick; }
 }
 function mpRidden2(e, m, from) { // a boat's back seat
@@ -704,7 +708,7 @@ function mpRidden2(e, m, from) { // a boat's back seat
   if (e.kind !== 'boat' || e.mob || e.rider2 === PL || (e.mpRider2 && e.mpRider2 !== from && performance.now() - e.mpRider2At < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 2 }, from); return; }
   e.mpRider2 = from; e.mpRider2At = performance.now();
 }
-function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; } }
+function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
 
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
@@ -817,7 +821,7 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
 }
 
 const MP_SND_SKIP = new Set(['break', 'place', 'dig', 'step', 'pop', 'xp', 'levelup', 'hurt']); // sent another way, or only for you
-const MP_FX = { arrow: e => [e.stuck ? 1 : 0, e.trident ? 1 : 0, +e.vx.toFixed(2), +e.vy.toFixed(2), +e.vz.toFixed(2)], fireball: e => e.small ? 1 : 0, wskull: e => e.blue ? 1 : 0, bullet: () => 0, fang: e => e.mesh && e.mesh.visible ? 1 : 0, falling: e => [e.block, e.bmeta || 0] };
+const MP_FX = { arrow: e => [e.stuck ? 1 : 0, e.trident ? 1 : 0, +e.vx.toFixed(2), +e.vy.toFixed(2), +e.vz.toFixed(2), e.spit ? 1 : 0], fireball: e => e.small ? 1 : 0, wskull: e => e.blue ? 1 : 0, bullet: () => 0, fang: e => e.mesh && e.mesh.visible ? 1 : 0, falling: e => [e.block, e.bmeta || 0] };
 function mpMirrorFx(l) {
   const seen = new Set();
   for (const [id, k, x, y, z, s] of l) { if (![x, y, z].every(isFinite)) continue; seen.add(id); let e = ENT.find(q => q.kind === 'mpfx' && q.rid === id && !q.dead);
@@ -827,7 +831,7 @@ function mpMirrorFx(l) {
 }
 function mpFxMake(k, x, y, z, s) {
   let mesh = null;
-  if (k === 'arrow') mesh = Array.isArray(s) && s[1] ? R.itemMesh(IID.trident) : new THREE.Mesh(arrowGeo, arrowMat.clone());
+  if (k === 'arrow') { mesh = Array.isArray(s) && s[1] ? R.itemMesh(IID.trident) : new THREE.Mesh(arrowGeo, arrowMat.clone()); if (Array.isArray(s) && s[5]) { mesh.scale.setScalar(0.3); mesh.material.color.set(0xf0f0e8); } } // a llama's spit is a small white blob
   else if (k === 'fireball') { mesh = R.itemMesh(IID.fire_charge); mesh.scale.setScalar(s ? 0.3 : 1); }
   else if (k === 'wskull') mesh = new THREE.Mesh(skullGeo, new THREE.MeshBasicMaterial({ color: s ? 0x6a8aff : 0x2a2a2a }));
   else if (k === 'bullet') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xf8f0d0 }));
@@ -898,6 +902,17 @@ function mpPlaceTag(p, s, ps) {
   p.tags.forEach((t, i) => { t.position.set(p.pos[0], y, p.pos[2]); t.scale.set(t.userData.w * k, k, 1); t.visible = !s.dead && d < 64 && !(i === 0 && ps.sneak); });
 }
 function mpDropAvatar(p) { if (p.m) { scene.remove(p.m); p.m.traverse(o => { if (o.material) for (const m of [].concat(o.material)) m.dispose(); }); for (const t of p.tags) { scene.remove(t); t.material.map.dispose(); t.material.dispose(); } p.m = null; } } // the figure's own materials (textures and shapes are shared)
+function mpSeatOf(p) {
+  const id = p.id, runner = MP.auth && MP.auth[W.dim], fresh = t => performance.now() - (t || 0) < 1500;
+  const is = v => v != null && v !== 0 && (v === id || (v === 'runner' && runner === id)); // 0 is "nobody" (and also the host's own id)
+  for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart' || e.kind === 'mob')) continue;
+    const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id && fresh(e.mpRideAt), back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At));
+    if (!drv && !back) continue;
+    const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
+    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
+    return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
+  return null;
+}
 function mpRender(dt) {
   if (!MP.on) return;
   for (const p of MP.peers.values()) {
@@ -910,6 +925,7 @@ function mpRender(dt) {
     const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
     p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
     if (Math.hypot(p.pos[0] - last[0], p.pos[2] - last[2]) > 8) p.hist = [[performance.now(), s.x, s.y, s.z]]; // a teleport: no sliding across the world
+    const seat = s.ride ? mpSeatOf(p) : null; if (seat) p.pos = seat; // riding: sat on the boat, cart or horse as it is drawn here, not floating beside it
     const mvx = p.pos[0] - last[0], mvz = p.pos[2] - last[2], dtT = dt * 20, segT = a && b && b[0] > a[0] ? (b[0] - a[0]) / 50 : 0;
     p.spd = segT ? Math.hypot(b[1] - a[1], b[3] - a[3]) / segT : 0; // blocks per tick
     if (!(st.bodyYaw === st.bodyYaw)) st.bodyYaw = s.yaw;
@@ -928,7 +944,7 @@ function mpRender(dt) {
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
-    mpPeerFx(p, s, light);
+    mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects
     const mn = Array.isArray(s.mine) && s.mine.length === 4 && s.mine.every(Number.isInteger) ? s.mine : null, mid = mn && getBlock(mn[0], mn[1], mn[2]); // the cracks in the block they dig
     if (mn && mid && (p.digT = (p.digT || 0) + dtT) > 4) { p.digT = 0; mpGotBfx({ dim: W.dim, x: mn[0], y: mn[1], z: mn[2], id: mid, m: getMeta(mn[0], mn[1], mn[2]), k: 'dig' }); }
     if (mn && mid) { if (!p.crack) { p.crack = new THREE.Mesh(R.crack.geometry, R.crack.material.clone()); scene.add(p.crack); } p.crack.geometry = crackGeometry(mid, getMeta(mn[0], mn[1], mn[2])); p.crack.position.set(mn[0] + .5, mn[1] + .5, mn[2] + .5); p.crack.scale.setScalar(1.002); p.crack.material.map = R.crackTexs[Math.max(0, Math.min(9, mn[3]))]; p.crack.visible = true; }
@@ -963,6 +979,13 @@ function mpInstall() {
   const sfg = spawnFang; spawnFang = function () { const e = sfg.apply(this, arguments); if (e && e.tick) { const t = e.tick; e.tick = function (q) { if (MP.role === 'host' && MP.peers.size) { const g = mpNearestGuest(q); if (g) return mpProxy(g, () => t(q)); } return t(q); }; } return e; };
   const ib = interactBlock; interactBlock = function (t, dry) { if (dry || !MP.on || !t || t.type !== 'block') return ib.apply(this, arguments); const j0 = JSON.stringify(getTile(t.x, t.y, t.z) || null), r = ib.apply(this, arguments);
     const j1 = JSON.stringify(getTile(t.x, t.y, t.z) || null); if (j1 !== j0 && j1 !== 'null' && !UI.screen) mpTileChanged(t.x, t.y, t.z); return r; }; // a record, a book, a cake bite changed in place: everyone gets it
+  const fpl = fishPull; fishPull = function (h, vx, vy, vz) { if (h.remote && h.kind === 'mob') { mpToAuth({ t: 'pull', e: h.rid, vx, vy, vz }); return; } return fpl.apply(this, arguments); }; // the runner's mob is pulled on the runner
+  const btk = bobberTick; bobberTick = function (e) { // a hook can catch another player too
+    if (MP.on && e.hookPeer != null) { const p = MP.peers.get(e.hookPeer); if (p && p.pos && p.s && !p.s.dead && p.s.dim === W.dim) { e.x = p.pos[0]; e.y = p.pos[1] + 1.4; e.z = p.pos[2]; const hd = PL.held(); if (!hd || hd.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e); return; } e.hookPeer = null; }
+    const r = btk.apply(this, arguments);
+    if (MP.on && !e.dead && !e.hooked && e.age > 2) for (const p of MP.peers.values()) { const q = p.pos, s = p.s; if (!q || !s || s.dead || s.dim !== W.dim || s.mode === 'spectator') continue; if (Math.abs(q[0] - e.x) < 0.4 && Math.abs(q[2] - e.z) < 0.4 && e.y > q[1] - 0.1 && e.y < q[1] + 1.8) { e.hookPeer = p.id; play('hit', { vol: 0.4 }); break; } }
+    return r; };
+  const urd = useRod; useRod = function () { const b = ENT.find(e => e.kind === 'bobber' && !e.dead); if (MP.on && b && b.hookPeer != null) { const p = MP.peers.get(b.hookPeer); if (p && p.pos) { const dx = PL.x - p.pos[0], dy = PL.y - p.pos[1], dz = PL.z - p.pos[2]; mpSend({ t: 'pull', tgt: p.id, vx: dx * 0.1, vy: dy * 0.1 + Math.sqrt(Math.hypot(dx, dy, dz)) * 0.08, vz: dz * 0.1 }, MP.server ? p.id : (MP.role === 'host' ? p.id : undefined)); } b.hookPeer = null; swing(); removeEnt(b); damageItem(INV.slots, INV.sel, 5); return; } return urd.apply(this, arguments); };
   const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
   for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
   const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };

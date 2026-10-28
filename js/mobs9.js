@@ -76,7 +76,7 @@ MOBDEF.panda.anim = (e, P) => {
 function llamaSpit(e, t) {
   const dx = t.x - e.x, dy = (t.y + (t.h || 1.6) * 0.6) - (e.y + 1.6), dz = t.z - e.z, d = Math.hypot(dx, dy, dz) || 1, v = 1.2;
   const s = shootArrow(e.x + dx / d * 0.6, e.y + 1.6, e.z + dz / d * 0.6, dx / d * v, dy / d * v + d * 0.015, dz / d * v, e, 0.8);
-  s.noPickup = true; s.age = 1170; s.mesh.scale.setScalar(0.3); s.mesh.material.color.set(0xf0f0e8);
+  s.noPickup = true; s.spit = true; s.age = 1170; s.mesh.scale.setScalar(0.3); s.mesh.material.color.set(0xf0f0e8);
   play('splash', { vol: 0.3, pitch: 1.6 });
 }
 function llamaExtras(e, dist) {

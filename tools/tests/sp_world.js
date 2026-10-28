@@ -42,5 +42,15 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const ch = chunkAt(Math.floor(c.x) >> 4, Math.floor(c.z) >> 4), kept = chunkKeep(ch, false).find(m => m[0] === 'cow' && m[6] && m[6].name === '누렁이');
     return { name: c.name, used: !INV.slots[INV.sel], kept: !!kept }; });
   ok(nt.name === '누렁이' && nt.used && nt.kept, 'a name tag names a mob and the name is saved', nt);
+  // a torch in the off hand lights up the dark around you (dynamic light), and so does one on the ground
+  const dl = await p.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)); const X = Math.floor(PL.x), Y = 60, Z = Math.floor(PL.z);
+    for (let a = -4; a <= 4; a++) for (let c = -4; c <= 4; c++) for (let y = -1; y <= 4; y++) setBlock(X + a, Y + y, Z + c, Math.abs(a) === 4 || Math.abs(c) === 4 || y === -1 || y === 4 ? BID.stone : 0);
+    PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.vy = 0; PL.mode = 'creative'; PL.flying = true; INV.slots[INV.sel] = null; INV.off = null; for (const e of [...ENT]) if (e.kind === 'item') removeEnt(e); await wait(600); // (earlier checks left torches lying about)
+    const dark = lightBright(X + 2.5, Y + 0.5, Z + .5); INV.off = { id: IID.torch, n: 1 }; await wait(400);
+    const lit = lightBright(X + 2.5, Y + 0.5, Z + .5), lv = R.dyn[0].w; INV.off = null; await wait(300); const off = R.dyn[0].w;
+    dropItem(X + 2.5, Y + .2, Z + 2.5, IID.lantern, 1); await wait(600); const ground = Math.max(...R.dyn.map(d => d.w));
+    return { dark: +dark.toFixed(2), lit: +lit.toFixed(2), lv, off, ground }; });
+  ok(dl.lv === 14 && dl.lit > dl.dark + 0.3 && dl.off === 0, 'a torch held in the off hand lights up the dark', dl);
+  ok(dl.ground === 15, 'a lantern lying on the ground gives light too', dl);
   ok(!p.errs.length, 'no page errors', p.errs);
 };

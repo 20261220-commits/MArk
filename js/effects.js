@@ -1,5 +1,16 @@
 // Status effects (Java Edition): applied by potions, food, beacons, mobs and totems; milk clears them.
 // t.eff = { key: { lv, t } }, lv 0 = level I, t = ticks left. Works for the player and for mobs.
+// the swirl of particles around anyone with an effect: the effects' colours mixed, stronger ones counting more (Java)
+function effSwirlColor(eff) {
+  if (!eff) return null; let r = 0, g = 0, b = 0, n = 0;
+  for (const k in eff) { const d = EFF[k], e = eff[k]; if (!d || !e || k === 'glowing' || k === 'invisibility' || e.hide) continue; const c = parseInt(d[1].slice(1), 16), w = (e.lv || 0) + 1; r += ((c >> 16) & 255) * w; g += ((c >> 8) & 255) * w; b += (c & 255) * w; n += w; }
+  return n ? [+(r / n / 255).toFixed(2), +(g / n / 255).toFixed(2), +(b / n / 255).toFixed(2)] : null;
+}
+function effSwirl(x, y, z, h, col, dt) { if (Math.random() < dt * 8) R.simpleParticle(x + (Math.random() - .5) * 0.6, y + Math.random() * h, z + (Math.random() - .5) * 0.6, col, { kind: 'effect', size: 0.1, vy: 0.4, grav: 0, life: 0.8 }); }
+function effSwirls(dt, px, pz) { // mobs near you, and you yourself when seen from outside
+  for (const e of ENT) { if (e.kind !== 'mob' || e.dead || e.deathT || Math.abs(e.x - px) > 32 || Math.abs(e.z - pz) > 32) continue; const c = e.remote ? e.ec : effSwirlColor(e.eff); if (c) effSwirl(e.x, e.y, e.z, e.h, c, dt); }
+  if (typeof view !== 'undefined' && view !== 0 && !PL.dead) { const c = effSwirlColor(PL.eff); if (c) effSwirl(PL.x, PL.y, PL.z, 1.8, c, dt); }
+}
 const EFF = {
   speed: ['신속', '#7cafc6'], slowness: ['구속', '#5a6c81'], haste: ['성급함', '#d9c043'], mining_fatigue: ['채굴 피로', '#4a4217'],
   strength: ['힘', '#932423'], instant_health: ['즉시 회복', '#f82423'], instant_damage: ['즉시 피해', '#430a09'], jump_boost: ['점프 강화', '#22ff4c'],

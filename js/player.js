@@ -830,6 +830,7 @@ function useRod() {
   swing();
   const b = ENT.find(e => e.kind === 'bobber' && !e.dead);
   if (b) { // reel in
+    if (b.hooked) { const h = b.hooked; if (!h.dead) { const dx = PL.x - h.x, dy = PL.y - h.y, dz = PL.z - h.z; fishPull(h, dx * 0.1, dy * 0.1 + Math.sqrt(Math.hypot(dx, dy, dz)) * 0.08, dz * 0.1); } removeEnt(b); damageItem(INV.slots, INV.sel, 5); return; } // a hooked mob is pulled in (Java: 5 durability)
     if (b.bite > 0) {
       const r = Math.min(0.9999, Math.random() + enchLv(PL.held(), 'luck_of_the_sea') * 0.021), loot = r < 0.51 ? 'cod' : r < 0.7225 ? 'salmon' : r < 0.7395 ? 'tropical_fish' : r < 0.85 ? 'pufferfish' : r < 0.95 ? ['bowl', 'leather', 'string', 'bone', 'stick', 'rotten_flesh', 'ink_sac'][Math.floor(Math.random() * 7)] : ['name_tag', 'saddle', 'bow', 'enchanted_book', 'nautilus_shell'][Math.floor(Math.random() * 5)];
       const it = dropItem(b.x, b.y + 0.3, b.z, IID[loot], 1, [(PL.x - b.x) * 0.1, 0.35 + Math.hypot(PL.x - b.x, PL.z - b.z) * 0.02, (PL.z - b.z) * 0.1], 0);
@@ -854,7 +855,10 @@ function fishHookMesh() { // the hook from the pack (a sprite), or a red float
   if (hook) { const t = new THREE.CanvasTexture(hook); t.magFilter = t.minFilter = THREE.NearestFilter; const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.5 })); m.scale.setScalar(0.5); return m; }
   return new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: 0xd83030 }));
 }
+function fishPull(h, vx, vy, vz) { h.vx = (h.vx || 0) + vx; h.vy = (h.vy || 0) + vy; h.vz = (h.vz || 0) + vz; }
 function bobberTick(e) {
+  if (e.hooked) { const h = e.hooked; if (h.dead || h.deathT) e.hooked = null; else { e.x = h.x; e.y = h.y + h.h * 0.8; e.z = h.z; e.vx = e.vy = e.vz = 0; const hd = PL.held(); if (!hd || hd.id !== IID.fishing_rod || Math.hypot(e.x - PL.x, e.z - PL.z) > 32 || PL.dead) removeEnt(e); return; } } // stuck in a mob, it rides along
+  if (!e.hooked && e.age > 2) for (const o of ENT) if (o.kind === 'mob' && !o.dead && !o.deathT && Math.abs(o.x - e.x) < o.w + 0.1 && Math.abs(o.z - e.z) < o.w + 0.1 && e.y > o.y - 0.1 && e.y < o.y + o.h) { e.hooked = o; play('hit', { vol: 0.4 }); return; }
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1;
   if (inW) { e.vy += 0.05; e.vy *= 0.6; e.vx *= 0.8; e.vz *= 0.8; if (--e.wait <= 0 && !e.bite) { e.bite = 30; play('splash', { vol: 0.4 }); for (let i = 0; i < 8; i++) R.simpleParticle(e.x, e.y + 0.3, e.z, [0.8, 0.9, 1], { kind: 'splash', size: 0.08, vy: 1.5 }); e.vy = -0.2; } if (e.bite > 0 && --e.bite === 0) e.wait = 100 + Math.floor(Math.random() * 400); }
   else e.vy -= 0.04;

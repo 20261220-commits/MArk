@@ -374,6 +374,7 @@ function frame(now) {
   { const [mh, oh] = handItems(); R.hand.glint = [mh && (mh.e || ITEMS[mh.id].glint), oh && (oh.e || ITEMS[oh.id].glint)]; R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
+  dynLights(px, py, pz); effSwirls(dt, px, pz);
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
@@ -415,6 +416,16 @@ function panoramaFrame(dt) {
   const rd = R.rd; R.rd = 4; R.showHand = false; R.sel.visible = false; R.crack.visible = false;
   R.stepAnimation(dt);
   R.renderFrame(dt, camera.position, null); R.rd = rd;
+}
+// light carried around: a torch or lantern in either hand (yours, other players'), and glowing items on the ground (OptiFine-style dynamic light)
+function dynLights(px, py, pz) {
+  const L = [];
+  if (OPT.dynLight !== false) {
+    if (!PL.dead && !spectator()) { const [mh, oh] = handItems(), lv = Math.max(R.itemLum(mh && mh.id), R.itemLum(oh && oh.id)); if (lv) L.push([px, py + 1.2, pz, lv, 1e9]); }
+    if (typeof MP !== 'undefined' && MP.on) for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || !p.pos || !p.m || !p.m.visible) continue; const lv = Math.max(R.itemLum(s.held), R.itemLum(s.off)), d = Math.hypot(p.pos[0] - px, p.pos[2] - pz); if (lv && d < 48) L.push([p.pos[0], p.pos[1] + 1.2, p.pos[2], lv, 1e6 - d]); }
+    for (const e of ENT) if (e.kind === 'item' && !e.dead && e.stack) { const lv = R.itemLum(e.stack.id); if (!lv) continue; const d = Math.hypot(e.x - px, e.z - pz); if (d < 40) L.push([e.x, e.y + 0.3, e.z, lv, 1e3 - d]); }
+  }
+  L.sort((a, b) => b[4] - a[4]); R.setDynLights(L.map(l => l.slice(0, 4)));
 }
 // torch flames/smoke and lit furnaces near the player (light sources rescanned twice a second)
 let ambT = 0, ambList = [];
