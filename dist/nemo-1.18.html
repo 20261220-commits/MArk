@@ -299,7 +299,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
     <div id="hotbar"></div>
   </div>
 </div>
-<div class="ov" id="ovSleep"></div><div id="sleepTip" hidden>웅크리기(Shift)를 누르면 침대에서 나갑니다</div>
+<div class="ov" id="ovSleep"></div><div id="sleepTip" hidden>웅크리기(Shift) 또는 Esc → 침대에서 나가기</div>
 <div id="touch" hidden>
   <div id="joy"><div id="knob"></div></div>
   <button class="tb" id="tJump" type="button">점프</button>
@@ -3208,8 +3208,14 @@ function genChunk0(seed, cx, cz, dim, exp) {
       const base = ['spine_1', 'spine_2', 'spine_3', 'spine_4', 'skull_1', 'skull_2', 'skull_3', 'skull_4'][R.int(8)], t = STRUCTS.t['fossil/' + base], rot = R.int(4), fy = 15 + R.int(30);
       const c = [[0, 0], [t.s[0] - 1, t.s[2] - 1]].map(([a, b]) => tplXZ(a, b, rot)), mnx = Math.min(c[0][0], c[1][0]), mxx = Math.max(c[0][0], c[1][0]), mnz = Math.min(c[0][1], c[1][1]), mxz = Math.max(c[0][1], c[1][1]);
       const ox = x0 + R.int(Math.max(1, 16 - (mxx - mnx))) - mnx, oz = z0 + R.int(Math.max(1, 16 - (mxz - mnz))) - mnz, st0 = makeStamp(blocks, meta, x0, z0); // inside this chunk
-      stampSingle(st0, 'fossil/' + base, ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 995) % 10 === 0 ? null : s2 });
-      stampSingle(st0, 'fossil/' + base + '_coal', ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 997) % 10 !== 0 ? null : s2 });
+      // Java's FossilFeature: not where more than 4 of the box's corners are open (a cave), and never into air or water
+      const open = b => b === 0 || b === WATER || b === LAVA; let oc = 0;
+      for (const cx of [ox + mnx, ox + mxx]) for (const cz of [oz + mnz, oz + mxz]) for (const cy of [fy, fy + t.s[1] - 1]) { const b = st0.get(cx, cy, cz); if (b >= 0 && open(b)) oc++; }
+      if (oc <= 4) {
+        const solidAt = (x, y, z) => { const b = st0.get(x, y, z); return b > 0 && !open(b); };
+        stampSingle(st0, 'fossil/' + base, ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 995) % 10 === 0 || !solidAt(x, y, z) ? null : s2 });
+        stampSingle(st0, 'fossil/' + base + '_coal', ox, fy, oz, rot, tiles, R, { ignoreAir: true, proc: (s2, x, y, z) => hash32(x, y, z, 997) % 10 !== 0 || !solidAt(x, y, z) ? null : s2 });
+      }
     } else if (R() < (cb === BIO.DESERT || cb === BIO.SWAMP ? 1 / 16 : 1 / 64)) {
       const fx = 4 + R.int(8), fz = 4 + R.int(8), fy = 15 + R.int(30), ax = R() < 0.5, len = 3 + R.int(3);
       const bone = (a, y, b, m) => { const x = ax ? fx + a : fx + b, z = ax ? fz + b : fz + a; if (x < 0 || z < 0 || x > 15 || z > 15 || y < 2) return; const i2 = I(x, y, z); if (!blocks[i2] || blocks[i2] === WATER || blocks[i2] === LAVA) return; blocks[i2] = R() < 0.1 ? (y < 8 ? BID.deepslate_coal_ore : 13) : BID.bone_block; meta[i2] = R() < 0.1 ? 0 : m; };
@@ -15110,8 +15116,8 @@ function playerTick() {
     if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
-    // sneak edge protection
-    if (PL.sneaking && PL.onGround) {
+    // sneak edge protection (Java's clipAtLedge: on the ground, or less than a step above it, as when landing or hopping)
+    if (PL.sneaking && (PL.onGround || ((PL.fallDist || 0) < 0.6 && !noCollision(PL.x, PL.y + (PL.fallDist || 0) - 0.6, PL.z)))) {
       const step = 0.05;
       while (mx !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z)) mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step;
       while (mz !== 0 && noCollision(PL.x, PL.y - 0.6, PL.z + mz)) mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step;
@@ -16233,7 +16239,7 @@ function showMenu(name, data) {
       <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
-    h = `<h2>게임 메뉴</h2><div class="btncol">${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
+    h = `<h2>게임 메뉴</h2><div class="btncol">${PL.sleeping ? btn('침대에서 나가기', 'leavebed') : ''}${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
   } else if (name === 'advworlds') { ADVUI.view = null; h = advWorldsHtml();
@@ -16268,6 +16274,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'skins') showMenu('skins');
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
+  else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }

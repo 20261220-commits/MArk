@@ -252,8 +252,8 @@ function playerTick() {
     if (!spec && inBerryBush(PL)) { mx *= 0.8; my = Math.max(my, -0.08) * (my > 0 ? 0.75 : 1); mz *= 0.8; if ((Math.abs(PL.x - PL.px) > 0.003 || Math.abs(PL.z - PL.pz) > 0.003) && W.tickN % 10 === 0 && !creative()) hurtPlayer(1, 'berry'); }
     if (web) { mx *= 0.25; my *= 0.05; mz *= 0.25; PL.fallDist = 0; }
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
-    // sneak edge protection
-    if (PL.sneaking && PL.onGround) {
+    // sneak edge protection (Java's clipAtLedge: on the ground, or less than a step above it, as when landing or hopping)
+    if (PL.sneaking && (PL.onGround || ((PL.fallDist || 0) < 0.6 && !noCollision(PL.x, PL.y + (PL.fallDist || 0) - 0.6, PL.z)))) {
       const step = 0.05;
       while (mx !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z)) mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step;
       while (mz !== 0 && noCollision(PL.x, PL.y - 0.6, PL.z + mz)) mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step;

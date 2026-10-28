@@ -34,6 +34,14 @@ module.exports = async ({ ok, srv, b, lib }) => {
     // a furnace lights up where it stands (tile rows count from y -64)
     setBlock(X + 4, Y, Z - 5, BID.furnace); setTile(X + 4, Y, Z - 5, { ...newFurnace(), items: [{ id: IID.raw_iron, n: 2 }, { id: IID.coal, n: 1 }, null] }); await run(40);
     o.furnace = { here: BLOCKS[getBlock(X + 4, Y, Z - 5)].key, above: getBlock(X + 4, Y + 64, Z - 5) };
+    // water spilt over a ledge dries up once its source is taken back (a dying level 8 used to turn into falling water)
+    { const wx = X - 30, wz = Z; for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) { setBlock(wx + a, Y - 1, wz + c, BID.stone); for (let y = 0; y < 5; y++) setBlock(wx + a, Y + y, wz + c, a <= 0 && y < 2 ? BID.stone : 0); }
+      setBlock(wx - 1, Y + 2, wz, BID.water); await run(60); const wet = () => { let n = 0; for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) for (let y = 0; y < 4; y++) if (getBlock(wx + a, Y + y, wz + c) === BID.water) n++; return n; };
+      o.water = [wet()]; setBlock(wx - 1, Y + 2, wz, 0); await run(120); o.water.push(wet()); }
+    // an item in lava burns
+    { setBlock(X + 6, Y, Z + 6, BID.lava); const it = dropItem(X + 6.5, Y + 1.2, Z + 6.5, IID.stick, 1, [0, 0, 0], 0); for (let i = 0; i < 60 && !it.dead; i++) await run(1); o.lavaItem = it.dead; setBlock(X + 6, Y, Z + 6, 0); }
+    // sneaking onto the edge of a block in the air, still moving outward: you stay on it
+    { const sx = X, sy = Y + 40, sz = Z + 20; setBlock(sx, sy - 1, sz, BID.stone); PL.x = sx + .5; PL.y = sy + 1.2; PL.z = sz + .5; PL.vx = PL.vy = PL.vz = 0; PL.onGround = false; PL.fallDist = 0; PL.yaw = 0; IN.sneak = true; IN.f = 1; await run(40); IN.f = 0; IN.sneak = false; o.edge = +(PL.y - sy).toFixed(2); PL.x = X + .5; PL.y = Y; PL.z = Z + .5; }
     // the build limit
     const fl = []; const f0 = UI.flash; UI.flash = t => { fl.push(t); }; INV.slots[INV.sel] = { id: IID.stone, n: 4 }; PL.y = 318; TARGET = { type: 'block', x: X, y: 319, z: Z, id: BID.stone, m: 0, nx: 0, ny: 1, nz: 0, t: 2 }; setBlock(X, 319, Z, BID.stone); USE.placeCd = 0; useItem(true); UI.flash = f0; o.limit = fl; setBlock(X, 319, Z, 0);
     return o; });
@@ -49,6 +57,9 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(!r.resp2.spawn && Math.abs(r.resp2.at[0] - r.resp2.ws[0]) < 20, 'with the bed gone: the world spawn', r.resp2);
   ok(r.wear[0] === 2 && r.wear[1] === 0, 'a hit wears armour, not an elytra', r.wear);
   ok(r.furnace.here === 'lit_furnace' && !r.furnace.above, 'a burning furnace lights up in place (not 64 blocks up)', r.furnace);
+  ok(r.water[0] > 5 && r.water[1] === 0, 'spilt water dries up when its source is gone', r.water);
+  ok(r.lavaItem, 'an item thrown into lava burns');
+  ok(r.edge === 0, 'sneaking onto a block edge in the air keeps you on it', r.edge);
   ok(r.limit.some(t => /320/.test(t)), 'building at the top says the limit', r.limit);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
