@@ -17157,7 +17157,7 @@ function mpWorldCore(store, out) {
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
         entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null };
-          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, my: c.rec.my, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
           send(p, o); }); return; }
       case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
       case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;
@@ -17337,8 +17337,8 @@ function mpHostStore() {
     time: W.time, rain: W.rainTarget, thunder: W.thunderOn, weatherT: 24000, players: W.meta.mpPlayers || (W.meta.mpPlayers = {}) };
   const toNet = r => { if (!r || typeof r !== 'object') return null; // (dbReq gives true for a missing key) if (!r.b) return { v: 2, it: r.it, mobs: r.mobs || null };
     let b = r.b, m = r.m, l = r.l; const h = r.ch || 128; if (r.v < 3) { const n = 256 * h, dec = a => r.v >= 2 ? rleDec(a, n, Uint8Array) : a; b = rleEnc(Uint16Array.from(dec(b))); m = rleEnc(dec(m)); l = rleEnc(dec(l)); } // older saves: 8-bit ids
-    return { v: 3, it: r.it, ch: h, b: mpB64(b), m: mpB64(m), l: mpB64(l), bio: Array.from(r.bio), t: r.t || [], mobs: r.mobs || null }; };
-  const fromNet = r => r.b ? { v: 3, it: r.it, ch: r.ch, b: mpUnB64(r.b, Uint16Array), m: mpUnB64(r.m, Uint8Array), l: mpUnB64(r.l, Uint8Array), bio: Uint8Array.from(r.bio), t: r.t || [], mobs: r.mobs || null } : { v: 2, it: r.it, mobs: r.mobs || null };
+    return { v: 3, it: r.it, ch: h, my: r.my, b: mpB64(b), m: mpB64(m), l: mpB64(l), bio: Array.from(r.bio), t: r.t || [], mobs: r.mobs || null }; };
+  const fromNet = r => r.b ? { v: 3, it: r.it, ch: r.ch, my: r.my, b: mpUnB64(r.b, Uint16Array), m: mpUnB64(r.m, Uint8Array), l: mpUnB64(r.l, Uint8Array), bio: Uint8Array.from(r.bio), t: r.t || [], mobs: r.mobs || null } : { v: 2, it: r.it, mobs: r.mobs || null };
   return { state, keys: new Set([...W.saved, ...(W.mpLogs || [])]),
     async load(dk) { const rec = await dbReq('chunks', 'readonly', st => st.get(id + ':' + dk)), lg = await dbReq('chunks', 'readonly', st => st.get(logKey(dk))); const ok = lg && typeof lg === 'object'; return { rec: toNet(rec), edits: ok && lg.edits || [], tiles: ok && lg.tiles || {} }; },
     save(dk, c) { dirty.set(dk, c); },
@@ -17352,13 +17352,50 @@ function mpHostStore() {
       } } };
 }
 function mpHostWelcome(m) { MP.id = m.you; MP.auth = m.auth || {}; for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null }); mpSend({ t: 'dim', dim: W.dim }); }
+// ---------- this browser's copy of a server world ----------
+// The server sends what changes (and, on joining, what this copy lacks); everything is kept per server address in
+// IndexedDB ('nemo-mirror'). If the server comes back empty (a free host wipes its disk on restart), joining puts the
+// copy back on it. Records: 'S|host' -> { wid, state, vers: { dk: version } }, 'C|host|dk' -> chunk entry.
+const MIR = { host: null, known: new Set(), rec: null, busy: Promise.resolve() };
+const mirHost = url => { try { return new URL(mpWsUrl(url)).host; } catch (e) { return String(url || ''); } };
+function mirDB() { return MIR.db || (MIR.db = new Promise((res, rej) => { const q = indexedDB.open('nemo-mirror', 1); q.onupgradeneeded = () => q.result.createObjectStore('c'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); })); }
+async function mirTx(mode, f) { const db = await mirDB(); return new Promise((res, rej) => { const t = db.transaction('c', mode), st = t.objectStore('c'), r = f(st); t.oncomplete = () => res(r && 'result' in r ? r.result : undefined); t.onerror = () => rej(t.error); }); }
+const mirGet = k => mirTx('readonly', st => st.get(k)).catch(() => null);
+mirTx('readonly', st => st.getAllKeys(IDBKeyRange.bound('S|', 'S|\uffff'))).then(ks => { for (const k of ks || []) MIR.known.add(k.slice(2)); }).catch(() => {});
+function mirSave(m) { // queued: copies arrive faster than IndexedDB writes them
+  const host = MIR.host; if (!host || !m.wid) return;
+  MIR.busy = MIR.busy.then(async () => {
+    let rec = MIR.rec && MIR.rec.host === host ? MIR.rec : await mirGet('S|' + host);
+    if (!rec || rec.wid !== m.wid || m.reset) { // another world than the one copied before: start over
+      if (rec) { const ks = await mirTx('readonly', st => st.getAllKeys(IDBKeyRange.bound('C|' + host + '|', 'C|' + host + '|\uffff'))); await mirTx('readwrite', st => { for (const k of ks || []) st.delete(k); }); }
+      rec = { host, wid: m.wid, state: null, vers: {} };
+    }
+    if (m.state) rec.state = m.state; for (const [dk, v] of m.l || []) rec.vers[dk] = v; rec.at = Date.now(); MIR.rec = rec;
+    await mirTx('readwrite', st => { for (const [dk, , e] of m.l || []) st.put(e, 'C|' + host + '|' + dk); st.put(rec, 'S|' + host); });
+    MIR.known.add(host);
+  }).catch(e => console.warn('서버 세계 사본 저장 실패', e));
+}
+async function mirHave() { const rec = await mirGet('S|' + MIR.host); mpSend({ t: 'mirrorhave', wid: rec ? rec.wid : null, vers: rec ? rec.vers : {} }); }
+// the server is empty and this browser has a copy of its world: send it all back
+async function mirRestore(host) {
+  const rec = await mirGet('S|' + host); if (!rec || !rec.state || !rec.state.meta) return false;
+  const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
+  mpSend({ t: 'restore', part: 'begin', state: rec.state });
+  const dks = Object.keys(rec.vers); let n = 0;
+  for (let i = 0; i < dks.length; i += 8) {
+    const l = []; for (const dk of dks.slice(i, i + 8)) { const e = await mirGet('C|' + host + '|' + dk); if (e) l.push([dk, rec.vers[dk], e]); }
+    mpSend({ t: 'restore', part: 'chunk', l }); n += l.length; say(`서버 세계를 되살리는 중... ${n}/${dks.length}`); await new Promise(r => setTimeout(r, 20));
+  }
+  mpSend({ t: 'restore', part: 'end' }); return true;
+}
 async function mpJoinWs(url, room) {
   MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
-  if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { showMenu('mp_create'); return 'noworld'; }
+  MIR.host = MP.link.hello.kind === 'world' ? mirHost(url) : null;
+  if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { if (await mirRestore(MIR.host)) return 'restoring'; showMenu('mp_create'); return 'noworld'; } // 'restored' then joins
   mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
@@ -17367,7 +17404,7 @@ function mpStop() {
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
     setTimeout(() => { st.flush(); setTimeout(() => st.flush(), 500); }, 50); try { MP.relay.close(); } catch (e) {} MP.relay = null; MP.core = null; MP.store = null; MP.isHost = false; }
-  if (MP.link) { const l = MP.link; if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
+  if (MP.link) { const l = MP.link; if (MP.server && MIR.host) { const done = () => { if (MIR.closing === done) MIR.closing = null; l.close(); }; MIR.closing = done; l.send({ t: 'flush' }); setTimeout(done, 5000); } else if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } /* a server world: wait for the final copy */ MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
   MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = [];
@@ -17392,7 +17429,9 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
+    case 'created': case 'restored': if (m.t === 'restored') chatMsg('저장해 둔 사본으로 서버 세계를 되살렸습니다', '#55ff55'); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
+    case 'mirror': mirSave(m); return;
+    case 'flushed': if (MIR.closing) MIR.closing(); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
@@ -17788,6 +17827,7 @@ async function mpEnterServerWorld(m) {
   if (!sm.spawn) mpSend({ t: 'meta', shared: {}, spawn: W.worldSpawn });
   mpSend({ t: 'dim', dim: W.dim });
   chatMsg(sm.name + ' 서버 세계에 들어왔습니다', '#ffff55');
+  mirHave(); // the server fills in this browser's copy of the world
 }
 function mpGotAuth(dim, id) {
   if (id == null) delete MP.auth[dim]; else MP.auth[dim] = id;
@@ -17852,7 +17892,7 @@ async function mpUpload(url) {
   const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys()); const mine = (keys || []).filter(k => typeof k === 'string' && k.startsWith(W.id + ':'));
   let n = 0;
   for (const k of mine) { const rec = await dbReq('chunks', 'readonly', st => st.get(k)); if (!rec) continue; const dk = k.slice(W.id.length + 1);
-    const out = rec.b ? { v: 3, it: rec.it, ch: rec.ch || 128, b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), t: rec.t || [], mobs: rec.mobs || null } : { v: 2, it: rec.it, mobs: rec.mobs || null };
+    const out = rec.b ? { v: 3, it: rec.it, ch: rec.ch || 128, my: rec.my, b: mpB64(rec.b), m: mpB64(rec.m), l: mpB64(rec.l), bio: Array.from(rec.bio), t: rec.t || [], mobs: rec.mobs || null } : { v: 2, it: rec.it, mobs: rec.mobs || null };
     if (rec.b && rec.v < 3) continue; // very old saves stay local
     link.send({ t: 'store', dk, rec: out }); if (++n % 50 === 0) { MP.status = `올리는 중... ${n}/${mine.length}`; const el = $('mpStatus'); if (el) el.textContent = MP.status; await new Promise(r => setTimeout(r, 0)); } }
   link.send({ t: 'pdata', name: MP.name, d: mpPdata() }); // you carry on where you were, with what you had
@@ -18342,7 +18382,8 @@ function mpListHtml() {
   const d = MPL.data, rows = [];
   if (d && d.world) rows.push(`<div class="mpi"><div><b>🌍 ${esc(d.world.name)}</b><span>서버 세계 · ${MODE_NAME[d.world.mode] || '서바이벌'} · ${d.world.players ? d.world.players + '명 접속 중' : '지금은 아무도 없어요'} · 언제든 들어갈 수 있어요</span></div>${btn('참가', 'mp_go:', 'sm')}</div>`);
   if (d) for (const r of d.rooms || []) rows.push(`<div class="mpi"><div><b>🏠 ${esc(r.host)}님의 세계${r.world ? ' "' + esc(r.world) + '"' : ''}</b><span>방 코드 ${esc(r.code)} · ${MODE_NAME[r.mode] || '서바이벌'} · ${r.players}명</span></div>${btn('참가', 'mp_go:' + esc(r.code), 'sm')}</div>`);
-  if (d && !d.world) rows.push(`<div class="mpi"><div><b>🌱 새 서버 세계 만들기</b><span>이 서버에는 아직 서버 세계가 없어요. 만들면 누구나 언제든 들어올 수 있습니다</span></div>${btn('만들기', 'mp_go:', 'sm')}</div>`);
+  if (d && !d.world && MIR.known.has(mirHost(MPL.addr || mpDefaultAddr()))) rows.push(`<div class="mpi"><div><b>🔄 서버 세계 되살리기</b><span>서버가 다시 시작되며 세계 파일이 지워졌어요. 이 브라우저에 저장된 사본으로 되살리고 들어갑니다</span></div>${btn('되살리기', 'mp_go:', 'sm')}</div>`);
+  else if (d && !d.world) rows.push(`<div class="mpi"><div><b>🌱 새 서버 세계 만들기</b><span>이 서버에는 아직 서버 세계가 없어요. 만들면 누구나 언제든 들어올 수 있습니다</span></div>${btn('만들기', 'mp_go:', 'sm')}</div>`);
   if (rows.length) return rows.join('');
   return `<p class="muted mpempty">${MPL.state === 'err' ? esc(MPL.msg || '서버에 연결하지 못했습니다') : MPL.state === 'ok' ? '열린 세계가 없습니다' : esc(MPL.msg || '서버 목록을 불러오는 중...')}</p>`;
 }

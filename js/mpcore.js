@@ -97,7 +97,7 @@ function mpWorldCore(store, out) {
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
         entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null };
-          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, my: c.rec.my, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
           send(p, o); }); return; }
       case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
       case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;

@@ -69,12 +69,49 @@ const keys = new Set(), dirty = new Map(); let stateDirty = false;
 const fileOf = dk => path.join(CDIR, encodeURIComponent(dk) + '.json');
 function loadWorld() { try { Object.assign(state, JSON.parse(fs.readFileSync(path.join(WDIR, 'world.json'), 'utf8'))); for (const f of fs.readdirSync(CDIR)) if (f.endsWith('.json')) keys.add(decodeURIComponent(f.slice(0, -5))); console.log(`세계 "${worldName}" 불러옴 (시드 ${state.meta.seed}, 청크 ${keys.size}개)`); } catch (e) { state.meta = null; } }
 loadWorld();
-let changedSinceBackup = false;
-function saveWorld() {
+let changedSinceBackup = false, mirrorStateAt = 0;
+function saveWorld(force) {
   if (!state.meta) return; fs.mkdirSync(CDIR, { recursive: true }); if (dirty.size) changedSinceBackup = true;
+  if (!state.wid) { state.wid = crypto.randomBytes(8).toString('hex'); stateDirty = true; } // tells the players' copies of one world from the next
+  const ver = state.cver || (state.cver = {}), out = [];
+  for (const [dk, c] of dirty) { const e = { rec: c.rec, edits: c.edits, tiles: c.tiles }; ver[dk] = (ver[dk] || 0) + 1; stateDirty = true; fs.writeFileSync(fileOf(dk), JSON.stringify(e)); out.push([dk, ver[dk], e]); }
   if (stateDirty) { fs.writeFileSync(path.join(WDIR, 'world.json'), JSON.stringify(state)); stateDirty = false; }
-  for (const [dk, c] of dirty) fs.writeFileSync(fileOf(dk), JSON.stringify({ rec: c.rec, edits: c.edits, tiles: c.tiles }));
   dirty.clear();
+  if (out.length || force || Date.now() - mirrorStateAt > 30000) mirrorOut(out);
+}
+// ---------- the players' copies ----------
+// Every browser in the server world keeps a copy of what was changed (chunks and world data) in its IndexedDB. A host
+// that loses its files (Render's free plan wipes the disk on every restart and redeploy) gets the world back from the
+// first player who connects while it is empty. Password hashes stay on the server: after such a restore, accounts are
+// made again with the next login.
+const mirrorState = () => { const o = { ...state }; delete o.logins; return o; };
+const joinedConns = () => [...conns].filter(([id]) => { const p = core.players.get(id); return p && p.joined; }).map(([, c]) => c);
+function mirrorOut(l) {
+  const to = joinedConns(); if (!to.length || !state.meta) return; mirrorStateAt = Date.now();
+  const s = JSON.stringify({ t: 'mirror', wid: state.wid, state: mirrorState(), l }); for (const c of to) c.send(s);
+}
+// a player who just came in says which versions it has; it gets the rest a few chunks at a time
+function mirrorFill(id, m) {
+  const c = conns.get(id); if (!c || !state.meta) return;
+  const have = m.wid === state.wid && m.vers && typeof m.vers === 'object' ? m.vers : {}, ver = state.cver || {};
+  const need = [...keys].filter(dk => !(dk in have) || have[dk] < (ver[dk] || 0));
+  c.send(JSON.stringify({ t: 'mirror', wid: state.wid, state: mirrorState(), reset: m.wid !== state.wid, l: [] }));
+  const next = () => { if (!conns.has(id) || !need.length) return; const l = need.splice(0, 12).map(dk => { try { return [dk, ver[dk] || 0, JSON.parse(fs.readFileSync(fileOf(dk), 'utf8'))]; } catch (e) { return null; } }).filter(Boolean);
+    if (l.length) c.send(JSON.stringify({ t: 'mirror', wid: state.wid, l })); setTimeout(next, 150); };
+  setTimeout(next, 3000); // after the player's own world has loaded
+}
+// an empty server and a player with a copy: that copy becomes the server world again
+let restorer = null;
+function restorePart(id, m) {
+  const c = conns.get(id); if (!c) return;
+  if (m.part === 'begin') {
+    if (state.meta || restorer != null || !m.state || !m.state.meta || !m.state.meta.seed) { c.send(JSON.stringify({ t: 'error', msg: '이 서버에는 이미 세계가 있습니다' })); return; }
+    restorer = id; const st = { ...m.state }; delete st.logins; Object.assign(state, st, { logins: {} }); state.players = state.players || {}; state.cver = {};
+    fs.mkdirSync(CDIR, { recursive: true }); stateDirty = true; console.log(`플레이어의 사본에서 세계 "${state.meta.name}"를 되살리는 중`); return;
+  }
+  if (restorer !== id) return;
+  if (m.part === 'chunk') { for (const [dk, v, e] of m.l || []) { if (typeof dk !== 'string' || !/^[ne]?-?\d+,-?\d+$/.test(dk) || !e) continue; fs.writeFileSync(fileOf(dk), JSON.stringify({ rec: e.rec || null, edits: e.edits || [], tiles: e.tiles || {} })); keys.add(dk); state.cver[dk] = +v || 1; } stateDirty = true; return; }
+  if (m.part === 'end') { restorer = null; saveWorld(); console.log(`세계를 되살렸습니다 (청크 ${keys.size}개)`); c.send(JSON.stringify({ t: 'restored' })); backupNow('되살림'); }
 }
 const store = { state, keys, load: dk => { try { return JSON.parse(fs.readFileSync(fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => dirty.set(dk, c), saveState: () => { stateDirty = true; }, log: t => console.log(t) };
 const conns = new Map(); // id -> socket of a player in the server world
@@ -126,6 +163,10 @@ server.on('upgrade', (req, sock) => {
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
     if (wp) {
+      if (m.t === 'restore') { restorePart(id, m); return; }
+      if (m.t === 'mirrorhave') { mirrorFill(id, m); return; }
+      // a player about to leave: save what it just sent and give it the final copy before it goes
+      if (m.t === 'flush') { setTimeout(() => { stateDirty = true; saveWorld(true); c.send(JSON.stringify({ t: 'flushed' })); }, 150); return; }
       if (m.t !== 'join') { core.message(id, m); return; }
       // a server that wants everyone logged in (REQUIRE_LOGIN=1): no nickname-and-password, no entry. The password itself
       // is checked by the world (js/mpcore.js)
@@ -151,7 +192,7 @@ server.on('upgrade', (req, sock) => {
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s); } else for (const g of room.guests.values()) g.send(s);
   }, () => {
-    if (wp) { conns.delete(id); core.leave(id); if (!conns.size) { stateDirty = true; saveWorld(); } return; }
+    if (wp) { conns.delete(id); core.leave(id); if (restorer === id) { restorer = null; saveWorld(); } if (!conns.size) { stateDirty = true; saveWorld(); backupNow('모두 나감'); } return; }
     if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
     else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
     if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
