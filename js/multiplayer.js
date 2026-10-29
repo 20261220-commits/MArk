@@ -11,7 +11,7 @@ const MP_SUMMON_KEYS = ['baby', 'variant', 'size', 'vtype', 'prof', 'persistent'
 const MP = { server: false, auth: {}, rolePending: false, queue: [], replaying: false, on: false, role: null, name: null, id: 0, link: null, peers: new Map(), local: false, applying: false, allowSpawn: false, nextId: 1, eid: 1, rtc: null, status: '' };
 const MP_NAME_KEY = 'nemo-mp-name', MP_ADDR_KEY = 'nemo-mp-addr';
 try { MP.name = localStorage.getItem(MP_NAME_KEY); } catch (e) {}
-if (!MP.name) MP.name = '플레이어' + (100 + Math.floor(Math.random() * 900));
+if (!MP.name) { MP.name = '플레이어' + (10000 + Math.floor(Math.random() * 90000)); try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {} } // kept: a server world finds your things by this name
 // the address offered first: the last one used, then the one this game was published with (js/config.js or the server's
 // SERVER_URL), then the server this page came from, if it came from one (not a static host such as GitHub Pages)
 // pages hosts that serve files only: they can't be a multiplayer server
@@ -216,7 +216,7 @@ function mpStop() {
   if (MP.link) { const l = MP.link; if (MP.server && MIR.host) { const done = () => { if (MIR.closing === done) MIR.closing = null; l.close(); }; MIR.closing = done; l.send({ t: 'flush' }); setTimeout(done, 5000); } else if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } /* a server world: wait for the final copy */ MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
-  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = [];
+  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = []; MP.pdataOk = false;
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
@@ -548,7 +548,7 @@ function mpTick() {
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
-  if (MP.server && W.tickN % 200 === 0) mpSendPdata();
+  if (MP.server && W.tickN % 100 === 0) mpSendPdata(); // every 5 s
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
   if (MP.server && W.tickN % 200 === 100) mpMobSnapshot();
@@ -644,8 +644,8 @@ async function mpEnterServerWorld(m) {
   const sm = m.meta, d = m.pdata;
   const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
     dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off, pend: d.pend || null } : null, time: m.time, rain: m.rain, thunder: m.thunder };
-  MP.rolePending = true; MP.role = 'guest';
-  await startWorld(meta.id, meta);
+  MP.rolePending = true; MP.role = 'guest'; MP.pdataOk = false;
+  await startWorld(meta.id, meta); MP.pdataOk = true;
   W.saved = new Set(m.stored); W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
   if (d && d.adv) W.meta.adv = d.adv; if (d && d.adv2) { W.meta.adv2 = d.adv2; W.meta.advMigrated = true; } if (d && d.stats) W.meta.stats = d.stats;
   if (!sm.spawn) mpSend({ t: 'meta', shared: {}, spawn: W.worldSpawn });
@@ -689,7 +689,7 @@ function mpPdata() {
   const pend = [INV.cursor, ...INV.craft2, ...INV.craft3].filter(st => st && st.n > 0); // in your hands or a crafting grid: yours too
   return { s, dim: W.dim, inv: INV.slots, armor: INV.armor, sel: INV.sel, it: ITEM_TABLE, ender: PL.ender, off: INV.off, pend: pend.length ? pend : null, adv: W.meta.adv || null, adv2: W.meta.adv2 || null, stats: W.meta.stats || null };
 }
-function mpSendPdata() { if (MP.server && W.active && !MP.rolePending) mpSend({ t: 'pdata', d: mpPdata() }); }
+function mpSendPdata() { if (MP.server && W.active && MP.pdataOk) mpSend({ t: 'pdata', d: mpPdata() }); } // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen)
 let mpSharedLast = '';
 function mpSendShared() { const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k]; const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
 function mpServerLeave(stay) { // keep everything in the world's store before going (stay: the host closes multiplayer and plays on)
@@ -1266,3 +1266,7 @@ async function mpAction(a) {
     else if (a === 'mp_stop') { const guest = !MP.isHost && !(MP.role === 'host' && !MP.server); mpStop(); if (guest) quitToTitle(); else showMenu('pause'); }
   } catch (e) { if (a === 'mp_joinws' || a === 'mp_hostws' || a === 'mp_code' || a.startsWith('mp_go:')) { MP.on = false; MP.role = null; MP.link = null; } say('실패: ' + (e.message || e)); }
 }
+
+// closing the tab or the window (or the Chromebook lid): what you have and where you are go to the server world first
+for (const ev of ['pagehide', 'beforeunload']) addEventListener(ev, () => { try { if (MP.on && MP.server) { mpSendPdata(); if (MP.role === 'host' && typeof mpSendShared === 'function') mpSendShared(); } } catch (e) {} });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && MP.on && MP.server) try { mpSendPdata(); } catch (e) {} });
