@@ -206,6 +206,7 @@ function neighborUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!b) return;
   const m = getMeta(x, y, z), below = getBlock(x, y - 1, z), d = BLOCKS[b];
   if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : W.dim === -1 ? 10 : 30); return; }
+  if (b === BID.fire) schedule(x, y, z, 30 + ((Math.random() * 10) | 0)); // fire ticks (dims.js)
   if (d.fall) { if (below === 0 || FLUID[below] || (REPL[below] && below !== b)) schedule(x, y, z, 2); return; }
   if (d.plant) {
     let ok = true;

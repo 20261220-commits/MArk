@@ -39,7 +39,7 @@ function physMove(e, dx, dy, dz, stepUp = 0) {
   if (stepUp > 0 && (e.onGround || onGround) && (dx !== odx || dz !== odz)) {
     // try stepping up
     let sx = e.x, sy = e.y, sz = e.z;
-    let up = clipY(sx, sy, sz, stepUp); sy += up;
+    let up = Math.min(clipY(sx, sy, sz, stepUp), clipY(sx + odx, sy, sz + odz, stepUp)); sy += up; // only as high as the ceiling where it's going allows (a door's lintel)
     let ddx = clipX(sx, sy, sz, odx); sx += ddx;
     let ddz = clipZ(sx, sy, sz, odz); sz += ddz;
     let down = clipY(sx, sy, sz, -up + (ody < 0 ? ody : 0)); sy += down;
