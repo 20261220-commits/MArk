@@ -1804,17 +1804,17 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
   }
 }
 // ---- villages ----
-const VREG = 12;
+const VREG = 32; // Java: one try per 32x32 chunks, at least 8 apart
 const villageCache = new Map();
 let VILLAGE_BIOMES = null;
 function villageAt(seed, G, rx, rz) {
   const key = seed + ':' + rx + ':' + rz; if (villageCache.has(key)) return villageCache.get(key);
   let v = null;
   const r = rng(hash32(seed, rx, rz, 31));
-  if (r() < 0.75) {
-    const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
+  {
+    const vx = (rx * VREG + r.int(VREG - 8)) * 16 + 8, vz = (rz * VREG + r.int(VREG - 8)) * 16 + 8;
     const [h, b, bv] = G.column(vx, vz);
-    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'desert', 'savanna', 'taiga', 'snowy_tundra', 'snowy_taiga'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
+    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'meadow', 'desert', 'savanna', 'taiga', 'snowy_tundra'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
     const vt = !VB.has(bv) ? null : b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
     if (vt && STRUCTS && h > SEA && h < 110) { // Mojang's village pieces, grown by jigsaw (2% are zombie villages)
       const jt = vt === 'snow' ? 'snowy' : vt, zombie = r() < 0.02, planks = { plains: 'oak', desert: 'smooth_sandstone_slab', savanna: 'acacia', snowy: 'spruce', taiga: 'spruce' }[jt];
@@ -2816,6 +2816,14 @@ function genNether(seed, cx, cz) {
       break;
     }
   }
+  // lava springs (Java's spring_open and spring_closed): a source in a netherrack wall with one side open runs down as a
+  // lavafall once the chunk is loaded; closed ones wait inside the rock for someone to dig into them
+  for (let k = 0; k < 56; k++) {
+    const x = 1 + R.int(14), z = 1 + R.int(14), y = 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
+    let rock = 0, air = 0; for (const j of [I(x + 1, y, z), I(x - 1, y, z), I(x, y, z + 1), I(x, y, z - 1), I(x, y - 1, z)]) { if (blocks[j] === 135) rock++; else if (blocks[j] === 0) air++; }
+    if (blocks[I(x, y + 1, z)] !== 135) continue;
+    if (k < 40 ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < 40) tiles.push({ t: 'flow', i }); }
+  }
   // fortresses
   const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
   for (let a = frx - 1; a <= frx + 1; a++) for (let b = frz - 1; b <= frz + 1; b++) {
@@ -3044,8 +3052,8 @@ function genChunk0(seed, cx, cz, dim, exp) {
     }
     for (let y = h + 1; y <= SEA; y++) blocks[I(x, y, z)] = WATER;
     if ((isOceanBio(b) || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || b === BIO.RIVER) && BIOMES[v][4] <= 0.15 && h < SEA) blocks[I(x, SEA, z)] = 52; // frozen oceans and rivers
-    blocks[I(x, 0, z)] = 8;
-    for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5) blocks[I(x, y, z)] = 8;
+    blocks[I(x, 0, z)] = GENV >= 3 ? 76 : 8; // 1.18: the old floor is deepslate the caves cut through (deepFill makes the depths below)
+    for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5 && GENV < 3) blocks[I(x, y, z)] = 8;
   }
   // 2. carvers (caves + ravines) seeded from surrounding chunks
   const carvable = id => id === 1 || id === 2 || id === 3 || id === 76 || id === 26 || id === 50 || (id >= 11 && id <= 18) || id === 91 || id === 92 || id === 93 || id === 75 || id === 10 || id === 9;
@@ -3053,7 +3061,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
     const minX = Math.max(0, Math.floor(px - x0 - rh) - 1), maxX = Math.min(15, Math.floor(px - x0 + rh) + 1);
     const minZ = Math.max(0, Math.floor(pz - z0 - rh) - 1), maxZ = Math.min(15, Math.floor(pz - z0 + rh) + 1);
     if (minX > maxX || minZ > maxZ) return;
-    const minY = Math.max(1, Math.floor(py - rv) - 1), maxY = Math.min(CH0 - 8, Math.floor(py + rv) + 1);
+    const minY = Math.max(GENV >= 3 ? 0 : 1, Math.floor(py - rv) - 1), maxY = Math.min(CH0 - 8, Math.floor(py + rv) + 1);
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) for (let y = maxY + 1; y >= minY - 1; y--) {
       if (y < 0 || y >= CH0) continue; const b = blocks[I(x, y, z)]; if (b === WATER || b === 52) return;
     }
@@ -3068,7 +3076,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
           if (b === 2) grass = true;
           if (!carvable(b)) continue;
           if ((b === 9 || b === 10) && blocks[I(x, Math.min(CH0 - 1, y + 1), z)] === WATER) continue;
-          blocks[i] = y <= 10 ? LAVA : 0;
+          blocks[i] = y <= 10 && GENV < 3 ? LAVA : 0; // 1.18 carvers only leave lava below y -55 (deepFill)
           if (grass && y > 0 && blocks[I(x, y - 1, z)] === 3) blocks[I(x, y - 1, z)] = 2;
         }
       }
@@ -3087,7 +3095,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
   if (GENV >= 3) { const N = deepNoise(seed);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const h = hgt[(z + 1) * 18 + x + 1], wx = x0 + x, wz = z0 + z, open = G.nX.n2(wx / 70 + 3.1, wz / 70 - 8.3) > 0.62, top = h < SEA ? Math.min(h - 8, SEA - 14) : open ? h : h - 6;
-      for (let y = 1; y <= top; y++) { const i = I(x, y, z), b = blocks[i]; if (!carvable(b) || !noiseCave(N, wx, y, wz)) continue; blocks[i] = 0; }
+      for (let y = GENV >= 3 ? 0 : 1; y <= top; y++) { const i = I(x, y, z), b = blocks[i]; if (!carvable(b) || !noiseCave(N, wx, y, wz)) continue; blocks[i] = 0; }
     } }
   // 3. ores and blobs (start inside chunk, clipped to chunk)
   function vein(id, size, y, onlyStone) {
@@ -4101,10 +4109,20 @@ function poolEls(pool) {
   const dm = /^village\/([a-z]+)\/(?:zombie\/)?decor$/.exec(pool); if (dm && !els.length) els = under('village/' + dm[1] + '/'); // lamp posts and the like sit in the type's own folder
   r = els.map(k => [k, /\/villagers\/(unemployed|nitwit|baby)$/.test(k) ? (k.endsWith('unemployed') ? 10 : 1) : 1]); // Java's villager pools: unemployed 10, nitwit 1, baby 1
   const fl = VILLAGE_FEATURES[pool.replace('/zombie/', '/')]; if (fl) for (const [f, w] of fl) r.push(['feature:' + f, w * Math.max(1, els.length >> 1)]); // trees, hay piles... (Java's feature elements)
-  if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
+  const hm = /^village\/([a-z]+)\/(?:zombie\/)?houses$/.exec(pool);
+  if (hm && HOUSE_W[hm[1]]) { const W = HOUSE_W[hm[1]]; r = r.map(([k, w]) => [k, W[k.split('/').pop().slice(hm[1].length + 1)] || 2]); r.push([null, W.empty]); } // Java's house weights (most are 2)
+  else if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
   else if (/decor$/.test(pool)) r.push([null, els.length * 3]);
   POOL_CACHE.set(pool, r); return r;
 }
+// Java's village house pools (PlainsVillageData and the others): the weights that aren't 2, and the empty element's
+const HOUSE_W = {
+  plains: { cartographer_1: 1, library_1: 5, library_2: 1, large_farm_1: 4, small_farm_1: 4, animal_pen_1: 1, animal_pen_2: 1, animal_pen_3: 5, accessory_1: 1, meeting_point_4: 3, meeting_point_5: 1, empty: 10 },
+  desert: { armorer_1: 1, large_farm_1: 11, farm_1: 4, farm_2: 4, empty: 5 },
+  savanna: { shepherd_1: 7, armorer_1: 1, fisher_cottage_1: 3, temple_2: 3, large_farm_1: 4, large_farm_2: 6, small_farm: 4, empty: 5 },
+  snowy: { shepherds_house_1: 3, armorer_house_1: 1, armorer_house_2: 1, farm_1: 3, farm_2: 3, empty: 6 },
+  taiga: { small_house_1: 4, small_house_2: 4, small_house_3: 4, small_house_4: 4, small_house_5: 4, armorer_house_1: 1, armorer_2: 1, fisher_cottage_1: 3, large_farm_1: 6, large_farm_2: 6, small_farm_1: 1, empty: 6 },
+};
 // the feature elements of the village decor / tree pools: [feature, weight relative to the pool's templates]
 const VILLAGE_FEATURES = {
   'village/plains/trees': [['tree:0', 1]], 'village/savanna/trees': [['tree:5', 1]],
@@ -6822,7 +6840,7 @@ function neighborUpdate(x, y, z) {
   if (y < MINY || y >= MAXY) return;
   const b = getBlock(x, y, z); if (!b) return;
   const m = getMeta(x, y, z), below = getBlock(x, y - 1, z), d = BLOCKS[b];
-  if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : 30); return; }
+  if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : W.dim === -1 ? 10 : 30); return; }
   if (d.fall) { if (below === 0 || FLUID[below] || (REPL[below] && below !== b)) schedule(x, y, z, 2); return; }
   if (d.plant) {
     let ok = true;
@@ -6925,9 +6943,11 @@ function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); ret
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
 function fluidUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
-  const water = b === 27, drop = water ? 1 : 2, m = getMeta(x, y, z);
+  const water = b === 27, drop = water || W.dim === -1 ? 1 : 2, m = getMeta(x, y, z); // lava runs 7 blocks in the Nether, 3 elsewhere
   let lvl = m & 7, falling = (m & 8) !== 0;
   const other = water ? 28 : 27;
+  // lava over soul soil next to blue ice makes basalt (Java 1.16)
+  if (!water && getBlock(x, y - 1, z) === BID.soul_soil && N6.some(([dx, dy, dz]) => dy === 0 && getBlock(x + dx, y, z + dz) === BID.blue_ice)) { setBlock(x, y, z, BID.basalt); return; }
   // lava meets water
   if (!water) for (const [dx, dy, dz] of N6) if (dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27) { setBlock(x, y, z, lvl === 0 && !falling ? BID.obsidian : BID.cobblestone); return; }
   if (lvl !== 0 || falling) {
@@ -6957,11 +6977,11 @@ function fluidUpdate(x, y, z) {
     if (bl && W.onDrop && !FLUID[bl]) W.onDrop(x, y - 1, z, blockDrops(bl, 0, null).items, 0);
     setBlock(x, y - 1, z, b, 8); return;
   }
-  if (bl === b && !(lvl === 0 && !falling)) return;
+  if (bl === b && (getMeta(x, y - 1, z) !== 0 || !(lvl === 0 && !falling))) { if (getMeta(x, y - 1, z) !== 8 && getMeta(x, y - 1, z) !== 0) setBlock(x, y - 1, z, b, 8); return; } // over flowing fluid it pours down; only still fluid below lets it spread
   const nl = (falling ? 0 : lvl) + drop; if (nl >= 8) return;
   // choose directions towards the nearest drop
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const range = water ? 4 : 2;
+  const range = water || W.dim === -1 ? 4 : 2;
   const canFlow = (px, pz) => { const t = getBlock(px, y, pz); return t === 0 || (REPL[t] && !FLUID[t]) || (t === b && getMeta(px, y, pz) !== 0 && (getMeta(px, y, pz) & 7) > nl) || t === other; };
   const dist = dirs.map(([dx, dz]) => {
     if (!canFlow(x + dx, z + dz)) return 99;
@@ -7130,7 +7150,7 @@ RANDOM_TICK[BID.cauldron] = (x, y, z, b, m) => {
   const lv = m & 3, k = (m >> 2) & 3, cold = S.BIOMES[biomeAt(x, z)][4] <= 0.15, kind = cold ? 2 : 0;
   if (lv < 3 && (lv === 0 || k === kind) && Math.random() < (cold ? 0.1 : 0.05)) setMeta(x, y, z, (lv + 1) | (kind << 2));
 };
-RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, 27); };
+RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, W.dim === -1 ? 0 : 27); };
 RANDOM_TICK[BID.snow] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11) setBlock(x, y, z, 0); };
 
 // ---------- worker pool ----------
@@ -7191,6 +7211,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
+    else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
@@ -8662,7 +8683,7 @@ function mobTick(e) {
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
   if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
-  if (e.target && (!plVisible || dist > 24)) e.target = null;
+  if (e.target && (!plVisible || dist > 24 || e.repel > 0)) e.target = null; // (hoglins backing off from warped fungus: nether.js)
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
     e.yawTarget = Math.atan2(-dx, -dz);
@@ -9371,7 +9392,7 @@ function dispense(x, y, z, b, m) {
   else if (ITEMS[id].splash || ITEMS[id].lingering) { const e = shootArrow(cx, cy, cz, d[0] * 0.6, d[1] * 0.6 + 0.1, d[2] * 0.6, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
   else if (id === IID.fire_charge) { spawnFireball(cx, cy, cz, d[0], d[1], d[2], null, true); take(); }
   else if (id === IID.snowball || id === IID.egg) { const e = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
-  else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); t.items[i] = { id: IID.bucket, n: 1 }; }
+  else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { if (id !== IID.water_bucket || W.dim !== -1) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); } else play("fizz", { vol: 0.5 }); t.items[i] = { id: IID.bucket, n: 1 }; }
   else if (id === IID.bucket && FLUID[fb] && getMeta(fx, fy, fz) === 0) { setBlock(fx, fy, fz, 0); t.items[i] = { id: fb === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; }
   else if (id === BID.tnt) { primeTNT(fx, fy, fz); take(); }
   else if (id === IID.flint_and_steel) { if (!fb && SOLID[getBlock(fx, fy - 1, fz)]) setBlock(fx, fy, fz, BID.fire); }
@@ -9515,8 +9536,8 @@ function pathDir(e, tx, ty, tz) {
   return [px / pl, pz / pl];
 }
 // ---------- projectiles ----------
-function spawnFireball(x, y, z, dx, dy, dz, owner, small) {
-  const e = Ent('fireball', x, y, z); e.kind = 'fireball'; e.hittable = !small; e.small = small; e.owner = owner; e.w = small ? 0.16 : 0.5; e.h = small ? 0.32 : 1;
+function spawnFireball(x, y, z, dx, dy, dz, owner, small, dragon) {
+  const e = Ent('fireball', x, y, z); e.kind = 'fireball'; e.hittable = !small && !dragon; e.small = small; e.dragon = !!dragon; e.owner = owner; e.w = small ? 0.16 : 0.5; e.h = small ? 0.32 : 1;
   const l = Math.hypot(dx, dy, dz) || 1; e.ax = dx / l * 0.1; e.ay = dy / l * 0.1; e.az = dz / l * 0.1;
   e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.3 : 1); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect;
   play(small ? 'blaze' : 'fireball', { vol: 0.6 }); return addEnt(e);
@@ -9537,6 +9558,8 @@ function fireballTick(e) {
         if (hit === 'pl') { if (hurtPlayer(5 * DIFF_MUL(), 'fire', e.owner)) PL.fire = Math.max(PL.fire, 100); }
         else if (typeof hit === 'object') { hurtMob(hit, 5, e.owner === PL ? PL : null); if (!hit.def.fireproof) hit.fire = 100; }
         else { const bx = Math.floor(e.x), by = Math.floor(e.y), bz = Math.floor(e.z); if (!getBlock(bx, by, bz) && SOLID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
+      } else if (e.dragon) { // the dragon's fireball: no blast, a lingering cloud of dragon's breath where it lands
+        spawnCloud(nx, Math.floor(cy) + (hit === true ? 1.05 : 0.05), nz, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 600 }); play('fizz', { vol: 0.6 });
       } else {
         if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
         if (hit === 'pl') hurtPlayer(6 * DIFF_MUL(), 'explosion', e.owner);
@@ -9632,17 +9655,29 @@ function rideTick() {
   PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
+// Java 1.18's nether spawn lists: [mob, weight, smallest group, largest group]
+const NETHER_SPAWNS = {
+  wastes: [['ghast', 50, 4, 4], ['zombified_piglin', 100, 4, 4], ['magma_cube', 2, 4, 4], ['enderman', 1, 4, 4], ['piglin', 15, 4, 4]],
+  crimson: [['zombified_piglin', 1, 2, 4], ['hoglin', 9, 3, 4], ['piglin', 5, 3, 4]],
+  warped: [['enderman', 1, 4, 4]],
+  soul: [['skeleton', 20, 5, 5], ['ghast', 50, 4, 4], ['enderman', 1, 4, 4]],
+  basalt: [['ghast', 40, 1, 1], ['magma_cube', 100, 2, 5]],
+  fortress: [['blaze', 10, 2, 3], ['zombified_piglin', 5, 4, 4], ['wither_skeleton', 8, 5, 5], ['skeleton', 2, 5, 5], ['magma_cube', 3, 4, 4]],
+};
+const pickSpawn = list => { let t = list.reduce((a, e) => a + e[1], 0), r = Math.random() * t; for (const e of list) if ((r -= e[1]) < 0) return e; return list[0]; };
+function inFortress(x, y, z) {
+  const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
+  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 24 && Math.abs(x - f.x) < 112 && Math.abs(z - f.z) < 112) return true; }
+  return false;
+}
 function mobsForDimension(x, y, z, b, below) {
   if (W.dim === -1) {
-    const ex = netherExtra(x, y, z); if (ex) return [ex];
-    const bio = biomeAt(x, z);
-    if (bio === S.NETHER_BIO.SOUL) return Math.random() < 0.7 ? ['skeleton'] : ['ghast'];
-    if (bio === S.NETHER_BIO.BASALT) return Math.random() < 0.6 ? ['magma_cube'] : ['ghast'];
-    if (bio === S.NETHER_BIO.WARPED) return ['enderman'];
-    const v = Math.random();
-    return v < 0.62 ? ['zombified_piglin'] : v < 0.85 ? ['ghast'] : v < 0.97 ? ['magma_cube'] : ['enderman'];
+    const bio = biomeAt(x, z), N = S.NETHER_BIO;
+    const list = below === BID.nether_bricks || (Math.random() < 0.5 && inFortress(x, y, z) && [BID.nether_bricks, BID.netherrack, BID.soul_sand].includes(below)) ? NETHER_SPAWNS.fortress
+      : bio === N.SOUL ? NETHER_SPAWNS.soul : bio === N.BASALT ? NETHER_SPAWNS.basalt : bio === N.WARPED ? NETHER_SPAWNS.warped : bio === N.CRIMSON ? NETHER_SPAWNS.crimson : NETHER_SPAWNS.wastes;
+    const [t, , lo, hi] = pickSpawn(list); return [t, lo + Math.floor(Math.random() * (hi - lo + 1))];
   }
-  if (W.dim === 1) return below === BID.end_stone ? ['enderman'] : null;
+  if (W.dim === 1) return below === BID.end_stone ? ['enderman', 4] : null;
   return null;
 }
 function trySpawnDimension() {
@@ -9658,10 +9693,15 @@ function trySpawnDimension() {
     if (!SOLID[below] || below === BID.bedrock || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)]) continue;
     if ((getLight(x, y, z) & 15) > 11) continue;
     const types = mobsForDimension(x, y, z, getBlock(x, y, z), below); if (!types) continue;
-    const t = types[0];
+    const t = types[0], group = types[1] || 1;
     if (t === 'ghast') { if (SOLID[getBlock(x, y + 4, z)] || countMobs(e => e.type === 'ghast') >= 4) continue; spawnMob(t, x + .5, y + 2, z + .5); }
-    else if (t === 'magma_cube') spawnMob(t, x + .5, y, z + .5, { size: [1, 2, 4][Math.floor(Math.random() * 3)] });
-    else { const n = t === 'zombified_piglin' ? 1 + Math.floor(Math.random() * 3) : 1; for (let i = 0; i < n; i++) spawnMob(t, x + .5 + i * 0.3, y, z + .5); }
+    else { // a pack: each member at a free spot nearby on the same kind of ground (Java's group spawning)
+      let n = 0; for (let k = 0; k < group * 3 && n < group; k++) {
+        const gx = k ? x + Math.floor(Math.random() * 7) - 3 : x, gz = k ? z + Math.floor(Math.random() * 7) - 3 : z; let gy = y + 1; while (gy > y - 4 && !SOLID[getBlock(gx, gy - 1, gz)]) gy--;
+        if (!SOLID[getBlock(gx, gy - 1, gz)] || getBlock(gx, gy - 1, gz) === BID.bedrock || SOLID[getBlock(gx, gy, gz)] || SOLID[getBlock(gx, gy + 1, gz)] || FLUID[getBlock(gx, gy, gz)]) continue;
+        if (t === 'magma_cube') spawnMob(t, gx + .5, gy, gz + .5, { size: [1, 2, 4][Math.floor(Math.random() * 3)] }); else spawnMob(t, gx + .5, gy, gz + .5); n++;
+      }
+    }
     break;
   }
 }
@@ -9820,8 +9860,15 @@ function dragonAI(e) {
   switch (e.phase) {
     case 'circle':
       e.ang += 0.012; tx = Math.cos(e.ang) * 60; tz = Math.sin(e.ang) * 60; ty = 80 + Math.sin(e.ang * 3) * 12;
-      if (e.phaseT > 300 && Math.random() < 0.01) { const r = Math.random(); e.phase = r < 0.45 && plTargetable() && W.dim === 1 ? 'charge' : r < 0.75 ? 'land' : 'circle'; e.phaseT = 0; if (e.phase === 'charge') play('growl'); }
+      if (e.phaseT > 300 && Math.random() < 0.01) { const r = Math.random(), live = ENT.filter(o => o.type === 'end_crystal' && !o.dead).length; // Java lands more often as its crystals are destroyed
+        e.phase = r < 0.3 && plTargetable() && W.dim === 1 ? 'charge' : r < 0.55 && plTargetable() && W.dim === 1 ? 'strafe' : r < 0.75 + (live ? 0 : 0.15) ? 'land' : 'circle'; e.phaseT = 0; if (e.phase === 'charge') play('growl'); }
       break;
+    case 'strafe': { // fly towards the player and spit a fireball from a distance
+      const a = Math.atan2(e.z - PL.z, e.x - PL.x); tx = PL.x + Math.cos(a) * 30; ty = PL.y + 18; tz = PL.z + Math.sin(a) * 30; sp = 0.5;
+      const d = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z);
+      if (e.phaseT > 40 && d < 64 && plTargetable()) { const hx = e.x - Math.sin(e.yaw) * 4, hz = e.z - Math.cos(e.yaw) * 4; spawnFireball(hx, e.y + 1, hz, PL.x - hx, PL.y + 1 - e.y - 1, PL.z - hz, e, false, true); e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
+      if (e.phaseT > 200 || !plTargetable()) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
+      break; }
     case 'charge':
       tx = PL.x; ty = PL.y + 1; tz = PL.z; sp = 0.65;
       if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(10 * DIFF_MUL(), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
@@ -9839,7 +9886,7 @@ function dragonAI(e) {
     case 'dying':
       e.vx *= 0.9; e.vz *= 0.9; e.vy = 0.03; e.y += e.vy;
       if (e.phaseT % 5 === 0) for (let i = 0; i < 4; i++) R.simpleParticle(e.x + (Math.random() - .5) * 8, e.y + Math.random() * 4, e.z + (Math.random() - .5) * 8, [1, 0.9, 0.6], { size: 1.2, vy: 1, grav: 0, life: 0.6 });
-      if (e.phaseT % 10 === 0) spawnXP(e.x, e.y + 2, e.z, W.meta.dragonKilled ? 25 : 300);
+      if (e.phaseT % 10 === 0) spawnXP(e.x, e.y + 2, e.z, W.meta.dragonDone ? 25 : 600); // 12000 the first time, 500 after (Java)
       if (e.phaseT === 1) play('growl');
       if (e.phaseT >= 200) { dragonDefeated(e); }
       bossBar(e); return;
@@ -9875,13 +9922,24 @@ function dragonDefeated(e) {
   removeEnt(e); bossBar(null);
   const y = S.END_PORTAL_Y;
   for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) { const d2 = x * x + z * z; if (d2 <= 6 && (x || z)) setBlock(x, y, z, BID.end_portal, 0, { noUpdate: true }); }
-  setBlock(0, y + 4, 0, BID.dragon_egg, 0, { noUpdate: true });
-  // an end gateway to the outer islands
-  const ga = Math.random() * Math.PI * 2, gx = Math.round(Math.cos(ga) * 96), gz = Math.round(Math.sin(ga) * 96);
-  for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
-  setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true });
-  W.meta.dragonKilled = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
+  if (!W.meta.dragonDone) setBlock(0, y + 4, 0, BID.dragon_egg, 0, { noUpdate: true }); // the egg only after the first fight
+  // an end gateway to the outer islands: Java's 20 places on a ring 96 out at y 75, one more each fight, in a shuffled order
+  const used = W.meta.gateways || (W.meta.gateways = []), free = [...Array(20).keys()].filter(i => !used.includes(i));
+  if (free.length) { const i = free[S.hash32(W.seed, used.length, 0, 7) % free.length], ga = 2 * (-Math.PI + 0.15707963267948966 * i), gx = Math.floor(96 * Math.cos(ga)), gz = Math.floor(96 * Math.sin(ga)); used.push(i);
+    for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
+    setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true }); }
+  W.meta.dragonKilled = true; W.meta.dragonDone = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
   play('levelup');
+}
+// the respawn sequence (four crystals on the exit portal): the pillars are rebuilt with their crystals and cages
+function endRespawnPillars() {
+  for (const [px, pz, rad, h, cage] of S.END_PILLARS) {
+    for (let x = px - rad; x <= px + rad; x++) for (let z = pz - rad; z <= pz + rad; z++) if ((x - px) ** 2 + (z - pz) ** 2 <= rad * rad + 1) for (let y = 40; y <= h; y++) if (getBlock(x, y, z) !== BID.obsidian) setBlock(x, y, z, BID.obsidian, 0, { noUpdate: true });
+    for (let x = px - 2; x <= px + 2; x++) for (let z = pz - 2; z <= pz + 2; z++) for (let y = h + 1; y <= h + 4; y++) setBlock(x, y, z, cage && (Math.abs(x - px) === 2 || Math.abs(z - pz) === 2 || y === h + 4) ? BID.iron_bars : 0, 0, { noUpdate: true });
+    setBlock(px, h + 1, pz, BID.bedrock, 0, { noUpdate: true }); setBlock(px, h + 2, pz, BID.fire, 0, { noUpdate: true });
+    for (const o of ENT) if (o.type === 'end_crystal' && !o.dead && Math.abs(o.x - px - .5) < 1 && Math.abs(o.z - pz - .5) < 1) removeEnt(o);
+    const c = spawnMob('end_crystal', px + .5, h + 2, pz + .5); if (c) c.persistent = true;
+  }
 }
 function ensureDragon() {
   if (W.dim !== 1 || W.meta.dragonKilled || ENT.some(o => o.type === 'ender_dragon' && !o.dead) || !isLoaded(0, 0)) return;
@@ -10174,13 +10232,6 @@ function overworldReplace(t, x, y, z) {
   if (t === 'zombie' && Math.random() < 0.05) return 'zombie_villager';
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
-}
-function netherExtra(x, y, z) {
-  const bio = biomeAt(x, z), below = getBlock(x, y - 1, z);
-  if (below === BID.nether_bricks) return Math.random() < 0.7 ? 'wither_skeleton' : 'blaze';
-  if (bio === S.NETHER_BIO.CRIMSON) return Math.random() < 0.45 ? 'piglin' : Math.random() < 0.5 ? 'hoglin' : null;
-  if (bio === S.NETHER_BIO.WASTES && Math.random() < 0.2) return 'piglin';
-  return null;
 }
 function trySpawnStrider() {
   if (W.dim !== -1 || countMobs(e => e.type === 'strider') >= 4) return;
@@ -10622,13 +10673,20 @@ function displayTick() {
   const px = Math.floor(PL.x), py = Math.floor(PL.y), pz = Math.floor(PL.z);
   for (let i = 0; i < 300; i++) {
     const x = px + ((Math.random() * 21) | 0) - 10, y = py + ((Math.random() * 21) | 0) - 10, z = pz + ((Math.random() * 21) | 0) - 10;
-    const b = getBlock(x, y, z); if (!b) continue;
+    const b = getBlock(x, y, z); if (!b) { if (W.dim === -1) netherAir(x, y, z); continue; }
     if (b === BID.spore_blossom) lushDisplay(x, y, z, b);
     else if (b === BID.pointed_dripstone && Math.random() < 0.3 && isTip(x, y, z)) { // dripstone: a drop of the fluid above falls from the tip
       const src = dripSource(x, y, z);
       if (src) R.simpleParticle(x + .5, y + 0.05, z + .5, src[0] === 28 ? [1, 0.45, 0.1] : [0.25, 0.45, 0.95], { size: 0.06, vx: 1e-4, vy: 0, vz: 1e-4, grav: 1, life: 1.2 });
     }
   }
+}
+// the Nether biomes' drifting particles (Java's BiomeParticleConfig): crimson spores, warped spores, soul sand valley's
+// ash and the basalt deltas' white ash
+const NETHER_AIR = { 14: [0.025, [0.55, 0.12, 0.12], 0], 15: [0.014, [0.3, 0.85, 0.8], 0], 16: [0.00625, [0.35, 0.33, 0.3], 1], 17: [0.118, [0.85, 0.85, 0.85], 1] };
+function netherAir(x, y, z) {
+  const c = NETHER_AIR[biomeAt(x, z)]; if (!c || Math.random() > c[0]) return;
+  R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), c[1], c[2] ? { size: 0.05, vx: (Math.random() - .5) * 0.2, vy: -0.15, vz: (Math.random() - .5) * 0.2, grav: 0, life: 3 } : { size: 0.05, vx: (Math.random() - .5) * 0.1, vy: 0.08, vz: (Math.random() - .5) * 0.1, grav: 0, life: 4 });
 }
 
 </script>
@@ -11378,7 +11436,7 @@ function standMesh(e) {
       if (!a) { const im = R.itemMesh(st.id); im.scale.setScalar(0.625); im.position.y = 1.75; g.add(im); im.userData.c = 0xffffff; return; }
       const [layer, dil, parts] = STAND_ARMOR[i], tk = STAND_TEX[a.mat], at = tk && packTexture('armor_' + tk + '_' + layer); if (!at) return;
       const spec = { tex: 'armor_' + tk + '_' + layer, tw: 64, th: 32, parts: parts.map(([n, o, b, r]) => { const bb = b.slice(); bb[8] = dil; return { n, o, r, b: [bb] }; }) };
-      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(0xa06540);
+      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(st.col != null ? st.col : 0xa06540);
       if (st.e) { const gl = buildMCModel('stand_armor_' + i, spec, at); gl.traverse(o => { if (o.isMesh) o.material = R.glintMaterial(true); }); g.add(gl); } });
     g.userData.mats = mats; return g;
   }
@@ -13236,6 +13294,23 @@ function piglinAnger(x, y, z) {
 Object.assign(MOBDEF, {
   piglin_brute: { ...MOBDEF.piglin, hp: 50, dmg: 13, xp: 20, neutral: 0, drops: [], extraDrop: [['golden_axe', 0.085]], ai: bruteAI, init: e => bruteGear(e) },
 });
+// outside the Nether, piglins and brutes turn into zombified piglins and hoglins into zoglins after 15 seconds; hoglins
+// keep away from warped fungus (and nether portals and respawn anchors), as in Java
+const ZOMBIFY = { piglin: 'zombified_piglin', piglin_brute: 'zombified_piglin', hoglin: 'zoglin' };
+function netherMobTick(e) {
+  const to = ZOMBIFY[e.type]; if (!to || e.remote) return;
+  if (W.dim !== -1) {
+    e.zomT = (e.zomT || 0) + 1; if (e.zomT % 4 === 0) e.yaw += (Math.random() - .5) * 0.2; // shaking
+    if (e.zomT >= 300) { const z = spawnMob(to, e.x, e.y, e.z, { baby: e.baby }); if (z) { z.yaw = e.yaw; z.persistent = !!e.persistent; addEffect(z, 'nausea', 200, 0); } play('groan', { vol: 0.6 }); removeEnt(e); return; }
+  } else e.zomT = 0;
+  if (e.type === 'hoglin' && e.age % 20 === 0) { // repelled: run from the nearest warped fungus, portal or anchor within 8
+    const x0 = Math.floor(e.x), y0 = Math.floor(e.y), z0 = Math.floor(e.z); let best = null, bd = 99;
+    for (let dx = -8; dx <= 8; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -8; dz <= 8; dz++) { const b = getBlock(x0 + dx, y0 + dy, z0 + dz); if (b === BID.warped_fungus || b === BID.nether_portal || b === BID.respawn_anchor) { const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = [dx, dz]; } } }
+    e.repel = best ? 40 : 0; e.repelDir = best;
+  }
+  if (e.repel > 0) { e.repel--; const [dx, dz] = e.repelDir, l = Math.hypot(dx, dz) || 1; e.target = null; e.goal = [e.x - dx / l * 8, e.z - dz / l * 8]; }
+}
+{ const base = mobExtraTick; mobExtraTick = function (e, dist) { netherMobTick(e); if (!e.dead) base(e, dist); }; }
 
 </script>
 <script>/* js/biomes.js */
@@ -13823,9 +13898,21 @@ function rocketTick() {
 // firework stars and their fades follow no fixed recipe: gunpowder, dyes and at most one each of a shape item,
 // glowstone dust (twinkle) and a diamond (trail); a star with more dyes gets fade colours
 const STAR_SHAPE_ITEM = () => ({ [IID.fire_charge]: 1, [IID.gold_nugget]: 2, [IID.feather]: 4, [IID.wither_skeleton_skull]: 3 });
+// leather armour dyeing (Java's ArmorDyeRecipe): the old colour and the dyes' are averaged, then brought back up to
+// their average brightness; a water cauldron washes it out again (player.js)
+const LEATHER_DEFAULT = 0xa06540, DYE_COL = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
+const isDyeable = id => /^leather_(helmet|chestplate|leggings|boots)$/.test(ITEMS[id].key);
+function dyeMix(old, dyes) {
+  const sum = [0, 0, 0]; let maxSum = 0, n = 0;
+  for (const c of (old != null ? [old] : []).concat(dyes.map(d => DYE_COL[d]))) { const r = c >> 16, g = (c >> 8) & 255, b = c & 255; sum[0] += r; sum[1] += g; sum[2] += b; maxSum += Math.max(r, g, b); n++; }
+  const a = sum.map(v => Math.floor(v / n)), avgMax = Math.floor(maxSum / n), mx = Math.max(...a) || 1;
+  const [r, g, b] = a.map(v => Math.floor(v * avgMax / mx)); return (r << 16) | (g << 8) | b;
+}
 function craftCustom(grid) {
   const st = grid.filter(Boolean), dyes = [], it = k => st.filter(s => s.id === IID[k]).length;
   for (const s of st) { const k = ITEMS[s.id].key; if (k.endsWith('_dye')) dyes.push(S.COLORS.indexOf(k.slice(0, -4))); }
+  const lea = st.filter(s => isDyeable(s.id));
+  if (lea.length === 1 && dyes.length && st.length === 1 + dyes.length) return { ...lea[0], n: 1, col: dyeMix(lea[0].col, dyes) };
   const shapeIt = st.filter(s => STAR_SHAPE_ITEM()[s.id] != null || ITEMS[s.id].place === BID.mob_head);
   const starIn = st.filter(s => s.id === IID.firework_star);
   if (starIn.length === 1 && dyes.length && st.length === 1 + dyes.length && starIn[0].star) { // fade
@@ -13952,9 +14039,8 @@ function dialTick() {
   const g = DIAL.g; g.clearRect(0, 0, 32, 32);
   g.fillStyle = h.id === IID.clock ? '#d8b040' : '#8a8a8a'; g.beginPath(); g.arc(16, 16, 15, 0, 7); g.fill();
   if (h.id === IID.clock) { // the sun and moon turn on the face
-    const a = ((W.time % 24000) / 24000) * Math.PI * 2;
-    g.fillStyle = W.dim === 0 ? '#3a6ad8' : '#2a1a3a'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
-    if (W.dim !== 0) return; // spins elsewhere: nothing sensible to show
+    const a = W.dim === 0 ? ((W.time % 24000) / 24000) * Math.PI * 2 : performance.now() / 150; // spins wildly outside the Overworld
+    g.fillStyle = '#3a6ad8'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
     g.fillStyle = '#ffe040'; g.beginPath(); g.arc(16 + Math.sin(a) * 8, 16 - Math.cos(a) * 8, 3, 0, 7); g.fill(); g.fillStyle = '#e8e8f0'; g.beginPath(); g.arc(16 - Math.sin(a) * 8, 16 + Math.cos(a) * 8, 2.5, 0, 7); g.fill();
     g.fillStyle = '#3a8a2a'; g.fillRect(3, 17, 26, 12); return;
   }
@@ -14004,7 +14090,7 @@ function swapHands() {
 function offhandHud() {
   let el = $('offslot');
   if (!el) { el = document.createElement('div'); el.id = 'offslot'; el.className = 'hs'; $('hotbar').appendChild(el); }
-  const s = OFF.swapped ? INV.slots[OFF.slot] : INV.off; el.hidden = !s; el.classList.toggle('right', OPT.mainHand === 'left'); el.innerHTML = s ? icon(s.id, s.n, s.d, s.e) : '';
+  const s = OFF.swapped ? INV.slots[OFF.slot] : INV.off; el.hidden = !s; el.classList.toggle('right', OPT.mainHand === 'left'); el.innerHTML = s ? icon(s.id, s.n, s.d, s.e, s.col) : '';
 }
 const offItem = () => OFF.swapped ? INV.slots[OFF.slot] : INV.off;
 
@@ -15356,7 +15442,7 @@ function breakBlock(x, y, z) {
   if (id === BID.infested && !creative() && !enchLv(held, 'silk_touch')) spawnMob('silverfish', x + .5, y, z + .5);
   if ((id === BID.bee_nest || id === BID.beehive) && !creative() && enchLv(held, 'silk_touch')) HIVE_KEEP.on = { honey: m >> 2 }; // the bees stay inside (W.onTileRemoved)
   let repl = 0;
-  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
+  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)] && W.dim !== -1) repl = 27; // (in the Nether it just vanishes)
   setBlock(x, y, z, repl);
   statOf('mined', itemOfBlock(id, m) || id);
   if (!creative() && gr('doTileDrops')) {
@@ -15371,7 +15457,7 @@ function breakBlock(x, y, z) {
   if (!creative()) { const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
     if (held && held.id === IID.shears && id !== BID.fire) damageItem(INV.slots, INV.sel, 1); }
   // water flows into the gap
-  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : 30); }
+  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : W.dim === -1 ? 10 : 30); }
 }
 function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
@@ -15440,6 +15526,7 @@ function interactBlock(t, dry) {
       const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
       const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
       if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.col != null && lv > 0 && k === 0) { if (!dry) { delete h.col; setMeta(x, y, z, lv - 1 ? (m & ~3) | (lv - 1) : 0); play('splash', { vol: 0.5 }); UI.hudDirty = true; } return true; } // dyed leather is washed out
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
@@ -15610,6 +15697,7 @@ function useItem(first) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
         const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
+        if (fl === 27 && W.dim === -1) { if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('fizz', { vol: 0.6 }); swing(); for (let k = 0; k < 8; k++) R.simpleParticle(px + Math.random(), py + Math.random(), pz + Math.random(), [0.8, 0.8, 0.8], { kind: 'smoke', vy: 0.6, grav: 0, size: 0.12, life: 0.8 }); return; } // water boils away in the Nether (fish too)
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
         if (BUCKET_MOB[h.id]) { const m = spawnMob(BUCKET_MOB[h.id], px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true }); if (m) m.persistent = true; } // released fish never despawn
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
@@ -15661,7 +15749,7 @@ function placeEndCrystal(t) {
   if (W.dim === 1 && W.meta.dragonKilled && !ENT.some(o => o.type === 'ender_dragon' && !o.dead)) {
     const near = ENT.filter(e => !e.dead && e.type === 'end_crystal' && e.placed && Math.hypot(e.x, e.z) < 4.5 && Math.abs(e.y - c.y) < 2);
     const sides = new Set(near.map(e => Math.abs(e.x) > Math.abs(e.z) ? (e.x > 0 ? 'e' : 'w') : (e.z > 0 ? 's' : 'n')));
-    if (sides.size === 4) setTimeout(() => { for (const e of near) if (!e.dead) { removeEnt(e); explode(e.x, e.y + 1, e.z, 0); } W.meta.dragonKilled = false; ensureDragon(); advGrant('end/respawn_dragon'); chatMsg('엔더 드래곤이 다시 나타났습니다!', '#ff55ff'); }, 3000);
+    if (sides.size === 4) setTimeout(() => { for (const e of near) if (!e.dead) { removeEnt(e); explode(e.x, e.y + 1, e.z, 0); } W.meta.dragonKilled = false; endRespawnPillars(); ensureDragon(); advGrant('end/respawn_dragon'); chatMsg('엔더 드래곤이 다시 나타났습니다!', '#ff55ff'); }, 3000);
   }
   return true;
 }
@@ -16084,9 +16172,21 @@ function applyGuiPack() {
     document.body.classList.add('vfurn');
   }
 }
-function icon(id, n, d, e) {
+// a dyed leather item: the icon's leather-tinted pixels (the default brown) recoloured, made once per colour
+const DYED_ICON = new Map();
+function dyedIconStyle(id, col, px) {
+  const key = id + ':' + col; let url = DYED_ICON.get(key);
+  if (!url) { const cell = iconIndex[id]; if (cell == null) return iconStyle(id, px);
+    const c = document.createElement('canvas'); c.width = c.height = ICON; const g = c.getContext('2d');
+    g.drawImage(iconCanvas, (cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON, ICON, ICON, 0, 0, ICON, ICON);
+    const im = g.getImageData(0, 0, ICON, ICON), d = im.data, tr = col >> 16, tg = (col >> 8) & 255, tb = col & 255;
+    for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const k = d[i] / 160; if (k > 0.05 && Math.abs(d[i + 1] / 101 - k) < 0.12 * k + 0.03 && Math.abs(d[i + 2] / 64 - k) < 0.15 * k + 0.04) { const gray = Math.min(255, k * 255); d[i] = gray * tr / 255; d[i + 1] = gray * tg / 255; d[i + 2] = gray * tb / 255; } }
+    g.putImageData(im, 0, 0); url = c.toDataURL(); DYED_ICON.set(key, url); }
+  return `background-image:url(${url});background-size:${px}px ${px}px;image-rendering:pixelated`;
+}
+function icon(id, n, d, e, col) {
   if (!id) return '';
-  const def = ITEMS[id], st = iconStyle(id, 16 * GUI_S);
+  const def = ITEMS[id], st = col != null ? dyedIconStyle(id, col, 16 * GUI_S) : iconStyle(id, 16 * GUI_S);
   let s = `<i class="ic" style="${st}"></i>`;
   if (e || (def && def.glint)) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
@@ -16111,7 +16211,7 @@ function renderHud(dt) {
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; setHtml(hs[i], s ? icon(s.id, s.n, s.d, s.e) : ''); }
+  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; setHtml(hs[i], s ? icon(s.id, s.n, s.d, s.e, s.col) : ''); }
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
@@ -16160,7 +16260,7 @@ function renderDebug(dt, fps) {
 }
 
 // ---------- container screens ----------
-function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e) : ''}</div>`; }
+function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e, s.col) : ''}</div>`; }
 function invRows(start) { let h = '<div class="grid9">'; for (let k = 0; k < 27; k++) h += slotHtml(start + k); h += '</div><div class="grid9 hot">'; for (let k = 0; k < 9; k++) h += slotHtml(start + 27 + k); return h + '</div>'; }
 UI.openScreen = (type, ctx) => {
   if (UI.screen) UI.closeScreen();
@@ -16221,14 +16321,14 @@ UI.renderScreen = () => {
     const xpBar = wand ? '' : (() => { const lo = VLEVEL_XP[lv - 1], hi = VLEVEL_XP[lv], f = lv >= 5 ? 1 : Math.max(0, Math.min(1, ((c.e.vxp || 0) - lo) / (hi - lo))); return `<div class="txp"><i style="width:${(f * 100).toFixed(0)}%"></i></div>`; })();
     const name = wand ? '떠돌이 상인' : (PROF_NAME[c.e.prof] || '주민') + ' · ' + VLEVEL_NAME[lv - 1];
     const tipOf = o => o ? (o.a2 != null ? itemName(o.a) + ' ' + tradePrice(o) + '개 + ' + itemName(o.a2) + ' ' + o.an2 + '개' : itemName(o.a) + ' ' + tradePrice(o) + '개') + ' → ' + (o.e && o.b === IID.enchanted_book ? '마법이 부여된 책 (' + Object.entries(o.e).map(([k, v]) => (ENCH[k] ? ENCH[k][0] : k) + ' ' + v).join(', ') + ')' : itemName(o.b) + ' ' + o.bn + '개') + (o.uses >= o.max ? ' (품절 — 일터에서 다시 채웁니다)' : '') : '';
-    h = `<div class="panel trade"><div class="cap">${name}</div>${xpBar}<div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span>${o.a2 != null ? `<span>${icon(o.a2, o.an2)}</span>` : ''}<i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.e ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">${tipOf(offers[c.sel])}</p></div></div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+    h = `<div class="panel trade"><div class="cap">${name}</div>${xpBar}<div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span>${o.a2 != null ? `<span>${icon(o.a2, o.an2)}</span>` : ''}<i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.e ? 1 : 0, o.col)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">${tipOf(offers[c.sel])}</p></div></div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
   } else if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T]) h = CUSTOM_SCREENS[T].html();
   const cur = INV.cursor;
-  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
+  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
   if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();
@@ -16950,7 +17050,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light, list = INV.armor) { // list: another player's armour in multiplayer
-  const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
+  const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') + (s.col != null ? '#' + s.col : '') : 0).join(',');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
     for (const a of ud.armor) { a.parent.remove(a); a.material.dispose(); } ud.armor = [];
@@ -16971,7 +17071,7 @@ function updateArmor(m, light, list = INV.armor) { // list: another player's arm
         const mat = new THREE.MeshBasicMaterial({ map: t, vertexColors: true, alphaTest: 0.1, skinning: true, polygonOffset: true, polygonOffsetFactor: -1 }); mat.userData.col = col;
         const mesh = new THREE.SkinnedMesh(geo, mat); mesh.bind(ud.skel, ud.main.bindMatrix); mesh.frustumCulled = false; m.add(mesh); ud.armor.push(mesh);
       };
-      add(tex, a.mat === 'leather' ? new THREE.Color(0xa06540) : null);
+      add(tex, a.mat === 'leather' ? new THREE.Color(st.col != null ? st.col : 0xa06540) : null);
       if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });
@@ -17773,7 +17873,7 @@ function mpApplyGuestSets(l) {
         if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
         if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
         if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
-        for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+        for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : W.dim === -1 ? 10 : 30); }
       }
     } finally { MP.applying = false; }
   }
@@ -17838,7 +17938,7 @@ function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -17928,7 +18028,7 @@ function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x -
 // ---------- a saved server world (node tools/server.js) ----------
 // The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
 // back to the server; the others follow as guests. When the runner leaves, the server names the next one.
-const MP_SHARED = ['dragonKilled', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
+const MP_SHARED = ['dragonKilled', 'dragonDone', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
 async function mpEnterServerWorld(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
@@ -18283,7 +18383,7 @@ function mpRender(dt) {
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
     mpPlaceTag(p, s, ps, light);
     for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
-    updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
+    updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
     mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects
@@ -18593,6 +18693,7 @@ const DYES16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'p
 // buy: the player gives n of key for one emerald; sell: price emeralds for n of key; proc: inN of inKey + price emeralds
 const VBUY = (key, n, max, xp) => ({ a: key, an: n, b: 'emerald', bn: 1, max, xp, mult: 0.05 });
 const VS = (key, price, n, max, xp, mult = 0.05) => ({ a: 'emerald', an: price, b: key, bn: n, max, xp, mult });
+const VSD = (key, price, xp) => ({ ...VS(key, price, 1, 12, xp), dye: 1 }); // Java's SellDyedArmorFactory: one random dye, maybe a second and a third
 const VP = (inKey, inN, price, key, n, max, xp) => ({ a: inKey, an: inN, a2: 'emerald', an2: price, b: key, bn: n, max, xp, mult: 0.05 });
 const VE = (key, base, xp) => ({ a: 'emerald', an: base, b: key, bn: 1, max: 3, xp, mult: 0.2, enchant: 1 }); // enchanted at level 5..19, the price grows by the level
 const VBOOK = xp => ({ a: 'emerald', an: 0, a2: 'book', an2: 1, b: 'enchanted_book', bn: 1, max: 12, xp, mult: 0.2, book: 1 });
@@ -18654,11 +18755,11 @@ const VTRADES = {
     [VBUY('mutton', 7, 16, 20), VBUY('beef', 10, 16, 20)],
     [VBUY('dried_kelp_block', 10, 12, 30)],
     [VBUY('sweet_berries', 10, 12, 30)]],
-  leatherworker: [[VBUY('leather', 6, 16, 2), VS('leather_leggings', 3, 1, 12, 1), VS('leather_chestplate', 7, 1, 12, 1)],
-    [VBUY('flint', 26, 12, 10), VS('leather_helmet', 5, 1, 12, 5), VS('leather_boots', 4, 1, 12, 5)],
-    [VBUY('rabbit_hide', 9, 12, 20), VS('leather_chestplate', 7, 1, 12, 10)],
+  leatherworker: [[VBUY('leather', 6, 16, 2), VSD('leather_leggings', 3, 1), VSD('leather_chestplate', 7, 1)],
+    [VBUY('flint', 26, 12, 10), VSD('leather_helmet', 5, 5), VSD('leather_boots', 4, 5)],
+    [VBUY('rabbit_hide', 9, 12, 20), VSD('leather_chestplate', 7, 10)],
     [VBUY('scute', 4, 12, 30), VS('leather_horse_armor', 6, 1, 12, 15)],
-    [VS('saddle', 6, 1, 12, 30), VS('leather_helmet', 5, 1, 12, 30)]],
+    [VS('saddle', 6, 1, 12, 30), VSD('leather_helmet', 5, 30)]],
   mason: [[VBUY('clay_ball', 10, 16, 2), VS('brick', 1, 10, 16, 1)],
     [VBUY('stone', 20, 16, 10), VS('chiseled_stone_bricks', 1, 4, 16, 5)],
     [VBUY('granite', 16, 16, 20), VBUY('andesite', 16, 16, 20), VBUY('diorite', 16, 16, 20), VS('polished_andesite', 1, 4, 16, 10), VS('polished_diorite', 1, 4, 16, 10), VS('polished_granite', 1, 4, 16, 10)],
@@ -18674,6 +18775,7 @@ function makeOffer(t, e, r) {
   if (t.a2) { o.a2 = IID[t.a2]; o.an2 = t.an2; if (o.a2 == null) return null; }
   if (t.boat) o.a = IID[BOAT_OF[e.vtype] || 'oak_boat'];
   if (t.map) { o.b = IID.filled_map; o.special = t.b; }
+  if (t.dye) { const d = [r.int(16)]; if (r() > 0.7) d.push(r.int(16)); if (r() > 0.8) d.push(r.int(16)); o.col = dyeMix(null, d); }
   if (t.stew) { o.stew = [t.stew[0], STEW_DUR[t.stew[0]] || t.stew[1]]; }
   if (t.tipped) { const arrows = Object.keys(IID).filter(k => k.endsWith('_arrow') && k !== 'spectral_arrow' && ITEMS[IID[k]].tipped && ITEMS[IID[k]].tipped !== 'water'); if (!arrows.length) return null; o.b = IID[arrows[r.int(arrows.length)]]; }
   if (t.book) { // Java's EnchantBookFactory: any enchantment a book can be traded with (not soul speed), at a random level
@@ -18718,7 +18820,7 @@ function tradeResult(c) {
   if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
   if (o.a2 != null && (!q || q.id !== o.a2 || q.n < o.an2)) return null;
   if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
-  const out = { id: o.b, n: o.bn }; if (o.e) out.e = { ...o.e }; if (o.stew) out.stew = [...o.stew];
+  const out = { id: o.b, n: o.bn }; if (o.e) out.e = { ...o.e }; if (o.stew) out.stew = [...o.stew]; if (o.col != null) out.col = o.col;
   return out;
 }
 function tradeTake(c) {

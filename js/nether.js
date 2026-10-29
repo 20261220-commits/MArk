@@ -16,3 +16,20 @@ function piglinAnger(x, y, z) {
 Object.assign(MOBDEF, {
   piglin_brute: { ...MOBDEF.piglin, hp: 50, dmg: 13, xp: 20, neutral: 0, drops: [], extraDrop: [['golden_axe', 0.085]], ai: bruteAI, init: e => bruteGear(e) },
 });
+// outside the Nether, piglins and brutes turn into zombified piglins and hoglins into zoglins after 15 seconds; hoglins
+// keep away from warped fungus (and nether portals and respawn anchors), as in Java
+const ZOMBIFY = { piglin: 'zombified_piglin', piglin_brute: 'zombified_piglin', hoglin: 'zoglin' };
+function netherMobTick(e) {
+  const to = ZOMBIFY[e.type]; if (!to || e.remote) return;
+  if (W.dim !== -1) {
+    e.zomT = (e.zomT || 0) + 1; if (e.zomT % 4 === 0) e.yaw += (Math.random() - .5) * 0.2; // shaking
+    if (e.zomT >= 300) { const z = spawnMob(to, e.x, e.y, e.z, { baby: e.baby }); if (z) { z.yaw = e.yaw; z.persistent = !!e.persistent; addEffect(z, 'nausea', 200, 0); } play('groan', { vol: 0.6 }); removeEnt(e); return; }
+  } else e.zomT = 0;
+  if (e.type === 'hoglin' && e.age % 20 === 0) { // repelled: run from the nearest warped fungus, portal or anchor within 8
+    const x0 = Math.floor(e.x), y0 = Math.floor(e.y), z0 = Math.floor(e.z); let best = null, bd = 99;
+    for (let dx = -8; dx <= 8; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -8; dz <= 8; dz++) { const b = getBlock(x0 + dx, y0 + dy, z0 + dz); if (b === BID.warped_fungus || b === BID.nether_portal || b === BID.respawn_anchor) { const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = [dx, dz]; } } }
+    e.repel = best ? 40 : 0; e.repelDir = best;
+  }
+  if (e.repel > 0) { e.repel--; const [dx, dz] = e.repelDir, l = Math.hypot(dx, dz) || 1; e.target = null; e.goal = [e.x - dx / l * 8, e.z - dz / l * 8]; }
+}
+{ const base = mobExtraTick; mobExtraTick = function (e, dist) { netherMobTick(e); if (!e.dead) base(e, dist); }; }

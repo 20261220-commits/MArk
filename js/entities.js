@@ -589,7 +589,7 @@ function mobTick(e) {
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
   if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
-  if (e.target && (!plVisible || dist > 24)) e.target = null;
+  if (e.target && (!plVisible || dist > 24 || e.repel > 0)) e.target = null; // (hoglins backing off from warped fungus: nether.js)
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
     e.yawTarget = Math.atan2(-dx, -dz);

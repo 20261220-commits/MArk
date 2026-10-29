@@ -307,9 +307,8 @@ function dialTick() {
   const g = DIAL.g; g.clearRect(0, 0, 32, 32);
   g.fillStyle = h.id === IID.clock ? '#d8b040' : '#8a8a8a'; g.beginPath(); g.arc(16, 16, 15, 0, 7); g.fill();
   if (h.id === IID.clock) { // the sun and moon turn on the face
-    const a = ((W.time % 24000) / 24000) * Math.PI * 2;
-    g.fillStyle = W.dim === 0 ? '#3a6ad8' : '#2a1a3a'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
-    if (W.dim !== 0) return; // spins elsewhere: nothing sensible to show
+    const a = W.dim === 0 ? ((W.time % 24000) / 24000) * Math.PI * 2 : performance.now() / 150; // spins wildly outside the Overworld
+    g.fillStyle = '#3a6ad8'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
     g.fillStyle = '#ffe040'; g.beginPath(); g.arc(16 + Math.sin(a) * 8, 16 - Math.cos(a) * 8, 3, 0, 7); g.fill(); g.fillStyle = '#e8e8f0'; g.beginPath(); g.arc(16 - Math.sin(a) * 8, 16 + Math.cos(a) * 8, 2.5, 0, 7); g.fill();
     g.fillStyle = '#3a8a2a'; g.fillRect(3, 17, 26, 12); return;
   }

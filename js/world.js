@@ -311,6 +311,8 @@ function fluidUpdate(x, y, z) {
   const water = b === 27, drop = water || W.dim === -1 ? 1 : 2, m = getMeta(x, y, z); // lava runs 7 blocks in the Nether, 3 elsewhere
   let lvl = m & 7, falling = (m & 8) !== 0;
   const other = water ? 28 : 27;
+  // lava over soul soil next to blue ice makes basalt (Java 1.16)
+  if (!water && getBlock(x, y - 1, z) === BID.soul_soil && N6.some(([dx, dy, dz]) => dy === 0 && getBlock(x + dx, y, z + dz) === BID.blue_ice)) { setBlock(x, y, z, BID.basalt); return; }
   // lava meets water
   if (!water) for (const [dx, dy, dz] of N6) if (dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27) { setBlock(x, y, z, lvl === 0 && !falling ? BID.obsidian : BID.cobblestone); return; }
   if (lvl !== 0 || falling) {
@@ -574,6 +576,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
+    else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
