@@ -489,7 +489,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.sheared = !!opts.sheared; e.persistent = !d.hostile; e.idleSnd = 200 + Math.random() * 400; e.deathT = 0; e.jumpCd = 0;
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
-  if (opts.owner) { e.owner = opts.owner; e.persistent = true; } if (opts.sitting) e.sitting = 1;
+  if (opts.owner) { e.owner = opts.owner; e.persistent = true; if (type === 'wolf') { e.def = { ...d, hp: 20 }; e.hp = 20; } } if (opts.sitting) e.sitting = 1; // a tame wolf has 20 health (its own copy of the definition)
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
@@ -522,7 +522,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
   if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
   play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
-  if (!e.def.hostile) e.panic = 60;
+  if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;
   if (e.hp <= 0) {
     e.deathT = 20;
@@ -613,7 +613,7 @@ function mobTick(e) {
     }
   } else {
     const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
-    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
+    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];

@@ -7,6 +7,10 @@
 //    over. With nobody on, the world waits. Players join with "멀티플레이 → 서버에 접속" at ws://<address>:<port>/mp.
 //  - one player's own world opened to others ("서버로 열기"), as before: guests' messages go to that host.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
+const zlib = require('zlib');
+// one bad message or a bug in some rarely used path must not take the whole server (and everyone in it) down
+process.on('uncaughtException', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
+process.on('unhandledRejection', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
 const root = path.join(__dirname, '..'), args = process.argv.slice(2);
 // on a hosting service (Render and the like) the port comes from PORT; WORLD names the world and WORLDS_DIR is where worlds are
 // kept (point it at a persistent disk there, or the world is lost whenever the service restarts)
@@ -52,7 +56,7 @@ function wsAccept(req, sock, onText, onClose) {
       buf = buf.subarray(p + len);
       if (op === 8) { c.close(); return; }
       if (op === 9) { sock.write(frame(10, data)); continue; }
-      if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; onText(msg); } }
+      if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
   // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself)
@@ -136,17 +140,25 @@ setInterval(saveAllWorlds, 5000);
 // ---------- staying up: a backup that outlives a wiped disk, and a ping so a free host doesn't put the server to sleep ----------
 const { githubBackup } = require(path.join(__dirname, 'backup.js'));
 const BACKUP = process.env.GITHUB_BACKUP_REPO && process.env.GITHUB_TOKEN ? githubBackup({ repo: process.env.GITHUB_BACKUP_REPO, token: process.env.GITHUB_TOKEN, branch: process.env.GITHUB_BACKUP_BRANCH || 'world-backup', api: process.env.GITHUB_API_URL || undefined }) : null;
-function worldSnapshot() { // everything on disk: every world's world.json and chunks
-  saveAllWorlds(); const out = {};
-  for (const w of worlds.values()) { if (!w.state.meta) continue;
-    const chunks = {}; for (const dk of w.keys) { try { chunks[dk] = JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) {} }
-    out[w.id] = { state: JSON.parse(fs.readFileSync(path.join(w.dir, 'world.json'), 'utf8')), chunks }; }
-  return Object.keys(out).length ? { v: 2, worlds: out } : null;
+// everything on disk (every world's world.json and chunks) as one gzipped JSON, written a file at a time straight from the
+// files' own text: parsing every chunk into objects first took more memory than a free host has once a world grew, and
+// the server was killed in the middle of a backup
+async function worldSnapshot() {
+  saveAllWorlds(); const list = [...worlds.values()].filter(w => w.state.meta); if (!list.length) return null;
+  const gz = zlib.createGzip({ level: 6 }), out = []; gz.on('data', d => out.push(d)); const done = new Promise((res, rej) => { gz.on('end', res); gz.on('error', rej); });
+  const put = s => gz.write(s) ? null : new Promise(r => gz.once('drain', r));
+  const raw = f => { try { const t = fs.readFileSync(f, 'utf8'); JSON.parse(t); return t; } catch (e) { return null; } }; // (a file cut short is left out)
+  await put('{"v":2,"worlds":{'); let first = true;
+  for (const w of list) { const st = raw(path.join(w.dir, 'world.json')); if (!st) continue;
+    await put((first ? '' : ',') + JSON.stringify(w.id) + ':{"state":' + st + ',"chunks":{'); first = false; let fc = true;
+    for (const dk of [...w.keys]) { const t = raw(w.fileOf(dk)); if (!t) continue; const p = put((fc ? '' : ',') + JSON.stringify(dk) + ':' + t); fc = false; if (p) await p; }
+    await put('}}'); }
+  gz.end('}}'); await done; return first ? null : Buffer.concat(out);
 }
 let backingUp = null;
 async function backupNow(why) {
-  if (!BACKUP || backingUp) return backingUp; const snap = worldSnapshot(); if (!snap) return;
-  backingUp = BACKUP.save(snap).then(n => { for (const w of worlds.values()) w.changedSinceBackup = false; console.log(`세계 백업 완료 (${why}, 세계 ${Object.keys(snap.worlds).length}개, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => console.log('세계 백업 실패: ' + e.message)).finally(() => { backingUp = null; });
+  if (!BACKUP || backingUp) return backingUp;
+  backingUp = worldSnapshot().then(snap => snap && BACKUP.save(snap)).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => console.log('세계 백업 실패: ' + e.message)).finally(() => { backingUp = null; });
   return backingUp;
 }
 async function restoreIfEmpty() { // a fresh disk (a restart on a free host): bring the worlds back from the backup

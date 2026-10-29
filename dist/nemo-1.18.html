@@ -8584,7 +8584,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.sheared = !!opts.sheared; e.persistent = !d.hostile; e.idleSnd = 200 + Math.random() * 400; e.deathT = 0; e.jumpCd = 0;
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
-  if (opts.owner) { e.owner = opts.owner; e.persistent = true; } if (opts.sitting) e.sitting = 1;
+  if (opts.owner) { e.owner = opts.owner; e.persistent = true; if (type === 'wolf') { e.def = { ...d, hp: 20 }; e.hp = 20; } } if (opts.sitting) e.sitting = 1; // a tame wolf has 20 health (its own copy of the definition)
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
@@ -8617,7 +8617,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
   if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
   play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
-  if (!e.def.hostile) e.panic = 60;
+  if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;
   if (e.hp <= 0) {
     e.deathT = 20;
@@ -8708,7 +8708,7 @@ function mobTick(e) {
     }
   } else {
     const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
-    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; speed = d.speed * 2.2; }
+    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
@@ -10219,7 +10219,7 @@ function mobInteract(e, h, d) {
   if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.hp = e.def.hp = 20; e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
+    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.def = { ...e.def, hp: 20 }; e.hp = 20; /* this wolf only: the shared definition stays at 8 */ e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
   }
   return false;
 }
@@ -17644,7 +17644,7 @@ async function mirRestore(host) {
 }
 // room: a player's open world by its code; world: a server world by its id ('+' makes a new one)
 async function mpJoinWs(url, room, world) {
-  MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
+  MP.lastUrl = url; MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : world === '+' ? { newWorld: true } : world ? { world } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
@@ -17654,7 +17654,7 @@ async function mpJoinWs(url, room, world) {
   mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
-  if (!MP.on) return;
+  if (!MP.on) return; MP.timeAt = 0;
   const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
@@ -17666,8 +17666,21 @@ function mpStop() {
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
-  if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
+  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, again = MP.server && !MP.isHost && url && wid && MP.link && MP.link.kind === 'ws';
+  mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
+  if (again) mpRejoin(url, wid);
+}
+// a server world whose connection dropped (the server restarting, a network blip): knock again every few seconds until
+// it answers (a free host takes a minute or two to come back), as long as the join screen stays open
+async function mpRejoin(url, wid) {
+  const t0 = Date.now(), gen = (MP.rejoinGen = (MP.rejoinGen || 0) + 1); showMenu('mp_join');
+  while (gen === MP.rejoinGen && UI.menu === 'mp_join' && Date.now() - t0 < 5 * 60000) {
+    const s = Math.round((Date.now() - t0) / 1000); MP.status = `서버와 다시 연결하는 중... ${s}초 (서버가 다시 켜지는 데 1~2분 걸릴 수 있어요)`; const el = $('mpStatus'); if (el) el.textContent = MP.status;
+    try { await mpJoinWs(url, null, wid); MP.status = ''; return; } catch (e) {}
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
 function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
@@ -17711,7 +17724,7 @@ function mpHandle(m, from) {
     case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
-    case 'time': if (host && !MP.server) return; if (Math.abs(W.time - m.time) > 30) W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
+    case 'time': if (host && !MP.server) return; MP.timeBase = +m.time; MP.timeAt = performance.now(); if (Math.abs(W.time - m.time) > 30) W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
     case 'mobs': if (!host) mpMirrorMobs(m.l); return;
     case 'hurt': if (!host) hurtPlayer(+m.dmg || 0, m.cause || 'mob'); return; // the host's mobs hit this guest
     case 'kb': if (!host) { PL.vx += +m.vx || 0; PL.vy += +m.vy || 0; PL.vz += +m.vz || 0; } return;
@@ -17742,7 +17755,7 @@ function mpHandle(m, from) {
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player');
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
       if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
     case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
     case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
@@ -19020,8 +19033,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyL') { UI.openScreen('adv'); return; }
   if (code === 'F3') { if (!F3K.down) { F3K.down = true; F3K.used = false; } return; }
   if (F3K.down && debugCombo(code)) { F3K.used = true; return; }
-  // F1 / F2 / F5 (Chromebook: back / forward / overview keys); H and V stay as extra keys
-  if (code === 'F1' || code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
+  // F1 / F2 / F5 (Chromebook: back / forward / overview keys); V stays as an extra key (H no longer hides the HUD: it was
+  // pressed by accident and the whole interface seemed to vanish)
+  if (code === 'F1') { UI.hideHud = !UI.hideHud; if (UI.hideHud) UI.flash('화면 표시를 숨겼습니다 — F1(크롬북: 뒤로 가기 키)을 다시 누르면 보입니다'); return; }
   if (code === 'F2') { takeScreenshot(); return; }
   if (code === 'F5' || code === 'KeyV') { view = (view + 1) % 3; return; }
   if (code === 'KeyG') { pickBlock(); return; } // touchpads have no middle button (ChromeOS turns Alt + click into a right click)
@@ -19185,7 +19199,7 @@ function resumeGame() {
   else grabLock();
   if (isTouch) $('touch').hidden = false;
 }
-function quitToTitle() {
+function quitToTitle() { UI.hideHud = false;
   if (MP.on) mpStop();
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
@@ -19198,7 +19212,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
-  if (gr('doDaylightCycle')) W.time++;
+  if (gr('doDaylightCycle')) W.time = MP.on && MP.role === 'guest' && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // a guest follows the world's clock in real time (no jumps when frames are slow)
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
@@ -19397,6 +19411,11 @@ function autoRes() {
   else if (fps >= 57 && R.pixelScale < 1) { if (++R.resUp >= 3) { R.resUp = 0; R.pixelScale = Math.min(1, R.pixelScale + 0.125); } }
   else R.resUp = 0;
   if (old !== R.pixelScale) R.resize();
+  // still struggling at the lowest resolution: draw fewer chunks, and back up to the chosen distance once there's room
+  // (not under test automation, whose software renderer is always slow)
+  if (navigator.webdriver) return;
+  if (R.pixelScale <= lo && fps < 25 && R.rd > 3) { if (++R.rdLow >= 4) { R.rdLow = 0; R.rd--; UI.flash(`렉이 심해 시야 거리를 ${R.rd}청크로 줄였습니다 (여유가 생기면 되돌립니다)`); } } else R.rdLow = 0;
+  if (R.rd < OPT.rd && fps >= 55 && R.pixelScale >= 1) { if (++R.rdUp >= 10) { R.rdUp = 0; R.rd++; } } else R.rdUp = 0;
 }
 
 // which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their
