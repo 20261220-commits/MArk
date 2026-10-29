@@ -93,7 +93,7 @@ function mpWorldCore(store, out) {
       }
       case 'dim': setDim(p, +m.dim || 0); return;
       case 'pl': p.s = m; if (m.dim !== p.dim && p.joined) setDim(p, m.dim); others(p, m); return;
-      case 'pdata': { const nm = p.key || p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; store.saveState(); } return; }
+      case 'pdata': { const nm = p.key || p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d) { S.players[nm] = m.d; p.pdataAt = Date.now(); store.saveState(); } return; }
       case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
@@ -114,6 +114,7 @@ function mpWorldCore(store, out) {
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
+    if (m.t === 'pl' && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z)) { p.lastPl = { x: m.x, y: m.y, z: m.z, yaw: +m.yaw || 0, pitch: +m.pitch || 0, dim: m.dim | 0 }; p.plAt = Date.now(); }
     const to = m.to; delete m.to;
     if (typeof to === 'number') { if (players.has(to)) out(to, m); }
     else if (to === 'auth') { const a = auth.get(m.dim != null ? m.dim : p.dim); if (a != null && a !== from) out(a, m); }
@@ -122,6 +123,8 @@ function mpWorldCore(store, out) {
   }
   function leave(id) {
     const p = players.get(id); if (!p) return; players.delete(id); if (!p.joined) return;
+    // gone without a last word (a closed tab, a crash, a dropped connection): where it was last seen goes into its record
+    const rec = p.key && S.players[p.key]; if (rec && rec.s && p.lastPl && (p.plAt || 0) > (p.pdataAt || 0)) { const l = p.lastPl; Object.assign(rec.s, { x: l.x, y: l.y, z: l.z, yaw: l.yaw, pitch: l.pitch }); rec.dim = l.dim; }
     others(p, { t: 'gone', id }); store.log(`${p.name} 나감 (${[...players.values()].filter(q => q.joined).length}명)`);
     if (p.dim != null) pickAuth(p.dim);
     store.saveState();
