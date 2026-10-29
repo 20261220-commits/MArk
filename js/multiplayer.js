@@ -624,7 +624,7 @@ function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x -
 // ---------- a saved server world (node tools/server.js) ----------
 // The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
 // back to the server; the others follow as guests. When the runner leaves, the server names the next one.
-const MP_SHARED = ['dragonKilled', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
+const MP_SHARED = ['dragonKilled', 'dragonDone', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
 async function mpEnterServerWorld(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
