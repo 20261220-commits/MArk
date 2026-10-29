@@ -102,8 +102,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyL') { UI.openScreen('adv'); return; }
   if (code === 'F3') { if (!F3K.down) { F3K.down = true; F3K.used = false; } return; }
   if (F3K.down && debugCombo(code)) { F3K.used = true; return; }
-  // F1 / F2 / F5 (Chromebook: back / forward / overview keys); H and V stay as extra keys
-  if (code === 'F1' || code === 'KeyH') { UI.hideHud = !UI.hideHud; return; }
+  // F1 / F2 / F5 (Chromebook: back / forward / overview keys); V stays as an extra key (H no longer hides the HUD: it was
+  // pressed by accident and the whole interface seemed to vanish)
+  if (code === 'F1') { UI.hideHud = !UI.hideHud; if (UI.hideHud) UI.flash('화면 표시를 숨겼습니다 — F1(크롬북: 뒤로 가기 키)을 다시 누르면 보입니다'); return; }
   if (code === 'F2') { takeScreenshot(); return; }
   if (code === 'F5' || code === 'KeyV') { view = (view + 1) % 3; return; }
   if (code === 'KeyG') { pickBlock(); return; } // touchpads have no middle button (ChromeOS turns Alt + click into a right click)
@@ -267,7 +268,7 @@ function resumeGame() {
   else grabLock();
   if (isTouch) $('touch').hidden = false;
 }
-function quitToTitle() {
+function quitToTitle() { UI.hideHud = false;
   if (MP.on) mpStop();
   saveAll(); for (const c of [...W.chunks.values()]) unloadChunk(c);
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
@@ -280,7 +281,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
-  if (gr('doDaylightCycle')) W.time++;
+  if (gr('doDaylightCycle')) W.time = MP.on && MP.role === 'guest' && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // a guest follows the world's clock in real time (no jumps when frames are slow)
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
@@ -479,6 +480,11 @@ function autoRes() {
   else if (fps >= 57 && R.pixelScale < 1) { if (++R.resUp >= 3) { R.resUp = 0; R.pixelScale = Math.min(1, R.pixelScale + 0.125); } }
   else R.resUp = 0;
   if (old !== R.pixelScale) R.resize();
+  // still struggling at the lowest resolution: draw fewer chunks, and back up to the chosen distance once there's room
+  // (not under test automation, whose software renderer is always slow)
+  if (navigator.webdriver) return;
+  if (R.pixelScale <= lo && fps < 25 && R.rd > 3) { if (++R.rdLow >= 4) { R.rdLow = 0; R.rd--; UI.flash(`렉이 심해 시야 거리를 ${R.rd}청크로 줄였습니다 (여유가 생기면 되돌립니다)`); } } else R.rdLow = 0;
+  if (R.rd < OPT.rd && fps >= 55 && R.pixelScale >= 1) { if (++R.rdUp >= 10) { R.rdUp = 0; R.rd++; } } else R.rdUp = 0;
 }
 
 // which block items Java draws flat (models/item/*.json: item/generated with a block texture) and which as their

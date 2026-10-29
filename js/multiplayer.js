@@ -198,7 +198,7 @@ async function mirRestore(host) {
 }
 // room: a player's open world by its code; world: a server world by its id ('+' makes a new one)
 async function mpJoinWs(url, room, world) {
-  MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
+  MP.lastUrl = url; MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
   try { MP.link = await mpWebSocket(url, 'join', room ? { room } : world === '+' ? { newWorld: true } : world ? { world } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
@@ -208,7 +208,7 @@ async function mpJoinWs(url, room, world) {
   mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
 }
 function mpStop() {
-  if (!MP.on) return;
+  if (!MP.on) return; MP.timeAt = 0;
   const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
@@ -220,8 +220,21 @@ function mpStop() {
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
-  if (!MP.on) return; const guest = MP.role === 'guest'; mpStop(); chatMsg(why, '#ff5555');
+  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, again = MP.server && !MP.isHost && url && wid && MP.link && MP.link.kind === 'ws';
+  mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
+  if (again) mpRejoin(url, wid);
+}
+// a server world whose connection dropped (the server restarting, a network blip): knock again every few seconds until
+// it answers (a free host takes a minute or two to come back), as long as the join screen stays open
+async function mpRejoin(url, wid) {
+  const t0 = Date.now(), gen = (MP.rejoinGen = (MP.rejoinGen || 0) + 1); showMenu('mp_join');
+  while (gen === MP.rejoinGen && UI.menu === 'mp_join' && Date.now() - t0 < 5 * 60000) {
+    const s = Math.round((Date.now() - t0) / 1000); MP.status = `서버와 다시 연결하는 중... ${s}초 (서버가 다시 켜지는 데 1~2분 걸릴 수 있어요)`; const el = $('mpStatus'); if (el) el.textContent = MP.status;
+    try { await mpJoinWs(url, null, wid); MP.status = ''; return; } catch (e) {}
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
 function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
@@ -265,7 +278,7 @@ function mpHandle(m, from) {
     case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
-    case 'time': if (host && !MP.server) return; if (Math.abs(W.time - m.time) > 30) W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
+    case 'time': if (host && !MP.server) return; MP.timeBase = +m.time; MP.timeAt = performance.now(); if (Math.abs(W.time - m.time) > 30) W.time = m.time; W.rainTarget = m.rain; if (Math.abs(W.rain - m.rain) > 0.5) W.rain = m.rain; W.thunderOn = m.thunder; return;
     case 'mobs': if (!host) mpMirrorMobs(m.l); return;
     case 'hurt': if (!host) hurtPlayer(+m.dmg || 0, m.cause || 'mob'); return; // the host's mobs hit this guest
     case 'kb': if (!host) { PL.vx += +m.vx || 0; PL.vy += +m.vy || 0; PL.vz += +m.vz || 0; } return;
@@ -296,7 +309,7 @@ function mpHandle(m, from) {
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player');
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
       if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
     case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
     case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
