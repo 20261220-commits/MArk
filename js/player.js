@@ -412,7 +412,7 @@ function breakBlock(x, y, z) {
   if (id === BID.infested && !creative() && !enchLv(held, 'silk_touch')) spawnMob('silverfish', x + .5, y, z + .5);
   if ((id === BID.bee_nest || id === BID.beehive) && !creative() && enchLv(held, 'silk_touch')) HIVE_KEEP.on = { honey: m >> 2 }; // the bees stay inside (W.onTileRemoved)
   let repl = 0;
-  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
+  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)] && W.dim !== -1) repl = 27; // (in the Nether it just vanishes)
   setBlock(x, y, z, repl);
   statOf('mined', itemOfBlock(id, m) || id);
   if (!creative() && gr('doTileDrops')) {
@@ -427,7 +427,7 @@ function breakBlock(x, y, z) {
   if (!creative()) { const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
     if (held && held.id === IID.shears && id !== BID.fire) damageItem(INV.slots, INV.sel, 1); }
   // water flows into the gap
-  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : 30); }
+  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : W.dim === -1 ? 10 : 30); }
 }
 function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
@@ -666,6 +666,7 @@ function useItem(first) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
         const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
+        if (fl === 27 && W.dim === -1) { if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('fizz', { vol: 0.6 }); swing(); for (let k = 0; k < 8; k++) R.simpleParticle(px + Math.random(), py + Math.random(), pz + Math.random(), [0.8, 0.8, 0.8], { kind: 'smoke', vy: 0.6, grav: 0, size: 0.12, life: 0.8 }); return; } // water boils away in the Nether (fish too)
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
         if (BUCKET_MOB[h.id]) { const m = spawnMob(BUCKET_MOB[h.id], px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true }); if (m) m.persistent = true; } // released fish never despawn
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };

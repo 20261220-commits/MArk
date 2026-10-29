@@ -469,7 +469,7 @@ function mpApplyGuestSets(l) {
         if (b === RSB.lever || b === RSB.button) { const a = switchAttach(m.x, m.y, m.z, m.m); rsNotify(a[0], a[1], a[2]); if (b === RSB.button && (m.m & 8)) { const k = (m.m >> 4) & 15; rsLater(m.x, m.y, m.z, k >= 1 && k <= 8 ? 30 : 20); } }
         if (FLUID[b]) schedule(m.x, m.y, m.z, 1);
         if (BLOCKS[b] && BLOCKS[b].fall) schedule(m.x, m.y, m.z, 2);
-        for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : 30); }
+        for (const [dx, dy, dz] of N6) { const n = getBlock(m.x + dx, m.y + dy, m.z + dz); if (FLUID[n]) schedule(m.x + dx, m.y + dy, m.z + dz, n === 27 ? 5 : W.dim === -1 ? 10 : 30); }
       }
     } finally { MP.applying = false; }
   }

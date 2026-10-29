@@ -334,7 +334,7 @@ function dispense(x, y, z, b, m) {
   else if (ITEMS[id].splash || ITEMS[id].lingering) { const e = shootArrow(cx, cy, cz, d[0] * 0.6, d[1] * 0.6 + 0.1, d[2] * 0.6, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
   else if (id === IID.fire_charge) { spawnFireball(cx, cy, cz, d[0], d[1], d[2], null, true); take(); }
   else if (id === IID.snowball || id === IID.egg) { const e = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
-  else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); t.items[i] = { id: IID.bucket, n: 1 }; }
+  else if ((id === IID.water_bucket || id === IID.lava_bucket) && (!fb || REPL[fb])) { if (id !== IID.water_bucket || W.dim !== -1) { setBlock(fx, fy, fz, id === IID.water_bucket ? 27 : 28, 0); schedule(fx, fy, fz, 1); } else play("fizz", { vol: 0.5 }); t.items[i] = { id: IID.bucket, n: 1 }; }
   else if (id === IID.bucket && FLUID[fb] && getMeta(fx, fy, fz) === 0) { setBlock(fx, fy, fz, 0); t.items[i] = { id: fb === 27 ? IID.water_bucket : IID.lava_bucket, n: 1 }; }
   else if (id === BID.tnt) { primeTNT(fx, fy, fz); take(); }
   else if (id === IID.flint_and_steel) { if (!fb && SOLID[getBlock(fx, fy - 1, fz)]) setBlock(fx, fy, fz, BID.fire); }

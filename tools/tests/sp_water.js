@@ -22,7 +22,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   });
   ok(r.spread.n > 50 && r.spread.far === 7, 'a source spreads exactly 7 blocks over flat ground', r.spread);
   ok(r.after.n === 0, 'removing the source dries the whole flow', r.after);
-  ok(r.fall.n > 50 && r.fall.far <= 8, 'water poured from above spreads 7 from where it lands (8 from below the source, as in Java)', r.fall);
+  ok(r.fall.n > 50 && r.fall.far === 7, 'water poured from above spreads 7 from where it lands, as in Java', r.fall);
   ok(r.fallAfter.n === 0 && !r.colWater, 'and dries up once its source is gone', r);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
