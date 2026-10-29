@@ -412,7 +412,7 @@ function breakBlock(x, y, z) {
   if (id === BID.infested && !creative() && !enchLv(held, 'silk_touch')) spawnMob('silverfish', x + .5, y, z + .5);
   if ((id === BID.bee_nest || id === BID.beehive) && !creative() && enchLv(held, 'silk_touch')) HIVE_KEEP.on = { honey: m >> 2 }; // the bees stay inside (W.onTileRemoved)
   let repl = 0;
-  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)]) repl = 27;
+  if (id === BID.ice && !creative() && SOLID[getBlock(x, y - 1, z)] && W.dim !== -1) repl = 27; // (in the Nether it just vanishes)
   setBlock(x, y, z, repl);
   statOf('mined', itemOfBlock(id, m) || id);
   if (!creative() && gr('doTileDrops')) {
@@ -427,7 +427,7 @@ function breakBlock(x, y, z) {
   if (!creative()) { const tool = held && ITEMS[held.id].tool; if (tool && BLOCKS[id].hard > 0) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD ? 2 : 1);
     if (held && held.id === IID.shears && id !== BID.fire) damageItem(INV.slots, INV.sel, 1); }
   // water flows into the gap
-  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : 30); }
+  for (const [dx, dy, dz] of N6) { const b = getBlock(x + dx, y + dy, z + dz); if (FLUID[b]) schedule(x + dx, y + dy, z + dz, b === 27 ? 5 : W.dim === -1 ? 10 : 30); }
 }
 function finishEat() {
   const h = PL.held(); USE.kind = null; USE.t = 0; R.hand.eat = 0;
@@ -496,6 +496,7 @@ function interactBlock(t, dry) {
       const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
       const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
       if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.col != null && lv > 0 && k === 0) { if (!dry) { delete h.col; setMeta(x, y, z, lv - 1 ? (m & ~3) | (lv - 1) : 0); play('splash', { vol: 0.5 }); UI.hudDirty = true; } return true; } // dyed leather is washed out
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
@@ -666,6 +667,7 @@ function useItem(first) {
         const [px, py, pz] = REPL[id] && !FLUID[id] ? [x, y, z] : [x + t.nx, y + t.ny, z + t.nz];
         const cur = getBlock(px, py, pz); if (cur && !REPL[cur] && !FLUID[cur]) return;
         const fl = h.id === IID.lava_bucket ? 28 : h.id === IID.powder_snow_bucket ? BID.powder_snow : 27;
+        if (fl === 27 && W.dim === -1) { if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('fizz', { vol: 0.6 }); swing(); for (let k = 0; k < 8; k++) R.simpleParticle(px + Math.random(), py + Math.random(), pz + Math.random(), [0.8, 0.8, 0.8], { kind: 'smoke', vy: 0.6, grav: 0, size: 0.12, life: 0.8 }); return; } // water boils away in the Nether (fish too)
         setBlock(px, py, pz, fl, 0); schedule(px, py, pz, 1);
         if (BUCKET_MOB[h.id]) { const m = spawnMob(BUCKET_MOB[h.id], px + .5, py + .1, pz + .5, { variant: h.v || 0, fromBucket: true }); if (m) m.persistent = true; } // released fish never despawn
         if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 };
@@ -717,7 +719,7 @@ function placeEndCrystal(t) {
   if (W.dim === 1 && W.meta.dragonKilled && !ENT.some(o => o.type === 'ender_dragon' && !o.dead)) {
     const near = ENT.filter(e => !e.dead && e.type === 'end_crystal' && e.placed && Math.hypot(e.x, e.z) < 4.5 && Math.abs(e.y - c.y) < 2);
     const sides = new Set(near.map(e => Math.abs(e.x) > Math.abs(e.z) ? (e.x > 0 ? 'e' : 'w') : (e.z > 0 ? 's' : 'n')));
-    if (sides.size === 4) setTimeout(() => { for (const e of near) if (!e.dead) { removeEnt(e); explode(e.x, e.y + 1, e.z, 0); } W.meta.dragonKilled = false; ensureDragon(); advGrant('end/respawn_dragon'); chatMsg('엔더 드래곤이 다시 나타났습니다!', '#ff55ff'); }, 3000);
+    if (sides.size === 4) setTimeout(() => { for (const e of near) if (!e.dead) { removeEnt(e); explode(e.x, e.y + 1, e.z, 0); } W.meta.dragonKilled = false; endRespawnPillars(); ensureDragon(); advGrant('end/respawn_dragon'); chatMsg('엔더 드래곤이 다시 나타났습니다!', '#ff55ff'); }, 3000);
   }
   return true;
 }

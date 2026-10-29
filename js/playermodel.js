@@ -93,7 +93,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light, list = INV.armor) { // list: another player's armour in multiplayer
-  const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') : 0).join(',');
+  const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') + (s.col != null ? '#' + s.col : '') : 0).join(',');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
     for (const a of ud.armor) { a.parent.remove(a); a.material.dispose(); } ud.armor = [];
@@ -114,7 +114,7 @@ function updateArmor(m, light, list = INV.armor) { // list: another player's arm
         const mat = new THREE.MeshBasicMaterial({ map: t, vertexColors: true, alphaTest: 0.1, skinning: true, polygonOffset: true, polygonOffsetFactor: -1 }); mat.userData.col = col;
         const mesh = new THREE.SkinnedMesh(geo, mat); mesh.bind(ud.skel, ud.main.bindMatrix); mesh.frustumCulled = false; m.add(mesh); ud.armor.push(mesh);
       };
-      add(tex, a.mat === 'leather' ? new THREE.Color(0xa06540) : null);
+      add(tex, a.mat === 'leather' ? new THREE.Color(st.col != null ? st.col : 0xa06540) : null);
       if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });

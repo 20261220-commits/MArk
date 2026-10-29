@@ -74,7 +74,7 @@ function standMesh(e) {
       if (!a) { const im = R.itemMesh(st.id); im.scale.setScalar(0.625); im.position.y = 1.75; g.add(im); im.userData.c = 0xffffff; return; }
       const [layer, dil, parts] = STAND_ARMOR[i], tk = STAND_TEX[a.mat], at = tk && packTexture('armor_' + tk + '_' + layer); if (!at) return;
       const spec = { tex: 'armor_' + tk + '_' + layer, tw: 64, th: 32, parts: parts.map(([n, o, b, r]) => { const bb = b.slice(); bb[8] = dil; return { n, o, r, b: [bb] }; }) };
-      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(0xa06540);
+      const am = buildMCModel('stand_armor_' + i, spec, at); g.add(am); mats.push(am.userData.mat); if (a.mat === 'leather') am.userData.mat.userData.col = new THREE.Color(st.col != null ? st.col : 0xa06540);
       if (st.e) { const gl = buildMCModel('stand_armor_' + i, spec, at); gl.traverse(o => { if (o.isMesh) o.material = R.glintMaterial(true); }); g.add(gl); } });
     g.userData.mats = mats; return g;
   }

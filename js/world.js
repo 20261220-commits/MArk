@@ -205,7 +205,7 @@ function neighborUpdate(x, y, z) {
   if (y < MINY || y >= MAXY) return;
   const b = getBlock(x, y, z); if (!b) return;
   const m = getMeta(x, y, z), below = getBlock(x, y - 1, z), d = BLOCKS[b];
-  if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : 30); return; }
+  if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : W.dim === -1 ? 10 : 30); return; }
   if (d.fall) { if (below === 0 || FLUID[below] || (REPL[below] && below !== b)) schedule(x, y, z, 2); return; }
   if (d.plant) {
     let ok = true;
@@ -308,9 +308,11 @@ function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); ret
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
 function fluidUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
-  const water = b === 27, drop = water ? 1 : 2, m = getMeta(x, y, z);
+  const water = b === 27, drop = water || W.dim === -1 ? 1 : 2, m = getMeta(x, y, z); // lava runs 7 blocks in the Nether, 3 elsewhere
   let lvl = m & 7, falling = (m & 8) !== 0;
   const other = water ? 28 : 27;
+  // lava over soul soil next to blue ice makes basalt (Java 1.16)
+  if (!water && getBlock(x, y - 1, z) === BID.soul_soil && N6.some(([dx, dy, dz]) => dy === 0 && getBlock(x + dx, y, z + dz) === BID.blue_ice)) { setBlock(x, y, z, BID.basalt); return; }
   // lava meets water
   if (!water) for (const [dx, dy, dz] of N6) if (dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27) { setBlock(x, y, z, lvl === 0 && !falling ? BID.obsidian : BID.cobblestone); return; }
   if (lvl !== 0 || falling) {
@@ -340,11 +342,11 @@ function fluidUpdate(x, y, z) {
     if (bl && W.onDrop && !FLUID[bl]) W.onDrop(x, y - 1, z, blockDrops(bl, 0, null).items, 0);
     setBlock(x, y - 1, z, b, 8); return;
   }
-  if (bl === b && !(lvl === 0 && !falling)) return;
+  if (bl === b && (getMeta(x, y - 1, z) !== 0 || !(lvl === 0 && !falling))) { if (getMeta(x, y - 1, z) !== 8 && getMeta(x, y - 1, z) !== 0) setBlock(x, y - 1, z, b, 8); return; } // over flowing fluid it pours down; only still fluid below lets it spread
   const nl = (falling ? 0 : lvl) + drop; if (nl >= 8) return;
   // choose directions towards the nearest drop
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const range = water ? 4 : 2;
+  const range = water || W.dim === -1 ? 4 : 2;
   const canFlow = (px, pz) => { const t = getBlock(px, y, pz); return t === 0 || (REPL[t] && !FLUID[t]) || (t === b && getMeta(px, y, pz) !== 0 && (getMeta(px, y, pz) & 7) > nl) || t === other; };
   const dist = dirs.map(([dx, dz]) => {
     if (!canFlow(x + dx, z + dz)) return 99;
@@ -513,7 +515,7 @@ RANDOM_TICK[BID.cauldron] = (x, y, z, b, m) => {
   const lv = m & 3, k = (m >> 2) & 3, cold = S.BIOMES[biomeAt(x, z)][4] <= 0.15, kind = cold ? 2 : 0;
   if (lv < 3 && (lv === 0 || k === kind) && Math.random() < (cold ? 0.1 : 0.05)) setMeta(x, y, z, (lv + 1) | (kind << 2));
 };
-RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, 27); };
+RANDOM_TICK[BID.ice] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11 || (getLight(x, y + 1, z) & 15) > 11) setBlock(x, y, z, W.dim === -1 ? 0 : 27); };
 RANDOM_TICK[BID.snow] = (x, y, z) => { if ((getLight(x, y, z) & 15) > 11) setBlock(x, y, z, 0); };
 
 // ---------- worker pool ----------
@@ -574,6 +576,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
+    else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on

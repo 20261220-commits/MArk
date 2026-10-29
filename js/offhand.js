@@ -34,7 +34,7 @@ function swapHands() {
 function offhandHud() {
   let el = $('offslot');
   if (!el) { el = document.createElement('div'); el.id = 'offslot'; el.className = 'hs'; $('hotbar').appendChild(el); }
-  const s = OFF.swapped ? INV.slots[OFF.slot] : INV.off; el.hidden = !s; el.classList.toggle('right', OPT.mainHand === 'left'); el.innerHTML = s ? icon(s.id, s.n, s.d, s.e) : '';
+  const s = OFF.swapped ? INV.slots[OFF.slot] : INV.off; el.hidden = !s; el.classList.toggle('right', OPT.mainHand === 'left'); el.innerHTML = s ? icon(s.id, s.n, s.d, s.e, s.col) : '';
 }
 const offItem = () => OFF.swapped ? INV.slots[OFF.slot] : INV.off;
 
