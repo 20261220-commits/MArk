@@ -1467,17 +1467,17 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
   }
 }
 // ---- villages ----
-const VREG = 12;
+const VREG = 32; // Java: one try per 32x32 chunks, at least 8 apart
 const villageCache = new Map();
 let VILLAGE_BIOMES = null;
 function villageAt(seed, G, rx, rz) {
   const key = seed + ':' + rx + ':' + rz; if (villageCache.has(key)) return villageCache.get(key);
   let v = null;
   const r = rng(hash32(seed, rx, rz, 31));
-  if (r() < 0.75) {
-    const vx = (rx * VREG + 3 + r.int(VREG - 6)) * 16 + 8, vz = (rz * VREG + 3 + r.int(VREG - 6)) * 16 + 8;
+  {
+    const vx = (rx * VREG + r.int(VREG - 8)) * 16 + 8, vz = (rz * VREG + r.int(VREG - 8)) * 16 + 8;
     const [h, b, bv] = G.column(vx, vz);
-    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'desert', 'savanna', 'taiga', 'snowy_tundra', 'snowy_taiga'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
+    const VB = VILLAGE_BIOMES || (VILLAGE_BIOMES = new Set(['plains', 'meadow', 'desert', 'savanna', 'taiga', 'snowy_tundra'].map(k => BIOK[k]))); // 1.17: not on hills, plateaus or shattered savannas
     const vt = !VB.has(bv) ? null : b === BIO.PLAINS ? 'plains' : b === BIO.DESERT ? 'desert' : b === BIO.TAIGA ? 'taiga' : b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA ? 'snow' : b === BIO.SAVANNA && STRUCTS ? 'savanna' : null;
     if (vt && STRUCTS && h > SEA && h < 110) { // Mojang's village pieces, grown by jigsaw (2% are zombie villages)
       const jt = vt === 'snow' ? 'snowy' : vt, zombie = r() < 0.02, planks = { plains: 'oak', desert: 'smooth_sandstone_slab', savanna: 'acacia', snowy: 'spruce', taiga: 'spruce' }[jt];
@@ -2707,8 +2707,8 @@ function genChunk0(seed, cx, cz, dim, exp) {
     }
     for (let y = h + 1; y <= SEA; y++) blocks[I(x, y, z)] = WATER;
     if ((isOceanBio(b) || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || b === BIO.RIVER) && BIOMES[v][4] <= 0.15 && h < SEA) blocks[I(x, SEA, z)] = 52; // frozen oceans and rivers
-    blocks[I(x, 0, z)] = 8;
-    for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5) blocks[I(x, y, z)] = 8;
+    blocks[I(x, 0, z)] = GENV >= 3 ? 76 : 8; // 1.18: the old floor is deepslate the caves cut through (deepFill makes the depths below)
+    for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5 && GENV < 3) blocks[I(x, y, z)] = 8;
   }
   // 2. carvers (caves + ravines) seeded from surrounding chunks
   const carvable = id => id === 1 || id === 2 || id === 3 || id === 76 || id === 26 || id === 50 || (id >= 11 && id <= 18) || id === 91 || id === 92 || id === 93 || id === 75 || id === 10 || id === 9;
@@ -2716,7 +2716,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
     const minX = Math.max(0, Math.floor(px - x0 - rh) - 1), maxX = Math.min(15, Math.floor(px - x0 + rh) + 1);
     const minZ = Math.max(0, Math.floor(pz - z0 - rh) - 1), maxZ = Math.min(15, Math.floor(pz - z0 + rh) + 1);
     if (minX > maxX || minZ > maxZ) return;
-    const minY = Math.max(1, Math.floor(py - rv) - 1), maxY = Math.min(CH0 - 8, Math.floor(py + rv) + 1);
+    const minY = Math.max(GENV >= 3 ? 0 : 1, Math.floor(py - rv) - 1), maxY = Math.min(CH0 - 8, Math.floor(py + rv) + 1);
     for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) for (let y = maxY + 1; y >= minY - 1; y--) {
       if (y < 0 || y >= CH0) continue; const b = blocks[I(x, y, z)]; if (b === WATER || b === 52) return;
     }
@@ -2731,7 +2731,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
           if (b === 2) grass = true;
           if (!carvable(b)) continue;
           if ((b === 9 || b === 10) && blocks[I(x, Math.min(CH0 - 1, y + 1), z)] === WATER) continue;
-          blocks[i] = y <= 10 ? LAVA : 0;
+          blocks[i] = y <= 10 && GENV < 3 ? LAVA : 0; // 1.18 carvers only leave lava below y -55 (deepFill)
           if (grass && y > 0 && blocks[I(x, y - 1, z)] === 3) blocks[I(x, y - 1, z)] = 2;
         }
       }
@@ -2750,7 +2750,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
   if (GENV >= 3) { const N = deepNoise(seed);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const h = hgt[(z + 1) * 18 + x + 1], wx = x0 + x, wz = z0 + z, open = G.nX.n2(wx / 70 + 3.1, wz / 70 - 8.3) > 0.62, top = h < SEA ? Math.min(h - 8, SEA - 14) : open ? h : h - 6;
-      for (let y = 1; y <= top; y++) { const i = I(x, y, z), b = blocks[i]; if (!carvable(b) || !noiseCave(N, wx, y, wz)) continue; blocks[i] = 0; }
+      for (let y = GENV >= 3 ? 0 : 1; y <= top; y++) { const i = I(x, y, z), b = blocks[i]; if (!carvable(b) || !noiseCave(N, wx, y, wz)) continue; blocks[i] = 0; }
     } }
   // 3. ores and blobs (start inside chunk, clipped to chunk)
   function vein(id, size, y, onlyStone) {
@@ -3764,10 +3764,20 @@ function poolEls(pool) {
   const dm = /^village\/([a-z]+)\/(?:zombie\/)?decor$/.exec(pool); if (dm && !els.length) els = under('village/' + dm[1] + '/'); // lamp posts and the like sit in the type's own folder
   r = els.map(k => [k, /\/villagers\/(unemployed|nitwit|baby)$/.test(k) ? (k.endsWith('unemployed') ? 10 : 1) : 1]); // Java's villager pools: unemployed 10, nitwit 1, baby 1
   const fl = VILLAGE_FEATURES[pool.replace('/zombie/', '/')]; if (fl) for (const [f, w] of fl) r.push(['feature:' + f, w * Math.max(1, els.length >> 1)]); // trees, hay piles... (Java's feature elements)
-  if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
+  const hm = /^village\/([a-z]+)\/(?:zombie\/)?houses$/.exec(pool);
+  if (hm && HOUSE_W[hm[1]]) { const W = HOUSE_W[hm[1]]; r = r.map(([k, w]) => [k, W[k.split('/').pop().slice(hm[1].length + 1)] || 2]); r.push([null, W.empty]); } // Java's house weights (most are 2)
+  else if (/houses$/.test(pool)) r.push([null, Math.max(1, Math.round(els.length * 0.35))]); // empty: some house slots stay free
   else if (/decor$/.test(pool)) r.push([null, els.length * 3]);
   POOL_CACHE.set(pool, r); return r;
 }
+// Java's village house pools (PlainsVillageData and the others): the weights that aren't 2, and the empty element's
+const HOUSE_W = {
+  plains: { cartographer_1: 1, library_1: 5, library_2: 1, large_farm_1: 4, small_farm_1: 4, animal_pen_1: 1, animal_pen_2: 1, animal_pen_3: 5, accessory_1: 1, meeting_point_4: 3, meeting_point_5: 1, empty: 10 },
+  desert: { armorer_1: 1, large_farm_1: 11, farm_1: 4, farm_2: 4, empty: 5 },
+  savanna: { shepherd_1: 7, armorer_1: 1, fisher_cottage_1: 3, temple_2: 3, large_farm_1: 4, large_farm_2: 6, small_farm: 4, empty: 5 },
+  snowy: { shepherds_house_1: 3, armorer_house_1: 1, armorer_house_2: 1, farm_1: 3, farm_2: 3, empty: 6 },
+  taiga: { small_house_1: 4, small_house_2: 4, small_house_3: 4, small_house_4: 4, small_house_5: 4, armorer_house_1: 1, armorer_2: 1, fisher_cottage_1: 3, large_farm_1: 6, large_farm_2: 6, small_farm_1: 1, empty: 6 },
+};
 // the feature elements of the village decor / tree pools: [feature, weight relative to the pool's templates]
 const VILLAGE_FEATURES = {
   'village/plains/trees': [['tree:0', 1]], 'village/savanna/trees': [['tree:5', 1]],

@@ -197,13 +197,6 @@ function overworldReplace(t, x, y, z) {
   if (t === 'spider' && y < 50 && Math.random() < 0.1) return 'silverfish';
   return t;
 }
-function netherExtra(x, y, z) {
-  const bio = biomeAt(x, z), below = getBlock(x, y - 1, z);
-  if (below === BID.nether_bricks) return Math.random() < 0.7 ? 'wither_skeleton' : 'blaze';
-  if (bio === S.NETHER_BIO.CRIMSON) return Math.random() < 0.45 ? 'piglin' : Math.random() < 0.5 ? 'hoglin' : null;
-  if (bio === S.NETHER_BIO.WASTES && Math.random() < 0.2) return 'piglin';
-  return null;
-}
 function trySpawnStrider() {
   if (W.dim !== -1 || countMobs(e => e.type === 'strider') >= 4) return;
   const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 40, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);

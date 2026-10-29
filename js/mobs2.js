@@ -208,17 +208,29 @@ function rideTick() {
   PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
+// Java 1.18's nether spawn lists: [mob, weight, smallest group, largest group]
+const NETHER_SPAWNS = {
+  wastes: [['ghast', 50, 4, 4], ['zombified_piglin', 100, 4, 4], ['magma_cube', 2, 4, 4], ['enderman', 1, 4, 4], ['piglin', 15, 4, 4]],
+  crimson: [['zombified_piglin', 1, 2, 4], ['hoglin', 9, 3, 4], ['piglin', 5, 3, 4]],
+  warped: [['enderman', 1, 4, 4]],
+  soul: [['skeleton', 20, 5, 5], ['ghast', 50, 4, 4], ['enderman', 1, 4, 4]],
+  basalt: [['ghast', 40, 1, 1], ['magma_cube', 100, 2, 5]],
+  fortress: [['blaze', 10, 2, 3], ['zombified_piglin', 5, 4, 4], ['wither_skeleton', 8, 5, 5], ['skeleton', 2, 5, 5], ['magma_cube', 3, 4, 4]],
+};
+const pickSpawn = list => { let t = list.reduce((a, e) => a + e[1], 0), r = Math.random() * t; for (const e of list) if ((r -= e[1]) < 0) return e; return list[0]; };
+function inFortress(x, y, z) {
+  const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
+  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 24 && Math.abs(x - f.x) < 112 && Math.abs(z - f.z) < 112) return true; }
+  return false;
+}
 function mobsForDimension(x, y, z, b, below) {
   if (W.dim === -1) {
-    const ex = netherExtra(x, y, z); if (ex) return [ex];
-    const bio = biomeAt(x, z);
-    if (bio === S.NETHER_BIO.SOUL) return Math.random() < 0.7 ? ['skeleton'] : ['ghast'];
-    if (bio === S.NETHER_BIO.BASALT) return Math.random() < 0.6 ? ['magma_cube'] : ['ghast'];
-    if (bio === S.NETHER_BIO.WARPED) return ['enderman'];
-    const v = Math.random();
-    return v < 0.62 ? ['zombified_piglin'] : v < 0.85 ? ['ghast'] : v < 0.97 ? ['magma_cube'] : ['enderman'];
+    const bio = biomeAt(x, z), N = S.NETHER_BIO;
+    const list = below === BID.nether_bricks || (Math.random() < 0.5 && inFortress(x, y, z) && [BID.nether_bricks, BID.netherrack, BID.soul_sand].includes(below)) ? NETHER_SPAWNS.fortress
+      : bio === N.SOUL ? NETHER_SPAWNS.soul : bio === N.BASALT ? NETHER_SPAWNS.basalt : bio === N.WARPED ? NETHER_SPAWNS.warped : bio === N.CRIMSON ? NETHER_SPAWNS.crimson : NETHER_SPAWNS.wastes;
+    const [t, , lo, hi] = pickSpawn(list); return [t, lo + Math.floor(Math.random() * (hi - lo + 1))];
   }
-  if (W.dim === 1) return below === BID.end_stone ? ['enderman'] : null;
+  if (W.dim === 1) return below === BID.end_stone ? ['enderman', 4] : null;
   return null;
 }
 function trySpawnDimension() {
@@ -234,10 +246,15 @@ function trySpawnDimension() {
     if (!SOLID[below] || below === BID.bedrock || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)]) continue;
     if ((getLight(x, y, z) & 15) > 11) continue;
     const types = mobsForDimension(x, y, z, getBlock(x, y, z), below); if (!types) continue;
-    const t = types[0];
+    const t = types[0], group = types[1] || 1;
     if (t === 'ghast') { if (SOLID[getBlock(x, y + 4, z)] || countMobs(e => e.type === 'ghast') >= 4) continue; spawnMob(t, x + .5, y + 2, z + .5); }
-    else if (t === 'magma_cube') spawnMob(t, x + .5, y, z + .5, { size: [1, 2, 4][Math.floor(Math.random() * 3)] });
-    else { const n = t === 'zombified_piglin' ? 1 + Math.floor(Math.random() * 3) : 1; for (let i = 0; i < n; i++) spawnMob(t, x + .5 + i * 0.3, y, z + .5); }
+    else { // a pack: each member at a free spot nearby on the same kind of ground (Java's group spawning)
+      let n = 0; for (let k = 0; k < group * 3 && n < group; k++) {
+        const gx = k ? x + Math.floor(Math.random() * 7) - 3 : x, gz = k ? z + Math.floor(Math.random() * 7) - 3 : z; let gy = y + 1; while (gy > y - 4 && !SOLID[getBlock(gx, gy - 1, gz)]) gy--;
+        if (!SOLID[getBlock(gx, gy - 1, gz)] || getBlock(gx, gy - 1, gz) === BID.bedrock || SOLID[getBlock(gx, gy, gz)] || SOLID[getBlock(gx, gy + 1, gz)] || FLUID[getBlock(gx, gy, gz)]) continue;
+        if (t === 'magma_cube') spawnMob(t, gx + .5, gy, gz + .5, { size: [1, 2, 4][Math.floor(Math.random() * 3)] }); else spawnMob(t, gx + .5, gy, gz + .5); n++;
+      }
+    }
     break;
   }
 }
