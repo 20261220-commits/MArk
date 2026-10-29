@@ -95,7 +95,48 @@ function portalTick() {
   } else if (PL.portalT > 0) PL.portalT = Math.max(0, PL.portalT - 4);
   const ov = $('ovPortal'); if (ov) ov.style.opacity = Math.min(1, (PL.portalT || 0) / 80) * 0.8;
 }
-// fire burns out unless it sits on netherrack or magma
-RANDOM_TICK[BID.fire] = (x, y, z) => { if (!gr('doFireTick')) return; const b = getBlock(x, y - 1, z); if (b !== BID.netherrack && b !== BID.magma_block && Math.random() < 0.35) setBlock(x, y, z, 0); };
+// ---------- fire (Java's FireBlock): every 1.5-2 s it ages, burns and spreads to flammable blocks, and burns out; it
+// burns for ever on netherrack and magma (and on bedrock in the End); rain puts it out. Lava lights flammable blocks near it.
+const FLAM = []; // block id -> [encouragement, flammability]
+BLOCKS.forEach((d, id) => { if (!d) return; const k = d.key; if (/crimson|warped/.test(k)) return;
+  const v = /_log$|^stem$/.test(k) ? [5, 5] : /(_planks|_slab|_stairs|_fence|_fence_gate|_door|_trapdoor)$|^(wood|stripped_wood|composter|beehive|lectern)$/.test(k) && !/iron|cobble|stone|brick|copper|smooth|nether|quartz|sand|prismarine|purpur|blackstone|deepslate|tuff|andesite|granite|diorite/.test(k) ? [5, 20]
+    : /leaves$/.test(k) || /wool$/.test(k) || k === 'dried_kelp_block' ? [30, 60] : k === 'carpet' || k === 'moss_carpet' || k === 'hay_block' ? [60, 20] : k === 'bookshelf' ? [30, 20] : k === 'tnt' || k === 'vine' || k === 'cave_vines' ? [15, 100]
+    : /^(short_grass|fern|tall_grass|large_fern|dandelion|poppy|cornflower|oxeye_daisy|dead_bush|flowers2|tall_flower|sweet_berry_bush|azalea|flowering_azalea)$/.test(k) ? [60, 100]
+    : k === 'scaffolding' || k === 'bamboo' ? [60, 60] : k === 'coal_block' ? [5, 5] : k === 'target' ? [15, 20] : k === 'moss_block' ? [5, 100] : null;
+  if (v) FLAM[id] = v; });
+const N6F = [[1, 0, 0], [-1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]];
+const fireEnc = (x, y, z) => { let e = 0; for (const [dx, dy, dz] of N6F) { const f = FLAM[getBlock(x + dx, y + dy, z + dz)]; if (f && f[0] > e) e = f[0]; } return e; };
+const rainedOn = (x, y, z) => W.dim === 0 && W.rain > 0.5 && (getLight(x, y, z) >> 4) === 15 && [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => (getLight(x + dx, y, z + dz) >> 4) === 15);
+function fireBurn(x, y, z, chance, age) {
+  const b = getBlock(x, y, z), f = FLAM[b]; if (!f || Math.random() * chance >= f[1]) return;
+  if (Math.random() * (age + 10) < 5 && !rainedOn(x, y, z)) setBlock(x, y, z, BID.fire, Math.min(15, age + ((Math.random() * 5) | 0) / 4 | 0)); else setBlock(x, y, z, 0);
+  if (b === BID.tnt) primeTNT(x, y, z);
+}
+SCHED_TICK[BID.fire] = (x, y, z, b, m) => {
+  if (!gr('doFireTick')) return;
+  const below = getBlock(x, y - 1, z), eternal = below === BID.netherrack || below === BID.magma_block || (W.dim === 1 && below === BID.bedrock);
+  const enc = fireEnc(x, y, z), age = m & 15;
+  if (!eternal && !SOLID[below] && !enc) { setBlock(x, y, z, 0); return; }
+  if (!eternal && rainedOn(x, y, z) && Math.random() < 0.2 + age * 0.03) { setBlock(x, y, z, 0); return; }
+  const na = Math.min(15, age + (((Math.random() * 3) | 0) >> 1)); if (na !== age) setMeta(x, y, z, na);
+  if (!eternal) {
+    if (!enc) { if (!SOLID[below] || age > 3) { setBlock(x, y, z, 0); return; } }
+    else if (age === 15 && !FLAM[below] && Math.random() < 0.25) { setBlock(x, y, z, 0); return; }
+  }
+  for (const [dx, dy, dz] of N6F) fireBurn(x + dx, y + dy, z + dz, dy ? 250 : 300, age);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 4; dy++) {
+    if (!dx && !dy && !dz) continue; const px = x + dx, py = y + dy, pz = z + dz; if (getBlock(px, py, pz) !== 0) continue;
+    const e = fireEnc(px, py, pz); if (!e) continue;
+    const p = (e + 40 + PL.difficulty * 7) / (age + 30);
+    if (p > 0 && Math.random() * (100 + (dy > 1 ? (dy - 1) * 100 : 0)) <= p && !rainedOn(px, py, pz)) setBlock(px, py, pz, BID.fire, Math.min(15, age + (((Math.random() * 5) | 0) >> 2)));
+  }
+  if (getBlock(x, y, z) === BID.fire) schedule(x, y, z, 30 + ((Math.random() * 10) | 0));
+};
+RANDOM_TICK[BID.lava] = (x, y, z) => { // LavaFluid.onRandomTick
+  if (!gr('doFireTick')) return; const n = (Math.random() * 3) | 0;
+  if (n > 0) { let px = x, py = y, pz = z; for (let k = 0; k < n; k++) { px += ((Math.random() * 3) | 0) - 1; py++; pz += ((Math.random() * 3) | 0) - 1; const b = getBlock(px, py, pz);
+    if (b === 0) { if (fireEnc(px, py, pz)) { setBlock(px, py, pz, BID.fire); return; } } else if (SOLID[b]) return; } }
+  else for (let k = 0; k < 3; k++) { const px = x + ((Math.random() * 3) | 0) - 1, pz = z + ((Math.random() * 3) | 0) - 1; if (getBlock(px, y + 1, pz) === 0 && FLAM[getBlock(px, y, pz)]) setBlock(px, y + 1, pz, BID.fire); }
+};
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
 function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }
