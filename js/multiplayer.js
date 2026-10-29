@@ -534,7 +534,7 @@ function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? [s.id, s.e ? 1 : 0] : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 200 === 0) mpSendPdata();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -979,7 +979,7 @@ function mpRender(dt) {
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
     mpPlaceTag(p, s, ps, light);
     for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
-    updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null } : null).map(a => a && ITEMS[a.id] ? a : null));
+    updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
     mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects

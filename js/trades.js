@@ -8,6 +8,7 @@ const DYES16 = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'p
 // buy: the player gives n of key for one emerald; sell: price emeralds for n of key; proc: inN of inKey + price emeralds
 const VBUY = (key, n, max, xp) => ({ a: key, an: n, b: 'emerald', bn: 1, max, xp, mult: 0.05 });
 const VS = (key, price, n, max, xp, mult = 0.05) => ({ a: 'emerald', an: price, b: key, bn: n, max, xp, mult });
+const VSD = (key, price, xp) => ({ ...VS(key, price, 1, 12, xp), dye: 1 }); // Java's SellDyedArmorFactory: one random dye, maybe a second and a third
 const VP = (inKey, inN, price, key, n, max, xp) => ({ a: inKey, an: inN, a2: 'emerald', an2: price, b: key, bn: n, max, xp, mult: 0.05 });
 const VE = (key, base, xp) => ({ a: 'emerald', an: base, b: key, bn: 1, max: 3, xp, mult: 0.2, enchant: 1 }); // enchanted at level 5..19, the price grows by the level
 const VBOOK = xp => ({ a: 'emerald', an: 0, a2: 'book', an2: 1, b: 'enchanted_book', bn: 1, max: 12, xp, mult: 0.2, book: 1 });
@@ -69,11 +70,11 @@ const VTRADES = {
     [VBUY('mutton', 7, 16, 20), VBUY('beef', 10, 16, 20)],
     [VBUY('dried_kelp_block', 10, 12, 30)],
     [VBUY('sweet_berries', 10, 12, 30)]],
-  leatherworker: [[VBUY('leather', 6, 16, 2), VS('leather_leggings', 3, 1, 12, 1), VS('leather_chestplate', 7, 1, 12, 1)],
-    [VBUY('flint', 26, 12, 10), VS('leather_helmet', 5, 1, 12, 5), VS('leather_boots', 4, 1, 12, 5)],
-    [VBUY('rabbit_hide', 9, 12, 20), VS('leather_chestplate', 7, 1, 12, 10)],
+  leatherworker: [[VBUY('leather', 6, 16, 2), VSD('leather_leggings', 3, 1), VSD('leather_chestplate', 7, 1)],
+    [VBUY('flint', 26, 12, 10), VSD('leather_helmet', 5, 5), VSD('leather_boots', 4, 5)],
+    [VBUY('rabbit_hide', 9, 12, 20), VSD('leather_chestplate', 7, 10)],
     [VBUY('scute', 4, 12, 30), VS('leather_horse_armor', 6, 1, 12, 15)],
-    [VS('saddle', 6, 1, 12, 30), VS('leather_helmet', 5, 1, 12, 30)]],
+    [VS('saddle', 6, 1, 12, 30), VSD('leather_helmet', 5, 30)]],
   mason: [[VBUY('clay_ball', 10, 16, 2), VS('brick', 1, 10, 16, 1)],
     [VBUY('stone', 20, 16, 10), VS('chiseled_stone_bricks', 1, 4, 16, 5)],
     [VBUY('granite', 16, 16, 20), VBUY('andesite', 16, 16, 20), VBUY('diorite', 16, 16, 20), VS('polished_andesite', 1, 4, 16, 10), VS('polished_diorite', 1, 4, 16, 10), VS('polished_granite', 1, 4, 16, 10)],
@@ -89,6 +90,7 @@ function makeOffer(t, e, r) {
   if (t.a2) { o.a2 = IID[t.a2]; o.an2 = t.an2; if (o.a2 == null) return null; }
   if (t.boat) o.a = IID[BOAT_OF[e.vtype] || 'oak_boat'];
   if (t.map) { o.b = IID.filled_map; o.special = t.b; }
+  if (t.dye) { const d = [r.int(16)]; if (r() > 0.7) d.push(r.int(16)); if (r() > 0.8) d.push(r.int(16)); o.col = dyeMix(null, d); }
   if (t.stew) { o.stew = [t.stew[0], STEW_DUR[t.stew[0]] || t.stew[1]]; }
   if (t.tipped) { const arrows = Object.keys(IID).filter(k => k.endsWith('_arrow') && k !== 'spectral_arrow' && ITEMS[IID[k]].tipped && ITEMS[IID[k]].tipped !== 'water'); if (!arrows.length) return null; o.b = IID[arrows[r.int(arrows.length)]]; }
   if (t.book) { // Java's EnchantBookFactory: any enchantment a book can be traded with (not soul speed), at a random level
@@ -133,7 +135,7 @@ function tradeResult(c) {
   if (!o || o.uses >= o.max || !p || p.id !== o.a || p.n < tradePrice(o)) return null;
   if (o.a2 != null && (!q || q.id !== o.a2 || q.n < o.an2)) return null;
   if (o.special) { if (!o.made) o.made = lootSpecial(o.special, c.e.x, c.e.z); return o.made ? { ...o.made } : null; }
-  const out = { id: o.b, n: o.bn }; if (o.e) out.e = { ...o.e }; if (o.stew) out.stew = [...o.stew];
+  const out = { id: o.b, n: o.bn }; if (o.e) out.e = { ...o.e }; if (o.stew) out.stew = [...o.stew]; if (o.col != null) out.col = o.col;
   return out;
 }
 function tradeTake(c) {

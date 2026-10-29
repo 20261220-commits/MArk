@@ -67,9 +67,21 @@ function applyGuiPack() {
     document.body.classList.add('vfurn');
   }
 }
-function icon(id, n, d, e) {
+// a dyed leather item: the icon's leather-tinted pixels (the default brown) recoloured, made once per colour
+const DYED_ICON = new Map();
+function dyedIconStyle(id, col, px) {
+  const key = id + ':' + col; let url = DYED_ICON.get(key);
+  if (!url) { const cell = iconIndex[id]; if (cell == null) return iconStyle(id, px);
+    const c = document.createElement('canvas'); c.width = c.height = ICON; const g = c.getContext('2d');
+    g.drawImage(iconCanvas, (cell % ICON_COLS) * ICON, Math.floor(cell / ICON_COLS) * ICON, ICON, ICON, 0, 0, ICON, ICON);
+    const im = g.getImageData(0, 0, ICON, ICON), d = im.data, tr = col >> 16, tg = (col >> 8) & 255, tb = col & 255;
+    for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const k = d[i] / 160; if (k > 0.05 && Math.abs(d[i + 1] / 101 - k) < 0.12 * k + 0.03 && Math.abs(d[i + 2] / 64 - k) < 0.15 * k + 0.04) { const gray = Math.min(255, k * 255); d[i] = gray * tr / 255; d[i + 1] = gray * tg / 255; d[i + 2] = gray * tb / 255; } }
+    g.putImageData(im, 0, 0); url = c.toDataURL(); DYED_ICON.set(key, url); }
+  return `background-image:url(${url});background-size:${px}px ${px}px;image-rendering:pixelated`;
+}
+function icon(id, n, d, e, col) {
   if (!id) return '';
-  const def = ITEMS[id], st = iconStyle(id, 16 * GUI_S);
+  const def = ITEMS[id], st = col != null ? dyedIconStyle(id, col, 16 * GUI_S) : iconStyle(id, 16 * GUI_S);
   let s = `<i class="ic" style="${st}"></i>`;
   if (e || (def && def.glint)) s += `<i class="glint" style="${st.replace(/background/g, '-webkit-mask')};${st.replace(/background/g, 'mask')}"></i>`;
   if (n > 1) s += `<b>${n}</b>`;
@@ -94,7 +106,7 @@ function renderHud(dt) {
   if (!UI.hudDirty) return;
   UI.hudDirty = false;
   const hs = document.querySelectorAll('#hotbar .hs');
-  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; setHtml(hs[i], s ? icon(s.id, s.n, s.d, s.e) : ''); }
+  for (let i = 0; i < 9; i++) { const s = OFF.swapped && i === OFF.slot ? INV.off : INV.slots[i]; setHtml(hs[i], s ? icon(s.id, s.n, s.d, s.e, s.col) : ''); }
   offhandHud();
   if (surv) {
     const hp = Math.ceil(PL.health), hearts = [], hard = PL.hardcore;
@@ -143,7 +155,7 @@ function renderDebug(dt, fps) {
 }
 
 // ---------- container screens ----------
-function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e) : ''}</div>`; }
+function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e, s.col) : ''}</div>`; }
 function invRows(start) { let h = '<div class="grid9">'; for (let k = 0; k < 27; k++) h += slotHtml(start + k); h += '</div><div class="grid9 hot">'; for (let k = 0; k < 9; k++) h += slotHtml(start + 27 + k); return h + '</div>'; }
 UI.openScreen = (type, ctx) => {
   if (UI.screen) UI.closeScreen();
@@ -204,14 +216,14 @@ UI.renderScreen = () => {
     const xpBar = wand ? '' : (() => { const lo = VLEVEL_XP[lv - 1], hi = VLEVEL_XP[lv], f = lv >= 5 ? 1 : Math.max(0, Math.min(1, ((c.e.vxp || 0) - lo) / (hi - lo))); return `<div class="txp"><i style="width:${(f * 100).toFixed(0)}%"></i></div>`; })();
     const name = wand ? '떠돌이 상인' : (PROF_NAME[c.e.prof] || '주민') + ' · ' + VLEVEL_NAME[lv - 1];
     const tipOf = o => o ? (o.a2 != null ? itemName(o.a) + ' ' + tradePrice(o) + '개 + ' + itemName(o.a2) + ' ' + o.an2 + '개' : itemName(o.a) + ' ' + tradePrice(o) + '개') + ' → ' + (o.e && o.b === IID.enchanted_book ? '마법이 부여된 책 (' + Object.entries(o.e).map(([k, v]) => (ENCH[k] ? ENCH[k][0] : k) + ' ' + v).join(', ') + ')' : itemName(o.b) + ' ' + o.bn + '개') + (o.uses >= o.max ? ' (품절 — 일터에서 다시 채웁니다)' : '') : '';
-    h = `<div class="panel trade"><div class="cap">${name}</div>${xpBar}<div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span>${o.a2 != null ? `<span>${icon(o.a2, o.an2)}</span>` : ''}<i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.e ? 1 : 0)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">${tipOf(offers[c.sel])}</p></div></div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
+    h = `<div class="panel trade"><div class="cap">${name}</div>${xpBar}<div class="row top"><div class="toffers">${offers.map((o, i) => `<button class="toff ${i === c.sel ? 'on' : ''} ${o.uses >= o.max ? 'off' : ''}" data-trade="${i}"><span>${icon(o.a, tradePrice(o))}</span>${o.a2 != null ? `<span>${icon(o.a2, o.an2)}</span>` : ''}<i class="tarr"></i><span>${icon(o.b, o.bn, 0, o.e ? 1 : 0, o.col)}</span></button>`).join('')}</div><div class="col tslots"><div class="row">${slotHtml(0)}${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip">${tipOf(offers[c.sel])}</p></div></div><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'creative') {
     const q = GUI.search.trim().toLowerCase();
     const list = ALL_ITEMS().filter(id => !q || itemName(id).toLowerCase().includes(q) || ITEMS[id].key.includes(q));
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
   } else if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T]) h = CUSTOM_SCREENS[T].html();
   const cur = INV.cursor;
-  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e) : ''}</div>`;
+  el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
   if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();

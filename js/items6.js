@@ -166,9 +166,21 @@ function rocketTick() {
 // firework stars and their fades follow no fixed recipe: gunpowder, dyes and at most one each of a shape item,
 // glowstone dust (twinkle) and a diamond (trail); a star with more dyes gets fade colours
 const STAR_SHAPE_ITEM = () => ({ [IID.fire_charge]: 1, [IID.gold_nugget]: 2, [IID.feather]: 4, [IID.wither_skeleton_skull]: 3 });
+// leather armour dyeing (Java's ArmorDyeRecipe): the old colour and the dyes' are averaged, then brought back up to
+// their average brightness; a water cauldron washes it out again (player.js)
+const LEATHER_DEFAULT = 0xa06540, DYE_COL = [0xf9fffe, 0xf9801d, 0xc74ebd, 0x3ab3da, 0xfed83d, 0x80c71f, 0xf38baa, 0x474f52, 0x9d9d97, 0x169c9c, 0x8932b8, 0x3c44aa, 0x835432, 0x5e7c16, 0xb02e26, 0x1d1d21];
+const isDyeable = id => /^leather_(helmet|chestplate|leggings|boots)$/.test(ITEMS[id].key);
+function dyeMix(old, dyes) {
+  const sum = [0, 0, 0]; let maxSum = 0, n = 0;
+  for (const c of (old != null ? [old] : []).concat(dyes.map(d => DYE_COL[d]))) { const r = c >> 16, g = (c >> 8) & 255, b = c & 255; sum[0] += r; sum[1] += g; sum[2] += b; maxSum += Math.max(r, g, b); n++; }
+  const a = sum.map(v => Math.floor(v / n)), avgMax = Math.floor(maxSum / n), mx = Math.max(...a) || 1;
+  const [r, g, b] = a.map(v => Math.floor(v * avgMax / mx)); return (r << 16) | (g << 8) | b;
+}
 function craftCustom(grid) {
   const st = grid.filter(Boolean), dyes = [], it = k => st.filter(s => s.id === IID[k]).length;
   for (const s of st) { const k = ITEMS[s.id].key; if (k.endsWith('_dye')) dyes.push(S.COLORS.indexOf(k.slice(0, -4))); }
+  const lea = st.filter(s => isDyeable(s.id));
+  if (lea.length === 1 && dyes.length && st.length === 1 + dyes.length) return { ...lea[0], n: 1, col: dyeMix(lea[0].col, dyes) };
   const shapeIt = st.filter(s => STAR_SHAPE_ITEM()[s.id] != null || ITEMS[s.id].place === BID.mob_head);
   const starIn = st.filter(s => s.id === IID.firework_star);
   if (starIn.length === 1 && dyes.length && st.length === 1 + dyes.length && starIn[0].star) { // fade

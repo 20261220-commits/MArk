@@ -496,6 +496,7 @@ function interactBlock(t, dry) {
       const h = PL.held(), lv = m & 3, k = (m >> 2) & 3; if (!h) return false;
       const FILL = { [IID.water_bucket]: 0, [IID.lava_bucket]: 1, [IID.powder_snow_bucket]: 2 }, OUT = [IID.water_bucket, IID.lava_bucket, IID.powder_snow_bucket];
       if (FILL[h.id] != null) { if (!dry) { setMeta(x, y, z, 3 | (FILL[h.id] << 2)); if (!creative()) INV.slots[INV.sel] = { id: IID.bucket, n: 1 }; play('splash'); } return true; }
+      if (h.col != null && lv > 0 && k === 0) { if (!dry) { delete h.col; setMeta(x, y, z, lv - 1 ? (m & ~3) | (lv - 1) : 0); play('splash', { vol: 0.5 }); UI.hudDirty = true; } return true; } // dyed leather is washed out
       if (h.id === IID.bucket && lv === 3) { if (!dry) { setMeta(x, y, z, 0); const it = { id: OUT[k], n: 1 }; if (!creative()) { consume(); if (!PL.held()) INV.slots[INV.sel] = it; else if (INV.add(it)) dropStack(PL.x, PL.y + 1, PL.z, it); } play('splash'); } return true; }
       return false;
     }
