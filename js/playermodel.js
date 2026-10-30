@@ -31,9 +31,15 @@ function armorGeo(slim, slot) {
 }
 
 // ---------- skins ----------
-// Steve or Alex from the resource pack, or the player's own skin file (kept in this browser only)
-const SKIN_KEY = 'nemo-mc-117-skin';
+// Steve or Alex from the resource pack, or the player's own skins (kept in this browser only): several can be kept and
+// switched between, each with its arm width (found from the picture, or set by hand), and Java's Skin Customization
+// switches turn the outer layers (hat, jacket, sleeves, trouser legs) on and off
+const SKIN_KEY = 'nemo-mc-117-skin', SKIN_LIB_KEY = 'nemo-skins', SKIN_LIB_MAX = 9;
 const PSKIN = { slim: false, ready: false };
+// the outer layer's areas on a 64x64 skin: [x, y, w, h]
+const SKIN_LAYERS = { hat: [[32, 0, 32, 16]], jacket: [[16, 32, 24, 16]], rsleeve: [[40, 32, 16, 16]], lsleeve: [[48, 48, 16, 16]], rpants: [[0, 32, 16, 16]], lpants: [[0, 48, 16, 16]] };
+const SKIN_LAYER_NAME = { hat: '모자', jacket: '상의', lsleeve: '왼쪽 소매', rsleeve: '오른쪽 소매', lpants: '왼쪽 바지', rpants: '오른쪽 바지' };
+const skinLayerOn = k => !(typeof OPT !== 'undefined' && OPT.skinOff && OPT.skinOff[k]);
 function skinPixels(img) { // 64x64, or an old 64x32 skin with its arm and leg copied over for the left side (as Java does)
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   g.drawImage(img, 0, 0);
@@ -46,37 +52,73 @@ function skinPixels(img) { // 64x64, or an old 64x32 skin with its arm and leg c
   }
   return g.getImageData(0, 0, 64, 64).data;
 }
+// PlayerSkinTexture's clean-up: the inner layer is never see-through; an old 64x32 skin whose hat layer is solid all over
+// (the "Notch transparency hack") has no hat; then the outer layers switched off in the options are cleared
+function skinFinish(px, legacy) {
+  const solid = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) px[(y * 64 + x) * 4 + 3] = 255; };
+  const clear = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) px[(y * 64 + x) * 4 + 3] = 0; };
+  solid(0, 0, 32, 16); solid(0, 16, 64, 32); solid(16, 48, 48, 64);
+  if (legacy) { let see = false; for (let y = 0; y < 32 && !see; y++) for (let x = 32; x < 64; x++) if (px[(y * 64 + x) * 4 + 3] < 128) { see = true; break; } if (!see) clear(32, 0, 32, 16); }
+  for (const k in SKIN_LAYERS) if (!skinLayerOn(k)) for (const r of SKIN_LAYERS[k]) clear(...r);
+  return px;
+}
+const skinIsSlim = px => px[(20 * 64 + 54) * 4 + 3] === 0; // slim skins leave the 4th arm column empty
+// the saved skins: [{ name, data, slim, auto }] and which one is worn (the worn one is also kept under SKIN_KEY)
+function skinLib() { let l = null; try { l = JSON.parse(localStorage.getItem(SKIN_LIB_KEY) || 'null'); } catch (e) {}
+  if (!Array.isArray(l)) { l = []; try { const r = JSON.parse(localStorage.getItem(SKIN_KEY) || 'null'); if (r && r.data) l.push({ name: '내 스킨', data: r.data, slim: !!r.slim, auto: true }); } catch (e) {} } // (from before there was a list)
+  return l.filter(e => e && typeof e.data === 'string'); }
+function skinLibSave(l) { try { localStorage.setItem(SKIN_LIB_KEY, JSON.stringify(l.slice(0, SKIN_LIB_MAX))); return true; } catch (e) { UI.flash('저장 공간이 부족해 스킨을 저장하지 못했어요 (안 쓰는 스킨을 지워 보세요)'); return false; } }
+function skinWear(i) { const l = skinLib(), e = l[i]; if (!e) return false;
+  try { localStorage.setItem(SKIN_KEY, JSON.stringify({ data: e.data, slim: !!e.slim })); } catch (er) { UI.flash('스킨을 저장하지 못했어요'); return false; }
+  OPT.skin = 'custom'; OPT.skinIdx = i; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'skins' || UI.menu === 'options') showMenu(UI.menu); if (typeof mpSkinChanged === 'function') mpSkinChanged(); }); return true; }
 function loadCustomSkin(done) {
   let rec = null; try { rec = JSON.parse(localStorage.getItem(SKIN_KEY) || 'null'); } catch (e) {}
   if (!rec || !rec.data) { done(false); return; }
-  const img = new Image(); img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { done(false); return; } PACKPX.ent.custom_skin = { px: new Uint8Array(skinPixels(img).buffer.slice(0)), w: 64, h: 64 }; delete entTex.custom_skin; PSKIN.customSlim = !!rec.slim; done(true); }; img.onerror = () => done(false); img.src = rec.data;
+  const img = new Image(); img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { done(false); return; } PACKPX.ent.custom_skin = { px: new Uint8Array(skinFinish(skinPixels(img), img.height === 32).buffer.slice(0)), w: 64, h: 64 }; delete entTex.custom_skin; PSKIN.customSlim = !!rec.slim; done(true); }; img.onerror = () => done(false); img.src = rec.data;
 }
+// a new skin picture (a file, a dropped file, a Java player's skin): checked, added to the list and worn
+function skinAdd(img, data, name) {
+  if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { UI.flash('64×64 또는 64×32 크기의 스킨 PNG가 필요해요'); return; }
+  const slim = img.height === 64 && skinIsSlim(skinPixels(img)), l = skinLib().filter(e => e.data !== data);
+  l.unshift({ name: String(name || '내 스킨').slice(0, 20), data, slim, auto: true }); if (l.length > SKIN_LIB_MAX) l.length = SKIN_LIB_MAX;
+  if (!skinLibSave(l)) return;
+  if (skinWear(0)) UI.flash(`${name || '내 스킨'} — ${slim ? '얇은 팔' : '기본 팔'} (팔 모양은 스킨 화면에서 바꿀 수 있어요)`);
+}
+function skinFromDataUrl(data, name) { const img = new Image(); img.onload = () => skinAdd(img, data, name); img.onerror = () => UI.flash('그림을 읽지 못했어요'); img.src = data; }
 // a Java Edition player's skin by name (mc-heads.net serves skins with CORS), kept like a picked file
 function skinFromUrl(url, label) {
   const img = new Image(); img.crossOrigin = 'anonymous';
-  img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { UI.flash('스킨을 읽지 못했어요'); return; }
-    let data; try { const c = document.createElement('canvas'); c.width = 64; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); data = c.toDataURL('image/png'); } catch (e) { UI.flash('이 스킨은 불러올 수 없어요'); return; }
-    const px = skinPixels(img), slim = img.height === 64 && px[(20 * 64 + 54) * 4 + 3] === 0;
-    try { localStorage.setItem(SKIN_KEY, JSON.stringify({ data, slim })); } catch (e) { UI.flash('스킨을 저장하지 못했어요'); return; }
-    OPT.skin = 'custom'; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'skins') showMenu('skins'); }); UI.flash(label + ' 스킨을 가져왔어요'); };
+  img.onload = () => { let data; try { const c = document.createElement('canvas'); c.width = 64; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); data = c.toDataURL('image/png'); } catch (e) { UI.flash('이 스킨은 불러올 수 없어요'); return; }
+    skinAdd(img, data, label); };
   img.onerror = () => UI.flash('스킨을 찾지 못했어요 (닉네임·인터넷 연결 확인)'); img.src = url;
 }
-function pickSkinFile() {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png';
-  inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => {
-    const img = new Image(); img.onload = () => {
-      if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) { UI.flash('64×64 또는 64×32 크기의 스킨 PNG가 필요해요'); return; }
-      const px = skinPixels(img), slim = img.height === 64 && px[(20 * 64 + 54) * 4 + 3] === 0; // slim skins leave the 4th arm column empty
-      try { localStorage.setItem(SKIN_KEY, JSON.stringify({ data: rd.result, slim })); } catch (e) { UI.flash('스킨을 저장하지 못했어요'); return; }
-      OPT.skin = 'custom'; saveOpt(); loadCustomSkin(() => { rebuildPlayer(); if (UI.menu === 'options' || UI.menu === 'skins') showMenu(UI.menu); }); UI.flash(slim ? '내 스킨 (얇은 팔)' : '내 스킨 (기본 팔)');
-    }; img.src = rd.result; }; rd.readAsDataURL(f); };
-  inp.click();
-}
-const skinChoice = () => { const s = (typeof OPT !== 'undefined' && OPT.skin) || 'steve'; if (s === 'custom' && PACKPX.ent.custom_skin) return { tex: 'custom_skin', slim: !!PSKIN.customSlim }; if (s === 'alex' && PACKPX.ent.alex) return { tex: 'alex', slim: true }; return { tex: 'steve', slim: false }; };
+function skinFromFile(f) { if (!f || !/png$/i.test(f.type || f.name)) { UI.flash('PNG 스킨 파일이 필요해요'); return; } const rd = new FileReader(); rd.onload = () => skinFromDataUrl(rd.result, f.name.replace(/\.png$/i, '')); rd.readAsDataURL(f); }
+function pickSkinFile() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png'; inp.onchange = () => skinFromFile(inp.files[0]); inp.click(); }
+// a skin file dropped anywhere on the skins screen
+addEventListener('dragover', e => { if (typeof UI !== 'undefined' && UI.menu === 'skins') e.preventDefault(); });
+addEventListener('drop', e => { if (typeof UI === 'undefined' || UI.menu !== 'skins') return; e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) skinFromFile(f); });
+// the worn skin's arm width by hand (null: as found in the picture)
+function skinSetArms(slim) { const l = skinLib(), i = Math.max(0, Math.min(l.length - 1, OPT.skinIdx || 0)), e = l[i]; if (!e) return;
+  e.auto = slim == null; if (slim == null) { const img = new Image(); img.onload = () => { e.slim = img.height === 64 && skinIsSlim(skinPixels(img)); if (skinLibSave(l)) skinWear(i); }; img.src = e.data; return; }
+  e.slim = slim; if (skinLibSave(l)) skinWear(i); }
+function skinDelete(i) { const l = skinLib(); if (!l[i]) return; l.splice(i, 1); skinLibSave(l);
+  if ((OPT.skinIdx || 0) === i || !l.length) { if (l.length) skinWear(0); else { try { localStorage.removeItem(SKIN_KEY); } catch (e) {} OPT.skin = 'steve'; OPT.skinIdx = 0; saveOpt(); rebuildPlayer(); if (typeof mpSkinChanged === 'function') mpSkinChanged(); showMenu('skins'); } }
+  else { if ((OPT.skinIdx || 0) > i) { OPT.skinIdx--; saveOpt(); } showMenu('skins'); } }
+function skinToggleLayer(k) { OPT.skinOff = { ...(OPT.skinOff || {}) }; if (OPT.skinOff[k]) delete OPT.skinOff[k]; else OPT.skinOff[k] = 1; saveOpt();
+  const go = () => { rebuildPlayer(); showMenu('skins'); if (typeof mpSkinChanged === 'function') mpSkinChanged(); };
+  skinPackLayers(); if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
+// Steve and Alex follow the layer switches too: a copy of their pack texture for this player alone (self_steve, self_alex),
+// with the switched-off layers cleared (other players and mobs keep the pack's own)
+function skinPackLayers() { for (const k of ['steve', 'alex']) { const src = PACKPX.ent[k]; if (!src || !src.px) continue;
+  const px = new Uint8Array(src.px); for (const l in SKIN_LAYERS) if (!skinLayerOn(l)) for (const [x0, y0, w, h] of SKIN_LAYERS[l]) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) px[(y * 64 + x) * 4 + 3] = 0;
+  PACKPX.ent['self_' + k] = { ...src, px }; delete entTex['self_' + k]; } }
+const skinLayersOff = () => typeof OPT !== 'undefined' && OPT.skinOff && Object.keys(OPT.skinOff).length > 0;
+const skinChoice = () => { const s = (typeof OPT !== 'undefined' && OPT.skin) || 'steve'; if (s === 'custom' && PACKPX.ent.custom_skin) return { tex: 'custom_skin', slim: !!PSKIN.customSlim }; const base = s === 'alex' && PACKPX.ent.alex ? 'alex' : 'steve'; if (skinLayersOff()) { if (!PACKPX.ent['self_' + base]) skinPackLayers(); if (PACKPX.ent['self_' + base]) return { tex: 'self_' + base, slim: base === 'alex' }; } return { tex: base, slim: base === 'alex' }; };
 
 // ---------- the model ----------
 const PLM = { model: null, doll: null };
 function makePlayerModel() {
+  if (skinLayersOff()) skinPackLayers(); // (fresh from the pack, in case it changed)
   const sk = skinChoice(), m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: sk.tex });
   m.userData.slim = sk.slim; m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null];
   if (m.userData.mat2) m.userData.mat2.visible = false;
