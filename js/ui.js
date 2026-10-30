@@ -315,8 +315,16 @@ function showMenu(name, data) {
   } else if (name === 'account') {
     h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
-    const cur = { steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브';
-    h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}${localStorage.getItem(SKIN_KEY) ? btn((OPT.skin === 'custom' ? '▶ ' : '') + '내 스킨', 'skinset_custom') : ''}${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}${btn('완료', 'title')}</div></div><p class="muted">지금 스킨: ${cur} · 멀티플레이에서 다른 플레이어에게도 이 스킨이 보입니다</p>`;
+    const lib = skinLib(), wi = OPT.skin === 'custom' ? Math.min(OPT.skinIdx || 0, lib.length - 1) : -1, worn = lib[wi];
+    const face = d => `<i class="skface" style="background-image:url(${d})"></i><i class="skface hat" style="background-image:url(${d})"></i>`;
+    const list = lib.map((e, i) => `<div class="skitem ${i === wi ? 'on' : ''}"><button class="mb skwear" data-act="skinwear_${i}" title="입기">${face(e.data)}<span>${esc(e.name)}${i === wi ? ' ✔' : ''}</span></button><button class="mb skdel" data-act="skindel_${i}" title="지우기">✕</button></div>`).join('');
+    const arms = worn ? `<div class="row"><span class="muted">팔 모양:</span>${btn((worn.auto ? '▶ ' : '') + '자동', 'skinarm_auto', 'sm')}${btn((!worn.auto && !worn.slim ? '▶ ' : '') + '기본 (4픽셀)', 'skinarm_wide', 'sm')}${btn((!worn.auto && worn.slim ? '▶ ' : '') + '얇은 (3픽셀)', 'skinarm_slim', 'sm')}</div>` : '';
+    const layers = Object.keys(SKIN_LAYER_NAME).map(k => btn(`${SKIN_LAYER_NAME[k]}: ${skinLayerOn(k) ? '켜짐' : '꺼짐'}`, 'skinlayer_' + k, 'sm')).join('');
+    h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}
+      ${lib.length ? `<div class="sklist">${list}</div>` : ''}${arms}
+      ${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}
+      <p class="muted">스킨 사용자 지정 (겉옷 레이어)</p><div class="sklayers">${layers}</div>${btn('완료', 'title')}</div></div>
+      <p class="muted">스킨 PNG 파일을 이 화면에 끌어다 놓아도 됩니다 · 스킨은 ${SKIN_LIB_MAX}개까지 저장 · 멀티플레이에서 다른 플레이어에게도 이 모습 그대로 보입니다</p>`;
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
@@ -367,14 +375,18 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'advs') showMenu('advworlds');
   else if (a === 'advworlds') showMenu('advworlds');
   else if (a.startsWith('advw_')) { const w = (UI.advWorlds || []).find(q => String(q.id) === a.slice(5)); if (w) { ADVUI.view = w; ADVUI.tab = 'story'; ADVUI.px = ADVUI.py = 0; showMenu('advview'); } }
-  else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
+  else if (a === 'skin') { const L = ['steve', 'alex']; if (localStorage.getItem(SKIN_KEY)) L.push('custom'); OPT.skin = L[(L.indexOf(OPT.skin) + 1) % L.length]; saveOpt(); const go = () => { rebuildPlayer(); showMenu('options'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a === 'skinfile') pickSkinFile();
   else if (a === 'skins') showMenu('skins');
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
-  else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
+  else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
+  else if (a.startsWith('skinwear_')) skinWear(+a.slice(9));
+  else if (a.startsWith('skindel_')) skinDelete(+a.slice(8));
+  else if (a.startsWith('skinarm_')) skinSetArms(a === 'skinarm_auto' ? null : a === 'skinarm_slim');
+  else if (a.startsWith('skinlayer_')) skinToggleLayer(a.slice(10));
   else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }
   else if (a === 'mainhand') { OPT.mainHand = OPT.mainHand === 'left' ? 'right' : 'left'; saveOpt(); R.setHandSkin(); showMenu('options'); }
   else if (a === 'packLoad') pickPackFile();

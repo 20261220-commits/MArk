@@ -102,10 +102,11 @@ const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
 const mpToAuth = o => mpSend({ ...o, dim: o.dim != null ? o.dim : W.dim }, MP.server ? 'auth' : undefined);
 const mpRelay = () => MP.role === 'host' && !MP.server; // a host passes guests' messages on; a server does that itself
 const mpSkin = () => { // a custom skin travels as a small PNG
-  const s = skinChoice(), out = { tex: s.tex === 'custom_skin' ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim };
-  if (s.tex === 'custom_skin') { const c = entCanvas('custom_skin'); if (c) out.data = c.toDataURL('image/png'); }
+  const s = skinChoice(), own = s.tex === 'custom_skin' || s.tex.startsWith('self_'), out = { tex: own ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim };
+  if (own) { const c = entCanvas(s.tex); if (c) out.data = c.toDataURL('image/png'); } // your own picture (or Steve/Alex with some layers off), as you see it
   return out;
 };
+function mpSkinChanged() { if (MP.on && W.active) mpSend({ t: 'skin', skin: mpSkin() }); } // your skin changed while playing with others
 function mpSkinTex(p) { // another player's custom skin, decoded once into a pack texture of its own
   const sk = p.skin || {}; if (!sk.data || p.skinKey || typeof sk.data !== 'string' || !/^data:image\/png;base64,/.test(sk.data) || sk.data.length > 150000) return;
   p.skinKey = 'mp_skin_' + p.id + '_' + Date.now(); const img = new Image();
@@ -257,6 +258,7 @@ function mpHandle(m, from) {
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
+    case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
     case 'gone': mpPeerGone(m.id); return;
     case 'leave': if (host) mpPeerGone(from); return;
