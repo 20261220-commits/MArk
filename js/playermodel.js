@@ -92,7 +92,45 @@ function skinFromUrl(url, label) {
     skinAdd(img, data, label); };
   img.onerror = () => UI.flash('스킨을 찾지 못했어요 (닉네임·인터넷 연결 확인)'); img.src = url;
 }
-function skinFromFile(f) { if (!f || !/png$/i.test(f.type || f.name)) { UI.flash('PNG 스킨 파일이 필요해요'); return; } const rd = new FileReader(); rd.onload = () => skinFromDataUrl(rd.result, f.name.replace(/\.png$/i, '')); rd.readAsDataURL(f); }
+// a skin from elsewhere: a Java player's name, a skin page on NameMC or The Skindex, any PNG address, or a data: picture.
+// The picture is fetched straight away if that site allows it, else through the game server (/skin), which may
+const SKIN_PAGES = [
+  [/^https?:\/\/(?:[a-z]+\.)?namemc\.com\/skin\/([0-9a-f]{16})/i, m => 'https://s.namemc.com/i/' + m[1] + '.png'],
+  [/^https?:\/\/(?:[a-z]+\.)?namemc\.com\/profile\/([A-Za-z0-9_]{3,16})/i, m => 'https://mc-heads.net/skin/' + m[1], m => m[1]],
+  [/^https?:\/\/(?:www\.)?minecraftskins\.com\/skin\/(\d+)\/([^/?#]*)/i, m => 'https://www.minecraftskins.com/skin/download/' + m[1], m => decodeURIComponent(m[2] || '').replace(/-/g, ' ')],
+  [/^https?:\/\/textures\.minecraft\.net\/texture\/([0-9a-f]+)/i, m => 'https://textures.minecraft.net/texture/' + m[1]],
+];
+function skinFromAny(text) {
+  text = String(text || '').trim(); if (!text) { UI.flash('닉네임이나 스킨 주소를 넣어 주세요'); return; }
+  if (/^data:image\/png;base64,/.test(text)) { skinFromDataUrl(text, '붙여 넣은 스킨'); return; }
+  if (/^[A-Za-z0-9_]{3,16}$/.test(text)) { skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(text), text); return; }
+  if (!/^https?:\/\//i.test(text)) { UI.flash('자바 닉네임(영문·숫자·_ 3~16자)이나 http로 시작하는 주소를 넣어 주세요'); return; }
+  let url = text, name = null;
+  for (const [re, to, nm] of SKIN_PAGES) { const m = text.match(re); if (m) { url = to(m); name = nm ? nm(m) : null; break; } }
+  if (!name) { try { name = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || '').replace(/\.png$/i, '').slice(0, 20) || null; } catch (e) {} }
+  skinFetch(url, name || '가져온 스킨');
+}
+async function skinFetch(url, name) {
+  UI.flash('스킨을 가져오는 중...');
+  const toData = blob => new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(blob); });
+  const isPng = async blob => { const b = new Uint8Array(await blob.slice(0, 4).arrayBuffer()); return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47; };
+  const tries = [url];
+  try { const a = typeof mpDefaultAddr === 'function' && mpDefaultAddr(); if (a) { const u = new URL(mpRoomsUrl(a)); u.pathname = '/skin'; u.search = '?u=' + encodeURIComponent(url); tries.push(u.href); } } catch (e) {}
+  for (const t of tries) {
+    try { const r = await fetch(t, { cache: 'no-store' }); if (!r.ok) continue; const blob = await r.blob(); if (!(await isPng(blob))) continue;
+      skinFromDataUrl((await toData(blob)).replace(/^data:[^;]*;/, 'data:image/png;'), name); return; } catch (e) {}
+  }
+  UI.flash('스킨을 가져오지 못했어요 — 스킨 PNG를 내려받아 파일로 고르거나 끌어다 놓아 주세요');
+}
+// pasting on the skins screen: a copied picture, or a copied address or name
+addEventListener('paste', e => {
+  if (typeof UI === 'undefined' || UI.menu !== 'skins') return;
+  const items = [...((e.clipboardData && e.clipboardData.items) || [])], img = items.find(i => i.kind === 'file' && /^image\/png$/.test(i.type));
+  if (img) { e.preventDefault(); skinFromFile(img.getAsFile()); return; }
+  const inp = document.getElementById('skinNick'); if (document.activeElement === inp) return; // typed into the box: the button takes it
+  const t = e.clipboardData && e.clipboardData.getData('text'); if (t && t.trim()) { e.preventDefault(); skinFromAny(t); }
+});
+function skinFromFile(f) { if (!f || !/png$/i.test(f.type || f.name)) { UI.flash('PNG 스킨 파일이 필요해요'); return; } const rd = new FileReader(); rd.onload = () => skinFromDataUrl(rd.result, (f.name || '붙여 넣은 스킨').replace(/\.png$/i, '') || '붙여 넣은 스킨'); rd.readAsDataURL(f); }
 function pickSkinFile() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png'; inp.onchange = () => skinFromFile(inp.files[0]); inp.click(); }
 // a skin file dropped anywhere on the skins screen
 addEventListener('dragover', e => { if (typeof UI !== 'undefined' && UI.menu === 'skins') e.preventDefault(); });
