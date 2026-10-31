@@ -322,9 +322,9 @@ function showMenu(name, data) {
     const layers = Object.keys(SKIN_LAYER_NAME).map(k => btn(`${SKIN_LAYER_NAME[k]}: ${skinLayerOn(k) ? '켜짐' : '꺼짐'}`, 'skinlayer_' + k, 'sm')).join('');
     h = `<h2>스킨 바꾸기</h2><div class="skinRow"><div class="titleDoll"></div><div class="btncol">${btn((OPT.skin === 'steve' ? '▶ ' : '') + '스티브', 'skinset_steve')}${btn((OPT.skin === 'alex' ? '▶ ' : '') + '알렉스', 'skinset_alex')}
       ${lib.length ? `<div class="sklist">${list}</div>` : ''}${arms}
-      ${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 에디션 닉네임으로 가져오기" maxlength="16" autocomplete="off"></div>${btn('닉네임 스킨 가져오기', 'skinnick')}
+      ${btn('스킨 파일 고르기 (PNG)...', 'skinfile')}<div class="form"><input id="skinNick" placeholder="자바 닉네임 또는 스킨 주소(NameMC·Skindex·PNG 주소)" maxlength="400" autocomplete="off"></div>${btn('가져오기', 'skinnick')}
       <p class="muted">스킨 사용자 지정 (겉옷 레이어)</p><div class="sklayers">${layers}</div>${btn('완료', 'title')}</div></div>
-      <p class="muted">스킨 PNG 파일을 이 화면에 끌어다 놓아도 됩니다 · 스킨은 ${SKIN_LIB_MAX}개까지 저장 · 멀티플레이에서 다른 플레이어에게도 이 모습 그대로 보입니다</p>`;
+      <p class="muted">스킨 PNG 파일을 끌어다 놓거나, 복사한 스킨 그림·주소를 Ctrl+V로 붙여 넣어도 됩니다 · 스킨은 ${SKIN_LIB_MAX}개까지 저장 · 멀티플레이에서 다른 플레이어에게도 이 모습 그대로 보입니다</p>`;
   } else if (name === 'options') {
     const sl = (k, label, min, max, step, fmt) => `<label class="slider"><span>${label}: <b id="v_${k}">${fmt(OPT[k])}</b></span><input type="range" data-opt="${k}" min="${min}" max="${max}" step="${step}" value="${OPT[k]}"></label>`;
     const tg = (k, label, on = '켜짐', off = '꺼짐') => btn(`${label}: ${OPT[k] ? on : off}`, 'tog_' + k);
@@ -387,7 +387,7 @@ $('menu').addEventListener('click', async e => {
   else if (a.startsWith('skindel_')) skinDelete(+a.slice(8));
   else if (a.startsWith('skinarm_')) skinSetArms(a === 'skinarm_auto' ? null : a === 'skinarm_slim');
   else if (a.startsWith('skinlayer_')) skinToggleLayer(a.slice(10));
-  else if (a === 'skinnick') { const n = ($('skinNick') && $('skinNick').value || '').trim(); if (!/^\w{3,16}$/.test(n)) UI.flash('닉네임은 영문·숫자·_ 3~16자예요'); else skinFromUrl('https://mc-heads.net/skin/' + encodeURIComponent(n), n); }
+  else if (a === 'skinnick') skinFromAny($('skinNick') && $('skinNick').value);
   else if (a === 'mainhand') { OPT.mainHand = OPT.mainHand === 'left' ? 'right' : 'left'; saveOpt(); R.setHandSkin(); showMenu('options'); }
   else if (a === 'packLoad') pickPackFile();
   else if (a === 'packReset') resetPack();

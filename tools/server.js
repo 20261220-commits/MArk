@@ -24,6 +24,7 @@ const CFG = { server: process.env.SERVER_URL || '' }, REQUIRE_LOGIN = /^(1|true|
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
+  if (u === '/skin') { skinProxy(req, res); return; }
   if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
   if (u === '/js/config.js' && CFG.server) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
@@ -31,6 +32,24 @@ const server = http.createServer((req, res) => {
   if (!f.startsWith(root + path.sep) || f.startsWith(WORLDS + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(d); /* no-cache: a new version shows on the next visit */ });
 });
+
+// ---------- a skin picture from another site (NameMC, The Skindex, Mojang's texture server...), fetched here for a page
+// whose browser may not read it itself (those sites seldom allow other pages to); PNG pictures only, small ones
+const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[|::|fc|fd)/i;
+async function skinProxy(req, res) {
+  const end = (code, msg) => { res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' }); res.end(msg); };
+  let target; try { target = new URL(new URL(req.url, 'http://x').searchParams.get('u') || ''); } catch (e) { end(400, 'bad url'); return; }
+  if (!/^https?:$/.test(target.protocol) || (PRIVATE_HOST.test(target.hostname) && process.env.SKIN_PROXY_LOCAL !== '1') /* (the tests fetch from this machine) */ || /\.(local|internal)$/i.test(target.hostname)) { end(400, 'not allowed'); return; }
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+  try {
+    const r = await fetch(target, { signal: ac.signal, redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0 (nemo skin import)', accept: 'image/png,image/*' } });
+    if (!r.ok) { end(502, 'status ' + r.status); return; }
+    if (+(r.headers.get('content-length') || 0) > 500000) { end(413, 'too big'); return; }
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 500000 || buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) { end(415, 'not a png'); return; }
+    res.writeHead(200, { 'content-type': 'image/png', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=3600' }); res.end(buf);
+  } catch (e) { end(502, 'fetch failed'); } finally { clearTimeout(to); }
+}
 
 // ---------- a minimal WebSocket (RFC 6455): text frames, fragments, ping, close ----------
 function frame(op, payload) {
