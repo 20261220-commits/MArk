@@ -25,6 +25,7 @@ const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/') u = '/index.html';
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
   if (u === '/skin') { skinProxy(req, res); return; }
+  if (u === '/profile') { profileLookup(req, res); return; }
   if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
   if (u === '/js/config.js' && CFG.server) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
@@ -33,22 +34,55 @@ const server = http.createServer((req, res) => {
   fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end('not found'); return; } res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(d); /* no-cache: a new version shows on the next visit */ });
 });
 
-// ---------- a skin picture from another site (NameMC, The Skindex, Mojang's texture server...), fetched here for a page
-// whose browser may not read it itself (those sites seldom allow other pages to); PNG pictures only, small ones
+// ---------- skins from elsewhere, as Java Edition gets them ----------
+// /profile?name=  a Minecraft account by its name, through Mojang's API (as the game does): the skin's address, whether
+//                 it is drawn with slim arms, and the cape's address
+// /skin?u=        a skin (or cape) picture from another site, for a page whose browser may not read it itself (most sites
+//                 don't allow that): PNG, JPEG, GIF, WebP or BMP; a web page is searched for a 64x64 or 64x32 picture
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[|::|fc|fd)/i;
+const IMG_SIG = [[[0x89, 0x50, 0x4e, 0x47], 'image/png'], [[0xff, 0xd8, 0xff], 'image/jpeg'], [[0x47, 0x49, 0x46], 'image/gif'], [[0x42, 0x4d], 'image/bmp']];
+const imgType = b => { for (const [sig, t] of IMG_SIG) if (sig.every((x, i) => b[i] === x)) return t; if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp'; return null; };
+const pngSize = b => b.length > 24 && imgType(b) === 'image/png' ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null;
+const okHost = u => /^https?:$/.test(u.protocol) && !((PRIVATE_HOST.test(u.hostname) || /\.(local|internal)$/i.test(u.hostname)) && process.env.SKIN_PROXY_LOCAL !== '1'); // (the tests fetch from this machine)
+async function getLimited(url, max, accept) {
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+  try { const r = await fetch(url, { signal: ac.signal, redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0 (nemo skin import)', accept } });
+    if (!r.ok) return { status: r.status }; if (+(r.headers.get('content-length') || 0) > max) return { status: 413 };
+    const buf = Buffer.from(await r.arrayBuffer()); return buf.length > max ? { status: 413 } : { buf, type: r.headers.get('content-type') || '', url: r.url || String(url) };
+  } finally { clearTimeout(to); }
+}
 async function skinProxy(req, res) {
   const end = (code, msg) => { res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' }); res.end(msg); };
   let target; try { target = new URL(new URL(req.url, 'http://x').searchParams.get('u') || ''); } catch (e) { end(400, 'bad url'); return; }
-  if (!/^https?:$/.test(target.protocol) || (PRIVATE_HOST.test(target.hostname) && process.env.SKIN_PROXY_LOCAL !== '1') /* (the tests fetch from this machine) */ || /\.(local|internal)$/i.test(target.hostname)) { end(400, 'not allowed'); return; }
-  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 8000);
+  if (!okHost(target)) { end(400, 'not allowed'); return; }
   try {
-    const r = await fetch(target, { signal: ac.signal, redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0 (nemo skin import)', accept: 'image/png,image/*' } });
-    if (!r.ok) { end(502, 'status ' + r.status); return; }
-    if (+(r.headers.get('content-length') || 0) > 500000) { end(413, 'too big'); return; }
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > 500000 || buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) { end(415, 'not a png'); return; }
-    res.writeHead(200, { 'content-type': 'image/png', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=3600' }); res.end(buf);
-  } catch (e) { end(502, 'fetch failed'); } finally { clearTimeout(to); }
+    const r = await getLimited(target, 2000000, 'image/*,text/html;q=0.8,*/*;q=0.5'); if (!r.buf) { end(502, 'status ' + r.status); return; }
+    let found = imgType(r.buf) ? r : null;
+    if (!found && /html/i.test(r.type)) { // a skin site's page: its pictures, the likely skin ones first, until one is skin-sized
+      const html = r.buf.toString('utf8'), seen = new Set(), cands = [];
+      for (const m of html.matchAll(/(?:src|href|content|data-src|data-skin|data-url)\s*=\s*["']([^"'<>]+)["']/gi)) { let u; try { u = new URL(m[1].replace(/&amp;/g, '&'), r.url); } catch (e) { continue; } if (!okHost(u) || seen.has(u.href)) continue; seen.add(u.href);
+        const k = u.href.toLowerCase(), score = (/\.png(\?|$)/.test(k) ? 2 : 0) + (/skin/.test(k) ? 2 : 0) + (/download/.test(k) ? 3 : 0) + (/texture/.test(k) ? 2 : 0) - (/(logo|icon|avatar|head|render|preview|banner|favicon|sprite)/.test(k) ? 3 : 0);
+        if (score > 0 || /\.(png|jpe?g|webp|gif)(\?|$)/.test(k)) cands.push([score, u]); }
+      cands.sort((x, y) => y[0] - x[0]);
+      for (const [, u] of cands.slice(0, 10)) { const c = await getLimited(u, 500000, 'image/*').catch(() => ({})); if (!c.buf || !imgType(c.buf)) continue; const sz = pngSize(c.buf); if (!sz || (sz[0] === 64 && (sz[1] === 64 || sz[1] === 32))) { found = c; if (sz) break; } }
+    }
+    if (!found || found.buf.length > 500000) { end(415, 'no skin picture there'); return; }
+    res.writeHead(200, { 'content-type': imgType(found.buf), 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=3600' }); res.end(found.buf);
+  } catch (e) { end(502, 'fetch failed'); }
+}
+async function profileLookup(req, res) {
+  const send = (code, o) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*', 'cache-control': code === 200 ? 'public, max-age=300' : 'no-store' }); res.end(JSON.stringify(o)); };
+  const name = (new URL(req.url, 'http://x').searchParams.get('name') || '').trim(); if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) { send(400, { error: 'bad name' }); return; }
+  try {
+    let id = null; // name -> UUID (Mojang's old address first, then the newer one)
+    for (const u of ['https://api.mojang.com/users/profiles/minecraft/' + name, 'https://api.minecraftservices.com/minecraft/profile/lookup/name/' + name]) {
+      const r = await getLimited(u, 100000, 'application/json').catch(() => ({})); if (r.buf && r.buf.length) { try { const j = JSON.parse(r.buf.toString('utf8')); if (j.id) { id = j.id; break; } } catch (e) {} } }
+    if (!id) { send(404, { error: 'no such player' }); return; }
+    const r = await getLimited('https://sessionserver.mojang.com/session/minecraft/profile/' + id, 100000, 'application/json'); if (!r.buf) { send(502, { error: 'profile' }); return; }
+    const prof = JSON.parse(r.buf.toString('utf8')), tp = (prof.properties || []).find(p => p.name === 'textures');
+    const tex = tp ? JSON.parse(Buffer.from(tp.value, 'base64').toString('utf8')).textures || {} : {}, fix = u => u ? String(u).replace(/^http:/, 'https:') : null;
+    send(200, { name: prof.name || name, id, skin: fix(tex.SKIN && tex.SKIN.url), slim: !!(tex.SKIN && tex.SKIN.metadata && tex.SKIN.metadata.model === 'slim'), cape: fix(tex.CAPE && tex.CAPE.url) });
+  } catch (e) { send(502, { error: 'lookup failed' }); }
 }
 
 // ---------- a minimal WebSocket (RFC 6455): text frames, fragments, ping, close ----------

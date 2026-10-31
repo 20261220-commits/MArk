@@ -104,11 +104,16 @@ const mpRelay = () => MP.role === 'host' && !MP.server; // a host passes guests'
 const mpSkin = () => { // a custom skin travels as a small PNG
   const s = skinChoice(), own = s.tex === 'custom_skin' || s.tex.startsWith('self_'), out = { tex: own ? (s.slim ? 'alex' : 'steve') : s.tex, slim: s.slim };
   if (own) { const c = entCanvas(s.tex); if (c) out.data = c.toDataURL('image/png'); } // your own picture (or Steve/Alex with some layers off), as you see it
+  const ck = skinCapeKey(); if (ck) { const c = entCanvas(ck); if (c) out.cape = c.toDataURL('image/png'); } // and your cape
   return out;
 };
 function mpSkinChanged() { if (MP.on && W.active) mpSend({ t: 'skin', skin: mpSkin() }); } // your skin changed while playing with others
 function mpSkinTex(p) { // another player's custom skin, decoded once into a pack texture of its own
-  const sk = p.skin || {}; if (!sk.data || p.skinKey || typeof sk.data !== 'string' || !/^data:image\/png;base64,/.test(sk.data) || sk.data.length > 150000) return;
+  const sk = p.skin || {};
+  if (sk.cape && !p.capeKey && typeof sk.cape === 'string' && /^data:image\/png;base64,/.test(sk.cape) && sk.cape.length < 40000) { // their cape (64x32)
+    const key = 'mp_cape_' + p.id + '_' + Date.now(), im = new Image(); p.capeKey = key + '?';
+    im.onload = () => { if (im.width !== 64 || im.height !== 32) return; const c = document.createElement('canvas'); c.width = 64; c.height = 32; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+      PACKPX.ent[key] = { px: new Uint8Array(g.getImageData(0, 0, 64, 32).data.buffer), w: 64, h: 32 }; p.capeKey = key; if (p.m) p.m.userData.capeTex = key; }; im.src = sk.cape; } if (!sk.data || p.skinKey || typeof sk.data !== 'string' || !/^data:image\/png;base64,/.test(sk.data) || sk.data.length > 150000) return;
   p.skinKey = 'mp_skin_' + p.id + '_' + Date.now(); const img = new Image();
   img.onload = () => { if (img.width !== 64 || (img.height !== 64 && img.height !== 32)) return; const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
     PACKPX.ent[p.skinKey] = { px: new Uint8Array(g.getImageData(0, 0, 64, 64).data.buffer), w: 64, h: 64 }; p.skinReady = true; mpDropAvatar(p); };
@@ -258,7 +263,7 @@ function mpHandle(m, from) {
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
-    case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
+    case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } if (p.capeKey && PACKPX.ent[p.capeKey]) { if (entTex[p.capeKey]) { entTex[p.capeKey].dispose(); delete entTex[p.capeKey]; } delete PACKPX.ent[p.capeKey]; } p.capeKey = null; p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
     case 'gone': mpPeerGone(m.id); return;
     case 'leave': if (host) mpPeerGone(from); return;
@@ -943,7 +948,7 @@ function mpDropPeerFx(p) { if (p.fxm) { for (const k in p.fxm) scene.remove(p.fx
 function mpAvatar(p) {
   if (p.m) return p.m;
   mpSkinTex(p);
-  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' });
+  const sk = p.skin || {}, m = buildModel(sk.slim ? 'player_slim' : 'player', { skin: p.skinReady ? p.skinKey : PACKPX.ent[sk.tex] ? sk.tex : 'steve' }); m.userData.capeTex = p.capeKey && PACKPX.ent[p.capeKey] ? p.capeKey : null;
   m.userData.armorKey = ''; m.userData.armor = []; m.userData.heldKey = ['', '']; m.userData.held = [null, null]; if (m.userData.mat2) m.userData.mat2.visible = false;
   m.userData.st = { bodyYaw: NaN, limb: 0, limbD: 0, wingP: 0.2617994, wingR: -0.2617994, wingY: 0, wingPy: 0, lean: 0, deathT: 0 };
   p.tag = makeNameTag(p.name); p.m = m; p.pos = null; scene.add(m); return m; // the name above the head, as Java draws it (entities.js)
