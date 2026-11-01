@@ -384,7 +384,7 @@ function skyDarken() { const d = dayFactor(); return Math.round((1 - d) * 11); }
 function celestial() { let a = (((W.time % 24000) + 24000) % 24000) / 24000 - 0.25; if (a < 0) a += 1; const b = 1 - (Math.cos(a * Math.PI) + 1) / 2; return a + (b - a) / 3; }
 function dayFactor() { const f = Math.cos(celestial() * Math.PI * 2) * 2 + 0.5; return Math.max(0, Math.min(1, f)) * (1 - W.rain * 0.3) * (1 - (W.thunder || 0) * 0.3); }
 function randomTicks(px, pz) {
-  const pcx = px >> 4, pcz = pz >> 4, R = 6;
+  const pcx = px >> 4, pcz = pz >> 4, R = Math.min(6, (typeof OPT !== 'undefined' && OPT.sim) || 6); // (1.18's simulation distance)
   for (let cx = pcx - R; cx <= pcx + R; cx++) for (let cz = pcz - R; cz <= pcz + R; cz++) {
     const c = chunkAt(cx, cz); if (!c || !meshable(c)) continue; // neighbours must be loaded (leaf decay, spreading)
     for (let s = 0, ns = (c.maxY >> 4) + 1, rts = gr('randomTickSpeed'); s < ns; s++) for (let k = 0; k < rts; k++) { // only sections that contain blocks

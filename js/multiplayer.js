@@ -784,7 +784,7 @@ function mpRidden2(e, m, from) { // a boat's back seat
   if (e.kind !== 'boat' || e.mob || e.rider2 === PL || (e.mpRider2 && e.mpRider2 !== from && performance.now() - e.mpRider2At < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 2 }, from); return; }
   e.mpRider2 = from; e.mpRider2At = performance.now();
 }
-function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
+function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 3000) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
 
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
@@ -979,6 +979,10 @@ function mpSeatOf(p) {
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
     const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
     return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
+  // it says it rides but no vehicle here knows (its last word came late): the nearest boat or cart it sits by
+  const q = p.pos; if (!q) return null; let best = null, bd = 2.5;
+  for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart')) continue; const d = Math.hypot(e.mesh.position.x - q[0], e.mesh.position.z - q[2]); if (d < bd) { bd = d; best = e; } }
+  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? 1.13 : best.rideY != null ? best.rideY : 0.18), m.z]; }
   return null;
 }
 function mpRender(dt) {
@@ -1028,7 +1032,8 @@ function mpInstall() {
   const wrapLocal = f => function () { MP.local = true; try { return f.apply(this, arguments); } finally { MP.local = false; } };
   playerTick = wrapLocal(playerTick); onUsePress = wrapLocal(onUsePress); onUseRelease = wrapLocal(onUseRelease);
   const gt = gameTick; gameTick = function () { gt(); mpTick(); };
-  const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
+  const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); MP.frameDt = dt; };
+  const er = entityRender; entityRender = function () { er.apply(this, arguments); mpRender(MP.frameDt || 0.016); }; // the others after the boats, carts and mounts are placed, so a rider sits where its vehicle is drawn this frame
   const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
   const sm = spawnMob; spawnMob = function () { const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) { removeEnt(e); // guests only show the host's mobs
       if (e && (MP.cmd || MP.act) && W.active && !MP.loading) { const [type, x, y, z] = arguments; queueMicrotask(() => { const o = {}; for (const k of MP_SUMMON_KEYS) if (e[k] != null && e[k] !== false) o[k] = e[k]; mpToAuth({ t: 'summon', type, x, y, z, o }); }); } } // a guest's egg, golem, crystal: the runner makes the real mob once the caller has set its fields

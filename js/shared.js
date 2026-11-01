@@ -1383,7 +1383,7 @@ const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'bu
 const LOOT = {
   smith: [['iron_horse_armor', 1], ['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
   house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
-  stronghold: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
+  stronghold: [['music_disc_otherside', 1, 0.15], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
   mineshaft: [['rail', 8], ['torch', 8], ['bread', 3], ['iron_ingot', 4], ['gold_ingot', 3], ['redstone', 8], ['lapis_lazuli', 8], ['coal', 8], ['diamond', 2], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['beetroot_seeds', 4], ['golden_apple', 1], ['name_tag', 1], ['powered_rail', 4], ['activator_rail', 4], ['detector_rail', 4], ['glow_berries', 6], ['iron_pickaxe', 1]],
   outpost: [['crossbow', 1], ['arrow', 9], ['wheat', 7], ['potato', 4], ['carrot', 4], ['dark_oak_log', 3], ['iron_ingot', 3], ['string', 6], ['experience_bottle', 2], ['tripwire_hook', 2]],
@@ -1402,7 +1402,7 @@ const LOOT = {
   ruin_big: [['coal', 4], ['gold_ingot', 3], ['emerald', 2], ['golden_apple', 1], ['wheat', 4], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1], ['buried_treasure_map', 1]],
   fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
-function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx] = pool[R.int(pool.length)]; if (mx) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; }
+function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; } // (a third number: a rare item's chance when picked)
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
 function tplPos(t, tx, tz, r) { return r === 0 ? [tx, tz] : r === 1 ? [t.d - 1 - tz, tx] : r === 2 ? [t.w - 1 - tx, t.d - 1 - tz] : [tz, t.w - 1 - tx]; }
 function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
@@ -2651,10 +2651,45 @@ function deepFill(blocks, meta, seed, cx, cz) {
   for (const [o, d, n, size, lo, hi, tri] of DEEP_ORES) { const O = BID[o], D = BID[d];
     for (let k = 0; k < n; k++) { const y = tri ? Math.round(lo + (R() + R()) / 2 * (hi - lo)) : lo + R.int(hi - lo + 1); if (y >= 0 || y <= MINY) continue; veinTall(blocks, R, b => b === DS || b === TUFF ? D : O, size, y, R.int(16), R.int(16), b => !!deepOre[b]); } }
 }
+// 1.18's large ore veins (OreVeinSampler): long ribbons where a vein toggle noise is strong and two ridged noises meet;
+// copper in granite between y 0 and 50, iron in tuff between -60 and -8, with now and then a block of raw ore
+const VEIN_N = new Map();
+function oreVeins(blocks, seed, cx, cz) {
+  let N = VEIN_N.get(seed); if (!N) { N = [makeNoise(hash32(seed, 118, 1, 1)), makeNoise(hash32(seed, 118, 2, 2)), makeNoise(hash32(seed, 118, 3, 3))]; if (VEIN_N.size > 4) VEIN_N.clear(); VEIN_N.set(seed, N); }
+  const [T, A, B] = N, R = rng(hash32(seed, cx, cz, 1180)), x0 = cx * 16, z0 = cz * 16;
+  const host = b => b === 1 || b === 76 || b === BID.tuff || b === BID.granite || b === BID.diorite || b === BID.andesite;
+  const C = [BID.copper_ore, BID.deepslate_copper_ore, BID.raw_copper_block, BID.granite], I = [BID.iron_ore, BID.deepslate_iron_ore, BID.raw_iron_block, BID.tuff];
+  for (let y = -60; y <= 50; y++) { if (y > -8 && y < 0) continue;
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const wx = x0 + x, wz = z0 + z, t = T.n3(wx / 110, y / 110, wz / 110), copper = t > 0; if (copper ? y < 0 : y > -8) continue;
+      const edge = copper ? Math.min(y, 50 - y) : Math.min(y + 60, -8 - y), need = 0.4 + (edge < 20 ? (20 - edge) / 20 * 0.2 : 0); if (Math.abs(t) < need) continue;
+      if (Math.max(Math.abs(A.n3(wx / 24, y / 24, wz / 24)), Math.abs(B.n3(wx / 24 + 51.3, y / 24, wz / 24 - 7.7))) > 0.08) continue;
+      const i = TI(x, y, z); if (!host(blocks[i]) || R() > 0.7) continue;
+      const S = copper ? C : I, rich = 0.1 + Math.min(1, (Math.abs(t) - 0.4) / 0.2) * 0.2;
+      blocks[i] = R() < rich ? (R() < 0.02 ? S[2] : y < 0 ? S[1] : S[0]) : S[3];
+    } }
+}
+// 1.18's aquifers: the caves below a region's own water level are flooded, the level picked per region (warped, so the
+// edges wander); where a region's water meets a drier one a wall of stone holds it (as Java's aquifer barriers)
+function aquifers(blocks, seed, cx, cz) {
+  const N = deepNoise(seed), x0 = cx * 16, z0 = cz * 16, lv = new Int16Array(18 * 18), top = new Int16Array(256);
+  const level = (wx, wz) => { const rx = Math.floor((wx + N[1].n2(wx / 40, wz / 40) * 12) / 48), rz = Math.floor((wz + N[2].n2(wx / 40 + 9.1, wz / 40) * 12) / 48), h = hash32(seed, rx, rz, 4242);
+    return (h & 1023) < 450 ? -48 + (h >>> 10) % 88 : -999; }; // about 44% of regions hold water, between y -48 and 39
+  for (let z = -1; z <= 16; z++) for (let x = -1; x <= 16; x++) lv[(z + 1) * 18 + x + 1] = level(x0 + x, z0 + z);
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { let y = SEA + 80; while (y > MINY && blocks[TI(x, y, z)] === 0) y--; top[z * 16 + x] = y; }
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const L = lv[(z + 1) * 18 + x + 1]; if (L < -54) continue;
+    const roof = Math.min(L, top[z * 16 + x] - 10);
+    for (let y = -54; y <= roof; y++) { const i = TI(x, y, z); if (blocks[i] !== 0) continue;
+      let wall = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (lv[(z + 1 + dz) * 18 + x + 1 + dx] < y) { wall = true; break; }
+      blocks[i] = wall ? (y < 0 ? 76 : 1) : 27; }
+  }
+}
 function genTall(r, dim, seed, cx, cz) {
   const off = (0 - MINY) << 8, blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
   blocks.set(r.blocks, off); meta.set(r.meta, off);
   if (dim === 0) deepFill(blocks, meta, seed, cx, cz);
+  if (dim === 0 && GENV >= 3) { oreVeins(blocks, seed, cx, cz); aquifers(blocks, seed, cx, cz); }
   for (const t of r.tiles) if (t.i != null) t.i += off;
   const light = new Uint8Array(CVOL); lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome: r.biome, tiles: r.tiles };
@@ -2869,8 +2904,8 @@ function genChunk0(seed, cx, cz, dim, exp) {
         let walls = 0; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (blocks[I(x + ax, dy, z + az)] !== 0) walls++;
         if (walls !== 1) continue;
         blocks[i2] = 44; meta[i2] = R.int(4);
-        const loot = [], pool = [['saddle', 0], ['bread', 1], ['wheat', 4], ['gunpowder', 4], ['string', 4], ['bucket', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1], ['music_disc_13', 1], ['music_disc_cat', 1], ['redstone', 4], ['iron_ingot', 4], ['coal', 4], ['bone', 6], ['rotten_flesh', 6], ['name_tag', 0], ['wheat_seeds', 4]];
-        for (let k = 1 + R.int(3) + 2; k > 0; k--) { const [it, mx] = pool[R.int(pool.length)]; if (mx) loot.push([R.int(27), it, 1 + R.int(mx)]); }
+        const loot = [], pool = [['saddle', 1], ['bread', 1], ['wheat', 4], ['gunpowder', 4], ['string', 4], ['bucket', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1, 0.2], ['music_disc_13', 1], ['music_disc_cat', 1], ['music_disc_otherside', 1, 0.15], ['redstone', 4], ['iron_ingot', 4], ['coal', 4], ['bone', 6], ['rotten_flesh', 6], ['name_tag', 1], ['wheat_seeds', 4]]; // (Java's dungeon chest: saddles and name tags are common, enchanted apples and otherside rare)
+        for (let k = 1 + R.int(3) + 2; k > 0; k--) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) loot.push([R.int(27), it, 1 + R.int(mx)]); }
         tiles.push({ t: 'chest', i: i2, loot });
         break;
       }

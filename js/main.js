@@ -281,7 +281,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
-  if (gr('doDaylightCycle')) W.time = MP.on && MP.role === 'guest' && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // a guest follows the world's clock in real time (no jumps when frames are slow)
+  if (gr('doDaylightCycle')) W.time = MP.on && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // in a server world everyone (the dimension's runner too) follows the server's clock in real time (no jumps when frames are slow)
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();
