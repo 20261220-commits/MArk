@@ -533,7 +533,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.type === 'villager' && typeof zombifyVillager === 'function') zombifyVillager(e, attacker);
     if (e.def.onDeathDrops) e.def.onDeathDrops(e);
     if (PL.riding === e) dismount();
-    if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
+    if (e.type === 'creeper' && src === 'skeleton') { const ds = ITEMS.filter(d => d && d.disc && d.key !== 'music_disc_pigstep' && d.key !== 'music_disc_otherside'); dropItem(e.x, e.y + .5, e.z, ds[(Math.random() * ds.length) | 0].id, 1); } // a skeleton's arrow killed it
     if ((attacker === PL || src === 'player') && gr('doMobLoot')) {
       const loot = attacker === PL ? enchLv(PL.held(), 'looting') : 0;
       const sz = e.size || 1, noDrop = e.def.slime && ((e.type === 'slime' && sz > 1) || (e.type === 'magma_cube' && sz === 1));
@@ -701,7 +701,7 @@ function entityTick() {
     if (e.dead) continue;
     e.px = e.x; e.py = e.y; e.pz = e.z; e.pyaw = e.yaw; e.age++;
     if (!isLoaded(Math.floor(e.x), Math.floor(e.z))) { if (e.kind !== 'mob' && e.kind !== 'boat' && e.kind !== 'minecart') removeEnt(e); continue; }
-    if (e.kind === 'mob') { mobTick(e); if (e.mount) { const m = e.mount; if (m.dead || m.deathT) e.mount = null; else { e.x = m.x; e.z = m.z; e.y = m.y + m.h * 0.75; e.vy = 0; e.onGround = true; } } }
+    if (e.kind === 'mob') { if (!(MP.on) && OPT.sim && !e.def.boss && Math.max(Math.abs((e.x >> 4) - (PL.x >> 4)), Math.abs((e.z >> 4) - (PL.z >> 4))) > OPT.sim) { e.px = e.x; e.py = e.y; e.pz = e.z; continue; } /* 1.18's simulation distance: out there nothing moves */ mobTick(e); if (e.mount) { const m = e.mount; if (m.dead || m.deathT) e.mount = null; else { e.x = m.x; e.z = m.z; e.y = m.y + m.h * 0.75; e.vy = 0; e.onGround = true; } } }
     else if (e.tick) e.tick(e);
     else if (e.kind === 'item' || e.kind === 'xp') {
       const fl = fluidAt(e.x, e.y + 0.1, e.z);

@@ -75,7 +75,7 @@ function bellSupported(x, y, z, m) {
 const MAJOR = [0, 2, 4, 5, 7, 9, 11], MINOR = [0, 2, 3, 5, 7, 8, 10], DORIAN = [0, 2, 3, 5, 7, 9, 10], PENTA = [0, 2, 4, 7, 9];
 const SONGS = { '13': [50, MINOR, 110, 'sine', 'eerie'], cat: [110, MAJOR, 330, 'triangle', 'pop'], blocks: [120, DORIAN, 220, 'square', 'funk'], chirp: [112, PENTA, 392, 'triangle', 'pop'],
   far: [72, MAJOR, 262, 'sine', 'pad'], mall: [100, DORIAN, 294, 'triangle', 'jazz'], mellohi: [60, MINOR, 196, 'sine', 'pad'], stal: [104, DORIAN, 262, 'square', 'jazz'],
-  strad: [126, MAJOR, 349, 'square', 'pop'], ward: [96, MINOR, 247, 'triangle', 'pop'], '11': [40, MINOR, 98, 'sawtooth', 'broken'], wait: [90, MAJOR, 294, 'sine', 'pop'], pigstep: [120, MINOR, 165, 'sawtooth', 'funk'] };
+  strad: [126, MAJOR, 349, 'square', 'pop'], ward: [96, MINOR, 247, 'triangle', 'pop'], '11': [40, MINOR, 98, 'sawtooth', 'broken'], wait: [90, MAJOR, 294, 'sine', 'pop'], pigstep: [120, MINOR, 165, 'sawtooth', 'funk'], otherside: [92, DORIAN, 233, 'triangle', 'jazz'] };
 const PLAYING = new Map(); // "x,y,z" -> { gain, end }
 const freqOf = (root, scale, step) => root * Math.pow(2, (scale[((step % scale.length) + scale.length) % scale.length] + 12 * Math.floor(step / scale.length)) / 12);
 function playDisc(key, x, y, z) {

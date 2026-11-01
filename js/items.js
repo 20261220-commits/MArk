@@ -171,8 +171,8 @@ item('end_crystal', '엔드 수정', { glint: 1 });
 for (const [k, n] of [['creeper', '크리퍼'], ['skull', '해골'], ['flower', '꽃'], ['mojang', '모장'], ['globe', '지구본'], ['piglin', '피글린']]) item(k + '_banner_pattern', '현수막 무늬', { stack: 1, lore: [n + ' 무늬'], pattern: k });
 item('painting', '그림'); item('armor_stand', '갑옷 거치대', { stack: 16 });
 // music discs (C418, Lena Raine); the tunes are synthesised in utility.js
-const DISCS = [['13', 0xf2e8a0], ['cat', 0x5ad83a], ['blocks', 0xd85a2a], ['chirp', 0xc82a2a], ['far', 0x8ae84a], ['mall', 0x8a5ad8], ['mellohi', 0xd8a8f0], ['stal', 0x2a2a2a], ['strad', 0xf0f0f0], ['ward', 0x3a8a3a], ['11', 0x4a4a4a], ['wait', 0x3ab8d8], ['pigstep', 0xc87a3a]];
-DISCS.forEach(([k, c], i) => item('music_disc_' + k, '음반', { stack: 1, disc: i + 1, dcol: c, lore: [(k === 'pigstep' ? 'Lena Raine' : 'C418') + ' - ' + k] }));
+const DISCS = [['13', 0xf2e8a0], ['cat', 0x5ad83a], ['blocks', 0xd85a2a], ['chirp', 0xc82a2a], ['far', 0x8ae84a], ['mall', 0x8a5ad8], ['mellohi', 0xd8a8f0], ['stal', 0x2a2a2a], ['strad', 0xf0f0f0], ['ward', 0x3a8a3a], ['11', 0x4a4a4a], ['wait', 0x3ab8d8], ['pigstep', 0xc87a3a], ['otherside', 0x3aa8c8]]; // otherside: 1.18
+DISCS.forEach(([k, c], i) => item('music_disc_' + k, '음반', { stack: 1, disc: i + 1, dcol: c, lore: [(k === 'pigstep' || k === 'otherside' ? 'Lena Raine' : 'C418') + ' - ' + k] }));
 item('shield', '방패', { stack: 1, dur: 336 }); item('crossbow', '쇠뇌', { stack: 1, dur: 465 }); item('tripwire_hook', '철사 덫 갈고리');
 item('trident', '삼지창', { stack: 1, dur: 250, tool: { type: TOOL.NONE, tier: 0, speed: 1, dmg: 9, as: 1.1, mat: 'trident', kind: 'trident' } });
 // mob drops and gear (mobs4.js / mobs5.js)

@@ -96,7 +96,7 @@ for (const k of ('white_dye orange_dye magenta_dye light_blue_dye yellow_dye lim
   'chain soul_lantern nether_sprouts hopper comparator glass_bottle honey_bottle sweet_berries melon_seeds pumpkin_seeds rabbit_hide lead nether_star').split(' ')) ITEM[k] = 'item/' + k;
 ITEM.clock = 'item/clock_00'; ITEM.compass = 'item/compass_16';
 for (const k of ('honeycomb tropical_fish tropical_fish_bucket fermented_spider_eye glistering_melon_slice dragon_breath rabbit_foot pufferfish painting armor_stand ' +
-  'music_disc_13 music_disc_cat music_disc_blocks music_disc_chirp music_disc_far music_disc_mall music_disc_mellohi music_disc_stal music_disc_strad music_disc_ward music_disc_11 music_disc_wait music_disc_pigstep ' +
+  'music_disc_13 music_disc_cat music_disc_blocks music_disc_chirp music_disc_far music_disc_mall music_disc_mellohi music_disc_stal music_disc_strad music_disc_ward music_disc_11 music_disc_wait music_disc_pigstep music_disc_otherside ' +
   'trident rabbit cooked_rabbit rabbit_stew leather_horse_armor iron_horse_armor golden_horse_armor diamond_horse_armor phantom_membrane scute turtle_helmet heart_of_the_sea nautilus_shell map filled_map ' +
   'minecart chest_minecart hopper_minecart tnt_minecart furnace_minecart writable_book written_book firework_rocket firework_star carrot_on_a_stick warped_fungus_on_a_stick suspicious_stew item_frame ' +
   'oak_sign spruce_sign birch_sign jungle_sign acacia_sign dark_oak_sign crimson_sign warped_sign kelp seagrass bamboo sea_pickle cake campfire soul_campfire bell flower_pot ' +
