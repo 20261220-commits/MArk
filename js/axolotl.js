@@ -133,6 +133,7 @@ function trySpawnAxolotl() {
   for (let y = S.SEA; y > MINY + 2; y--) {
     if (getBlock(x, y, z) !== BID.water || getBlock(x, y - 1, z) !== BID.clay) continue;
     if (getLight(x, y, z) !== 0) return; // no sky light and no block light
+    if (S.caveBiomeAt(W.seed, x, y, z, topY(x, z), W.exp) !== S.BIOK.lush_caves) return; // 1.18: only in lush caves
     const n = 1 + ((Math.random() * 4) | 0), v = MOBDEF.axolotl.variant();
     for (let i = 0; i < n; i++) spawnMob('axolotl', x + .5 + (Math.random() - .5), y + .1, z + .5 + (Math.random() - .5), { variant: Math.random() < 0.7 ? v : undefined });
     return;
@@ -151,7 +152,7 @@ function trySpawnGlowSquid() {
   if (W.dim !== 0 || countMobs(e => e.type === 'glow_squid' && Math.hypot(e.x - PL.x, e.z - PL.z) < 64) >= 5) return;
   const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 32, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);
   if (!isLoaded(x, z)) return;
-  for (let y = 30; y > 2; y--) {
+  for (let y = 30; y > MINY + 2; y--) { // (1.18: all the way down)
     if (getBlock(x, y, z) !== BID.water || getBlock(x, y + 1, z) !== BID.water) continue;
     if (getLight(x, y, z) !== 0) return;
     for (let i = 1 + ((Math.random() * 3) | 0); i > 0; i--) spawnMob('glow_squid', x + .5, y, z + .5);

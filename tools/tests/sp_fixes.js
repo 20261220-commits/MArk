@@ -7,7 +7,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     for (let a = -8; a <= 8; a++) for (let c = -8; c <= 8; c++) { setBlock(X + a, Y - 1, Z + c, BID.stone); for (let y = 0; y < 6; y++) setBlock(X + a, Y + y, Z + c, 0); }
     PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.vx = PL.vy = PL.vz = 0;
     for (const e of ENT) if (e.kind === 'mob' || e.kind === 'item') removeEnt(e);
-    const items = () => ENT.filter(e => e.kind === 'item' && !e.dead).map(e => ITEMS[e.stack.id].key);
+    const items = () => ENT.filter(e => e.kind === 'item' && !e.dead && Math.hypot(e.x - X, e.z - Z) < 12).map(e => ITEMS[e.stack.id].key); // (only here: leaves decaying elsewhere drop sticks too)
     // glass panes break into nothing
     for (const k of ['glass_pane', 'glass', 'stained_glass_pane']) { setBlock(X + 3, Y, Z + 3, BID[k]); INV.slots[INV.sel] = null; breakBlock(X + 3, Y, Z + 3); }
     await run(4); o.glassDrops = items();

@@ -9,7 +9,7 @@ module.exports = async ({ ok, b, lib }) => {
     await P.evaluate(async u => { showMenu('mp_join'); await mpJoinWs(u); }, srv.ws);
     await P.evaluate(() => { $('mpSeed').value = '555'; $('mpMode').value = 'survival'; return mpAction('mp_createworld'); });
     await P.waitForFunction(() => W.active && W.meta && W.meta.server && UI.menu !== 'loading', null, { timeout: 90000 }); await P.evaluate(() => { showMenu(null); UI.paused = false; });
-    const clock = await P.evaluate(async () => { await new Promise(r => setTimeout(r, 3000)); const t0 = W.time, r0 = performance.now(); await new Promise(r => setTimeout(r, 15000)); await new Promise(r => requestAnimationFrame(r)); return { rate: +((W.time - t0) / ((performance.now() - r0) / 1000)).toFixed(1), base: !!MP.timeAt }; });
+    const clock = await P.evaluate(async () => { await new Promise(r => setTimeout(r, 3000)); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); const t0 = W.time, r0 = performance.now(); /* both ends read just after a frame: a stalled page's clock is only brought up to date when it draws */ await new Promise(r => setTimeout(r, 40000)); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return { rate: +((W.time - t0) / ((performance.now() - r0) / 1000)).toFixed(1), base: !!MP.timeAt }; });
     ok(clock.base && clock.rate > 18 && clock.rate < 22, 'the day goes at the server\'s 20 ticks a second, however slowly the page draws', clock);
     sp.kill('SIGKILL'); await P.waitForTimeout(3000);
     const lost = await P.evaluate(() => ({ on: MP.on, menu: UI.menu, st: MP.status }));

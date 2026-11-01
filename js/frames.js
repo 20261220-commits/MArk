@@ -56,7 +56,7 @@ function frameHit(e) { // attack: knock the item out, then the frame itself
   rsNotify(e.ax, e.ay, e.az); vibrate(e.x, e.y, e.z);
 }
 function frameUse(e, h) { // use: put the held item in, or turn the item
-  if (!e.item) { if (!h) return; e.item = { id: h.id, n: 1 }; if (h.d != null) e.item.d = h.d; if (h.e) e.item.e = h.e; consume(); play('place', { mat: 'wood' }); }
+  if (!e.item) { if (!h) return; e.item = { ...h, n: 1 }; /* a map keeps its number, a name stays */ consume(); play('place', { mat: 'wood' }); }
   else { e.rot = (e.rot + 1) & 7; play('click', { pitch: 0.8 }); }
   frameRebuild(e); rsNotify(e.ax, e.ay, e.az); vibrate(e.x, e.y, e.z); swing();
 }

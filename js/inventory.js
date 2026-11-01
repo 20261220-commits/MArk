@@ -1,6 +1,9 @@
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), off: null, sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
-const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
+// two stacks merge only when everything they carry matches (a rocket's flight, a stew's effect, a lodestone compass's target,
+// a shulker box's contents, a banner's patterns, a name...); empty values count as missing
+const stackSig = s => { const o = []; for (const k of Object.keys(s).sort()) if (k !== 'n' && k !== 'brewed' && s[k]) o.push(k, s[k]); return JSON.stringify(o); };
+const same = (a, b) => !!(a && b && a.id === b.id && !ITEMS[a.id].dur && !a.e && !b.e && stackSig(a) === stackSig(b));
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
@@ -13,6 +16,12 @@ INV.count = id => INV.slots.reduce((a, s) => a + (s && s.id === id ? s.n : 0), 0
 INV.remove = function (id, n) { for (let i = 35; i >= 0 && n > 0; i--) { const s = INV.slots[i]; if (s && s.id === id) { const m = Math.min(n, s.n); s.n -= m; n -= m; if (!s.n) INV.slots[i] = null; } } UI.hudDirty = true; };
 INV.giveOrDrop = st => { const left = INV.add(st); if (left > 0) dropItem(PL.x, PL.y + 1.2, PL.z, st.id, left, null, 40, st.d, st); };
 
+// furnace fuel as in Java 1.18, by kind, so every wood type and colour gets it (nether wood never burns)
+for (const d of ITEMS) { if (!d || /^(crimson|warped)_/.test(d.key)) continue; const k = d.key;
+  const f = /_door$/.test(k) && k !== 'iron_door' ? 200 : /_button$/.test(k) && !/stone|blackstone/.test(k) ? 100 : /_pressure_plate$/.test(k) && /^(oak|spruce|birch|jungle|acacia|dark_oak)_/.test(k) ? 300
+    : /_banner$/.test(k) || (/_trapdoor$/.test(k) && k !== 'iron_trapdoor') ? 300 : ['jukebox', 'trapped_chest', 'smithing_table', 'crossbow', 'fishing_rod'].includes(k) ? 300 : k === 'dried_kelp_block' ? 4001 : null;
+  if (f != null) d.fuel = f; }
+for (const d of ITEMS) if (d && /^(stripped_)?(oak|spruce|birch|jungle|acacia|dark_oak)_(log|wood)$/.test(d.key)) { d.fuel = 300; if (!SMELT[d.id]) SMELT[d.id] = [IID.charcoal, 0.15]; } // every log and wood block, stripped or not, burns and turns to charcoal
 // ---------- screens ----------
 const GUI = { slots: [], el: null, type: null, ctx: null, drag: null, hover: -1, lastClick: { t: 0, i: -1 }, creativeTab: 'all', search: '' };
 function slotRef(arr, i, opts = {}) { return { get: () => arr[i], set: v => { arr[i] = v; }, ...opts }; }
@@ -32,6 +41,7 @@ function buildSlots(type, ctx) {
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes
+    if (ctx.pair) { const t2 = getTile(ctx.pair[0], ctx.pair[1], ctx.pair[2]); if (t2 && Array.isArray(t2.items)) { ctx.pairC = ctx.pairC || { x: ctx.pair[0], y: ctx.pair[1], z: ctx.pair[2] }; for (let i = 0; i < t2.items.length; i++) L.push(slotRef(t2.items, i, { group: 'cont' })); } } // a large chest's other half
   } else if (type === 'horse') {
     const e = ctx.horse;
     L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));
@@ -105,7 +115,7 @@ function clickSlot(i, btn, shift) {
     if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) { INV.giveOrDrop({ ...rr, n: left }); sl.take(); } break; } sl.take(); } } // nothing fits: the ingredients stay
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
-    else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
+    else if (same(cur, r) && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); } // (a rocket of another flight time doesn't join the stack in hand)
     play('click', { vol: 0.3 }); return afterClick();
   }
   if (shift && st) { quickMove(i); return afterClick(); }
@@ -153,7 +163,7 @@ function quickMove(i) {
     if (T === 'creative') targets = [];
   } else targets = [...idx(s => s.group === 'hot').reverse(), ...idx(s => s.group === 'main').reverse()].reverse();
   if (!targets.length) return;
-  if (g !== 'main' && g !== 'hot') targets = [...idx(s => s.group === 'main'), ...idx(s => s.group === 'hot')];
+  if (g !== 'main' && g !== 'hot') { targets = [...idx(s => s.group === 'main'), ...idx(s => s.group === 'hot')]; if (g === 'cont' || sl.takeOnly) targets.reverse(); } // Java: out of a chest or a furnace's output, from the hotbar's right end; out of a grid or armour, from the top of the inventory
   for (const k of targets) { const t = GUI.slots[k].get(); if (t && same(t, st)) { const m = Math.min(st.n, maxStack(st.id) - t.n); t.n += m; st.n -= m; if (!st.n) break; } }
   if (st.n) for (const k of targets) { const s2 = GUI.slots[k]; if (!s2.get() && (!s2.accepts || s2.accepts(st))) { const m = Math.min(st.n, s2.max || maxStack(st.id)); s2.set({ ...st, n: m }); st.n -= m; if (!st.n) break; } }
   if (!st.n) sl.set(null);

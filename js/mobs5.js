@@ -122,7 +122,7 @@ function beeAI(e, dist) {
     fly(PL.x, PL.y + 1.2, PL.z, 0.2);
     if (dist < 1.5 && e.attackCd <= 0) {
       e.attackCd = 20;
-      if (hurtPlayer(2 * DIFF_MUL() || 0, 'mob', e) !== false && PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 360 : 200, 0);
+      if (hurtPlayer(diffDmg(2) || 0, 'mob', e) !== false && PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 360 : 200, 0);
       e.stung = true; e.stungT = 0; e.target = null; hidePart(e, 'sting', false);
     }
     return;
