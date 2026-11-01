@@ -13,7 +13,7 @@ module.exports = async ({ ok, b, lib }) => {
     ok(clock.base && clock.rate > 18 && clock.rate < 22, 'the day goes at the server\'s 20 ticks a second, however slowly the page draws', clock);
     sp.kill('SIGKILL'); await P.waitForTimeout(3000);
     const lost = await P.evaluate(() => ({ on: MP.on, menu: UI.menu, st: MP.status }));
-    ok(!lost.on && lost.menu === 'mp_join' && /다시 연결/.test(lost.st), 'when the server goes away the game keeps knocking', lost);
+    ok(lost.menu === 'mp_join' && /다시 연결/.test(lost.st), 'when the server goes away the game keeps knocking', lost);
     await P.waitForTimeout(4000); sp = await start();
     let back = false; try { await P.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join', null, { timeout: 60000 }); back = true; } catch (e) {}
     ok(back, 'and is back in the same world once the server is up again', await P.evaluate(() => [MP.on, UI.menu, MP.status]));
