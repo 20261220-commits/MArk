@@ -227,7 +227,7 @@ function cartTransfer(e) {
   const x = Math.floor(e.x), y = e.ry, z = Math.floor(e.z);
   if (e.ctype === 'hopper' && !e.activated) {
     const above = getTile(x, y + 1, z);
-    if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(e, one)) { s.n--; if (!s.n) above.items[k] = null; const c = chunkAt(x >> 4, z >> 4); if (c) c.modified = c.edited = true; } break; } }
+    if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { ...s, n: 1 }; /* everything it carries goes along (a shulker box's contents, a name) */ if (insertItem(e, one)) { s.n--; if (!s.n) above.items[k] = null; const c = chunkAt(x >> 4, z >> 4); if (c) c.modified = c.edited = true; } break; } }
     for (const it of ENT) if (it.kind === 'item' && !it.dead && Math.abs(it.x - e.x) < 1 && Math.abs(it.z - e.z) < 1 && it.y >= e.y - 0.2 && it.y < e.y + 1.5) { if (insertItem(e, it.stack)) removeEnt(it); break; }
   }
   if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen();

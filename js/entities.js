@@ -468,7 +468,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -672,9 +672,10 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
+  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
+const diffDmg = d => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? Math.min(d / 2 + 1, d) : PL.difficulty === 3 ? d * 1.5 : d; // Java's scaling of a mob's hit: easy halves it plus one, hard adds half
 // ---------- per-tick update ----------
 // baby zombies (5% of the zombie kind, never grow up, faster) and jockeys: 5% of babies ride a chicken, 1% of spiders carry a skeleton
 const ZOMBIE_KIND = new Set(['zombie', 'husk', 'drowned', 'zombie_villager']);
@@ -762,7 +763,7 @@ function arrowTick(e) {
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
-      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {

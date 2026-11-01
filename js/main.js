@@ -5,9 +5,11 @@ W.active = false; UI.paused = true;
 
 // ---------- pointer lock ----------
 function grabLock() { if (isTouch || !W.active || UI.screen || UI.chatOpen || UI.menu) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+const LOCK_AT = { t: 0, first: false }; // when the pointer was last locked: the first moves after it can carry the whole jump from where the cursor was
 function releaseLock() { if (document.pointerLockElement) document.exitPointerLock(); }
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === canvas;
+  if (locked && !was) LOCK_AT.t = performance.now(), LOCK_AT.first = true;
   if (was && !locked && W.active && !UI.screen && !UI.chatOpen && !UI.menu && !PL.dead) pauseGame();
 });
 canvas.addEventListener('click', () => { if (W.active && !locked && !UI.menu && !UI.screen) grabLock(); });
@@ -122,7 +124,7 @@ addEventListener('blur', () => { F3K.down = false; });
 addEventListener('blur', () => { clearInput(); });
 
 // ---------- mouse ----------
-document.addEventListener('mousemove', e => { if (!locked || UI.paused || PL.dead) return; look(e.movementX, e.movementY, 0.0022 * OPT.sens / 100); });
+document.addEventListener('mousemove', e => { if (!locked || UI.paused || PL.dead) return; if (LOCK_AT.first || performance.now() - LOCK_AT.t < 80) { LOCK_AT.first = false; if (Math.abs(e.movementX) + Math.abs(e.movementY) > 60) return; } if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return; /* Chrome's spikes: the view jumped on clicking into the game */ look(e.movementX, e.movementY, 0.0022 * OPT.sens / 100); });
 function look(dx, dy, s) {
   if (PL.sleeping) return;
   const zoom = USE.kind === 'spy' ? 0.15 : 1;
@@ -190,7 +192,7 @@ async function startWorld(id, meta) {
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
   W.id = meta.id; W.seed = meta.seed; W.gen = meta.gen || 1; S.setGenVersion(W.gen); W.genCache = null; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
-  W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
+  W.exp = W.gen >= 3 || (meta.exp !== undefined ? meta.exp : true); // 1.18 worlds always have lush caves (the generator forces them; biome checks must agree); older worlds keep their option
   await loadSavedKeys(meta.id);
   W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
@@ -373,7 +375,7 @@ function frame(now) {
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
-    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0);
+    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0); if (MP.on && MP.timeAt && W.active && gr('doDaylightCycle')) W.time = Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)); // the server's clock every frame, even when a slow page fell behind on ticks
     if (n >= 5) acc = 0;
   }
   const alpha = UI.paused ? 1 : acc / 50;

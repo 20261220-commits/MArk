@@ -99,6 +99,7 @@ async function mpAnswerInvite(code) {
 }
 const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
 // a guest's request to whoever runs its dimension (the host, or in a server world the dimension's runner)
+const MP_AUTH_PLACED = new Set(['blast', 'drop', 'prime', 'summon', 'veh', 'xp']); // (requests that only place something: the server stamps a forwarded one as from the forwarder)
 const mpToAuth = o => mpSend({ ...o, dim: o.dim != null ? o.dim : W.dim }, MP.server ? 'auth' : undefined);
 const mpRelay = () => MP.role === 'host' && !MP.server; // a host passes guests' messages on; a server does that itself
 const mpSkin = () => { // a custom skin travels as a small PNG
@@ -247,6 +248,9 @@ function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvat
 // ---------- message handling ----------
 function mpHandle(m, from) {
   const host = MP.role === 'host';
+  // a request for a dimension's runner that arrived just after this player left that dimension: hand it on to whoever runs
+  // it now, so a dropped item or an explosion doesn't land at the same spot in the wrong world
+  if (host && MP.server && m.dim != null && m.dim !== W.dim && MP_AUTH_PLACED.has(m.t)) { if ((m.hop | 0) < 3) mpSend({ ...m, hop: (m.hop | 0) + 1 }, 'auth'); return; }
   switch (m.t) {
     case 'join': if (!host || MP.server) return; { // a new guest: hand over the world's seed, clock and what has been edited
       const p = { id: from, name: String(m.name || '손님').slice(0, 16), skin: m.skin || { tex: 'steve', slim: false }, s: null }; MP.peers.set(from, p);
@@ -381,6 +385,7 @@ function mpApplyTile(m, from) {
     else c.tiles.set(i, m.tile);
     c.modified = c.edited = true; if (/^(furnace|brewing|campfire)$/.test(m.tile.type)) c.hasFurnace = true; // so it keeps working here
     if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); }
+    const pc = GUI.ctx && GUI.ctx.pairC; if (pc && pc.x === m.x && pc.y === m.y && pc.z === m.z) { pc.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) { GUI.slots = buildSlots(GUI.type, GUI.ctx); UI.renderScreen(); } }
     if (m.tile.type === 'jukebox') { const t = c.tiles.get(i), k = m.x + ',' + m.y + ',' + m.z, st = t.items && t.items[0]; // someone else's record: heard here too
       if (t.playing && st && ITEMS[st.id] && ITEMS[st.id].disc) { if (!PLAYING.has(k)) playDisc(ITEMS[st.id].key.replace('music_disc_', ''), m.x, m.y, m.z); } else stopDisc(m.x, m.y, m.z); } }
   else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
@@ -413,6 +418,7 @@ function mpTileSlots(m, from) {
   if (m.rest) for (const k of Object.keys(m.rest)) if (k !== 'type') t[k] = m.rest[k];
   c.modified = c.edited = true;
   if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(t); if (UI.screen) UI.renderScreen(); }
+  { const pc = GUI.ctx && GUI.ctx.pairC; if (pc && pc.x === m.x && pc.y === m.y && pc.z === m.z) { pc.mpBase = mpJ(t); if (UI.screen) UI.renderScreen(); } }
   if (typeof rsNotify === 'function') rsNotify(m.x, m.y, m.z);
   mpSend(msg(mpJ(t))); // everyone (the guest too) gets what the chest now holds
 }
@@ -832,7 +838,7 @@ function mpBlastSelf(x, y, z, power) {
   if (PL.dead || PL.mode === 'creative' || PL.mode === 'spectator') return;
   const rad = power * 2, cx = PL.x, cy = PL.y + (PL.h || 1.8) / 2, cz = PL.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
   const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1), kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-  hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
+  hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
 }
 function mpGotBoom(m, from) {
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
@@ -892,7 +898,7 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
   if (e.stuck || e.thrown || e.owner === PL) return false;
   for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative') continue;
     if (e.x > s.x - 0.4 && e.x < s.x + 0.4 && e.z > s.z - 0.4 && e.z < s.z + 0.4 && e.y > s.y && e.y < s.y + 1.8) {
-      const dmg = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) * e.dmgMul); mpSend({ t: 'hurt', dmg: dmg * DIFF_MUL(), cause: 'arrow' }, p.id); mpSend({ t: 'kb', vx: e.vx * 0.3, vy: 0.2, vz: e.vz * 0.3 }, p.id); removeEnt(e); return true; } }
+      const dmg = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) * e.dmgMul); mpSend({ t: 'hurt', dmg: diffDmg(dmg), cause: 'arrow' }, p.id); mpSend({ t: 'kb', vx: e.vx * 0.3, vy: 0.2, vz: e.vz * 0.3 }, p.id); removeEnt(e); return true; } }
   return false;
 }
 
@@ -1106,7 +1112,7 @@ function mpInstall() {
   const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpToAuth({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
   // a block entity made by a player's own action (a placed furnace, chest, sign...) reaches the others right after the block
   const st0 = setTile; setTile = function (x, y, z, t) { st0.apply(this, arguments); if (MP.on && MP.local && !MP.applying && t) queueMicrotask(() => mpTileChanged(x, y, z)); };
-  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); }
+  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); if (c.pairC) { if (MP.role === 'guest') mpTileEdit(c.pairC); else mpTileChanged(c.pairC.x, c.pairC.y, c.pairC.z); } } // (and a large chest's other half)
     // a guest changes what is in the runner's chest or hopper minecart, or the gear of the runner's horse
     if (MP.role === 'guest' && c && c.cart && c.cart.remote) mpToAuth({ t: 'cartset', e: c.cart.rid, items: c.cart.items });
     if (MP.role === 'guest' && c && c.horse && c.horse.remote) mpToAuth({ t: 'gear', e: c.horse.rid, gear: c.horse.gear }); };

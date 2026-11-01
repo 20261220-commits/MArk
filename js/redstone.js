@@ -312,8 +312,10 @@ function containerSignal(x, y, z) {
   if (b === BID.jukebox) { const t = getTile(x, y, z), st = t && t.items && t.items[0]; return st ? ITEMS[st.id].disc : 0; } // the disc number
   const fr = typeof frameAt === 'function' && frameAt(x, y, z); if (fr) return fr.item ? fr.rot + 1 : 0; // item frame: its rotation
   const t = getTile(x, y, z); if (!t || !t.items) return -1;
-  let f = 0, any = false; for (const st of t.items) if (st) { f += st.n / maxStack(st.id); any = true; }
-  return any ? Math.floor(1 + f / t.items.length * 14) : 0;
+  const pr = typeof chestPair === 'function' && chestPair(x, y, z), t2 = pr && getTile(...(pr.left[0] === x && pr.left[2] === z ? pr.right : pr.left)); // a large chest is read whole
+  const items = t2 && t2.items ? [...t.items, ...t2.items] : t.items;
+  let f = 0, any = false; for (const st of items) if (st) { f += st.n / maxStack(st.id); any = true; }
+  return any ? Math.floor(1 + f / items.length * 14) : 0;
 }
 function compute(x, y, z) {
   const m = getMeta(x, y, z), d = DIRS[m & 3], bx = x - d[0], bz = z - d[2];
@@ -328,7 +330,7 @@ function dispense(x, y, z, b, m) {
   const i = full[Math.floor(Math.random() * full.length)], st = t.items[i], d = S.DIR6[m & 7], fx = x + d[0], fy = y + d[1], fz = z + d[2], id = st.id;
   const take = () => { st.n--; if (st.n <= 0) t.items[i] = null; };
   const cx = fx + .5, cy = fy + .5, cz = fz + .5;
-  if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { id, n: 1, d: st.d, e: st.e })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
+  if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { ...st, id, n: 1 })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
   const fb = getBlock(fx, fy, fz);
   if (isArrow(id)) { const a = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 2); if (ITEMS[id].tipped != null) { a.potion = ITEMS[id].tipped; a.item = id; } take(); }
   else if (ITEMS[id].splash || ITEMS[id].lingering) { const e = shootArrow(cx, cy, cz, d[0] * 0.6, d[1] * 0.6 + 0.1, d[2] * 0.6, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
@@ -344,8 +346,9 @@ function dispense(x, y, z, b, m) {
 }
 // put a stack into a container tile (furnace: input slot only); returns true when it fit completely
 function insertItem(t, st, slots) {
+  if (t.shulker && typeof isShulkerItem === 'function' && isShulkerItem(st.id)) return false; // no shulker box goes into a shulker box
   const list = slots || (t.type === 'furnace' ? [ITEMS[st.id].fuel && !SMELT[st.id] ? 1 : 0] : t.items.map((_, i) => i));
-  for (const i of list) { const s = t.items[i]; if (s && s.id === st.id && !s.e && !st.e && (s.d || 0) === (st.d || 0) && s.n < maxStack(st.id)) { const k = Math.min(st.n, maxStack(st.id) - s.n); s.n += k; st.n -= k; if (!st.n) return true; } }
+  for (const i of list) { const s = t.items[i]; if (s && same(s, st) && s.n < maxStack(st.id)) { const k = Math.min(st.n, maxStack(st.id) - s.n); s.n += k; st.n -= k; if (!st.n) return true; } }
   for (const i of list) if (!t.items[i]) { t.items[i] = { ...st }; st.n = 0; return true; }
   return false;
 }
@@ -355,10 +358,16 @@ function hopperTick(c, i, t) {
   const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
-  const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
-  if (below && below.items) { const k = t.items.findIndex(s => s); if (k >= 0) { const s = t.items[k], one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(below, one, below.type === 'furnace' ? [ITEMS[s.id].fuel && !SMELT[s.id] ? 1 : 0] : null)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(x, y - 1, z); } } }
-  const above = getTile(x, y + 1, z) || cartsAt(x, y + 1, z).find(e => e.items);
-  if (above && above.items) { if (above.loot) cartFillLoot(above); const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
+  // out through the spout: down, or sideways into the block it was placed against; a furnace takes it in its top (to smelt)
+  // or, from the side, in its fuel slot; a large chest is filled as one
+  const f = S.DIR6[c.meta[i] & 7] || S.DIR6[0], ox = x + f[0], oy = y + f[1], oz = z + f[2];
+  const outs = (() => { const pr = typeof chestPair === 'function' && chestPair(ox, oy, oz); if (pr) return [getTile(...pr.left), getTile(...pr.right)].filter(Boolean); const o = getTile(ox, oy, oz) || cartsAt(ox, oy, oz).find(e => e.items); return o ? [o] : []; })();
+  out: for (let k = 0; k < t.items.length; k++) { const s = t.items[k]; if (!s) continue; // the first item that fits goes (Java tries each slot)
+    for (const below of outs) { if (!below.items) continue; const one = { ...s, n: 1 }, slots = below.type === 'furnace' ? (f[1] < 0 ? [0] : ITEMS[s.id].fuel ? [1] : []) : null; if (slots && !slots.length) break;
+      if (insertItem(below, one, slots)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(ox, oy, oz); break out; } } }
+  const aboveL = (() => { const pr = typeof chestPair === 'function' && chestPair(x, y + 1, z); if (pr) { const a = getTile(...pr.left), b2 = getTile(...pr.right); return a && b2 && a.items && b2.items ? (a.items.some(Boolean) ? a : b2) : a || b2; } return null; })();
+  const above = aboveL || getTile(x, y + 1, z) || cartsAt(x, y + 1, z).find(e => e.items);
+  if (above && above.items) { if (above.loot) cartFillLoot(above); const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { ...s, n: 1 }; /* everything it carries goes along (a shulker box's contents, a name) */ if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
   else for (const e of ENT) if (e.kind === 'item' && !e.dead && Math.abs(e.x - x - .5) < 0.7 && Math.abs(e.z - z - .5) < 0.7 && e.y >= y + 0.5 && e.y < y + 2) { if (insertItem(t, e.stack)) removeEnt(e); moved = true; break; }
   if (moved) { c.modified = c.edited = true; rsNotify(x, y, z); if (UI.screen) UI.renderScreen(); }
 }

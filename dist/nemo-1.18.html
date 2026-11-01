@@ -776,7 +776,7 @@ const BLOCK_ROWS = [
   [1106, 'polished_basalt', '윤나는 현무암', C, ['polished_basalt_side', 'polished_basalt_top', 'polished_basalt_top'], 1.25, P, 1, { log: 1 }],
   [1107, 'stripped_crimson_stem', '껍질 벗긴 진홍빛 자루', C, ['stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_crimson_stem_top'], 2, A, 0, { log: 1 }],
   [1108, 'stripped_warped_stem', '껍질 벗긴 뒤틀린 자루', C, ['stripped_warped_stem', 'stripped_warped_stem_top', 'stripped_warped_stem_top'], 2, A, 0, { log: 1 }],
-  [1109, 'deepslate_emerald_ore', '심층암 에메랄드 광석', C, 'deepslate_emerald_ore', 4.5, P, 2],
+  [1109, 'deepslate_emerald_ore', '심층암 에메랄드 광석', C, 'deepslate_emerald_ore', 4.5, P, 3],
   [1110, 'tall_grass', '큰 풀', X, 'tall_grass_bottom', 0, N, 0, { tint: 1, repl: 1, plant: 20 }], // meta 8: upper half
   [1111, 'large_fern', '큰 고사리', X, 'large_fern_bottom', 0, N, 0, { tint: 1, repl: 1, plant: 20 }],
   [1112, 'wood', '나무', C, null, 2, A, 0, { vars: [...WOOD8.slice(0, 6).map(w => w[0] + '_log'), 'crimson_stem', 'warped_stem'], vk: [...WOOD8.slice(0, 6).map(w => w[0] + '_wood'), 'crimson_hyphae', 'warped_hyphae'], vn: [...WOOD8.slice(0, 6).map(w => w[1] + ' 나무'), '진홍빛 균사', '뒤틀린 균사'] }],
@@ -4088,7 +4088,7 @@ function convertState(str, rot) {
   else if (id === BID.lever || id === BID.stone_button) { const sup = props.face === 'floor' ? 0 : props.face === 'ceiling' ? 1 : F4_6[(F + 2) & 3]; meta = (meta & ~15) | sup | (props.powered === 'true' ? 8 : 0); }
   else if (id === BID.bell) meta = (props.attachment === 'floor' ? 0 : props.attachment === 'ceiling' ? 1 : 2) | (F << 2);
   else if (id === BID.campfire || id === BID.soul_campfire) meta = F | (props.lit === 'false' ? 0 : 4);
-  else if (id === BID.end_rod || id === BID.observer || id === BID.dispenser || id === BID.dropper || id === BID.piston || id === BID.sticky_piston || id === BID.barrel) meta = (meta & ~7) | (d6(props.facing) || 0);
+  else if (id === BID.end_rod || id === BID.observer || id === BID.dispenser || id === BID.dropper || id === BID.piston || id === BID.sticky_piston || id === BID.barrel || id === BID.hopper) meta = (meta & ~7) | (d6(props.facing) || 0);
   else if (id === BID.repeater || id === BID.comparator) meta = (F + 2) & 3;
   else if (id === BID.wall_banner) meta = (meta & 15) | (F << 4);
   else if (id === BID.banner) meta = (meta & 15) | ((((+props.rotation || 0) + rot * 4) & 15) << 4);
@@ -4100,7 +4100,7 @@ function convertState(str, rot) {
   else if (id === BID.composter) meta = +props.level || 0;
   else if (id === BID.brewing_stand) meta = (props.has_bottle_0 === 'true' ? 1 : 0) | (props.has_bottle_1 === 'true' ? 2 : 0) | (props.has_bottle_2 === 'true' ? 4 : 0);
   else if (b.leaves) meta |= 1;
-  else if (props.facing in FACE4 && (b.facing || id === BID.anvil || id === BID.glazed_terracotta || id === BID.chest || id === BID.trapped_chest || id === BID.ender_chest)) meta = (meta & ~3) | F;
+  else if (props.facing in FACE4 && (b.facing || id === BID.anvil || id === BID.glazed_terracotta || id === BID.chest || id === BID.trapped_chest || id === BID.ender_chest)) { meta = (meta & ~3) | F; if (id !== BID.ender_chest && (props.type === 'left' || props.type === 'right')) meta |= props.type === 'left' ? 4 : 8; } // (a large chest's halves: Java's left half has its partner clockwise)
   return [id, meta];
 }
 // a template's bounding box after quarter turns about its origin (Java's StructureTemplate.transform with pivot 0)
@@ -5187,7 +5187,7 @@ item('honey_bottle', '꿀이 든 병', { food: [6, 1.2], stack: 16, leaves: 'gla
 item('turtle_helmet', '거북 등딱지', { stack: 1, dur: 275, armor: { slot: 0, pts: 2, tough: 0, mat: 'turtle' } });
 // the sea and maps (ocean.js, maps.js)
 item('heart_of_the_sea', '바다의 심장'); item('nautilus_shell', '앵무조개 껍데기');
-item('map', '빈 지도'); item('filled_map', '지도', { stack: 1 });
+item('map', '빈 지도'); item('filled_map', '지도'); /* same-numbered maps stack to 64, as in Java */
 // minecarts (cart: the kind spawned by minecarts.js)
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
@@ -5647,7 +5647,7 @@ function blockDrops(b, meta, stack) {
     case 'coal_ore': case 'deepslate_coal_ore': add('coal'); res.xp = ri(0, 2); break;
     case 'iron_ore': case 'deepslate_iron_ore': add('raw_iron'); break;
     case 'gold_ore': case 'deepslate_gold_ore': add('raw_gold'); break;
-    case 'copper_ore': case 'deepslate_copper_ore': add('raw_copper', ri(2, 3)); break;
+    case 'copper_ore': case 'deepslate_copper_ore': add('raw_copper', ri(2, 5)); break; // 1.18: 2-5 (was 2-3)
     case 'diamond_ore': case 'deepslate_diamond_ore': add('diamond'); res.xp = ri(3, 7); break;
     case 'emerald_ore': case 'deepslate_emerald_ore': add('emerald'); res.xp = ri(3, 7); break;
     case 'infested': break; // a silverfish comes out instead (silk touch gives the plain block, below)
@@ -8605,7 +8605,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -8809,9 +8809,10 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
+  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
+const diffDmg = d => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? Math.min(d / 2 + 1, d) : PL.difficulty === 3 ? d * 1.5 : d; // Java's scaling of a mob's hit: easy halves it plus one, hard adds half
 // ---------- per-tick update ----------
 // baby zombies (5% of the zombie kind, never grow up, faster) and jockeys: 5% of babies ride a chicken, 1% of spiders carry a skeleton
 const ZOMBIE_KIND = new Set(['zombie', 'husk', 'drowned', 'zombie_villager']);
@@ -8899,7 +8900,7 @@ function arrowTick(e) {
     const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
     if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
-      if (PL.mode !== 'creative') { if (hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
@@ -9413,8 +9414,10 @@ function containerSignal(x, y, z) {
   if (b === BID.jukebox) { const t = getTile(x, y, z), st = t && t.items && t.items[0]; return st ? ITEMS[st.id].disc : 0; } // the disc number
   const fr = typeof frameAt === 'function' && frameAt(x, y, z); if (fr) return fr.item ? fr.rot + 1 : 0; // item frame: its rotation
   const t = getTile(x, y, z); if (!t || !t.items) return -1;
-  let f = 0, any = false; for (const st of t.items) if (st) { f += st.n / maxStack(st.id); any = true; }
-  return any ? Math.floor(1 + f / t.items.length * 14) : 0;
+  const pr = typeof chestPair === 'function' && chestPair(x, y, z), t2 = pr && getTile(...(pr.left[0] === x && pr.left[2] === z ? pr.right : pr.left)); // a large chest is read whole
+  const items = t2 && t2.items ? [...t.items, ...t2.items] : t.items;
+  let f = 0, any = false; for (const st of items) if (st) { f += st.n / maxStack(st.id); any = true; }
+  return any ? Math.floor(1 + f / items.length * 14) : 0;
 }
 function compute(x, y, z) {
   const m = getMeta(x, y, z), d = DIRS[m & 3], bx = x - d[0], bz = z - d[2];
@@ -9429,7 +9432,7 @@ function dispense(x, y, z, b, m) {
   const i = full[Math.floor(Math.random() * full.length)], st = t.items[i], d = S.DIR6[m & 7], fx = x + d[0], fy = y + d[1], fz = z + d[2], id = st.id;
   const take = () => { st.n--; if (st.n <= 0) t.items[i] = null; };
   const cx = fx + .5, cy = fy + .5, cz = fz + .5;
-  if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { id, n: 1, d: st.d, e: st.e })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
+  if (b === BID.dropper) { const tt = getTile(fx, fy, fz); if (tt && tt.items && insertItem(tt, { ...st, id, n: 1 })) take(); else { take(); dropItem(cx, cy - 0.2, cz, id, 1, [d[0] * 0.25, d[1] * 0.25 + 0.05, d[2] * 0.25], 5, st.d); } play('click'); return; }
   const fb = getBlock(fx, fy, fz);
   if (isArrow(id)) { const a = shootArrow(cx, cy, cz, d[0] * 1.1, d[1] * 1.1 + 0.1, d[2] * 1.1, null, 2); if (ITEMS[id].tipped != null) { a.potion = ITEMS[id].tipped; a.item = id; } take(); }
   else if (ITEMS[id].splash || ITEMS[id].lingering) { const e = shootArrow(cx, cy, cz, d[0] * 0.6, d[1] * 0.6 + 0.1, d[2] * 0.6, null, 0); e.thrown = id; scene.remove(e.mesh); e.mesh = R.itemMesh(id); e.mesh.scale.setScalar(0.3); scene.add(e.mesh); take(); }
@@ -9445,8 +9448,9 @@ function dispense(x, y, z, b, m) {
 }
 // put a stack into a container tile (furnace: input slot only); returns true when it fit completely
 function insertItem(t, st, slots) {
+  if (t.shulker && typeof isShulkerItem === 'function' && isShulkerItem(st.id)) return false; // no shulker box goes into a shulker box
   const list = slots || (t.type === 'furnace' ? [ITEMS[st.id].fuel && !SMELT[st.id] ? 1 : 0] : t.items.map((_, i) => i));
-  for (const i of list) { const s = t.items[i]; if (s && s.id === st.id && !s.e && !st.e && (s.d || 0) === (st.d || 0) && s.n < maxStack(st.id)) { const k = Math.min(st.n, maxStack(st.id) - s.n); s.n += k; st.n -= k; if (!st.n) return true; } }
+  for (const i of list) { const s = t.items[i]; if (s && same(s, st) && s.n < maxStack(st.id)) { const k = Math.min(st.n, maxStack(st.id) - s.n); s.n += k; st.n -= k; if (!st.n) return true; } }
   for (const i of list) if (!t.items[i]) { t.items[i] = { ...st }; st.n = 0; return true; }
   return false;
 }
@@ -9456,10 +9460,16 @@ function hopperTick(c, i, t) {
   const x = c.cx * 16 + (i & 15), y = (i >> 8) + MINY, z = c.cz * 16 + ((i >> 4) & 15);
   if (c.meta[i] & 8) return;
   let moved = false;
-  const below = getTile(x, y - 1, z) || cartsAt(x, y - 1, z).find(e => e.items);
-  if (below && below.items) { const k = t.items.findIndex(s => s); if (k >= 0) { const s = t.items[k], one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(below, one, below.type === 'furnace' ? [ITEMS[s.id].fuel && !SMELT[s.id] ? 1 : 0] : null)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(x, y - 1, z); } } }
-  const above = getTile(x, y + 1, z) || cartsAt(x, y + 1, z).find(e => e.items);
-  if (above && above.items) { if (above.loot) cartFillLoot(above); const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
+  // out through the spout: down, or sideways into the block it was placed against; a furnace takes it in its top (to smelt)
+  // or, from the side, in its fuel slot; a large chest is filled as one
+  const f = S.DIR6[c.meta[i] & 7] || S.DIR6[0], ox = x + f[0], oy = y + f[1], oz = z + f[2];
+  const outs = (() => { const pr = typeof chestPair === 'function' && chestPair(ox, oy, oz); if (pr) return [getTile(...pr.left), getTile(...pr.right)].filter(Boolean); const o = getTile(ox, oy, oz) || cartsAt(ox, oy, oz).find(e => e.items); return o ? [o] : []; })();
+  out: for (let k = 0; k < t.items.length; k++) { const s = t.items[k]; if (!s) continue; // the first item that fits goes (Java tries each slot)
+    for (const below of outs) { if (!below.items) continue; const one = { ...s, n: 1 }, slots = below.type === 'furnace' ? (f[1] < 0 ? [0] : ITEMS[s.id].fuel ? [1] : []) : null; if (slots && !slots.length) break;
+      if (insertItem(below, one, slots)) { s.n--; if (!s.n) t.items[k] = null; moved = true; rsNotify(ox, oy, oz); break out; } } }
+  const aboveL = (() => { const pr = typeof chestPair === 'function' && chestPair(x, y + 1, z); if (pr) { const a = getTile(...pr.left), b2 = getTile(...pr.right); return a && b2 && a.items && b2.items ? (a.items.some(Boolean) ? a : b2) : a || b2; } return null; })();
+  const above = aboveL || getTile(x, y + 1, z) || cartsAt(x, y + 1, z).find(e => e.items);
+  if (above && above.items) { if (above.loot) cartFillLoot(above); const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { ...s, n: 1 }; /* everything it carries goes along (a shulker box's contents, a name) */ if (insertItem(t, one)) { s.n--; if (!s.n) above.items[k] = null; moved = true; rsNotify(x, y + 1, z); } break; } }
   else for (const e of ENT) if (e.kind === 'item' && !e.dead && Math.abs(e.x - x - .5) < 0.7 && Math.abs(e.z - z - .5) < 0.7 && e.y >= y + 0.5 && e.y < y + 2) { if (insertItem(t, e.stack)) removeEnt(e); moved = true; break; }
   if (moved) { c.modified = c.edited = true; rsNotify(x, y, z); if (UI.screen) UI.renderScreen(); }
 }
@@ -9598,14 +9608,14 @@ function fireballTick(e) {
     if (hit) {
       removeEnt(e);
       if (e.small) {
-        if (hit === 'pl') { if (hurtPlayer(5 * DIFF_MUL(), 'fire', e.owner)) PL.fire = Math.max(PL.fire, 100); }
+        if (hit === 'pl') { if (hurtPlayer(diffDmg(5), 'fire', e.owner)) PL.fire = Math.max(PL.fire, 100); }
         else if (typeof hit === 'object') { hurtMob(hit, 5, e.owner === PL ? PL : null); if (!hit.def.fireproof) hit.fire = 100; }
         else { const bx = Math.floor(e.x), by = Math.floor(e.y), bz = Math.floor(e.z); if (!getBlock(bx, by, bz) && SOLID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
       } else if (e.dragon) { // the dragon's fireball: no blast, a lingering cloud of dragon's breath where it lands
         spawnCloud(nx, Math.floor(cy) + (hit === true ? 1.05 : 0.05), nz, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 600 }); play('fizz', { vol: 0.6 });
       } else {
         if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
-        if (hit === 'pl') hurtPlayer(6 * DIFF_MUL(), 'explosion', e.owner);
+        if (hit === 'pl') hurtPlayer(diffDmg(6), 'explosion', e.owner);
         explode(nx, cy, nz, 1, true);
       }
       return;
@@ -9854,7 +9864,7 @@ function golemAI(e, dist) {
     const td = Math.hypot(t.x - e.x, t.z - e.z);
     if (td < e.w + (t.w || 0.3) + 1 && Math.abs(t.y - e.y) < 2 && e.attackCd <= 0) {
       e.attackCd = 20; e.swing = 10; play('golem'); const dmg = 7 + Math.random() * 14;
-      if (t === PL) { if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) PL.vy = 0.6; } else { hurtMob(t, dmg, e, 0, 0); t.vy = 0.6; }
+      if (t === PL) { if (hurtPlayer(diffDmg(dmg), 'mob', e)) PL.vy = 0.6; } else { hurtMob(t, dmg, e, 0, 0); t.vy = 0.6; }
     }
   } else {
     if (!e.goal && Math.random() < 1 / 200) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12];
@@ -9914,7 +9924,7 @@ function dragonAI(e) {
       break; }
     case 'charge':
       tx = PL.x; ty = PL.y + 1; tz = PL.z; sp = 0.65;
-      if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(10 * DIFF_MUL(), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
+      if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(diffDmg(10), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
       if (e.phaseT > 200 || !plTargetable()) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
       break;
     case 'land': tx = C[0]; ty = C[1] + 12; tz = C[2] + 0.5; sp = 0.35; if (Math.hypot(e.x - tx, e.z - tz) < 3) { e.phase = 'descend'; e.phaseT = 0; } break;
@@ -10217,7 +10227,7 @@ function bulletTick(e) {
   e.vx += (dx / d * sp - e.vx) * 0.15; e.vy += (dy / d * sp - e.vy) * 0.15; e.vz += (dz / d * sp - e.vz) * 0.15;
   e.x += e.vx; e.y += e.vy; e.z += e.vz;
   if (SOLID[getBlock(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z))]) { removeEnt(e); return; }
-  if (d < 0.8) { removeEnt(e); if (hurtPlayer(4 * DIFF_MUL(), 'mob', e.owner)) addEffect(PL, 'levitation', 200, 0); }
+  if (d < 0.8) { removeEnt(e); if (hurtPlayer(diffDmg(4), 'mob', e.owner)) addEffect(PL, 'levitation', 200, 0); }
   if (Math.random() < 0.3) R.simpleParticle(e.x, e.y + 0.15, e.z, [1, 1, 0.9], { size: 0.08, vy: 0, grav: 0, life: 0.3 });
 }
 function wolfAI(e, dist) {
@@ -10466,6 +10476,7 @@ function trySpawnAxolotl() {
   for (let y = S.SEA; y > MINY + 2; y--) {
     if (getBlock(x, y, z) !== BID.water || getBlock(x, y - 1, z) !== BID.clay) continue;
     if (getLight(x, y, z) !== 0) return; // no sky light and no block light
+    if (S.caveBiomeAt(W.seed, x, y, z, topY(x, z), W.exp) !== S.BIOK.lush_caves) return; // 1.18: only in lush caves
     const n = 1 + ((Math.random() * 4) | 0), v = MOBDEF.axolotl.variant();
     for (let i = 0; i < n; i++) spawnMob('axolotl', x + .5 + (Math.random() - .5), y + .1, z + .5 + (Math.random() - .5), { variant: Math.random() < 0.7 ? v : undefined });
     return;
@@ -10484,7 +10495,7 @@ function trySpawnGlowSquid() {
   if (W.dim !== 0 || countMobs(e => e.type === 'glow_squid' && Math.hypot(e.x - PL.x, e.z - PL.z) < 64) >= 5) return;
   const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 32, x = Math.floor(PL.x + Math.cos(a) * r), z = Math.floor(PL.z + Math.sin(a) * r);
   if (!isLoaded(x, z)) return;
-  for (let y = 30; y > 2; y--) {
+  for (let y = 30; y > MINY + 2; y--) { // (1.18: all the way down)
     if (getBlock(x, y, z) !== BID.water || getBlock(x, y + 1, z) !== BID.water) continue;
     if (getLight(x, y, z) !== 0) return;
     for (let i = 1 + ((Math.random() * 3) | 0); i > 0; i--) spawnMob('glow_squid', x + .5, y, z + .5);
@@ -10996,7 +11007,7 @@ function frameHit(e) { // attack: knock the item out, then the frame itself
   rsNotify(e.ax, e.ay, e.az); vibrate(e.x, e.y, e.z);
 }
 function frameUse(e, h) { // use: put the held item in, or turn the item
-  if (!e.item) { if (!h) return; e.item = { id: h.id, n: 1 }; if (h.d != null) e.item.d = h.d; if (h.e) e.item.e = h.e; consume(); play('place', { mat: 'wood' }); }
+  if (!e.item) { if (!h) return; e.item = { ...h, n: 1 }; /* a map keeps its number, a name stays */ consume(); play('place', { mat: 'wood' }); }
   else { e.rot = (e.rot + 1) & 7; play('click', { pitch: 0.8 }); }
   frameRebuild(e); rsNotify(e.ax, e.ay, e.az); vibrate(e.x, e.y, e.z); swing();
 }
@@ -11276,7 +11287,7 @@ function tridentRelease(h) {
 function tridentHit(e, o) {
   const st = e.trident;
   let dmg = 8; if (st && AQUATIC.has(o.type)) dmg += 2.5 * enchLv(st, 'impaling');
-  if (o === PL) { if (!creative()) hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e); }
+  if (o === PL) { if (!creative()) hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e); }
   else { HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e); hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); HURTPROJ = null; }
   if (st && enchLv(st, 'channeling') && o.type === 'villager' && W.thunder > 0.5 && W.dim === 0 && e.owner === PL && typeof advGrant === 'function') advGrant('adventure/very_very_frightening');
   if (st && enchLv(st, 'channeling') && W.thunder > 0.5 && W.dim === 0 && (getLight(Math.floor(o.x), Math.floor(o.y + 1), Math.floor(o.z)) >> 4) === 15) strikeLightning(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z), false);
@@ -11437,7 +11448,7 @@ function jukeboxUse(x, y, z, h) {
   const told = () => { if (typeof MP !== 'undefined' && MP.on && typeof mpTileChanged === 'function') mpTileChanged(x, y, z); }; // the others hear it start or stop (a jukebox already holding its tile made no news)
   if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); told(); return true; }
   if (!h || !ITEMS[h.id].disc) return false;
-  t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
+  t.items[0] = { ...h, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
   UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z); told();
   if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
   return true;
@@ -11875,7 +11886,7 @@ function cartTransfer(e) {
   const x = Math.floor(e.x), y = e.ry, z = Math.floor(e.z);
   if (e.ctype === 'hopper' && !e.activated) {
     const above = getTile(x, y + 1, z);
-    if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { id: s.id, n: 1, d: s.d, e: s.e }; if (insertItem(e, one)) { s.n--; if (!s.n) above.items[k] = null; const c = chunkAt(x >> 4, z >> 4); if (c) c.modified = c.edited = true; } break; } }
+    if (above && above.items) { const slots = above.type === 'furnace' ? [2] : above.items.map((_, k) => k); for (const k of slots) { const s = above.items[k]; if (!s) continue; const one = { ...s, n: 1 }; /* everything it carries goes along (a shulker box's contents, a name) */ if (insertItem(e, one)) { s.n--; if (!s.n) above.items[k] = null; const c = chunkAt(x >> 4, z >> 4); if (c) c.modified = c.edited = true; } break; } }
     for (const it of ENT) if (it.kind === 'item' && !it.dead && Math.abs(it.x - e.x) < 1 && Math.abs(it.z - e.z) < 1 && it.y >= e.y - 0.2 && it.y < e.y + 1.5) { if (insertItem(e, it.stack)) removeEnt(it); break; }
   }
   if (UI.screen && GUI.ctx && GUI.ctx.cart === e) UI.renderScreen();
@@ -12383,7 +12394,7 @@ function beeAI(e, dist) {
     fly(PL.x, PL.y + 1.2, PL.z, 0.2);
     if (dist < 1.5 && e.attackCd <= 0) {
       e.attackCd = 20;
-      if (hurtPlayer(2 * DIFF_MUL() || 0, 'mob', e) !== false && PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 360 : 200, 0);
+      if (hurtPlayer(diffDmg(2) || 0, 'mob', e) !== false && PL.difficulty >= 2) addEffect(PL, 'poison', PL.difficulty === 3 ? 360 : 200, 0);
       e.stung = true; e.stungT = 0; e.target = null; hidePart(e, 'sting', false);
     }
     return;
@@ -12930,7 +12941,7 @@ function witherSkullTick(e) {
     if (hit) {
       removeEnt(e);
       const dur = PL.difficulty === 3 ? 800 : PL.difficulty === 2 ? 200 : 0;
-      if (who === PL) { hurtPlayer(8 * DIFF_MUL(), 'wither', e.owner); if (dur) addEffect(PL, 'wither', dur, 1); }
+      if (who === PL) { hurtPlayer(diffDmg(8), 'wither', e.owner); if (dur) addEffect(PL, 'wither', dur, 1); }
       else if (who) { hurtMob(who, 8, e.owner); if (dur) addEffect(who, 'wither', dur, 1); if (who.hp <= 0 && !who.dead) witherRose(who); }
       explode(e.x, e.y, e.z, e.blue ? 1.5 : 1);
       return;
@@ -13052,7 +13063,7 @@ function guardianAI(e, dist) {
     if (!canSee(e.x, e.y + e.h / 2, e.z, t.x, ty, t.z)) { e.beam = 0; swimToward(e, t.x, ty, t.z, 0.08); }
     else {
       e.beam = (e.beam || 0) + 1; e.vx *= 0.8; e.vy *= 0.8; e.vz *= 0.8; physMove(e, e.vx, e.vy, e.vz, 0);
-      if (e.beam >= (d.elder ? 60 : 80)) { e.beam = 0; e.attackCd = 40; if (t === PL) hurtPlayer((d.elder ? 8 : 6) * DIFF_MUL(), 'magic', e); else hurtMob(t, d.elder ? 8 : 6, e); }
+      if (e.beam >= (d.elder ? 60 : 80)) { e.beam = 0; e.attackCd = 40; if (t === PL) hurtPlayer(diffDmg(d.elder ? 8 : 6), 'magic', e); else hurtMob(t, d.elder ? 8 : 6, e); }
     }
     e.spikes = e.beam > 0; // spikes out while it holds still (thorns)
   } else {
@@ -14774,7 +14785,10 @@ function zombieSiege(vs) {
 <script>/* js/inventory.js */
 // Inventory model + container screens with Java Edition click semantics.
 const INV = { slots: new Array(36).fill(null), armor: new Array(4).fill(null), off: null, sel: 0, cursor: null, craft2: new Array(4).fill(null), craft3: new Array(9).fill(null) };
-const same = (a, b) => a && b && a.id === b.id && (a.d || 0) === (b.d || 0) && !ITEMS[a.id].dur && !a.e && !b.e && a.name === b.name && (a.v || 0) === (b.v || 0) && JSON.stringify(a.bp || null) === JSON.stringify(b.bp || null);
+// two stacks merge only when everything they carry matches (a rocket's flight, a stew's effect, a lodestone compass's target,
+// a shulker box's contents, a banner's patterns, a name...); empty values count as missing
+const stackSig = s => { const o = []; for (const k of Object.keys(s).sort()) if (k !== 'n' && k !== 'brewed' && s[k]) o.push(k, s[k]); return JSON.stringify(o); };
+const same = (a, b) => !!(a && b && a.id === b.id && !ITEMS[a.id].dur && !a.e && !b.e && stackSig(a) === stackSig(b));
 INV.add = function (st) { // returns leftover count; mutates nothing on success except slots
   let n = st.n; const max = maxStack(st.id);
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
@@ -14787,6 +14801,12 @@ INV.count = id => INV.slots.reduce((a, s) => a + (s && s.id === id ? s.n : 0), 0
 INV.remove = function (id, n) { for (let i = 35; i >= 0 && n > 0; i--) { const s = INV.slots[i]; if (s && s.id === id) { const m = Math.min(n, s.n); s.n -= m; n -= m; if (!s.n) INV.slots[i] = null; } } UI.hudDirty = true; };
 INV.giveOrDrop = st => { const left = INV.add(st); if (left > 0) dropItem(PL.x, PL.y + 1.2, PL.z, st.id, left, null, 40, st.d, st); };
 
+// furnace fuel as in Java 1.18, by kind, so every wood type and colour gets it (nether wood never burns)
+for (const d of ITEMS) { if (!d || /^(crimson|warped)_/.test(d.key)) continue; const k = d.key;
+  const f = /_door$/.test(k) && k !== 'iron_door' ? 200 : /_button$/.test(k) && !/stone|blackstone/.test(k) ? 100 : /_pressure_plate$/.test(k) && /^(oak|spruce|birch|jungle|acacia|dark_oak)_/.test(k) ? 300
+    : /_banner$/.test(k) || (/_trapdoor$/.test(k) && k !== 'iron_trapdoor') ? 300 : ['jukebox', 'trapped_chest', 'smithing_table', 'crossbow', 'fishing_rod'].includes(k) ? 300 : k === 'dried_kelp_block' ? 4001 : null;
+  if (f != null) d.fuel = f; }
+for (const d of ITEMS) if (d && /^(stripped_)?(oak|spruce|birch|jungle|acacia|dark_oak)_(log|wood)$/.test(d.key)) { d.fuel = 300; if (!SMELT[d.id]) SMELT[d.id] = [IID.charcoal, 0.15]; } // every log and wood block, stripped or not, burns and turns to charcoal
 // ---------- screens ----------
 const GUI = { slots: [], el: null, type: null, ctx: null, drag: null, hover: -1, lastClick: { t: 0, i: -1 }, creativeTab: 'all', search: '' };
 function slotRef(arr, i, opts = {}) { return { get: () => arr[i], set: v => { arr[i] = v; }, ...opts }; }
@@ -14806,6 +14826,7 @@ function buildSlots(type, ctx) {
   } else if (type === 'chest' || type === 'hopper' || type === 'dispenser') {
     const t = ctx.cart || getTile(ctx.x, ctx.y, ctx.z); ctx.tile = t;
     for (let i = 0; i < t.items.length; i++) L.push(slotRef(t.items, i, t.shulker ? { group: 'cont', accepts: st => !st || !isShulkerItem(st.id) } : { group: 'cont' })); // no shulker boxes in shulker boxes
+    if (ctx.pair) { const t2 = getTile(ctx.pair[0], ctx.pair[1], ctx.pair[2]); if (t2 && Array.isArray(t2.items)) { ctx.pairC = ctx.pairC || { x: ctx.pair[0], y: ctx.pair[1], z: ctx.pair[2] }; for (let i = 0; i < t2.items.length; i++) L.push(slotRef(t2.items, i, { group: 'cont' })); } } // a large chest's other half
   } else if (type === 'horse') {
     const e = ctx.horse;
     L.push(slotRef(e.gear, 0, { group: 'hsad', accepts: st => !st || st.id === IID.saddle, max: 1 }));
@@ -14879,7 +14900,7 @@ function clickSlot(i, btn, shift) {
     if (sl.make) { if (cur) return; const g = sl.make(); sl.take(); if (shift) INV.giveOrDrop(g); else INV.cursor = g; play('click', { vol: 0.3 }); return afterClick(); }
     if (shift) { for (let k = 0; k < 64; k++) { const rr = sl.get(); if (!rr || !rr.id) break; if (r.id !== rr.id) break; const left = INV.add({ ...rr }); if (left) { if (left < rr.n) { INV.giveOrDrop({ ...rr, n: left }); sl.take(); } break; } sl.take(); } } // nothing fits: the ingredients stay
     else if (!cur) { INV.cursor = { ...r }; sl.take(); }
-    else if (cur.id === r.id && !ITEMS[r.id].dur && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); }
+    else if (same(cur, r) && cur.n + r.n <= maxStack(r.id)) { cur.n += r.n; sl.take(); } // (a rocket of another flight time doesn't join the stack in hand)
     play('click', { vol: 0.3 }); return afterClick();
   }
   if (shift && st) { quickMove(i); return afterClick(); }
@@ -14927,7 +14948,7 @@ function quickMove(i) {
     if (T === 'creative') targets = [];
   } else targets = [...idx(s => s.group === 'hot').reverse(), ...idx(s => s.group === 'main').reverse()].reverse();
   if (!targets.length) return;
-  if (g !== 'main' && g !== 'hot') targets = [...idx(s => s.group === 'main'), ...idx(s => s.group === 'hot')];
+  if (g !== 'main' && g !== 'hot') { targets = [...idx(s => s.group === 'main'), ...idx(s => s.group === 'hot')]; if (g === 'cont' || sl.takeOnly) targets.reverse(); } // Java: out of a chest or a furnace's output, from the hotbar's right end; out of a grid or armour, from the top of the inventory
   for (const k of targets) { const t = GUI.slots[k].get(); if (t && same(t, st)) { const m = Math.min(st.n, maxStack(st.id) - t.n); t.n += m; st.n -= m; if (!st.n) break; } }
   if (st.n) for (const k of targets) { const s2 = GUI.slots[k]; if (!s2.get() && (!s2.accepts || s2.accepts(st))) { const m = Math.min(st.n, s2.max || maxStack(st.id)); s2.set({ ...st, n: m }); st.n -= m; if (!st.n) break; } }
   if (!st.n) sl.set(null);
@@ -15384,6 +15405,8 @@ function playerTick() {
     else if (PL.onGround) {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
+      { const fx = Math.floor(PL.x), fy = Math.floor(PL.y - 0.01), fz = Math.floor(PL.z); // landing on farmland can trample it back to dirt (Java: the chance is the fall height less half a block)
+        if (PL.fallDist > 0.5 && getBlock(fx, fy, fz) === BID.farmland && Math.random() < PL.fallDist - 0.5) { const cb = getBlock(fx, fy + 1, fz); if (cb && BLOCKS[cb].plant) { for (const [iid, n] of blockDrops(cb, getMeta(fx, fy + 1, fz), null).items) dropItem(fx + .5, fy + 1.3, fz + .5, iid, n); setBlock(fx, fy + 1, fz, 0); } setBlock(fx, fy, fz, 3); } }
       if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       fallLanded();
       PL.fallDist = 0;
@@ -15637,8 +15660,8 @@ function interactBlock(t, dry) {
     case BID.stonecutter: if (!dry) UI.openScreen('stonecutter', { x, y, z }); return true;
     case BID.cartography_table: if (!dry) UI.openScreen('cartography', { x, y, z }); return true;
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
-    case BID.trapped_chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); setMeta(x, y, z, m | 32); rsNotify(x, y, z); rsNotify(x, y - 1, z); UI.openScreen('chest', { x, y, z, title: '덫 상자' }); } return true;
-    case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
+    case BID.trapped_chest: if (!dry) openChest(x, y, z, true); return true;
+    case BID.chest: if (!dry) { piglinAnger(x, y, z); openChest(x, y, z, false); } return true;
     case BID.iron_door: return false;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
     case BID.red_bed: if (!dry) trySleep(x, y, z); return true;
@@ -15651,6 +15674,29 @@ function interactBlock(t, dry) {
   return false;
 }
 // beds (Java's BedBlock / ServerPlayerEntity.trySleep): meta & 3 the facing, & 4 the head half
+// two chests of a kind facing the same way side by side make one large chest (Java): a chest placed beside a single one joins
+// it (not while sneaking), and the pair is kept in the blocks (meta 4: the other half is to the left as seen from the front,
+// 8: to the right), so a third chest beside a large one stays single. Each half keeps its own 27 slots.
+function chestLeftOf(x, y, z) { const d = DIRS[getMeta(x, y, z) & 3]; return [-d[2], d[0]]; }
+function chestPair(x, y, z) {
+  const b = getBlock(x, y, z); if (b !== BID.chest && b !== BID.trapped_chest) return null;
+  const m = getMeta(x, y, z), f = m & 3, L = chestLeftOf(x, y, z), side = m & 4 ? 1 : m & 8 ? -1 : 0; if (!side) return null;
+  const px = x + L[0] * side, pz = z + L[1] * side, pm = getMeta(px, y, pz);
+  if (getBlock(px, y, pz) !== b || (pm & 3) !== f || !(pm & (side > 0 ? 8 : 4))) return null;
+  return side > 0 ? { left: [px, y, pz], right: [x, y, z] } : { left: [x, y, z], right: [px, y, pz] };
+}
+function chestJoin(x, y, z) {
+  const b = getBlock(x, y, z), f = getMeta(x, y, z) & 3, L = chestLeftOf(x, y, z);
+  for (const side of [1, -1]) { const px = x + L[0] * side, pz = z + L[1] * side, pm = getMeta(px, y, pz);
+    if (getBlock(px, y, pz) !== b || (pm & 3) !== f || chestPair(px, y, pz)) continue;
+    setMeta(px, y, pz, (pm & ~12) | (side > 0 ? 8 : 4)); setMeta(x, y, z, (getMeta(x, y, z) & ~12) | (side > 0 ? 4 : 8)); return; }
+}
+function openChest(x, y, z, trapped) {
+  const pr = chestPair(x, y, z), parts = pr ? [pr.left, pr.right] : [[x, y, z]];
+  for (const [a, b, c] of parts) { if (!getTile(a, b, c)) setTile(a, b, c, { type: 'chest', items: new Array(27).fill(null) }); if (trapped) { setMeta(a, b, c, getMeta(a, b, c) | 32); rsNotify(a, b, c); rsNotify(a, b - 1, c); } }
+  const [a, b, c] = parts[0];
+  UI.openScreen('chest', pr ? { x: a, y: b, z: c, pair: pr.right, title: trapped ? '큰 덫 상자' : '큰 상자' } : { x, y, z, title: trapped ? '덫 상자' : undefined });
+}
 function bedParts(x, y, z) { const m = getMeta(x, y, z), d = DIRS[m & 3], s = (m & 4) ? -1 : 1; const o = [x + d[0] * s, y, z + d[2] * s]; return m & 4 ? { head: [x, y, z], foot: o, f: m & 3 } : { head: o, foot: [x, y, z], f: m & 3 }; }
 // where someone getting out of a bed stands: a free spot around it with a floor (BedBlock.findWakeUpPosition), or on top
 function bedWakeSpot(x, y, z) {
@@ -15889,6 +15935,7 @@ function placeBlock(t, d) {
   if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
+  if (id === BID.hopper) meta = t.ny === 0 ? S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === 0 && v[2] === -t.nz) : 0; // against a block's side it points into that block (Java), else down
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
   if (id === BID.vine && (t.ny !== 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)])) return;
   if (id === BID.lily_pad && below !== 27) return;
@@ -15944,7 +15991,7 @@ function placeBlock(t, d) {
   if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
   biomePlaced(x, y, z, id, meta); blocks6Placed(x, y, z, id, meta, PL.held());
   if (id === BID.tripwire || id === BID.tripwire_hook_block) tripRefresh(x, y, z);
-  if (id === BID.chest || id === BID.trapped_chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
+  if (id === BID.chest || id === BID.trapped_chest) { setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); if (!PL.sneaking) chestJoin(x, y, z); }
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }
 function pickBlock() {
@@ -16357,7 +16404,7 @@ UI.openScreen = (type, ctx) => {
 };
 UI.closeScreen = () => {
   if (!UI.screen) return;
-  if (UI.screen === 'chest') { play('door', { vol: 0.5 }); const c = GUI.ctx; if (c && c.x != null && getBlock(c.x, c.y, c.z) === BID.trapped_chest) { setMeta(c.x, c.y, c.z, getMeta(c.x, c.y, c.z) & ~32); rsNotify(c.x, c.y, c.z); rsNotify(c.x, c.y - 1, c.z); } }
+  if (UI.screen === 'chest') { play('door', { vol: 0.5 }); const c = GUI.ctx; for (const [x, y, z] of c && c.x != null ? [[c.x, c.y, c.z], ...(c.pair ? [c.pair] : [])] : []) if (getBlock(x, y, z) === BID.trapped_chest) { setMeta(x, y, z, getMeta(x, y, z) & ~32); rsNotify(x, y, z); rsNotify(x, y - 1, z); } }
   closeScreenItems(); UI.screen = null; $('screen').hidden = true; $('tooltip').hidden = true; UI.hudDirty = true; grabLock();
 };
 // creative list: colour/material variants sit right after their base block
@@ -16501,7 +16548,7 @@ function showMenu(name, data) {
   } else if (name === 'create') {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
-    h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}${btn('실험 기능(동굴과 절벽): ' + (c.exp ? '켜짐' : '꺼짐'), 'cexp')}<p class="muted">켜면 무성한 동굴이 생성됩니다 (1.17 실험용 데이터 팩)</p><label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
+    h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}<label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
   } else if (name === 'account') {
     h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
@@ -16621,7 +16668,7 @@ function runCommand(cmd) {
     case 'weather': W.rainTarget = a[0] === 'rain' || a[0] === 'thunder' ? 1 : 0; W.thunderOn = a[0] === 'thunder'; W.rainTimer = W.thunderTimer = 6000 + Math.random() * 12000; ok(a[0] === 'thunder' ? '날씨를 뇌우로 변경했습니다' : '날씨를 변경했습니다'); break;
     case 'give': { const k = (a[0] || '').replace('minecraft:', ''); const id = IID[k] != null ? IID[k] : ITEMS.findIndex(d => d && d.name === a[0]); if (id == null || id < 0 || !ITEMS[id]) return err('알 수 없는 아이템: ' + a[0]); const n = Math.max(1, Math.min(6400, +a[1] || 1)); let left = n; while (left > 0) { const m = Math.min(left, maxStack(id)); INV.giveOrDrop({ id, n: m }); left -= m; } ok(`[${itemName(id)}] ${n}개를 주었습니다`); break; }
     case 'teleport': case 'tp': { if (a[0] && a[0].startsWith('@')) a.shift(); const x = num(a[0], PL.x), y = num(a[1], PL.y), z = num(a[2], PL.z); if ([x, y, z].some(isNaN)) return err('좌표가 잘못되었습니다'); PL.x = PL.px = x; PL.y = PL.py = y; PL.z = PL.pz = z; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; ok(`${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}(으)로 순간이동했습니다`); break; }
-    case 'summon': { const t = (a[0] || '').replace('minecraft:', ''); if (!MOBDEF[t] || t === 'player') return err('알 수 없는 몹: ' + a[0]); const [dx, , dz] = lookDir(); spawnMob(t, PL.x + dx * 3, PL.y, PL.z + dz * 3); ok(t + ' 소환'); break; }
+    case 'summon': { const t = (a[0] || '').replace('minecraft:', ''); if (!MOBDEF[t] || t === 'player') return err('알 수 없는 몹: ' + a[0]); const [dx, , dz] = lookDir(); const at = a.length >= 4 ? [num(a[1], PL.x), num(a[2], PL.y), num(a[3], PL.z)] : [PL.x + dx * 3, PL.y, PL.z + dz * 3]; if (at.some(isNaN)) return err('좌표가 잘못되었습니다'); spawnMob(t, at[0], at[1], at[2]); ok(t + ' 소환'); break; } // /summon <몹> [x y z]
     case 'locate': { // nearest structure, like Java's /locate
       const k = (a[0] || '').replace('minecraft:', ''); let best = null;
       const near = o => { if (!o) return; const d = Math.hypot(o.x - PL.x, o.z - PL.z); if (!best || d < best[2]) best = [o.x, o.z, d]; };
@@ -16669,7 +16716,10 @@ function runCommand(cmd) {
       const key = (a[n] || '').replace('minecraft:', ''), vk = typeof VKEY !== 'undefined' && VKEY[key]; const id = vk ? vk[0] : BID[key] != null ? BID[key] : key === 'air' ? 0 : null, m = vk ? vk[1] : 0;
       if (id == null) return err('알 수 없는 블록: ' + a[n]);
       const [x0, y0, z0, x1 = x0, y1 = y0, z1 = z0] = p; const vol = (Math.abs(x1 - x0) + 1) * (Math.abs(y1 - y0) + 1) * (Math.abs(z1 - z0) + 1); if (vol > 32768) return err('영역이 너무 큽니다 (최대 32768 블록)');
-      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(MINY, Math.min(y0, y1)); y <= Math.min(MAXY - 1, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { if (a[n + 1] === 'keep' && getBlock(x, y, z)) continue; setBlock(x, y, z, id, m); cnt++; }
+      let cnt = 0; for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let y = Math.max(MINY, Math.min(y0, y1)); y <= Math.min(MAXY - 1, Math.max(y0, y1)); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) { const mode = a[n + 1], edge = x === x0 || x === x1 || y === y0 || y === y1 || z === z0 || z === z1; // Java's fill modes
+        if (mode === 'keep' && getBlock(x, y, z)) continue; if (mode === 'outline' && !edge) continue; if (mode === 'replace' && a[n + 2] && getBlock(x, y, z) !== BID[a[n + 2].replace('minecraft:', '')]) continue;
+        if (mode === 'destroy' && getBlock(x, y, z)) for (const [iid, k] of blockDrops(getBlock(x, y, z), getMeta(x, y, z), null).items) dropItem(x + .5, y + .3, z + .5, iid, k);
+        setBlock(x, y, z, mode === 'hollow' && !edge ? 0 : id, mode === 'hollow' && !edge ? 0 : m); cnt++; }
       ok(c === 'fill' ? cnt + '개 블록을 채웠습니다' : '블록을 바꿨습니다'); break;
     }
     case 'say': case 'me': chatMsg((c === 'me' ? '* 플레이어 ' : '[플레이어] ') + a.join(' '), '#ffffff'); break;
@@ -16682,7 +16732,7 @@ function runCommand(cmd) {
     case 'difficulty': { const d = { peaceful: 0, easy: 1, normal: 2, hard: 3 }[a[0]] ?? +a[0]; if (!(d >= 0 && d <= 3)) return err('0-3 사이로 입력하세요'); PL.difficulty = d; if (d === 0) for (const e of ENT) if (e.kind === 'mob' && e.def.hostile) removeEnt(e); ok('난이도: ' + DIFF_NAME[d]); break; }
     case 'xp': case 'experience': { const r = a[0] === 'add' || a[0] === 'give' ? a.slice(1).filter(v => !v.startsWith('@')) : a; const v = Math.max(0, parseInt(r[0]) || 0); if (/l$/i.test(r[0] || '') || r[1] === 'levels') { PL.level += v; UI.hudDirty = true; ok('레벨 ' + v + ' 추가'); } else { addXP(v); ok('경험치 ' + v + ' 추가'); } break; }
     case 'spawnpoint': PL.spawn = [Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)]; PL.spawnBed = false; ok('스폰 지점을 설정했습니다'); break;
-    case 'clear': INV.slots.fill(null); INV.armor.fill(null); UI.hudDirty = true; ok('인벤토리를 비웠습니다'); break;
+    case 'clear': INV.slots.fill(null); INV.armor.fill(null); INV.off = null; UI.hudDirty = true; ok('인벤토리를 비웠습니다'); break;
     case 'keepinventory': W.keepInv = !W.keepInv; ok('인벤토리 보존: ' + (W.keepInv ? '켜짐' : '꺼짐')); break;
     default: err('알 수 없는 명령어입니다. /help 를 입력하세요');
   }
@@ -17737,6 +17787,7 @@ async function mpAnswerInvite(code) {
 }
 const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
 // a guest's request to whoever runs its dimension (the host, or in a server world the dimension's runner)
+const MP_AUTH_PLACED = new Set(['blast', 'drop', 'prime', 'summon', 'veh', 'xp']); // (requests that only place something: the server stamps a forwarded one as from the forwarder)
 const mpToAuth = o => mpSend({ ...o, dim: o.dim != null ? o.dim : W.dim }, MP.server ? 'auth' : undefined);
 const mpRelay = () => MP.role === 'host' && !MP.server; // a host passes guests' messages on; a server does that itself
 const mpSkin = () => { // a custom skin travels as a small PNG
@@ -17885,6 +17936,9 @@ function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvat
 // ---------- message handling ----------
 function mpHandle(m, from) {
   const host = MP.role === 'host';
+  // a request for a dimension's runner that arrived just after this player left that dimension: hand it on to whoever runs
+  // it now, so a dropped item or an explosion doesn't land at the same spot in the wrong world
+  if (host && MP.server && m.dim != null && m.dim !== W.dim && MP_AUTH_PLACED.has(m.t)) { if ((m.hop | 0) < 3) mpSend({ ...m, hop: (m.hop | 0) + 1 }, 'auth'); return; }
   switch (m.t) {
     case 'join': if (!host || MP.server) return; { // a new guest: hand over the world's seed, clock and what has been edited
       const p = { id: from, name: String(m.name || '손님').slice(0, 16), skin: m.skin || { tex: 'steve', slim: false }, s: null }; MP.peers.set(from, p);
@@ -18019,6 +18073,7 @@ function mpApplyTile(m, from) {
     else c.tiles.set(i, m.tile);
     c.modified = c.edited = true; if (/^(furnace|brewing|campfire)$/.test(m.tile.type)) c.hasFurnace = true; // so it keeps working here
     if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) UI.renderScreen(); }
+    const pc = GUI.ctx && GUI.ctx.pairC; if (pc && pc.x === m.x && pc.y === m.y && pc.z === m.z) { pc.mpBase = mpJ(c.tiles.get(i)); if (UI.screen) { GUI.slots = buildSlots(GUI.type, GUI.ctx); UI.renderScreen(); } }
     if (m.tile.type === 'jukebox') { const t = c.tiles.get(i), k = m.x + ',' + m.y + ',' + m.z, st = t.items && t.items[0]; // someone else's record: heard here too
       if (t.playing && st && ITEMS[st.id] && ITEMS[st.id].disc) { if (!PLAYING.has(k)) playDisc(ITEMS[st.id].key.replace('music_disc_', ''), m.x, m.y, m.z); } else stopDisc(m.x, m.y, m.z); } }
   else if (host && !MP.server) { const T = W.meta.mpTiles || (W.meta.mpTiles = {}); (T[m.dk] || (T[m.dk] = {}))[i] = m.tile; }
@@ -18051,6 +18106,7 @@ function mpTileSlots(m, from) {
   if (m.rest) for (const k of Object.keys(m.rest)) if (k !== 'type') t[k] = m.rest[k];
   c.modified = c.edited = true;
   if (GUI.ctx && GUI.ctx.x === m.x && GUI.ctx.y === m.y && GUI.ctx.z === m.z) { GUI.ctx.mpBase = mpJ(t); if (UI.screen) UI.renderScreen(); }
+  { const pc = GUI.ctx && GUI.ctx.pairC; if (pc && pc.x === m.x && pc.y === m.y && pc.z === m.z) { pc.mpBase = mpJ(t); if (UI.screen) UI.renderScreen(); } }
   if (typeof rsNotify === 'function') rsNotify(m.x, m.y, m.z);
   mpSend(msg(mpJ(t))); // everyone (the guest too) gets what the chest now holds
 }
@@ -18470,7 +18526,7 @@ function mpBlastSelf(x, y, z, power) {
   if (PL.dead || PL.mode === 'creative' || PL.mode === 'spectator') return;
   const rad = power * 2, cx = PL.x, cy = PL.y + (PL.h || 1.8) / 2, cz = PL.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
   const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1), kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-  hurtPlayer(dmg * DIFF_MUL(), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
+  hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
 }
 function mpGotBoom(m, from) {
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
@@ -18530,7 +18586,7 @@ function mpArrowAtGuest(e) { // host-side arrows also hit guests where they stan
   if (e.stuck || e.thrown || e.owner === PL) return false;
   for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative') continue;
     if (e.x > s.x - 0.4 && e.x < s.x + 0.4 && e.z > s.z - 0.4 && e.z < s.z + 0.4 && e.y > s.y && e.y < s.y + 1.8) {
-      const dmg = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) * e.dmgMul); mpSend({ t: 'hurt', dmg: dmg * DIFF_MUL(), cause: 'arrow' }, p.id); mpSend({ t: 'kb', vx: e.vx * 0.3, vy: 0.2, vz: e.vz * 0.3 }, p.id); removeEnt(e); return true; } }
+      const dmg = Math.ceil(Math.hypot(e.vx, e.vy, e.vz) * e.dmgMul); mpSend({ t: 'hurt', dmg: diffDmg(dmg), cause: 'arrow' }, p.id); mpSend({ t: 'kb', vx: e.vx * 0.3, vy: 0.2, vz: e.vz * 0.3 }, p.id); removeEnt(e); return true; } }
   return false;
 }
 
@@ -18744,7 +18800,7 @@ function mpInstall() {
   const sx = spawnXP; spawnXP = function (x, y, z, amt) { if (MP.role === 'guest' && !MP.allowSpawn && W.active) { if (amt > 0) mpToAuth({ t: 'xp', x, y, z, v: amt }); return; } return sx.apply(this, arguments); }; // shared orbs too
   // a block entity made by a player's own action (a placed furnace, chest, sign...) reaches the others right after the block
   const st0 = setTile; setTile = function (x, y, z, t) { st0.apply(this, arguments); if (MP.on && MP.local && !MP.applying && t) queueMicrotask(() => mpTileChanged(x, y, z)); };
-  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); }
+  const ac = afterClick; afterClick = function () { ac.apply(this, arguments); const c = GUI.ctx; if (MP.on && c && c.x != null) { if (MP.role === 'guest') mpTileEdit(c); else mpTileChanged(c.x, c.y, c.z); if (c.pairC) { if (MP.role === 'guest') mpTileEdit(c.pairC); else mpTileChanged(c.pairC.x, c.pairC.y, c.pairC.z); } } // (and a large chest's other half)
     // a guest changes what is in the runner's chest or hopper minecart, or the gear of the runner's horse
     if (MP.role === 'guest' && c && c.cart && c.cart.remote) mpToAuth({ t: 'cartset', e: c.cart.rid, items: c.cart.items });
     if (MP.role === 'guest' && c && c.horse && c.horse.remote) mpToAuth({ t: 'gear', e: c.horse.rid, gear: c.horse.gear }); };
@@ -19155,9 +19211,11 @@ W.active = false; UI.paused = true;
 
 // ---------- pointer lock ----------
 function grabLock() { if (isTouch || !W.active || UI.screen || UI.chatOpen || UI.menu) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+const LOCK_AT = { t: 0, first: false }; // when the pointer was last locked: the first moves after it can carry the whole jump from where the cursor was
 function releaseLock() { if (document.pointerLockElement) document.exitPointerLock(); }
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === canvas;
+  if (locked && !was) LOCK_AT.t = performance.now(), LOCK_AT.first = true;
   if (was && !locked && W.active && !UI.screen && !UI.chatOpen && !UI.menu && !PL.dead) pauseGame();
 });
 canvas.addEventListener('click', () => { if (W.active && !locked && !UI.menu && !UI.screen) grabLock(); });
@@ -19272,7 +19330,7 @@ addEventListener('blur', () => { F3K.down = false; });
 addEventListener('blur', () => { clearInput(); });
 
 // ---------- mouse ----------
-document.addEventListener('mousemove', e => { if (!locked || UI.paused || PL.dead) return; look(e.movementX, e.movementY, 0.0022 * OPT.sens / 100); });
+document.addEventListener('mousemove', e => { if (!locked || UI.paused || PL.dead) return; if (LOCK_AT.first || performance.now() - LOCK_AT.t < 80) { LOCK_AT.first = false; if (Math.abs(e.movementX) + Math.abs(e.movementY) > 60) return; } if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return; /* Chrome's spikes: the view jumped on clicking into the game */ look(e.movementX, e.movementY, 0.0022 * OPT.sens / 100); });
 function look(dx, dy, s) {
   if (PL.sleeping) return;
   const zoom = USE.kind === 'spy' ? 0.15 : 1;
@@ -19340,7 +19398,7 @@ async function startWorld(id, meta) {
   stopPanorama(); resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0; R.particles.length = 0;
   for (const k in remapCache) delete remapCache[k]; // item tables belong to one world
   W.id = meta.id; W.seed = meta.seed; W.gen = meta.gen || 1; S.setGenVersion(W.gen); W.genCache = null; W.meta = meta; W.dim = (meta.player && meta.dim) || 0; W.arrive = null; W.cheats = meta.cheats !== false; W.keepInv = !!meta.keepInv;
-  W.exp = meta.exp !== undefined ? meta.exp : true; // worlds made before the option existed already have lush patches
+  W.exp = W.gen >= 3 || (meta.exp !== undefined ? meta.exp : true); // 1.18 worlds always have lush caves (the generator forces them; biome checks must agree); older worlds keep their option
   await loadSavedKeys(meta.id);
   W.mpLogs = meta.remote ? null : await mpLogKeys(meta.id); // changes from a multiplayer session still to be put in place
   const p = meta.player;
@@ -19523,7 +19581,7 @@ function frame(now) {
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
-    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0);
+    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0); if (MP.on && MP.timeAt && W.active && gr('doDaylightCycle')) W.time = Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)); // the server's clock every frame, even when a slow page fell behind on ticks
     if (n >= 5) acc = 0;
   }
   const alpha = UI.paused ? 1 : acc / 50;

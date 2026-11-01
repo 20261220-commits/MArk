@@ -63,7 +63,7 @@ function tridentRelease(h) {
 function tridentHit(e, o) {
   const st = e.trident;
   let dmg = 8; if (st && AQUATIC.has(o.type)) dmg += 2.5 * enchLv(st, 'impaling');
-  if (o === PL) { if (!creative()) hurtPlayer(dmg * DIFF_MUL(), 'arrow', e.owner, e); }
+  if (o === PL) { if (!creative()) hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e); }
   else { HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e); hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : null); HURTPROJ = null; }
   if (st && enchLv(st, 'channeling') && o.type === 'villager' && W.thunder > 0.5 && W.dim === 0 && e.owner === PL && typeof advGrant === 'function') advGrant('adventure/very_very_frightening');
   if (st && enchLv(st, 'channeling') && W.thunder > 0.5 && W.dim === 0 && (getLight(Math.floor(o.x), Math.floor(o.y + 1), Math.floor(o.z)) >> 4) === 15) strikeLightning(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z), false);

@@ -432,7 +432,7 @@ const BLOCK_ROWS = [
   [1106, 'polished_basalt', '윤나는 현무암', C, ['polished_basalt_side', 'polished_basalt_top', 'polished_basalt_top'], 1.25, P, 1, { log: 1 }],
   [1107, 'stripped_crimson_stem', '껍질 벗긴 진홍빛 자루', C, ['stripped_crimson_stem', 'stripped_crimson_stem_top', 'stripped_crimson_stem_top'], 2, A, 0, { log: 1 }],
   [1108, 'stripped_warped_stem', '껍질 벗긴 뒤틀린 자루', C, ['stripped_warped_stem', 'stripped_warped_stem_top', 'stripped_warped_stem_top'], 2, A, 0, { log: 1 }],
-  [1109, 'deepslate_emerald_ore', '심층암 에메랄드 광석', C, 'deepslate_emerald_ore', 4.5, P, 2],
+  [1109, 'deepslate_emerald_ore', '심층암 에메랄드 광석', C, 'deepslate_emerald_ore', 4.5, P, 3],
   [1110, 'tall_grass', '큰 풀', X, 'tall_grass_bottom', 0, N, 0, { tint: 1, repl: 1, plant: 20 }], // meta 8: upper half
   [1111, 'large_fern', '큰 고사리', X, 'large_fern_bottom', 0, N, 0, { tint: 1, repl: 1, plant: 20 }],
   [1112, 'wood', '나무', C, null, 2, A, 0, { vars: [...WOOD8.slice(0, 6).map(w => w[0] + '_log'), 'crimson_stem', 'warped_stem'], vk: [...WOOD8.slice(0, 6).map(w => w[0] + '_wood'), 'crimson_hyphae', 'warped_hyphae'], vn: [...WOOD8.slice(0, 6).map(w => w[1] + ' 나무'), '진홍빛 균사', '뒤틀린 균사'] }],
@@ -3744,7 +3744,7 @@ function convertState(str, rot) {
   else if (id === BID.lever || id === BID.stone_button) { const sup = props.face === 'floor' ? 0 : props.face === 'ceiling' ? 1 : F4_6[(F + 2) & 3]; meta = (meta & ~15) | sup | (props.powered === 'true' ? 8 : 0); }
   else if (id === BID.bell) meta = (props.attachment === 'floor' ? 0 : props.attachment === 'ceiling' ? 1 : 2) | (F << 2);
   else if (id === BID.campfire || id === BID.soul_campfire) meta = F | (props.lit === 'false' ? 0 : 4);
-  else if (id === BID.end_rod || id === BID.observer || id === BID.dispenser || id === BID.dropper || id === BID.piston || id === BID.sticky_piston || id === BID.barrel) meta = (meta & ~7) | (d6(props.facing) || 0);
+  else if (id === BID.end_rod || id === BID.observer || id === BID.dispenser || id === BID.dropper || id === BID.piston || id === BID.sticky_piston || id === BID.barrel || id === BID.hopper) meta = (meta & ~7) | (d6(props.facing) || 0);
   else if (id === BID.repeater || id === BID.comparator) meta = (F + 2) & 3;
   else if (id === BID.wall_banner) meta = (meta & 15) | (F << 4);
   else if (id === BID.banner) meta = (meta & 15) | ((((+props.rotation || 0) + rot * 4) & 15) << 4);
@@ -3756,7 +3756,7 @@ function convertState(str, rot) {
   else if (id === BID.composter) meta = +props.level || 0;
   else if (id === BID.brewing_stand) meta = (props.has_bottle_0 === 'true' ? 1 : 0) | (props.has_bottle_1 === 'true' ? 2 : 0) | (props.has_bottle_2 === 'true' ? 4 : 0);
   else if (b.leaves) meta |= 1;
-  else if (props.facing in FACE4 && (b.facing || id === BID.anvil || id === BID.glazed_terracotta || id === BID.chest || id === BID.trapped_chest || id === BID.ender_chest)) meta = (meta & ~3) | F;
+  else if (props.facing in FACE4 && (b.facing || id === BID.anvil || id === BID.glazed_terracotta || id === BID.chest || id === BID.trapped_chest || id === BID.ender_chest)) { meta = (meta & ~3) | F; if (id !== BID.ender_chest && (props.type === 'left' || props.type === 'right')) meta |= props.type === 'left' ? 4 : 8; } // (a large chest's halves: Java's left half has its partner clockwise)
   return [id, meta];
 }
 // a template's bounding box after quarter turns about its origin (Java's StructureTemplate.transform with pivot 0)

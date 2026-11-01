@@ -184,7 +184,7 @@ item('honey_bottle', '꿀이 든 병', { food: [6, 1.2], stack: 16, leaves: 'gla
 item('turtle_helmet', '거북 등딱지', { stack: 1, dur: 275, armor: { slot: 0, pts: 2, tough: 0, mat: 'turtle' } });
 // the sea and maps (ocean.js, maps.js)
 item('heart_of_the_sea', '바다의 심장'); item('nautilus_shell', '앵무조개 껍데기');
-item('map', '빈 지도'); item('filled_map', '지도', { stack: 1 });
+item('map', '빈 지도'); item('filled_map', '지도'); /* same-numbered maps stack to 64, as in Java */
 // minecarts (cart: the kind spawned by minecarts.js)
 item('minecart', '광산 수레', { stack: 1, cart: 'minecart' }); item('chest_minecart', '상자가 실린 광산 수레', { stack: 1, cart: 'chest' });
 item('hopper_minecart', '호퍼가 실린 광산 수레', { stack: 1, cart: 'hopper' }); item('tnt_minecart', 'TNT가 실린 광산 수레', { stack: 1, cart: 'tnt' });
@@ -644,7 +644,7 @@ function blockDrops(b, meta, stack) {
     case 'coal_ore': case 'deepslate_coal_ore': add('coal'); res.xp = ri(0, 2); break;
     case 'iron_ore': case 'deepslate_iron_ore': add('raw_iron'); break;
     case 'gold_ore': case 'deepslate_gold_ore': add('raw_gold'); break;
-    case 'copper_ore': case 'deepslate_copper_ore': add('raw_copper', ri(2, 3)); break;
+    case 'copper_ore': case 'deepslate_copper_ore': add('raw_copper', ri(2, 5)); break; // 1.18: 2-5 (was 2-3)
     case 'diamond_ore': case 'deepslate_diamond_ore': add('diamond'); res.xp = ri(3, 7); break;
     case 'emerald_ore': case 'deepslate_emerald_ore': add('emerald'); res.xp = ri(3, 7); break;
     case 'infested': break; // a silverfish comes out instead (silk touch gives the plain block, below)

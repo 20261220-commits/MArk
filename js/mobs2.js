@@ -110,14 +110,14 @@ function fireballTick(e) {
     if (hit) {
       removeEnt(e);
       if (e.small) {
-        if (hit === 'pl') { if (hurtPlayer(5 * DIFF_MUL(), 'fire', e.owner)) PL.fire = Math.max(PL.fire, 100); }
+        if (hit === 'pl') { if (hurtPlayer(diffDmg(5), 'fire', e.owner)) PL.fire = Math.max(PL.fire, 100); }
         else if (typeof hit === 'object') { hurtMob(hit, 5, e.owner === PL ? PL : null); if (!hit.def.fireproof) hit.fire = 100; }
         else { const bx = Math.floor(e.x), by = Math.floor(e.y), bz = Math.floor(e.z); if (!getBlock(bx, by, bz) && SOLID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
       } else if (e.dragon) { // the dragon's fireball: no blast, a lingering cloud of dragon's breath where it lands
         spawnCloud(nx, Math.floor(cy) + (hit === true ? 1.05 : 0.05), nz, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 600 }); play('fizz', { vol: 0.6 });
       } else {
         if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
-        if (hit === 'pl') hurtPlayer(6 * DIFF_MUL(), 'explosion', e.owner);
+        if (hit === 'pl') hurtPlayer(diffDmg(6), 'explosion', e.owner);
         explode(nx, cy, nz, 1, true);
       }
       return;
@@ -366,7 +366,7 @@ function golemAI(e, dist) {
     const td = Math.hypot(t.x - e.x, t.z - e.z);
     if (td < e.w + (t.w || 0.3) + 1 && Math.abs(t.y - e.y) < 2 && e.attackCd <= 0) {
       e.attackCd = 20; e.swing = 10; play('golem'); const dmg = 7 + Math.random() * 14;
-      if (t === PL) { if (hurtPlayer(dmg * DIFF_MUL(), 'mob', e)) PL.vy = 0.6; } else { hurtMob(t, dmg, e, 0, 0); t.vy = 0.6; }
+      if (t === PL) { if (hurtPlayer(diffDmg(dmg), 'mob', e)) PL.vy = 0.6; } else { hurtMob(t, dmg, e, 0, 0); t.vy = 0.6; }
     }
   } else {
     if (!e.goal && Math.random() < 1 / 200) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12];
@@ -426,7 +426,7 @@ function dragonAI(e) {
       break; }
     case 'charge':
       tx = PL.x; ty = PL.y + 1; tz = PL.z; sp = 0.65;
-      if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(10 * DIFF_MUL(), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
+      if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(diffDmg(10), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
       if (e.phaseT > 200 || !plTargetable()) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
       break;
     case 'land': tx = C[0]; ty = C[1] + 12; tz = C[2] + 0.5; sp = 0.35; if (Math.hypot(e.x - tx, e.z - tz) < 3) { e.phase = 'descend'; e.phaseT = 0; } break;

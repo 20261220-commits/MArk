@@ -99,7 +99,7 @@ function witherSkullTick(e) {
     if (hit) {
       removeEnt(e);
       const dur = PL.difficulty === 3 ? 800 : PL.difficulty === 2 ? 200 : 0;
-      if (who === PL) { hurtPlayer(8 * DIFF_MUL(), 'wither', e.owner); if (dur) addEffect(PL, 'wither', dur, 1); }
+      if (who === PL) { hurtPlayer(diffDmg(8), 'wither', e.owner); if (dur) addEffect(PL, 'wither', dur, 1); }
       else if (who) { hurtMob(who, 8, e.owner); if (dur) addEffect(who, 'wither', dur, 1); if (who.hp <= 0 && !who.dead) witherRose(who); }
       explode(e.x, e.y, e.z, e.blue ? 1.5 : 1);
       return;

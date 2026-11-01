@@ -269,6 +269,8 @@ function playerTick() {
     else if (PL.onGround) {
       const sgy = [Math.floor(PL.y - 0.01), Math.floor(PL.y + 0.01)].find(yy => getBlock(Math.floor(PL.x), yy, Math.floor(PL.z)) === BID.pointed_dripstone && getMeta(Math.floor(PL.x), yy, Math.floor(PL.z)) === 1);
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
+      { const fx = Math.floor(PL.x), fy = Math.floor(PL.y - 0.01), fz = Math.floor(PL.z); // landing on farmland can trample it back to dirt (Java: the chance is the fall height less half a block)
+        if (PL.fallDist > 0.5 && getBlock(fx, fy, fz) === BID.farmland && Math.random() < PL.fallDist - 0.5) { const cb = getBlock(fx, fy + 1, fz); if (cb && BLOCKS[cb].plant) { for (const [iid, n] of blockDrops(cb, getMeta(fx, fy + 1, fz), null).items) dropItem(fx + .5, fy + 1.3, fz + .5, iid, n); setBlock(fx, fy + 1, fz, 0); } setBlock(fx, fy, fz, 3); } }
       if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
       fallLanded();
       PL.fallDist = 0;
@@ -522,8 +524,8 @@ function interactBlock(t, dry) {
     case BID.stonecutter: if (!dry) UI.openScreen('stonecutter', { x, y, z }); return true;
     case BID.cartography_table: if (!dry) UI.openScreen('cartography', { x, y, z }); return true;
     case BID.furnace: case BID.lit_furnace: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, newFurnace()); UI.openScreen('furnace', { x, y, z }); } return true;
-    case BID.trapped_chest: if (!dry) { if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); setMeta(x, y, z, m | 32); rsNotify(x, y, z); rsNotify(x, y - 1, z); UI.openScreen('chest', { x, y, z, title: '덫 상자' }); } return true;
-    case BID.chest: if (!dry) { piglinAnger(x, y, z); if (!getTile(x, y, z)) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); UI.openScreen('chest', { x, y, z }); } return true;
+    case BID.trapped_chest: if (!dry) openChest(x, y, z, true); return true;
+    case BID.chest: if (!dry) { piglinAnger(x, y, z); openChest(x, y, z, false); } return true;
     case BID.iron_door: return false;
     case BID.oak_door: if (!dry) { const oy = m & 8 ? -1 : 1; setMeta(x, y, z, m ^ 4); if (getBlock(x, y + oy, z) === id) setMeta(x, y + oy, z, getMeta(x, y + oy, z) ^ 4); play('door'); } return true;
     case BID.red_bed: if (!dry) trySleep(x, y, z); return true;
@@ -536,6 +538,29 @@ function interactBlock(t, dry) {
   return false;
 }
 // beds (Java's BedBlock / ServerPlayerEntity.trySleep): meta & 3 the facing, & 4 the head half
+// two chests of a kind facing the same way side by side make one large chest (Java): a chest placed beside a single one joins
+// it (not while sneaking), and the pair is kept in the blocks (meta 4: the other half is to the left as seen from the front,
+// 8: to the right), so a third chest beside a large one stays single. Each half keeps its own 27 slots.
+function chestLeftOf(x, y, z) { const d = DIRS[getMeta(x, y, z) & 3]; return [-d[2], d[0]]; }
+function chestPair(x, y, z) {
+  const b = getBlock(x, y, z); if (b !== BID.chest && b !== BID.trapped_chest) return null;
+  const m = getMeta(x, y, z), f = m & 3, L = chestLeftOf(x, y, z), side = m & 4 ? 1 : m & 8 ? -1 : 0; if (!side) return null;
+  const px = x + L[0] * side, pz = z + L[1] * side, pm = getMeta(px, y, pz);
+  if (getBlock(px, y, pz) !== b || (pm & 3) !== f || !(pm & (side > 0 ? 8 : 4))) return null;
+  return side > 0 ? { left: [px, y, pz], right: [x, y, z] } : { left: [x, y, z], right: [px, y, pz] };
+}
+function chestJoin(x, y, z) {
+  const b = getBlock(x, y, z), f = getMeta(x, y, z) & 3, L = chestLeftOf(x, y, z);
+  for (const side of [1, -1]) { const px = x + L[0] * side, pz = z + L[1] * side, pm = getMeta(px, y, pz);
+    if (getBlock(px, y, pz) !== b || (pm & 3) !== f || chestPair(px, y, pz)) continue;
+    setMeta(px, y, pz, (pm & ~12) | (side > 0 ? 8 : 4)); setMeta(x, y, z, (getMeta(x, y, z) & ~12) | (side > 0 ? 4 : 8)); return; }
+}
+function openChest(x, y, z, trapped) {
+  const pr = chestPair(x, y, z), parts = pr ? [pr.left, pr.right] : [[x, y, z]];
+  for (const [a, b, c] of parts) { if (!getTile(a, b, c)) setTile(a, b, c, { type: 'chest', items: new Array(27).fill(null) }); if (trapped) { setMeta(a, b, c, getMeta(a, b, c) | 32); rsNotify(a, b, c); rsNotify(a, b - 1, c); } }
+  const [a, b, c] = parts[0];
+  UI.openScreen('chest', pr ? { x: a, y: b, z: c, pair: pr.right, title: trapped ? '큰 덫 상자' : '큰 상자' } : { x, y, z, title: trapped ? '덫 상자' : undefined });
+}
 function bedParts(x, y, z) { const m = getMeta(x, y, z), d = DIRS[m & 3], s = (m & 4) ? -1 : 1; const o = [x + d[0] * s, y, z + d[2] * s]; return m & 4 ? { head: [x, y, z], foot: o, f: m & 3 } : { head: o, foot: [x, y, z], f: m & 3 }; }
 // where someone getting out of a bed stands: a free spot around it with a floor (BedBlock.findWakeUpPosition), or on top
 function bedWakeSpot(x, y, z) {
@@ -774,6 +799,7 @@ function placeBlock(t, d) {
   if (S.BUD[id]) { const f = S.DIR6.findIndex(v => v[0] === t.nx && v[1] === t.ny && v[2] === t.nz); if (f < 0 || !OPQ[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = 1 + f; }
   if (id === BID.observer || id === BID.dispenser || id === BID.dropper) meta = PL.pitch < -0.85 ? 1 : PL.pitch > 0.85 ? 0 : [3, 4, 2, 5][fd];
   if (id === BID.comparator) { if (!supportedBy(below)) return; meta = fd; }
+  if (id === BID.hopper) meta = t.ny === 0 ? S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === 0 && v[2] === -t.nz) : 0; // against a block's side it points into that block (Java), else down
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
   if (id === BID.vine && (t.ny !== 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)])) return;
   if (id === BID.lily_pad && below !== 27) return;
@@ -829,7 +855,7 @@ function placeBlock(t, d) {
   if (id === BID.wither_skeleton_skull) witherCheck(x, y, z);
   biomePlaced(x, y, z, id, meta); blocks6Placed(x, y, z, id, meta, PL.held());
   if (id === BID.tripwire || id === BID.tripwire_hook_block) tripRefresh(x, y, z);
-  if (id === BID.chest || id === BID.trapped_chest) setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) });
+  if (id === BID.chest || id === BID.trapped_chest) { setTile(x, y, z, { type: 'chest', items: new Array(27).fill(null) }); if (!PL.sneaking) chestJoin(x, y, z); }
   consume(); play('place', { mat: soundMat(id) }); swing(); vibrate(x + .5, y + .5, z + .5);
 }
 function pickBlock() {

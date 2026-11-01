@@ -98,7 +98,7 @@ function guardianAI(e, dist) {
     if (!canSee(e.x, e.y + e.h / 2, e.z, t.x, ty, t.z)) { e.beam = 0; swimToward(e, t.x, ty, t.z, 0.08); }
     else {
       e.beam = (e.beam || 0) + 1; e.vx *= 0.8; e.vy *= 0.8; e.vz *= 0.8; physMove(e, e.vx, e.vy, e.vz, 0);
-      if (e.beam >= (d.elder ? 60 : 80)) { e.beam = 0; e.attackCd = 40; if (t === PL) hurtPlayer((d.elder ? 8 : 6) * DIFF_MUL(), 'magic', e); else hurtMob(t, d.elder ? 8 : 6, e); }
+      if (e.beam >= (d.elder ? 60 : 80)) { e.beam = 0; e.attackCd = 40; if (t === PL) hurtPlayer(diffDmg(d.elder ? 8 : 6), 'magic', e); else hurtMob(t, d.elder ? 8 : 6, e); }
     }
     e.spikes = e.beam > 0; // spikes out while it holds still (thorns)
   } else {
