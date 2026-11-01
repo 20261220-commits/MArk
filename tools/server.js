@@ -133,7 +133,7 @@ function openWorld(id) {
   w = { id, dir, cdir, state, keys: new Set(), dirty: new Map(), stateDirty: false, conns: new Map(), changedSinceBackup: false, mirrorStateAt: 0, restorer: null };
   w.fileOf = dk => path.join(cdir, encodeURIComponent(dk) + '.json');
   loadWorld(w);
-  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), saveState: () => { w.stateDirty = true; }, log: t => console.log(`[${id}] ${t}`) };
+  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), saveState: () => { w.stateDirty = true; w.changedSinceBackup = true; }, /* (players' things count too: the 10-minute backup used to wait for a changed block) */ log: t => console.log(`[${id}] ${t}`) };
   w.core = mpWorldCore(store, (cid, o) => { const c = w.conns.get(cid); if (c) c.send(JSON.stringify(o)); });
   worlds.set(id, w); return w;
 }
