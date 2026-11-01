@@ -42,17 +42,19 @@ function mpWorldCore(store, out) {
     const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
   }
   function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
+  let lastTick = 0, tickAcc = 0, saveN = 0;
   function tick() { // once a second: 20 ticks of the clock and the weather while anyone plays
-    if (!players.size || !S.meta) return;
-    const g = S.meta.gamerules || {};
-    if (g.doDaylightCycle !== false) S.time += 20;
-    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - 20) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+    if (!players.size || !S.meta) { lastTick = 0; return; }
+    const g = S.meta.gamerules || {}, now = Date.now(); // ticks by the real clock: a busy server's late timer doesn't slow the day
+    tickAcc += lastTick ? Math.min(5000, now - lastTick) / 50 : 20; lastTick = now; const n = Math.floor(tickAcc); tickAcc -= n;
+    if (g.doDaylightCycle !== false) S.time += n;
+    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - n) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
     // the night passes once everyone in the Overworld has been in bed for a few seconds
     const ow = [...players.values()].filter(q => q.joined && q.dim === 0 && q.s && q.s.mode !== 'spectator');
     const asleep = ow.length && ow.every(q => q.s.sleep); S.sleepT = asleep ? (S.sleepT || 0) + 1 : 0;
     if (S.sleepT >= 5) { S.time = Math.ceil(S.time / 24000) * 24000; S.rain = 0; S.thunder = false; S.sleepT = 0; for (const q of players.values()) if (q.joined) out(q.id, { t: 'wake' }); }
     for (const q of players.values()) if (q.joined) out(q.id, { t: 'time', time: S.time, rain: S.rain, thunder: S.thunder });
-    if (S.time % 200 === 0) store.saveState();
+    if (++saveN % 10 === 0) store.saveState();
   }
   function message(id, m) {
     let p = players.get(id); if (!p) { p = { id, name: null, dim: null, joined: false, s: null }; players.set(id, p); }

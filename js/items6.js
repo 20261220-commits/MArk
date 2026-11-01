@@ -105,7 +105,7 @@ CUSTOM_SCREENS.book = {
     const lecternPage = () => { if (!c.lectern) return; const t = getTile(...c.lectern); if (t) t.page = c.page; lecternPulse(c.lectern); };
     on('bprev', () => { c.page = Math.max(0, c.page - 1); lecternPage(); });
     on('bnext', () => { if (c.page === pages.length - 1 && st.id === IID.writable_book && pages.length < 50) pages.push(''); c.page = Math.min(pages.length - 1, c.page + 1); lecternPage(); });
-    on('btake', () => { const [x, y, z] = c.lectern, t = getTile(x, y, z); if (t && t.items[0]) { INV.giveOrDrop(t.items[0]); t.items[0] = null; } setMeta(x, y, z, getMeta(x, y, z) & ~4); UI.closeScreen(); });
+    on('btake', () => { const [x, y, z] = c.lectern, t = getTile(x, y, z); if (t && t.items[0]) { INV.giveOrDrop(t.items[0]); t.items[0] = null; } setMeta(x, y, z, getMeta(x, y, z) & ~4); if (typeof MP !== 'undefined' && MP.on && typeof mpTileChanged === 'function') mpTileChanged(x, y, z); UI.closeScreen(); });
     on('bsignq', () => { c.signing = true; }); on('bcancel', () => { c.signing = false; });
     on('bsign', () => { if (!(c.title || '').trim()) return; st.id = IID.written_book; st.title = c.title.trim(); st.name = st.title; st.author = '플레이어'; UI.hudDirty = true; UI.closeScreen(); play('levelup', { vol: 0.3 }); });
     on('bdone', () => UI.closeScreen());

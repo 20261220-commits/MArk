@@ -11434,10 +11434,11 @@ function jukeboxVolume() {
 }
 function jukeboxUse(x, y, z, h) {
   let t = getTile(x, y, z); if (!t) { t = { type: 'jukebox', items: [null] }; setTile(x, y, z, t); }
-  if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); return true; }
+  const told = () => { if (typeof MP !== 'undefined' && MP.on && typeof mpTileChanged === 'function') mpTileChanged(x, y, z); }; // the others hear it start or stop (a jukebox already holding its tile made no news)
+  if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); told(); return true; }
   if (!h || !ITEMS[h.id].disc) return false;
   t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
-  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z);
+  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z); told();
   if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
   return true;
 }
@@ -13921,7 +13922,7 @@ CUSTOM_SCREENS.book = {
     const lecternPage = () => { if (!c.lectern) return; const t = getTile(...c.lectern); if (t) t.page = c.page; lecternPulse(c.lectern); };
     on('bprev', () => { c.page = Math.max(0, c.page - 1); lecternPage(); });
     on('bnext', () => { if (c.page === pages.length - 1 && st.id === IID.writable_book && pages.length < 50) pages.push(''); c.page = Math.min(pages.length - 1, c.page + 1); lecternPage(); });
-    on('btake', () => { const [x, y, z] = c.lectern, t = getTile(x, y, z); if (t && t.items[0]) { INV.giveOrDrop(t.items[0]); t.items[0] = null; } setMeta(x, y, z, getMeta(x, y, z) & ~4); UI.closeScreen(); });
+    on('btake', () => { const [x, y, z] = c.lectern, t = getTile(x, y, z); if (t && t.items[0]) { INV.giveOrDrop(t.items[0]); t.items[0] = null; } setMeta(x, y, z, getMeta(x, y, z) & ~4); if (typeof MP !== 'undefined' && MP.on && typeof mpTileChanged === 'function') mpTileChanged(x, y, z); UI.closeScreen(); });
     on('bsignq', () => { c.signing = true; }); on('bcancel', () => { c.signing = false; });
     on('bsign', () => { if (!(c.title || '').trim()) return; st.id = IID.written_book; st.title = c.title.trim(); st.name = st.title; st.author = '플레이어'; UI.hudDirty = true; UI.closeScreen(); play('levelup', { vol: 0.3 }); });
     on('bdone', () => UI.closeScreen());
@@ -17539,17 +17540,19 @@ function mpWorldCore(store, out) {
     const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
   }
   function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
+  let lastTick = 0, tickAcc = 0, saveN = 0;
   function tick() { // once a second: 20 ticks of the clock and the weather while anyone plays
-    if (!players.size || !S.meta) return;
-    const g = S.meta.gamerules || {};
-    if (g.doDaylightCycle !== false) S.time += 20;
-    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - 20) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
+    if (!players.size || !S.meta) { lastTick = 0; return; }
+    const g = S.meta.gamerules || {}, now = Date.now(); // ticks by the real clock: a busy server's late timer doesn't slow the day
+    tickAcc += lastTick ? Math.min(5000, now - lastTick) / 50 : 20; lastTick = now; const n = Math.floor(tickAcc); tickAcc -= n;
+    if (g.doDaylightCycle !== false) S.time += n;
+    if (g.doWeatherCycle !== false && (S.weatherT = (S.weatherT || 24000) - n) <= 0) { const on = S.rain < 0.5; S.rain = on ? 1 : 0; S.thunder = on && Math.random() < 0.3; S.weatherT = on ? 12000 + Math.random() * 12000 : 12000 + Math.random() * 168000; }
     // the night passes once everyone in the Overworld has been in bed for a few seconds
     const ow = [...players.values()].filter(q => q.joined && q.dim === 0 && q.s && q.s.mode !== 'spectator');
     const asleep = ow.length && ow.every(q => q.s.sleep); S.sleepT = asleep ? (S.sleepT || 0) + 1 : 0;
     if (S.sleepT >= 5) { S.time = Math.ceil(S.time / 24000) * 24000; S.rain = 0; S.thunder = false; S.sleepT = 0; for (const q of players.values()) if (q.joined) out(q.id, { t: 'wake' }); }
     for (const q of players.values()) if (q.joined) out(q.id, { t: 'time', time: S.time, rain: S.rain, thunder: S.thunder });
-    if (S.time % 200 === 0) store.saveState();
+    if (++saveN % 10 === 0) store.saveState();
   }
   function message(id, m) {
     let p = players.get(id); if (!p) { p = { id, name: null, dim: null, joined: false, s: null }; players.set(id, p); }
@@ -18419,7 +18422,7 @@ function mpRidden2(e, m, from) { // a boat's back seat
   if (e.kind !== 'boat' || e.mob || e.rider2 === PL || (e.mpRider2 && e.mpRider2 !== from && performance.now() - e.mpRider2At < 1500)) { mpSend({ t: 'unride', e: m.e, seat: 2 }, from); return; }
   e.mpRider2 = from; e.mpRider2At = performance.now();
 }
-function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 1500) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
+function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 3000) { e.mpRider = 0; e.tick = e.mpTick0; e.mpTick0 = null; return; } if (e.rtx != null) { e.x += (e.rtx + e.vx - e.x) * 0.6; e.y += (e.rty - e.y) * 0.6; e.z += (e.rtz + e.vz - e.z) * 0.6; e.yaw += wrapA(e.rtyaw - e.yaw) * 0.6; } }
 
 // ---------- the host's mobs fight guests too ----------
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
@@ -18614,6 +18617,10 @@ function mpSeatOf(p) {
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
     const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
     return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
+  // it says it rides but no vehicle here knows (its last word came late): the nearest boat or cart it sits by
+  const q = p.pos; if (!q) return null; let best = null, bd = 2.5;
+  for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart')) continue; const d = Math.hypot(e.mesh.position.x - q[0], e.mesh.position.z - q[2]); if (d < bd) { bd = d; best = e; } }
+  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? 1.13 : best.rideY != null ? best.rideY : 0.18), m.z]; }
   return null;
 }
 function mpRender(dt) {
@@ -18663,7 +18670,8 @@ function mpInstall() {
   const wrapLocal = f => function () { MP.local = true; try { return f.apply(this, arguments); } finally { MP.local = false; } };
   playerTick = wrapLocal(playerTick); onUsePress = wrapLocal(onUsePress); onUseRelease = wrapLocal(onUseRelease);
   const gt = gameTick; gameTick = function () { gt(); mpTick(); };
-  const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); mpRender(dt); };
+  const upm = updatePlayerModel; updatePlayerModel = function (dt) { upm.apply(this, arguments); MP.frameDt = dt; };
+  const er = entityRender; entityRender = function () { er.apply(this, arguments); mpRender(MP.frameDt || 0.016); }; // the others after the boats, carts and mounts are placed, so a rider sits where its vehicle is drawn this frame
   const g0 = gr; gr = k => (MP.role === 'guest' && (k === 'doWeatherCycle' || k === 'doMobSpawning')) || (MP.server && k === 'doWeatherCycle') ? false : g0(k); // the host's (or the server's) world decides; clocks run here and are corrected
   const sm = spawnMob; spawnMob = function () { const e = sm.apply(this, arguments); if (MP.role === 'guest' && !MP.allowSpawn) { removeEnt(e); // guests only show the host's mobs
       if (e && (MP.cmd || MP.act) && W.active && !MP.loading) { const [type, x, y, z] = arguments; queueMicrotask(() => { const o = {}; for (const k of MP_SUMMON_KEYS) if (e[k] != null && e[k] !== false) o[k] = e[k]; mpToAuth({ t: 'summon', type, x, y, z, o }); }); } } // a guest's egg, golem, crystal: the runner makes the real mob once the caller has set its fields
@@ -19423,7 +19431,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
-  if (gr('doDaylightCycle')) W.time = MP.on && MP.role === 'guest' && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // a guest follows the world's clock in real time (no jumps when frames are slow)
+  if (gr('doDaylightCycle')) W.time = MP.on && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // in a server world everyone (the dimension's runner too) follows the server's clock in real time (no jumps when frames are slow)
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
   weatherTick();

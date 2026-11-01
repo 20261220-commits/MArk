@@ -120,10 +120,11 @@ function jukeboxVolume() {
 }
 function jukeboxUse(x, y, z, h) {
   let t = getTile(x, y, z); if (!t) { t = { type: 'jukebox', items: [null] }; setTile(x, y, z, t); }
-  if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); return true; }
+  const told = () => { if (typeof MP !== 'undefined' && MP.on && typeof mpTileChanged === 'function') mpTileChanged(x, y, z); }; // the others hear it start or stop (a jukebox already holding its tile made no news)
+  if (t.items[0]) { dropItem(x + .5, y + 1.2, z + .5, t.items[0].id, 1, [0, 0.2, 0]); t.items[0] = null; t.playing = false; stopDisc(x, y, z); rsNotify(x, y, z); told(); return true; }
   if (!h || !ITEMS[h.id].disc) return false;
   t.items[0] = { id: h.id, n: 1 }; t.playing = true; consume(); playDisc(ITEMS[h.id].key.replace('music_disc_', ''), x, y, z);
-  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z);
+  UI.flash('재생 중: ' + ITEMS[h.id].lore[0]); rsNotify(x, y, z); told();
   if (W.dim === 0 && typeof advGrant === 'function' && S.BIOMES[biomeAt(x, z)][8] === 'meadow') advGrant('adventure/play_jukebox_in_meadows'); // sound of music
   return true;
 }

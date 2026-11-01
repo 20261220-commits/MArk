@@ -56,6 +56,8 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await C.evaluate(() => { window.__disc = 0; const pd = playDisc; playDisc = function () { __disc++; return pd.apply(this, arguments); }; });
   await B.evaluate(([X, Y, Z]) => { PL.x = X + 5.5; PL.z = Z - 2.5; INV.slots[INV.sel] = { id: IID.music_disc_cat, n: 1 }; TARGET = { type: 'block', x: X + 6, y: Y, z: Z - 4, nx: 0, ny: 1, nz: 0, id: BID.jukebox, m: 0, t: 2 }; USE.placeCd = 0; MP.local = true; try { useItem(true); } finally { MP.local = false; } }, pos);
   ok(await until(C, () => __disc > 0, null, 10000), 'a record someone puts in a jukebox plays for the others');
+  await B.evaluate(([X, Y, Z]) => { TARGET = { type: 'block', x: X + 6, y: Y, z: Z - 4, nx: 0, ny: 1, nz: 0, id: BID.jukebox, m: 0, t: 2 }; USE.placeCd = 0; INV.slots[INV.sel] = null; MP.local = true; try { useItem(true); } finally { MP.local = false; } }, pos);
+  ok(await until(C, p => !PLAYING.has((p[0] + 6) + ',' + p[1] + ',' + (p[2] - 4)), pos, 8000), 'and taking it out stops it for them too');
   await B.evaluate(([X, Y, Z]) => { INV.slots[INV.sel] = null; TARGET = { type: 'block', x: X + 6, y: Y, z: Z - 4, nx: 0, ny: 1, nz: 0, id: BID.jukebox, m: 0, t: 2 }; USE.placeCd = 0; MP.local = true; try { useItem(true); } finally { MP.local = false; } }, pos);
   ok(await until(C, ([x, y, z]) => !PLAYING.has(x + ',' + y + ',' + z), [X + 6, Y, Z - 4], 10000), 'and stops for them when taken out');
   // a door opened by someone is heard
@@ -81,6 +83,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await B.evaluate(() => { const bt = ENT.find(e => e.kind === 'boat' && e.remote && !e.dead); mount(bt); MP.testHold = setInterval(() => { IN.f = 1; IN.s = 0.6; }, 20); });
   await wait(2500);
   const seat = await A.evaluate(new Function(`const p = ${peerOf('밥')}; const bt = ENT.find(e => e.kind === 'boat' && !e.dead); if (!p || !p.pos || !bt) return null; return +Math.hypot(p.pos[0] - bt.mesh.position.x, p.pos[2] - bt.mesh.position.z).toFixed(2);`));
-  ok(seat !== null && seat < 0.3, 'a guest steering a boat is drawn sitting in it on the runner\'s screen', seat);
+  const seatInfo = await A.evaluate(() => { const bt = ENT.find(e => e.kind === 'boat' && !e.dead); const p = [...MP.peers.values()].find(q => q.name === '밥'); return bt && { mob: bt.mob && bt.mob.type, rider: bt.mpRider, rider2: bt.mpRider2, r2: !!bt.rider2, pid: p && p.id, ride: p && p.s && p.s.ride, seat: p && mpSeatOf(p), boat: [bt.mesh.position.x, bt.mesh.position.z].map(v => +v.toFixed(2)), ppos: p && p.pos && p.pos.map(v => +v.toFixed(2)), ex: [bt.x, bt.z].map(v => +v.toFixed(2)) }; });
+  ok(seat !== null && seat < 0.3, 'a guest steering a boat is drawn sitting in it on the runner\'s screen', [seat, seatInfo && seatInfo.rider]);
   await B.evaluate(() => { clearInterval(MP.testHold); IN.f = 0; IN.s = 0; dismount(); });
 };
