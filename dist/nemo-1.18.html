@@ -11269,6 +11269,7 @@ function crossbowFire(h) {
 const AQUATIC = new Set(['squid', 'glow_squid', 'cod', 'salmon', 'tropical_fish', 'axolotl', 'dolphin', 'turtle']);
 function tridentRelease(h) {
   if (USE.t < 10) return;
+  if (!creative() && (h.d || 0) >= ITEMS[h.id].dur - 1) return; // Java: a trident about to break can't be thrown or used for riptide
   const rip = enchLv(h, 'riptide');
   if (rip) { // only works in water or rain: launches the player instead of the trident
     const wet = PL.inWater || (W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15);
@@ -15125,7 +15126,7 @@ function renderEffects() {
 // mending: picked-up experience repairs a damaged mending item first (2 durability per point)
 function mendWithXP(v) {
   const cands = [];
-  [INV.slots[INV.sel], ...INV.armor].forEach(s => { if (s && s.d > 0 && enchLv(s, 'mending')) cands.push(s); });
+  [INV.slots[INV.sel], INV.off, ...INV.armor].forEach(s => { if (s && s.d > 0 && enchLv(s, 'mending')) cands.push(s); });
   if (!cands.length) return v;
   const s = cands[(Math.random() * cands.length) | 0], fix = Math.min(s.d, v * 2);
   s.d -= fix; UI.hudDirty = true;
@@ -15530,8 +15531,9 @@ function attackEntity(e) {
   const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
-  if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // a trident's stab wears it by 1, like a sword
+  const landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player');
+  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
+  if (tool && landed) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // only a hit that lands wears the weapon (Java: not one into a mob's moment of invulnerability); a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
   { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
@@ -15805,7 +15807,8 @@ function useItem(first) {
       if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); advGrant('husbandry/wax_on'); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); advGrant('husbandry/wax_off'); return; }
-      if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      if (tool && tool.type === S.TOOL.HOE && id === BID.coarse_dirt && t.ny !== -1 && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, 3); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // coarse dirt is tilled to dirt first (Java)
+      if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3 || id === BID.dirt_path) && t.ny !== -1 && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && t.ny !== -1 && [2, 3, BID.podzol, BID.mycelium, BID.coarse_dirt, BID.rooted_dirt].includes(id) && !getBlock(x, y + 1, z)) { setBlock(x, y, z, BID.dirt_path); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // a shovel makes a path (Java: not from below, nothing on top)
       if (tool && tool.type === S.TOOL.AXE && STRIP()[id] != null) { // axes strip logs, wood, stems and hyphae (the axis / kind stays)
         const to = STRIP()[id]; setBlock(x, y, z, to, id === BID.wood ? t.m : t.m & 3); play('place', { mat: 'wood' }); swing(); if (!creative()) damageItem(INV.slots, INV.sel, 1); return;
@@ -18779,7 +18782,7 @@ function mpInstall() {
     if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
     return r; };
   const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0, th: e.thrown || 0 }); }); return e; };
-  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
+  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { const t = performance.now(); if (t - (e.myHitAt || 0) < 450) return false; /* still flashing from the last hit: the runner won't take it */ e.myHitAt = t; mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
   const sc = saveChunk; saveChunk = function (c) { if (MP.server) { if (MP.role === 'host' && !MP.rolePending) mpStoreChunk(c); return; } return sc.apply(this, arguments); };
@@ -18840,7 +18843,7 @@ function mpAttackPeer(p) {
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2);
+  if (performance.now() - (p.myHitAt || 0) >= 450) { p.myHitAt = performance.now(); if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); } // a hit into the other player's moment of invulnerability doesn't wear it
 }
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;

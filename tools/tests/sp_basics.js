@@ -36,6 +36,14 @@ module.exports = async ({ ok, srv, b, lib }) => {
     { const fx = X + 4, fz = Z - 2; setBlock(fx, Y - 1, fz, BID.farmland, 7); setBlock(fx, Y, fz, BID.wheat, 3); PL.mode = 'survival'; PL.flying = false; PL.x = fx + .5; PL.z = fz + .5; PL.y = Y + 6; PL.vy = 0; PL.fallDist = 0; PL.health = 20;
       for (let i = 0; i < 80 && !(PL.onGround && PL.y < Y + 1); i++) { UI.paused = false; await new Promise(r => setTimeout(r, 50)); }
       o.trample = [getBlock(fx, Y - 1, fz) === 3, getBlock(fx, Y, fz), +(PL.y - Y).toFixed(3), PL.onGround, getBlock(fx, Y - 1, fz)]; PL.mode = 'creative'; }
+    // durability: spam-clicking a mob wears the sword once per hit that lands, not once per click; a hoe tills coarse dirt
+    // to dirt; mending mends the off-hand item too; a trident about to break isn't thrown
+    { PL.mode = 'survival'; INV.sel = 0; INV.slots[0] = { id: IID.iron_sword, n: 1 }; const cow = spawnMob('cow', X + 1.5, Y, Z - 2.5); cow.ai = null; cow.hp = 100;
+      for (let i = 0; i < 5; i++) { PL.attackT = 100; attackEntity(cow); } o.spam = INV.slots[0].d; removeEnt(cow);
+      INV.slots[0] = { id: IID.iron_hoe, n: 1 }; setBlock(X + 6, Y - 1, Z - 2, BID.coarse_dirt); setBlock(X + 6, Y, Z - 2, 0); TARGET = { type: 'block', x: X + 6, y: Y - 1, z: Z - 2, id: BID.coarse_dirt, m: 0, nx: 0, ny: 1, nz: 0, t: 2 }; USE.placeCd = 0; useItem(true);
+      o.coarse = [getBlock(X + 6, Y - 1, Z - 2) === 3, INV.slots[0].d];
+      INV.slots[0] = null; INV.armor = [null, null, null, null]; INV.off = { id: IID.iron_sword, n: 1, d: 50, e: { mending: 1 } }; mendWithXP(5); o.mendOff = INV.off.d; INV.off = null;
+      INV.slots[0] = { id: IID.trident, n: 1, d: 249 }; USE.t = 20; tridentRelease(INV.slots[0]); o.trident = !!INV.slots[0]; PL.mode = 'creative'; }
     o.lush = W.exp; o.mapStack = ITEMS[IID.filled_map].stack;
     // a hopper moves a shulker box with what is in it, and keeps rockets of different flights apart
     const H = [X + 6, Y + 1, Z + 6]; setBlock(H[0], H[1] + 1, H[2], BID.chest, 0); setTile(H[0], H[1] + 1, H[2], { type: 'chest', items: new Array(27).fill(null) });
@@ -64,5 +72,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(JSON.stringify(r.hopper) === JSON.stringify(['shulker_box1+1', 'firework_rocket2f1', 'firework_rocket2f3']), 'a hopper keeps what an item carries', r.hopper);
   ok(JSON.stringify(r.sideFuel) === JSON.stringify([null, 'coal3', null]) && r.comp, 'a hopper on a furnace\'s side fills the fuel slot; a comparator reads a large chest whole', [r.sideFuel, r.comp]);
   ok(r.trample[0] && r.trample[1] === 0, 'landing on farmland tramples it', r.trample);
+  ok(r.spam === 1, 'clicking a mob five times at once wears the sword once (only hits that land)', r.spam);
+  ok(r.coarse[0] && r.coarse[1] === 1 && r.mendOff === 40 && r.trident, 'a hoe tills coarse dirt; mending mends the off hand; a trident about to break stays in hand', [r.coarse, r.mendOff, r.trident]);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
