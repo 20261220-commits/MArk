@@ -45,6 +45,7 @@ function crossbowFire(h) {
 const AQUATIC = new Set(['squid', 'glow_squid', 'cod', 'salmon', 'tropical_fish', 'axolotl', 'dolphin', 'turtle']);
 function tridentRelease(h) {
   if (USE.t < 10) return;
+  if (!creative() && (h.d || 0) >= ITEMS[h.id].dur - 1) return; // Java: a trident about to break can't be thrown or used for riptide
   const rip = enchLv(h, 'riptide');
   if (rip) { // only works in water or rain: launches the player instead of the trident
     const wet = PL.inWater || (W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15);

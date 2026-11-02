@@ -71,7 +71,7 @@ function renderEffects() {
 // mending: picked-up experience repairs a damaged mending item first (2 durability per point)
 function mendWithXP(v) {
   const cands = [];
-  [INV.slots[INV.sel], ...INV.armor].forEach(s => { if (s && s.d > 0 && enchLv(s, 'mending')) cands.push(s); });
+  [INV.slots[INV.sel], INV.off, ...INV.armor].forEach(s => { if (s && s.d > 0 && enchLv(s, 'mending')) cands.push(s); });
   if (!cands.length) return v;
   const s = cands[(Math.random() * cands.length) | 0], fix = Math.min(s.d, v * 2);
   s.d -= fix; UI.hudDirty = true;

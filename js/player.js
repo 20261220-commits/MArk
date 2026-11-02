@@ -394,8 +394,9 @@ function attackEntity(e) {
   const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
-  if (hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player')) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
-  if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // a trident's stab wears it by 1, like a sword
+  const landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player');
+  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
+  if (tool && landed) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // only a hit that lands wears the weapon (Java: not one into a mob's moment of invulnerability); a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
   { const bb = getBlock(x, y, z); if (bb === BID.gold_block || bb === BID.gilded_blackstone || bb === BID.nether_gold_ore) piglinAnger(x, y, z); } // piglins guard their gold
@@ -669,7 +670,8 @@ function useItem(first) {
       if (h.id === IID.honeycomb && BLOCKS[id].wax && !(t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m | BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 0.7, 0.2], { size: 0.08, vy: 0.5 }); consume(); advGrant('husbandry/wax_on'); play('place', { mat: 'wool' }); swing(); return; }
       const tool = d.tool;
       if (tool && tool.type === S.TOOL.AXE && BLOCKS[id].wax && (t.m & BLOCKS[id].wax)) { setMeta(x, y, z, t.m & ~BLOCKS[id].wax); for (let i = 0; i < 8; i++) R.simpleParticle(x + Math.random(), y + 1.05, z + Math.random(), [1, 1, 1], { size: 0.08, vy: 0.5 }); damageItem(INV.slots, INV.sel, 1); swing(); advGrant('husbandry/wax_off'); return; }
-      if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3) && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
+      if (tool && tool.type === S.TOOL.HOE && id === BID.coarse_dirt && t.ny !== -1 && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, 3); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // coarse dirt is tilled to dirt first (Java)
+      if (tool && tool.type === S.TOOL.HOE && (id === 2 || id === 3 || id === BID.dirt_path) && t.ny !== -1 && getBlock(x, y + 1, z) === 0) { setBlock(x, y, z, BID.farmland); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; }
       if (tool && tool.type === S.TOOL.SHOVEL && t.ny !== -1 && [2, 3, BID.podzol, BID.mycelium, BID.coarse_dirt, BID.rooted_dirt].includes(id) && !getBlock(x, y + 1, z)) { setBlock(x, y, z, BID.dirt_path); play('place', { mat: 'gravel' }); damageItem(INV.slots, INV.sel, 1); swing(); return; } // a shovel makes a path (Java: not from below, nothing on top)
       if (tool && tool.type === S.TOOL.AXE && STRIP()[id] != null) { // axes strip logs, wood, stems and hyphae (the axis / kind stays)
         const to = STRIP()[id]; setBlock(x, y, z, to, id === BID.wood ? t.m : t.m & 3); play('place', { mat: 'wood' }); swing(); if (!creative()) damageItem(INV.slots, INV.sel, 1); return;
