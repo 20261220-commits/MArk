@@ -163,7 +163,7 @@ function placeBoat(x, y, z, yaw, wood) {
   const tex = e.wood !== 'oak' && packTexture('boat_' + e.wood);
   e.mesh = tex ? buildMCModel('boat', MCMODELS.boat, tex) : buildModel('boat'); e.tick = boatTick; e.render = boatRender; e.onHit = boatHit; return addEnt(e);
 }
-function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } e.hp--; e.hurt = 8; play('hit', { vol: 0.5 }); if (e.hp <= 0) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
+function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } const h = PL.held(), t = h && ITEMS[h.id] && ITEMS[h.id].tool; e.dmgAcc = (e.dmgAcc || 0) + (t ? t.dmg : 1) * 10; e.hurt = 10; play('hit', { vol: 0.5 }); /* Java: damage x10 builds up and wears off; over 40 breaks it (a fist: five quick hits, a sword: one) */ if (e.dmgAcc > 40) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
 const seat2Busy = e => !!(e.mob || e.rider2 || e.seat2Other || (e.mpRider2 && performance.now() - e.mpRider2At < 1500));
 function mount(e) {
   if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) { // someone is driving (multiplayer): a boat has a back seat
@@ -178,17 +178,26 @@ function dismount() {
 }
 function boatTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1, deep = fluidAt(e.x, e.y + 0.45, e.z) === 1, under = getBlock(Math.floor(e.x), Math.floor(e.y - 0.1), Math.floor(e.z));
-  if (e.hurt > 0) e.hurt--;
+  if (e.hurt > 0) e.hurt--; if (e.dmgAcc > 0) e.dmgAcc = Math.max(0, e.dmgAcc - 1);
+  // Java's BoatEntity: the hull's momentum is 0.9 on water or in the air, 0.45 under water, and on land the slipperiness of
+  // what it sits on (0.6, ice and packed ice 0.98, blue ice 0.989); A/D add a degree a tick to a turn that keeps going and
+  // eases off with the same momentum, W pushes 0.04 a tick, S 0.005 back, and turning alone creeps forward
+  const sl = BLOCKS[under] && BLOCKS[under].slip, mom = deep ? 0.45 : inW || !under ? 0.9 : sl === 2 ? 0.989 : sl ? 0.98 : 0.6;
+  e.drot = e.drot || 0;
   if (e.rider === PL) {
-    e.yaw -= IN.s * 0.055; // A/D steer
-    const th = IN.f > 0 ? 0.04 : IN.f < 0 ? -0.005 : 0;
+    e.drot -= IN.s * Math.PI / 180;
+    const th = (IN.f > 0 ? 0.04 : IN.f < 0 ? -0.005 : 0) + (IN.s && !IN.f ? 0.005 : 0);
     e.vx += -Math.sin(e.yaw) * th; e.vz += -Math.cos(e.yaw) * th;
     if (IN.sneak) { dismount(); }
   }
+  e.yaw += e.drot; if (PL.riding === e) { PL.yaw += e.drot; e.viewYaw = e.yaw; } e.drot *= mom; // (the view turns in the same tick)
   if (deep) e.vy = Math.min(e.vy + 0.06, 0.12); else if (inW) { e.vy *= 0.5; if (e.vy < 0) e.vy = 0; } else e.vy -= 0.04;
-  physMove(e, e.vx, e.vy, e.vz, 0);
-  const fr = inW || deep ? 0.9 : under === BID.ice ? 0.98 : 0.5;
-  e.vx *= fr; e.vz *= fr; e.vy *= 0.98;
+  const oy = e.y; physMove(e, e.vx, e.vy, e.vz, 0);
+  if (!inW && !deep && e.y < oy) e.fall = (e.fall || 0) + oy - e.y;
+  else if (e.onGround && e.fall > 3 && !fluidAt(e.x, e.y + 0.1, e.z)) { // a fall of more than three blocks onto land breaks it into planks and sticks (Java)
+    if (!MP.on || MP.role !== 'guest') { removeEnt(e); for (const r of [e.rider, e.rider2]) if (r === PL) dismount(); if (gr('doEntityDrops')) { dropItem(e.x, e.y + .3, e.z, IID[(e.wood || 'oak') + '_planks'] || IID.oak_planks, 3); dropItem(e.x, e.y + .3, e.z, IID.stick, 2); } return; } }
+  else if (inW || e.onGround) e.fall = 0;
+  e.vx *= mom; e.vz *= mom; e.vy *= 0.98;
   if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y + 0.18; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
   if (e.y < voidY()) removeEnt(e);
 }
@@ -202,6 +211,7 @@ function rideTick() {
   const e = PL.riding;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
   if (!e || e.dead) { PL.riding = null; return; }
+  if (e.kind === 'boat') { if (e.viewYaw != null && PL.viewBoat === e) PL.yaw += e.yaw - e.viewYaw; e.viewYaw = e.yaw; PL.viewBoat = e; } // the view turns with the boat (Java)
   if (e.rider2 === PL) { // the back seat of a boat: rides along, can't steer; takes the front when the driver gets off
     if (!e.rider && !(e.mpRider && performance.now() - e.mpRideAt < 1500)) { e.rider2 = null; e.rider = PL; }
     else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y + 0.18; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }

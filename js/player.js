@@ -254,10 +254,11 @@ function playerTick() {
     if (snowB) { mx *= 0.9; my *= 1.5; mz *= 0.9; my = Math.max(my, -0.1); PL.fallDist = 0; }
     // sneak edge protection (Java's clipAtLedge: on the ground, or less than a step above it, as when landing or hopping)
     if (PL.sneaking && (PL.onGround || ((PL.fallDist || 0) < 0.6 && !noCollision(PL.x, PL.y + (PL.fallDist || 0) - 0.6, PL.z)))) {
-      const step = 0.05;
+      const step = 0.05, mx0 = mx, mz0 = mz;
       while (mx !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z)) mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step;
       while (mz !== 0 && noCollision(PL.x, PL.y - 0.6, PL.z + mz)) mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step;
       while (mx !== 0 && mz !== 0 && noCollision(PL.x + mx, PL.y - 0.6, PL.z + mz)) { mx = Math.abs(mx) < step ? 0 : mx - Math.sign(mx) * step; mz = Math.abs(mz) < step ? 0 : mz - Math.sign(mz) * step; }
+      if (mx !== mx0) PL.vx = 0; if (mz !== mz0) PL.vz = 0; // held at the edge: no speed is left over to carry you off when you let go
     }
     const oy = PL.y;
     PHYS.snowSolid = !!(INV.armor[3] && INV.armor[3].id === IID.leather_boots) && !PL.sneaking; PHYS.scafTop = !PL.sneaking;
@@ -478,7 +479,7 @@ function onUseRelease() {
       const ai = arrowSlot(), ast = ai >= 0 ? INV.slots[ai] : null;
       const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
       if (ast && ITEMS[ast.id].tipped != null) { arr.potion = ITEMS[ast.id].tipped; arr.item = ast.id; }
-      arr.flame = enchLv(bowSt, 'flame') > 0; arr.punch = enchLv(bowSt, 'punch');
+      arr.flame = enchLv(bowSt, 'flame') > 0; arr.punch = enchLv(bowSt, 'punch'); arr.crit = charge >= 1; // a fully drawn bow's arrow is critical
       if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
     }
   }

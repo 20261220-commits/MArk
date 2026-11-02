@@ -417,7 +417,7 @@ $('chatIn').addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeChat(); e.preventDefault(); }
   if (e.key === 'Enter') { const v = $('chatIn').value.trim(); closeChat(); if (v) { if (v[0] === '/') runCommand(v.slice(1)); else { chatMsg('<' + (MP.on ? MP.name : '플레이어') + '> ' + v); if (MP.on) mpSend({ t: 'chat', name: MP.name, text: v }); } } }
 });
-function runCommand(cmd) {
+function runCommandBasic(cmd) { // (the older handler: still answers /locate, /gamerule, /keepinventory)
   let [c, ...a] = cmd.split(/\s+/);
   const isTarget = v => v && (v[0] === '@' || v === '플레이어' || (typeof MP !== 'undefined' && v === MP.name));
   if ((c === 'give' || c === 'clear' || c === 'tp' || c === 'teleport') && isTarget(a[0]) && (c !== 'tp' && c !== 'teleport' || a.length >= 4)) a = a.slice(1); // Java's "<target>" first: this game has one player

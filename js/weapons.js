@@ -32,7 +32,7 @@ function crossbowFire(h) {
   for (const a of angles) {
     const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
     if (h.ch === IID.firework_rocket) { launchRocket(PL.x + vx * 0.6, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.6, { fw: h.chFw }, false, [vx * 1.6, dy * 1.6, vz * 1.6]); continue; }
-    const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2);
+    const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2); e.crit = true; // crossbow arrows are always critical (Java)
     if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
     if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
