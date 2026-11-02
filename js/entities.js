@@ -555,6 +555,14 @@ function canSee(ax, ay, az, bx, by, bz) {
   for (let i = 1; i < n; i++) { const t = i / n; if (OPQ[getBlock(Math.floor(ax + (bx - ax) * t), Math.floor(ay + (by - ay) * t), Math.floor(az + (bz - az) * t))]) return false; }
   return true;
 }
+// Java's walk nodes: a mob won't step where it would drop more than three blocks or onto lava, fire, cactus or magma
+function mobSafeAhead(e, mx, mz) {
+  const ax = e.x + mx * (e.w + 0.45), az = e.z + mz * (e.w + 0.45), ix = Math.floor(ax), iz = Math.floor(az), y = Math.floor(e.y + 0.01);
+  const bad = b => b === BID.lava || b === BID.fire || b === BID.soul_fire || b === BID.cactus || b === BID.magma_block || b === BID.sweet_berry_bush || FLUID[b] === 2;
+  const f = getBlock(ix, y, iz); if (bad(f) || bad(getBlock(ix, y + 1, iz))) return false; if (SOLID[f]) return true; // a wall: jumping or the path deals with it
+  for (let d = 1; d <= 4; d++) { const b = getBlock(ix, y - d, iz); if (bad(b)) return false; if (FLUID[b] === 1) return true; if (SOLID[b]) return d <= 4; }
+  return false;
+}
 function mobTick(e) {
   const d = e.def;
   if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y + 0.2; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
@@ -617,7 +625,8 @@ function mobTick(e) {
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
-    if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } if (Math.random() < 1 / 400) e.goal = null; }
+    if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
+    else if (plVisible && dist < 8 && !e.rider) { if (!(e.lookT > 0) && Math.random() < 0.02) e.lookT = 40 + Math.floor(Math.random() * 40); if (e.lookT > 0) { e.lookT--; e.yawTarget = Math.atan2(-dx, -dz); } } // now and then looks at a player nearby
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
@@ -630,6 +639,8 @@ function mobTick(e) {
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }
   // movement physics
   const inF = e.inWater || e.inLava;
+  if ((mx || mz) && e.onGround && !inF && !d.fly && !mobSafeAhead(e, mx, mz)) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } } // a ledge or lava ahead: stop (and pick somewhere else to go)
+  if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0; e.lastX = e.x; e.lastZ = e.z; // walking into a wall for two seconds: give up on that spot
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = d.jumpy ? 0.6 : 0.42; e.jumpCd = 10; }
@@ -638,6 +649,7 @@ function mobTick(e) {
   const push = (o, ow, oh) => { const ddx = e.x - o.x, ddz = e.z - o.z, r = e.w + ow; if (Math.abs(ddx) < r && Math.abs(ddz) < r && e.y < o.y + oh && o.y < e.y + e.h) { const l = Math.hypot(ddx, ddz) || 0.01, f = 0.05; e.vx += ddx / l * f; e.vz += ddz / l * f; return [ddx / l * f, ddz / l * f]; } return null; };
   if (!PL.dead && !spectator()) { const pp = push(PL, PL.w, PL.h); if (pp) { PL.vx -= pp[0] * 0.5; PL.vz -= pp[1] * 0.5; } }
   if ((e.age & 1) === 0) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead) push(o, o.w, o.h);
+  { const hv = Math.hypot(e.vx, e.vz); if (hv > 0.003 && hv < 0.15 && e.onGround && !inF && !d.fly && !(e.hurt > 0) && !mobSafeAhead(e, e.vx / hv, e.vz / hv)) { e.vx *= -0.2; e.vz *= -0.2; } } // a slow drift (a crowd pushing) toward a drop or lava is held back; a knock from a hit still carries over
   physMove(e, e.vx, e.vy, e.vz, 0.6);
   if (!inF) e.vy = (e.vy - 0.08) * 0.98; // Java order: move, then gravity (a 0.42 jump clears 1.25 blocks)
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
@@ -751,6 +763,8 @@ function entityTick() {
   // compact
   if (ENT.some(e => e.dead)) { for (let i = ENT.length - 1; i >= 0; i--) if (ENT[i].dead) ENT.splice(i, 1); }
 }
+// an arrow stops on a block's real shape (a slab's half, a fence post), not its whole cell
+function arrowInBlock(b, x, y, z) { const bs = S.collide(b, getMeta(Math.floor(x), Math.floor(y), Math.floor(z))); if (!bs) return true; const fx = (x - Math.floor(x)) * 16, fy = (y - Math.floor(y)) * 16, fz = (z - Math.floor(z)) * 16; return bs.some(q => fx >= q[0] && fx <= q[3] && fy >= q[1] && fy <= q[4] && fz >= q[2] && fz <= q[5]); }
 function arrowTick(e) {
   if (e.trident && tridentTick(e)) return;
   if (e.stuck) { if (e.age > 1200 && !(e.trident && e.owner === PL)) removeEnt(e); else if (e.trident) {} else if (e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) { if (e.noPickup) removeEnt(e); else if (PL.mode === 'creative' || INV.add({ id: e.item || IID.arrow, n: 1 }) === 0) { play('pop', { vol: .5 }); removeEnt(e); } } return; }
@@ -758,23 +772,29 @@ function arrowTick(e) {
   for (let s = 0; s < steps; s++) {
     const nx = e.x + e.vx / steps, ny = e.y + e.vy / steps, nz = e.z + e.vz / steps;
     const b = getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-    if (SOLID[b] && !(b === BID.water)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) { const v = targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (v === 15 && e.owner === PL && e.from && Math.hypot(nx - e.from[0], nz - e.from[1]) >= 30 && typeof advGrant === 'function') advGrant('adventure/bullseye'); } if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
+    if (SOLID[b] && !(b === BID.water) && arrowInBlock(b, nx, ny, nz)) { if (!e.stuck) { vibrate(nx, ny, nz); if (b === BID.bell) ringBell(Math.floor(nx), Math.floor(ny), Math.floor(nz)); } if (b === BID.target) { const v = targetHit(Math.floor(nx), Math.floor(ny), Math.floor(nz), nx, ny, nz); if (v === 15 && e.owner === PL && e.from && Math.hypot(nx - e.from[0], nz - e.from[1]) >= 30 && typeof advGrant === 'function') advGrant('adventure/bullseye'); } if (e.thrown) { onThrownHit(e, e.x, e.y, e.z, null); removeEnt(e); return; } e.stuck = true; e.age = 0; play('hit', { vol: 0.4 }); return; }
     // entity hits
-    const speed = Math.hypot(e.vx, e.vy, e.vz), dmg = Math.ceil(speed * e.dmgMul);
-    if (e.owner !== PL && !e.thrown && !PL.dead && nx > PL.x - 0.4 && nx < PL.x + 0.4 && nz > PL.z - 0.4 && nz < PL.z + 0.4 && ny > PL.y && ny < PL.y + 1.8) {
+    // Java: a target's box grows by 0.3 for arrows; a full-strength (critical) arrow adds up to half its damage plus one;
+    // your own arrow can hit you once it has left you (one shot straight up comes back down on you)
+    const speed = Math.hypot(e.vx, e.vy, e.vz); let dmg = Math.ceil(speed * e.dmgMul); if (e.crit) dmg += Math.floor(Math.random() * (dmg / 2 + 2));
+    const inPL = nx > PL.x - 0.6 && nx < PL.x + 0.6 && nz > PL.z - 0.6 && nz < PL.z + 0.6 && ny > PL.y - 0.3 && ny < PL.y + (PL.h || 1.8) + 0.3;
+    if (e.owner === PL && !e.leftOwner && !inPL && !e.thrown) e.leftOwner = true;
+    if ((e.owner !== PL || (e.leftOwner && !e.trident)) && !e.thrown && !PL.dead && inPL) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
       if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
-    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .1 && nx < o.x + o.w + .1 && nz > o.z - o.w - .1 && nz < o.z + o.w + .1 && ny > o.y && ny < o.y + o.h) {
+    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .3 && nx < o.x + o.w + .3 && nz > o.z - o.w - .3 && nz < o.z + o.w + .3 && ny > o.y - .3 && ny < o.y + o.h + .3) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
       if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour
       if (e.trident) { tridentHit(e, o); break; }
       if (e.flame && !o.def.fireproof) o.fire = Math.max(o.fire || 0, 100);
       HURTPROJ = e; if (e.owner === PL && typeof ADVT !== 'undefined') ADVT.hitByPlayer(o, e);
-      if (hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx * (1 + (e.punch || 0)), e.vz * (1 + (e.punch || 0)), e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null) && e.potion) applyPotion(o, e.potion, 0.125);
+      const landed = hurtMob(o, dmg, e.owner === PL ? PL : null, e.vx, e.vz, e.owner === PL ? 'player' : e.owner && (e.owner.type === 'skeleton' || e.owner.type === 'stray') ? 'skeleton' : null);
       HURTPROJ = null;
+      if (landed) { if (e.potion) applyPotion(o, e.potion, 0.125); if (e.punch && !o.def.kbRes) { const l = Math.hypot(e.vx, e.vz) || 1; o.vx += e.vx / l * 0.6 * e.punch; o.vz += e.vz / l * 0.6 * e.punch; } } // punch: more knockback
+      else if (!e.trident && !e.hitSet) { e.vx *= -0.1; e.vy *= -0.1; e.vz *= -0.1; e.hitDone = true; break; } // a mob still flashing from a hit: the arrow bounces off (Java)
       if (e.hitSet && e.pierce-- > 0) { e.hitSet.add(o); continue; } // piercing: keeps flying through
       removeEnt(e); return;
     }
