@@ -153,6 +153,6 @@ function mpWorldCore(store, out) {
   }
   // let go of cached chunks down to keep (the most recently used stay), except those with changes not yet written
   function trim(keep) { if (!store.pending) return; for (const k of cache.keys()) { if (cache.size <= keep) break; if (!store.pending(k)) cache.delete(k); } }
-  return { message, leave, tick, trim, players, auth };
+  return { message, leave, tick, trim, cacheSize: () => cache.size, players, auth };
 }
 if (typeof module !== 'undefined') module.exports = { mpWorldCore, mpSha256 };

@@ -18399,7 +18399,7 @@ function mpWorldCore(store, out) {
   }
   // let go of cached chunks down to keep (the most recently used stay), except those with changes not yet written
   function trim(keep) { if (!store.pending) return; for (const k of cache.keys()) { if (cache.size <= keep) break; if (!store.pending(k)) cache.delete(k); } }
-  return { message, leave, tick, trim, players, auth };
+  return { message, leave, tick, trim, cacheSize: () => cache.size, players, auth };
 }
 if (typeof module !== 'undefined') module.exports = { mpWorldCore, mpSha256 };
 
@@ -18479,9 +18479,9 @@ function mpWsOnce(url, role, extra) {
       mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
     ws.onerror = () => { if (!ok) rej(new Error('서버에 연결하지 못했습니다')); };
     ws.onclose = () => { clearInterval(link.dog); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
-    // nothing from the server for 20 s (it sends the clock every second): the connection is dead even if the browser
+    // nothing from the server for 40 s (it sends the clock every second): the connection is dead even if the browser
     // hasn't noticed - give it up and connect again at once instead of waiting minutes for the browser's own timeout
-    link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 20000 : 75000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
+    link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 40000 : 75000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
   });
 }
 // WebRTC data channels, a star around the host; long messages are split (data channels cap message size)

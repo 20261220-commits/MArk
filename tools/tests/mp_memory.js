@@ -17,12 +17,14 @@ module.exports = async ({ ok, lib }) => {
     if (req.method === 'POST' && u === '/git/refs') { refs[b.ref.replace('refs/heads/', '')] = b.sha; return send(201, {}); }
     send(404); }); });
   await new Promise(r => api.listen(0, r)); const apiUrl = 'http://localhost:' + api.address().port;
-  const rss = pid => { try { return +/VmRSS:\s+(\d+)/.exec(fs.readFileSync(`/proc/${pid}/status`, 'utf8'))[1] / 1024; } catch (e) { return 0; } };
+  const rss1 = pid => { try { return +/VmRSS:\s+(\d+)/.exec(fs.readFileSync(`/proc/${pid}/status`, 'utf8'))[1] / 1024; } catch (e) { return 0; } };
+  const kids = pid => { try { return fs.readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8').trim().split(/\s+/).filter(Boolean).map(Number); } catch (e) { return []; } };
+  const rss = pid => rss1(pid) + kids(pid).reduce((a, k) => a + rss(k), 0); // the watchman and the server it runs, together
   const run = async (dir, port) => {
     const p = spawn(process.execPath, ['--max-old-space-size=360', '--expose-gc', path.join(lib.root, 'tools', 'server.js')], { env: { ...process.env, PORT: String(port), WORLDS_DIR: dir, GITHUB_BACKUP_REPO: 'o/r', GITHUB_TOKEN: 'tok', GITHUB_API_URL: apiUrl, KEEP_AWAKE: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
-    let log = '', peak = 0; p.stdout.on('data', d => log += d); p.stderr.on('data', d => log += d); const iv = setInterval(() => { peak = Math.max(peak, rss(p.pid)); }, 50);
+    let log = '', peak = 0; p.stdout.on('data', d => log += d); p.stderr.on('data', d => log += d); let pp = 0; const iv = setInterval(() => { peak = Math.max(peak, rss(p.pid)); pp = Math.max(pp, rss1(p.pid)); }, 50);
     for (let i = 0; i < 1200 && !/멀티플레이 주소/.test(log); i++) await new Promise(r => setTimeout(r, 100));
-    return { p, log: () => log, peak: () => peak, stop: () => new Promise(r => { p.on('exit', () => { clearInterval(iv); r(); }); p.kill('SIGTERM'); }) };
+    return { p, log: () => log, peak: () => peak, pp: () => pp, stop: () => new Promise(r => { p.on('exit', () => { clearInterval(iv); r(); }); p.kill('SIGTERM'); }) };
   };
   const d1 = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-mem1-')), d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-mem2-')), W1 = path.join(d1, 'big');
   try {
@@ -35,8 +37,13 @@ module.exports = async ({ ok, lib }) => {
     const s2 = await run(d2, 21000 + Math.floor(Math.random() * 1000)); await new Promise(r => setTimeout(r, 500));
     const n = fs.existsSync(path.join(d2, 'big', 'chunks')) ? fs.readdirSync(path.join(d2, 'big', 'chunks')).length : 0;
     ok(/백업에서 세계를 되살렸습니다/.test(s2.log()) && n === 4000, 'and restored whole on an empty disk', [n, s2.log().slice(0, 300)]);
-    console.log('  memory peak MB (backup, restore):', Math.round(s1.peak()), Math.round(s2.peak()));
+    console.log('  memory peak MB (backup, restore):', Math.round(s1.peak()), Math.round(s2.peak()), '- the watchman itself:', Math.round(s1.pp()), Math.round(s2.pp()));
     ok(s1.peak() < 330 && s2.peak() < 250, 'the server stays far under 512 MB while backing up and restoring (MB)', [Math.round(s1.peak()), Math.round(s2.peak())]);
+    // the real server dies (out of memory, a crash): the watchman starts it again at once, on the same disk, and /stats says why
+    const port = s2.log().match(/localhost:(\d+)/)[1], st = await fetch(`http://localhost:${port}/stats`).then(r => r.json());
+    process.kill(st.pid, 'SIGKILL'); let st2 = null;
+    for (let i = 0; i < 60 && !(st2 && st2.pid !== st.pid); i++) { await new Promise(r => setTimeout(r, 250)); st2 = await fetch(`http://localhost:${port}/stats`).then(r => r.json()).catch(() => null); }
+    ok(st2 && st2.pid !== st.pid && st2.restarts === 1 && st2.lastCrash && st2.lastCrash.sig === 'SIGKILL' && st2.worlds.length === 1 && st2.worlds[0].chunksOnDisk === 4000, 'a server that dies is back within seconds with its world, and /stats tells why', st2 && { restarts: st2.restarts, lastCrash: st2.lastCrash, worlds: st2.worlds });
     await s2.stop();
   } finally { api.close(); for (const d of [d1, d2]) try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) {} }
 };
