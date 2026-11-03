@@ -63,18 +63,19 @@ function mpWsOnce(url, role, extra) {
       ws.send(s); }, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
-    ws.onmessage = e => { link.rx = Date.now(); let m; try { m = JSON.parse(e.data); } catch (er) { return; }
+    ws.onmessage = e => { link.rx = Date.now(); if (ok && MP.link !== link && !(MP.core && role === 'host')) return; /* an old connection still talking after the game moved on */ let m; try { m = JSON.parse(e.data); } catch (er) { return; }
       if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { const er = new Error(m.msg); er.fromServer = true; rej(er); ws.close(); } return; }
       if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
-      if (m.t === 'kicked') { MP.noRejoin = true; mpLost(m.msg || '연결이 끊겼습니다'); MP.noRejoin = false; return; } // taken over by a newer connection: no knocking again
+      if (m.t === 'kicked') { if (MP.link !== link) return; /* (meant for an old connection this game already left: the new one stays) */ MP.noRejoin = true; mpLost(m.msg || '연결이 끊겼습니다'); MP.noRejoin = false; return; } // taken over by a newer connection: no knocking again
       if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
       mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
     ws.onerror = () => { if (!ok) rej(new Error('서버에 연결하지 못했습니다')); };
-    ws.onclose = () => { clearInterval(link.dog); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
-    // nothing from the server for 40 s (it sends the clock every second): the connection is dead even if the browser
+    ws.onclose = () => { clearInterval(link.dog); clearInterval(link.hb); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
+    // nothing from the server for 60 s (it sends the clock every second): the connection is dead even if the browser
     // hasn't noticed - give it up and connect again at once instead of waiting minutes for the browser's own timeout
-    link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 40000 : 75000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
+    link.hb = setInterval(() => { if (ws.readyState === 1 && ok) ws.send('{"t":"hb"}'); }, 10000); // a word every 10 s, even from a background tab: the server knows this player is still there
+    link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 60000 : 90000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
   });
 }
 // WebRTC data channels, a star around the host; long messages are split (data channels cap message size)
@@ -238,6 +239,8 @@ function mpStop() {
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
+  try { if (MP.on && MP.lastUrl && MP.link && MP.link.kind === 'ws') { // tell the server why (it shows the last ones on /stats), for finding what drops players
+    const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why, world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
   if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
   const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   mpStop(); chatMsg(why, '#ff5555');

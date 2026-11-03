@@ -48,6 +48,7 @@ const server = http.createServer((req, res) => {
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
   if (u === '/skin') { skinProxy(req, res); return; }
   if (u === '/profile') { profileLookup(req, res); return; }
+  if (u === '/report' && req.method === 'POST') { let b = ''; req.on('data', d => { b += d; if (b.length > 2000) req.destroy(); }); req.on('end', () => { try { const o = JSON.parse(b); noteDrop({ at: new Date().toISOString(), side: 'game', name: String(o.name || '').slice(0, 16), why: String(o.why || '').slice(0, 200), world: String(o.world || '').slice(0, 40), secs: +o.secs || 0 }); } catch (e) {} res.writeHead(204, { 'access-control-allow-origin': '*' }); res.end(); }); return; }
   if (u === '/stats') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(serverStats(), null, 1)); return; }
   if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
@@ -126,7 +127,7 @@ function wsAccept(req, sock, onText, onClose) {
   const latest = new Map();
   const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) sock.write(frame(1, Buffer.from(s))); };
   sock.on('drain', flush);
-  const c = { send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(); } } };
+  const c = { backlog: () => sock.writableLength, send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose('서버가 닫음'); } } };
   sock.on('data', d => {
     seen = Date.now(); buf = buf.length ? Buffer.concat([buf, d]) : d;
     for (;;) {
@@ -137,17 +138,18 @@ function wsAccept(req, sock, onText, onClose) {
       const mask = masked ? buf.subarray(p, p + 4) : null; p += masked ? 4 : 0;
       const data = Buffer.from(buf.subarray(p, p + len)); if (mask) for (let i = 0; i < len; i++) data[i] ^= mask[i & 3];
       buf = buf.subarray(p + len);
-      if (op === 8) { c.close(); return; }
+      if (op === 8) { why = '플레이어가 나감'; closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(why); return; }
       if (op === 9) { sock.write(frame(10, data)); continue; }
       if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
   // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself). A connection
-  // that hasn't said anything for 45 s - not even the pong - is dead (a phone that changed networks, a closed laptop):
+  // that hasn't said anything for 2 minutes - not even the pong - is dead (a phone that changed networks, a closed laptop):
   // closed here, so its player leaves at once instead of blocking its own way back in
   let seen = Date.now();
-  const ping = setInterval(() => { if (closed) return; if (Date.now() - seen > 45000) { try { sock.destroy(); } catch (e) {} return; } try { sock.write(frame(9, Buffer.alloc(0))); } catch (e) {} }, 15000);
-  sock.on('close', () => { clearInterval(ping); if (!closed) { closed = true; onClose(); } }); sock.on('error', () => {});
+  const ping = setInterval(() => { if (closed) return; if (Date.now() - seen > 120000) { why = '2분 동안 응답 없음'; try { sock.destroy(); } catch (e) {} return; } try { sock.write(frame(9, Buffer.alloc(0))); } catch (e) {} }, 15000);
+  let why = '플레이어 쪽에서 닫힘';
+  sock.on('close', () => { clearInterval(ping); if (!closed) { closed = true; onClose(why); } }); sock.on('error', e => { why = '네트워크 오류 ' + (e && e.code || ''); });
   return c;
 }
 
@@ -205,8 +207,8 @@ function mirrorFill(w, id, m) {
   const have = m.wid === st.wid && m.vers && typeof m.vers === 'object' ? m.vers : {}, ver = st.cver || {};
   const need = [...w.keys].filter(dk => !(dk in have) || have[dk] < (ver[dk] || 0));
   c.send(JSON.stringify({ t: 'mirror', wid: st.wid, state: mirrorState(w), reset: m.wid !== st.wid, l: [] }));
-  const next = () => { if (!w.conns.has(id) || !need.length) return; const l = need.splice(0, 12).map(dk => { try { return [dk, ver[dk] || 0, JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8'))]; } catch (e) { return null; } }).filter(Boolean);
-    if (l.length) c.send(JSON.stringify({ t: 'mirror', wid: st.wid, l })); setTimeout(next, 150); };
+  const next = () => { if (!w.conns.has(id) || !need.length) return; if (c.backlog() > 64 * 1024) { setTimeout(next, 400); return; } /* a slow connection gets the copy as fast as it can take it, the game first */ const l = need.splice(0, 6).map(dk => { try { return [dk, ver[dk] || 0, JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8'))]; } catch (e) { return null; } }).filter(Boolean);
+    if (l.length) c.send(JSON.stringify({ t: 'mirror', wid: st.wid, l })); setTimeout(next, 250); };
   setTimeout(next, 3000); // after the player's own world has loaded
 }
 // a world the server lost and a player with a copy: that copy becomes the server world again
@@ -302,12 +304,13 @@ async function restoreIfEmpty() { // a fresh disk (a restart on a free host): br
   catch (e) { console.log('백업 불러오기 실패: ' + e.message); }
 }
 // /stats: how the server is doing (memory, worlds, players), and why it last stopped if it did
-const STARTED = Date.now(); let lastBackup = null;
+const STARTED = Date.now(); let lastBackup = null; const DROPS = [];
+const noteDrop = d => { DROPS.push(d); if (DROPS.length > 40) DROPS.shift(); }; // the last connections that ended, and why (as the server saw it, and as players' games reported it)
 function serverStats() {
   const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
   return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup,
     worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.id, name: w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
-    rooms: [...rooms.values()].filter(r => r.host).length };
+    rooms: [...rooms.values()].filter(r => r.host).length, recentDrops: DROPS.slice().reverse() };
 }
 setInterval(() => { const m = process.memoryUsage(); console.log(`메모리 ${Math.round(m.rss / 1048576)} MB (힙 ${Math.round(m.heapUsed / 1048576)} MB), 접속 ${[...worlds.values()].reduce((a, w) => a + w.conns.size, 0)}명`); }, 5 * 60000).unref();
 if (process.env.NEMO_LASTCRASH) console.log('지난번 서버가 멈춘 이유: ' + process.env.NEMO_LASTCRASH.slice(0, 600));
@@ -345,6 +348,7 @@ server.on('upgrade', (req, sock) => {
   const id = nextId++; let role = null, wp = false;
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (m.t === 'hb') return; // a player's game saying it is still there (in a background tab too)
     if (wp) {
       if (m.t === 'restore') { restorePart(w, id, m); return; }
       if (m.t === 'mirrorhave') { mirrorFill(w, id, m); return; }
@@ -381,7 +385,8 @@ server.on('upgrade', (req, sock) => {
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id }), dr); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s, dr); } else for (const g of room.guests.values()) g.send(s, dr);
-  }, () => {
+  }, why => {
+    { const p = wp && w.core.players.get(id); if (p && p.joined || role) noteDrop({ at: new Date().toISOString(), side: 'server', world: wp ? w.id : roomName, name: p ? p.name : role, why }); }
     if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
     if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
     else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }

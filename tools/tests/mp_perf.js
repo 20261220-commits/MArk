@@ -30,5 +30,15 @@ module.exports = async ({ ok, srv, b, lib }) => {
   let back2 = false; try { await g2.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join' && MP.link !== window.__oldLink, null, { timeout: 80000 }); back2 = true; } catch (e) {}
   const names = await A.evaluate(() => [...MP.peers.values()].map(p => p.name));
   ok(back2 && new Set(names).size === names.length, 'a connection that died unnoticed: back in by itself, the old one replaced (not "already playing", no double)', [back2, names, await g2.evaluate(() => MP.status)]);
+  // the game gave up on a connection that was in fact still open: the server hands the name to the new one and tells the
+  // old one it was taken over - that word, arriving on the old connection, must not throw the new one out
+  const g3 = [A, B, C][(await roles()).indexOf('guest')];
+  await g3.evaluate(() => { const l = MP.link; window.__old3 = l; l.ws.close = () => {}; l.ws.onclose = null; mpLost('서버 응답이 없어 다시 연결합니다'); }); // what the watchdog does - but the socket stays open and still delivering
+  let back3 = false; try { await g3.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join' && MP.link !== window.__old3, null, { timeout: 60000 }); back3 = true; } catch (e) {}
+  await g3.waitForTimeout(4000);
+  const st3 = await g3.evaluate(() => [MP.on, !!W.active, UI.menu || null, MP.status]);
+  ok(back3 && st3[0] && st3[1] && st3[2] !== 'mp_join', 'a reconnect while the old connection still lived: the new one stays in (not thrown out by the old one\'s "taken over")', [back3, st3]);
+  const st = await fetch(srv.url + 'stats').then(r => r.json());
+  ok(st.recentDrops.some(d => d.side === 'game' && /응답이 없어/.test(d.why)) && st.recentDrops.some(d => d.side === 'server'), '/stats lists the dropped connections and why (as the server saw it and as the game reported it)', st.recentDrops.slice(0, 6));
   ok(![A, B, C].some(P => P.errs.length), 'no page errors', [A.errs, B.errs, C.errs]);
 };
