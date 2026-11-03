@@ -14,13 +14,14 @@ function githubBackup({ repo, token, branch = 'world-backup', api = 'https://api
     return r.json();
   };
   return {
-    async load() {
+    async loadGz() { // the backup as it is kept (gzipped), or null
       const ref = await call('GET', '/git/ref/heads/' + branch); if (!ref) return null;
       const c = await call('GET', '/git/commits/' + ref.object.sha), t = await call('GET', '/git/trees/' + c.tree.sha), f = t && t.tree.find(x => x.path === file);
       if (!f) return null;
       const b = await call('GET', '/git/blobs/' + f.sha);
-      return JSON.parse(zlib.gunzipSync(Buffer.from(b.content, 'base64')).toString('utf8'));
+      return Buffer.from(b.content, 'base64');
     },
+    async load() { const gz = await this.loadGz(); return gz && JSON.parse(zlib.gunzipSync(gz).toString('utf8')); },
     async save(obj) { // an object, or the backup already gzipped (a Buffer: the server writes it piece by piece)
       const content = (Buffer.isBuffer(obj) ? obj : zlib.gzipSync(Buffer.from(JSON.stringify(obj)))).toString('base64');
       const blob = await call('POST', '/git/blobs', { content, encoding: 'base64' });

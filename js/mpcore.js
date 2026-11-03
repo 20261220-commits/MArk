@@ -30,7 +30,7 @@ function mpWorldCore(store, out) {
   const blank = () => ({ rec: null, edits: [], tiles: {} });
   // chunks read from the store stay cached while in use; past a limit the longest unused ones that are already on disk go
   // (a server that kept every chunk anyone ever visited ran out of memory and restarted, dropping everyone)
-  const CACHE_MAX = 1200;
+  const CACHE_MAX = 600;
   const entry = dk => { let p = cache.get(dk);
     if (p) { cache.delete(dk); cache.set(dk, p); return p; }
     p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p);
@@ -151,6 +151,8 @@ function mpWorldCore(store, out) {
     if (p.dim != null) pickAuth(p.dim);
     store.saveState();
   }
-  return { message, leave, tick, players, auth };
+  // let go of cached chunks down to keep (the most recently used stay), except those with changes not yet written
+  function trim(keep) { if (!store.pending) return; for (const k of cache.keys()) { if (cache.size <= keep) break; if (!store.pending(k)) cache.delete(k); } }
+  return { message, leave, tick, trim, players, auth };
 }
 if (typeof module !== 'undefined') module.exports = { mpWorldCore, mpSha256 };

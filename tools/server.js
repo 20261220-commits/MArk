@@ -209,16 +209,18 @@ const BACKUP = process.env.GITHUB_BACKUP_REPO && process.env.GITHUB_TOKEN ? gith
 // files' own text: parsing every chunk into objects first took more memory than a free host has once a world grew, and
 // the server was killed in the middle of a backup
 async function worldSnapshot() {
+  // one record per line (NEMO3): a world's state, then its chunks; the restore reads it a line at a time, so a big world
+  // never has to fit in memory whole (the old one-object backups were parsed all at once on start - with a big world
+  // that alone could pass the free plan's 512 MB and the server died on every start)
   saveAllWorlds(); const list = [...worlds.values()].filter(w => w.state.meta); if (!list.length) return null;
   const gz = zlib.createGzip({ level: 6 }), out = []; gz.on('data', d => out.push(d)); const done = new Promise((res, rej) => { gz.on('end', res); gz.on('error', rej); });
   const put = s => gz.write(s) ? null : new Promise(r => gz.once('drain', r));
   const raw = f => { try { const t = fs.readFileSync(f, 'utf8'); JSON.parse(t); return t; } catch (e) { return null; } }; // (a file cut short is left out)
-  await put('{"v":2,"worlds":{'); let first = true;
-  for (const w of list) { const st = raw(path.join(w.dir, 'world.json')); if (!st) continue;
-    await put((first ? '' : ',') + JSON.stringify(w.id) + ':{"state":' + st + ',"chunks":{'); first = false; let fc = true;
-    for (const dk of [...w.keys]) { const t = raw(w.fileOf(dk)); if (!t) continue; const p = put((fc ? '' : ',') + JSON.stringify(dk) + ':' + t); fc = false; if (p) await p; }
-    await put('}}'); }
-  gz.end('}}'); await done; return first ? null : Buffer.concat(out);
+  await put('NEMO3\n'); let any = false;
+  for (const w of list) { const st = raw(path.join(w.dir, 'world.json')); if (!st) continue; any = true;
+    await put('W\t' + w.id + '\t' + st.replace(/\n/g, '') + '\n');
+    for (const dk of [...w.keys]) { const t = raw(w.fileOf(dk)); if (!t) continue; const p = put('C\t' + w.id + '\t' + dk + '\t' + t.replace(/\n/g, '') + '\n'); if (p) await p; } }
+  gz.end(); await done; return any ? Buffer.concat(out) : null;
 }
 let backingUp = null;
 async function backupNow(why) {
@@ -226,17 +228,64 @@ async function backupNow(why) {
   backingUp = worldSnapshot().then(snap => snap && BACKUP.save(snap)).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => console.log('세계 백업 실패: ' + e.message)).finally(() => { backingUp = null; });
   return backingUp;
 }
+// the one-object backups ({"v":2,"worlds":{id:{"state":{..},"chunks":{dk:{..}}}}}) read a piece at a time: a small
+// scanner keeps only the value it is copying (a world's state, or one chunk), never the whole world
+async function scanOldBackup(input, put) {
+  const key = []; let depth = 0, inStr = false, esc = false, str = null, last = null, cap = null, capAt = 0, capWhat = null;
+  input.setEncoding('utf8');
+  for await (const t of input) {
+    let from = cap ? 0 : -1;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') { inStr = false; if (str != null) { last = str; str = null; } } else if (str != null) str += ch; continue; }
+      if (ch === '"') { inStr = true; str = cap ? null : ''; continue; }
+      if (ch === ':' && !cap && last != null) { key[depth] = last; last = null; continue; }
+      if (ch === '{' || ch === '[') {
+        if (!cap && ch === '{' && ((depth === 3 && key[3] === 'state') || (depth === 4 && key[3] === 'chunks'))) { cap = []; from = i; capAt = depth; capWhat = depth === 3 ? [key[2], null] : [key[2], key[4]]; }
+        depth++; continue; }
+      if (ch === '}' || ch === ']') { depth--;
+        if (cap && depth === capAt) { cap.push(t.slice(from, i + 1)); put(capWhat[0], capWhat[1], cap.join('')); cap = null; from = -1; }
+        continue; }
+      if (ch === ',') last = null;
+    }
+    if (cap && from >= 0) cap.push(t.slice(from));
+  }
+}
 async function restoreIfEmpty() { // a fresh disk (a restart on a free host): bring the worlds back from the backup
   if (!BACKUP || [...worlds.values()].some(w => w.state.meta)) return;
-  try { const snap = await BACKUP.load(); const all = snap && (snap.v === 2 ? snap.worlds : snap.state ? { [snap.name || worldName]: { state: snap.state, chunks: snap.chunks } } : null); // v1: the one-world backups before
-    if (!all || !Object.keys(all).length) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
-    for (const [id, x] of Object.entries(all)) { if (!WORLD_ID.test(id) || !x.state || !x.state.meta) continue; const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
-      fs.mkdirSync(cdir, { recursive: true }); fs.writeFileSync(path.join(dir, 'world.json'), JSON.stringify(x.state));
-      for (const [dk, c] of Object.entries(x.chunks || {})) fs.writeFileSync(path.join(cdir, encodeURIComponent(dk) + '.json'), JSON.stringify(c));
-      const w = worlds.get(id); if (w) loadWorld(w); else openWorld(id); }
+  try { const gz = BACKUP.loadGz ? await BACKUP.loadGz() : null; if (!gz) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
+    const head = zlib.gunzipSync(gz.subarray(0, Math.min(gz.length, 4096)), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).toString('utf8', 0, 6);
+    const ids = new Set();
+    if (head === 'NEMO3\n') { // a line at a time, straight to the files
+      const rl = require('readline').createInterface({ input: require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), crlfDelay: Infinity });
+      for await (const line of rl) {
+        const a = line.indexOf('\t'), b = line.indexOf('\t', a + 1); if (a < 0 || b < 0) continue; const kind = line.slice(0, a), id = line.slice(a + 1, b); if (!WORLD_ID.test(id)) continue;
+        const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
+        if (kind === 'W') { fs.mkdirSync(cdir, { recursive: true }); fs.writeFileSync(path.join(dir, 'world.json'), line.slice(b + 1)); ids.add(id); }
+        else if (kind === 'C' && ids.has(id)) { const c = line.indexOf('\t', b + 1); if (c < 0) continue; const dk = line.slice(b + 1, c); if (!/^[ne]?-?\d+,-?\d+$|^o:/.test(dk)) continue; fs.writeFileSync(path.join(cdir, encodeURIComponent(dk) + '.json'), line.slice(c + 1)); }
+      }
+    } else { // a backup made before (one object): read as a stream too, each world's state and each chunk on its own
+      const put = (id, dk, text) => { if (!WORLD_ID.test(id)) return; const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
+        if (dk == null) { let st; try { st = JSON.parse(text); } catch (e) { return; } if (!st || !st.meta) return; fs.mkdirSync(cdir, { recursive: true }); fs.writeFileSync(path.join(dir, 'world.json'), text); ids.add(id); }
+        else if (ids.has(id)) fs.writeFileSync(path.join(cdir, encodeURIComponent(dk) + '.json'), text); };
+      await scanOldBackup(require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), put);
+      if (!ids.size) { const snap = JSON.parse(zlib.gunzipSync(gz).toString('utf8')); if (snap && snap.state && snap.state.meta) { put(snap.name || worldName, null, JSON.stringify(snap.state)); for (const [dk, c] of Object.entries(snap.chunks || {})) put(snap.name || worldName, dk, JSON.stringify(c)); } } // the very first (one-world) backups
+    }
+    if (!ids.size) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
+    for (const id of ids) { const w = worlds.get(id); if (w) loadWorld(w); else openWorld(id); }
     console.log('백업에서 세계를 되살렸습니다'); }
   catch (e) { console.log('백업 불러오기 실패: ' + e.message); }
 }
+// memory: the free plan stops the server at 512 MB. Worlds nobody is in keep no chunks in memory, and when the server
+// nears the limit every world lets go of the chunks it isn't changing (they are on disk) - long before it would be stopped
+const MEM_SOFT = (+process.env.MEM_LIMIT_MB || 512) * 0.62 * 1048576;
+setInterval(() => {
+  for (const w of worlds.values()) if (!w.conns.size) w.core.trim && w.core.trim(0);
+  const rss = process.memoryUsage().rss; if (rss < MEM_SOFT) return;
+  for (const w of worlds.values()) { saveWorld(w); w.core.trim && w.core.trim(100); }
+  if (global.gc) global.gc();
+  console.log(`메모리 ${Math.round(rss / 1048576)} MB: 쓰지 않는 청크를 비웠습니다 → ${Math.round(process.memoryUsage().rss / 1048576)} MB`);
+}, 10000).unref();
 if (BACKUP) { setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow('10분마다'); }, 10 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
 // Render gives the service's own address; asking it for /ping every 10 minutes counts as a visit, so the free plan's
 // 15-minute sleep never comes (KEEP_AWAKE=0 turns this off; KEEP_AWAKE_URL sets the address on other hosts)
