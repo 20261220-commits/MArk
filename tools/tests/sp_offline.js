@@ -1,7 +1,7 @@
 // offline play: after one visit the game opens with no network at all, and the world saved before is still there
 module.exports = async ({ ok, srv, b, lib }) => {
   const p = await lib.page(b, srv); await lib.newWorld(p, 'creative', '2468');
-  const ready = await p.evaluate(async () => { const r = await navigator.serviceWorker.ready; for (let i = 0; i < 60; i++) { const c = await caches.open('nemo-offline-v1'), n = (await c.keys()).length; if (n > 40) return n; await new Promise(r => setTimeout(r, 500)); } return 0; });
+  const ready = await p.evaluate(async () => { const r = await navigator.serviceWorker.ready; for (let i = 0; i < 60; i++) { const c = await caches.open('nemo-offline-v2'), n = (await c.keys()).length; if (n > 40) return n; await new Promise(r => setTimeout(r, 500)); } return 0; });
   ok(ready > 40, 'the game\'s files are kept for offline use', ready);
   const saved = await p.evaluate(async () => { const x = Math.floor(PL.x), z = Math.floor(PL.z); setBlock(x, 200, z, BID.gold_block); INV.slots[0] = { id: IID.emerald, n: 5 }; saveAll(true); await new Promise(r => setTimeout(r, 800)); quitToTitle(); await new Promise(r => setTimeout(r, 800)); return { id: W.id || null, at: [x, 200, z] }; });
   await p.context().setOffline(true);

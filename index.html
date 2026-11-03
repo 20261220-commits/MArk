@@ -108,6 +108,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 /* the player's inventory top row as Java lays it out (inventory.png): armour, doll, off hand, crafting, arrow and result
    side by side in the width of the 9 slots below */
 .panel.inv .row.top{gap:0;justify-content:flex-start}
+.newver{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:#3a2a00;color:#ffe680;border:2px solid #ffd000;padding:6px 12px;font-size:14px;z-index:5}.newver button{margin-left:8px;font:inherit}
 .rbwrap{display:flex;align-items:flex-start;gap:calc(1 * var(--px))}
 /* the green book button beside the crafting grid (gui/recipe_button.png when a jar is loaded) */
 .rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));align-self:center;margin-left:calc(4 * var(--px));border:0;padding:0;cursor:pointer;position:relative;background:#5e8a3a;box-shadow:inset var(--px) var(--px) 0 #9fd16f,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #2e4a18,0 0 0 var(--px) #000}
@@ -362,6 +363,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 <!-- scripts: order matters (shared globals) -->
 <script src="vendor/three.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/version.js"></script>
 <script src="js/shared.js"></script>
 <script src="js/pack.js"></script>
 <script src="js/packmap.js"></script>
