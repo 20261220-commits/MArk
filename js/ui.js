@@ -369,6 +369,9 @@ function showMenu(name, data) {
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${PL.sleeping ? btn('침대에서 나가기', 'leavebed') : ''}${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
+  } else if (name === 'mpdc') { // Java's "connection lost" screen: why, and a way straight back
+    const d = data || {}; UI.mpdc = d;
+    h = `<h2>서버와 연결이 끊어졌습니다</h2><p style="color:#ff8080;max-width:34em;margin:1em auto;line-height:1.5">${esc(d.why || '알 수 없는 이유')}</p><p class="muted">${esc(d.at || '')}</p><div class="btncol">${d.url ? btn('다시 접속', 'mpdc_again') : ''}${btn('타이틀로', 'title')}</div>`;
   } else if (name === 'death') {
     h = `<div class="death"><h1>${PL.hardcore ? '게임 오버!' : '사망했습니다!'}</h1><p>${esc(data || '')}</p><p>점수: <b>${PL.xpTotal}</b></p><div class="btncol">${PL.hardcore ? btn('관전하기', 'spectate') : btn('리스폰', 'respawn')}${btn('타이틀 화면', 'quit')}</div></div>`;
   } else if (name === 'advworlds') { ADVUI.view = null; h = advWorldsHtml();
@@ -404,6 +407,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
   else if (a === 'accnick') accNick();
+  else if (a === 'mpdc_again') { const d = UI.mpdc || {}; showMenu('mp_join'); if (d.url) mpJoinWs(d.url, d.code || null, d.wid || undefined).catch(e => { MP.status = e.message; const el = $('mpStatus'); if (el) el.textContent = e.message; }); }
   else if (a === 'accchange') accChange();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();

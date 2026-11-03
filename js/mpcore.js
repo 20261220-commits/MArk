@@ -141,6 +141,7 @@ function mpWorldCore(store, out) {
         others(p, m, true); return;
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
+      case 'hb': return; // a game saying it's still there (seenAt is set above)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
       case 'nick': { const n = typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''; if (!p.joined || !n || /[\s<>"'&\\]/.test(n)) return; // a new nickname mid-game (an account's, or a guest's)
         const lo = n.toLowerCase(); if ([...players.values()].some(q => q !== p && q.joined && q.name.toLowerCase() === lo) || (S.logins && S.logins[lo] && lo !== p.account)) { send(p, { t: 'error', msg: `"${n}"은(는) 쓸 수 없는 닉네임입니다 (다른 플레이어나 계정의 이름)` }); return; }
