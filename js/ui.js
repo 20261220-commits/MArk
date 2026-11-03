@@ -318,6 +318,8 @@ function showMenu(name, data) {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}<label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
+  } else if (name === 'account' && ACC.user) { // logged in: the nickname others see can change; the account stays the same
+    h = `<h2>계정</h2><p class="muted">로그인한 계정: <b>${esc(ACC.user.name)}</b> — 인벤토리·위치는 이 계정에 그대로 남고, 다른 사람에게는 아래 닉네임으로 보입니다.</p><div class="form"><label>닉네임<input id="accNick" value="${esc(ACC.user.nick || ACC.user.name)}" maxlength="16" onkeydown="if (event.key === 'Enter') accNick()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('닉네임 바꾸기', 'accnick')}${btn('로그아웃', 'accout')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'account') {
     h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
@@ -386,6 +388,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'skins') showMenu('skins');
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
+  else if (a === 'accnick') accNick();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }

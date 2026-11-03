@@ -326,6 +326,7 @@ function mpHandle(m, from) {
     case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } if (p.capeKey && PACKPX.ent[p.capeKey]) { if (entTex[p.capeKey]) { entTex[p.capeKey].dispose(); delete entTex[p.capeKey]; } delete PACKPX.ent[p.capeKey]; } p.capeKey = null; p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
     case 'gone': mpPeerGone(m.id); return;
+    case 'nick': { if (m.id === MP.id) { MP.name = m.name; chatMsg('닉네임이 ' + m.name + '(으)로 바뀌었습니다', '#ffff55'); return; } const p = MP.peers.get(m.id); if (p) { p.name = m.name; mpDropAvatar(p); } chatMsg(m.old + '님이 닉네임을 ' + m.name + '(으)로 바꿨습니다', '#ffff55'); return; } // (the name tag is drawn again)
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
     case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
