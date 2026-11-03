@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: free
     buildCommand: echo "의존성 없음"
-    startCommand: node --max-old-space-size=360 --expose-gc tools/server.js # (memory: the JavaScript heap stays well under the free plan's 512 MB)
+    startCommand: node tools/server.js # (it runs the server under a watchman with a memory cap and restarts it if it ever stops)
     healthCheckPath: /
     envVars:
       - key: WORLD

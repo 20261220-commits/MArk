@@ -8,6 +8,28 @@
 //  - one player's own world opened to others ("서버로 열기"), as before: guests' messages go to that host.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const zlib = require('zlib');
+// ---------- the watchman: this process only starts the real server and starts it again if it ever stops ----------
+// The real server runs as a child with a cap on its memory (so it cleans up long before the free plan's 512 MB, whatever
+// start command the host was given); if it crashes or runs out anyway it is back within a second, on the same disk (no
+// wiped world), and why it stopped is kept for /stats. SUPERVISE=0 runs the server directly.
+if (!process.env.NEMO_CHILD && !/^(0|no|false)$/i.test(process.env.SUPERVISE || '')) {
+  const { spawn } = require('child_process'), starts = []; let child = null, stopping = false, tail = '', lastCrash = null;
+  const start = () => {
+    starts.push(Date.now()); while (starts.length > 10) starts.shift();
+    child = spawn(process.execPath, ['--max-old-space-size=' + (+process.env.HEAP_MB || 300), '--expose-gc', __filename, ...process.argv.slice(2)],
+      { stdio: ['ignore', 'inherit', 'pipe', 'ipc'], env: { ...process.env, NEMO_CHILD: '1', NEMO_RESTARTS: String(starts.length - 1), NEMO_LASTCRASH: lastCrash ? JSON.stringify(lastCrash) : '' } });
+    child.stderr.on('data', d => { process.stderr.write(d); tail = (tail + d).slice(-3000); });
+    child.on('exit', (code, sig) => {
+      if (stopping) process.exit(code || 0);
+      lastCrash = { at: new Date().toISOString(), code, sig, err: tail.slice(-1500) }; tail = '';
+      console.log(`서버가 멈췄습니다 (${sig || '코드 ' + code}) — 다시 켭니다`);
+      const fast = starts.length >= 5 && Date.now() - starts[starts.length - 5] < 60000; setTimeout(start, fast ? 10000 : 500); // (one that keeps falling over waits a little)
+    });
+  };
+  for (const sg of ['SIGINT', 'SIGTERM']) process.on(sg, () => { stopping = true; if (child) child.kill(sg); else process.exit(0); setTimeout(() => process.exit(0), 28000); });
+  start(); return;
+}
+if (process.env.NEMO_CHILD) process.on('disconnect', () => process.exit(0)); // the watchman is gone: so is this
 // one bad message or a bug in some rarely used path must not take the whole server (and everyone in it) down
 process.on('uncaughtException', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
 process.on('unhandledRejection', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
@@ -26,6 +48,7 @@ const server = http.createServer((req, res) => {
   // what can be joined here: the saved server world and the players' own worlds that are open (the join screen lists them)
   if (u === '/skin') { skinProxy(req, res); return; }
   if (u === '/profile') { profileLookup(req, res); return; }
+  if (u === '/stats') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(serverStats(), null, 1)); return; }
   if (u === '/ping') { res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (u === '/rooms') { res.writeHead(200, { 'content-type': TYPES['.json'], 'cache-control': 'no-store', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(roomList())); return; }
   if (u === '/js/config.js' && CFG.server) { res.writeHead(200, { 'content-type': TYPES['.js'], 'cache-control': 'no-cache' }); res.end('var NEMO_CONFIG = ' + JSON.stringify(CFG) + ';\n'); return; }
@@ -213,19 +236,21 @@ async function worldSnapshot() {
   // never has to fit in memory whole (the old one-object backups were parsed all at once on start - with a big world
   // that alone could pass the free plan's 512 MB and the server died on every start)
   saveAllWorlds(); const list = [...worlds.values()].filter(w => w.state.meta); if (!list.length) return null;
+  // (a free host has a tenth of a processor: the work is done a few files at a time, with the game served in between -
+  // a backup that held the server for tens of seconds made every player's game think the connection had died)
   const gz = zlib.createGzip({ level: 6 }), out = []; gz.on('data', d => out.push(d)); const done = new Promise((res, rej) => { gz.on('end', res); gz.on('error', rej); });
-  const put = s => gz.write(s) ? null : new Promise(r => gz.once('drain', r));
-  const raw = f => { try { const t = fs.readFileSync(f, 'utf8'); JSON.parse(t); return t; } catch (e) { return null; } }; // (a file cut short is left out)
+  let n = 0; const put = async s => { if (!gz.write(s)) await new Promise(r => gz.once('drain', r)); if (++n % 8 === 0) await new Promise(r => setTimeout(r, 5)); };
+  const raw = f => { try { const t = fs.readFileSync(f, 'utf8'); return t.length > 1 && t[0] === '{' && t[t.length - 1] === '}' ? t : null; } catch (e) { return null; } }; // (a file cut short is left out)
   await put('NEMO3\n'); let any = false;
   for (const w of list) { const st = raw(path.join(w.dir, 'world.json')); if (!st) continue; any = true;
     await put('W\t' + w.id + '\t' + st.replace(/\n/g, '') + '\n');
-    for (const dk of [...w.keys]) { const t = raw(w.fileOf(dk)); if (!t) continue; const p = put('C\t' + w.id + '\t' + dk + '\t' + t.replace(/\n/g, '') + '\n'); if (p) await p; } }
+    for (const dk of [...w.keys]) { const t = raw(w.fileOf(dk)); if (!t) continue; await put('C\t' + w.id + '\t' + dk + '\t' + t.replace(/\n/g, '') + '\n'); } }
   gz.end(); await done; return any ? Buffer.concat(out) : null;
 }
 let backingUp = null;
 async function backupNow(why) {
   if (!BACKUP || backingUp) return backingUp;
-  backingUp = worldSnapshot().then(snap => snap && BACKUP.save(snap)).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => console.log('세계 백업 실패: ' + e.message)).finally(() => { backingUp = null; });
+  backingUp = worldSnapshot().then(snap => snap && BACKUP.save(snap)).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
   return backingUp;
 }
 // the one-object backups ({"v":2,"worlds":{id:{"state":{..},"chunks":{dk:{..}}}}}) read a piece at a time: a small
@@ -276,6 +301,16 @@ async function restoreIfEmpty() { // a fresh disk (a restart on a free host): br
     console.log('백업에서 세계를 되살렸습니다'); }
   catch (e) { console.log('백업 불러오기 실패: ' + e.message); }
 }
+// /stats: how the server is doing (memory, worlds, players), and why it last stopped if it did
+const STARTED = Date.now(); let lastBackup = null;
+function serverStats() {
+  const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
+  return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup,
+    worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.id, name: w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
+    rooms: [...rooms.values()].filter(r => r.host).length };
+}
+setInterval(() => { const m = process.memoryUsage(); console.log(`메모리 ${Math.round(m.rss / 1048576)} MB (힙 ${Math.round(m.heapUsed / 1048576)} MB), 접속 ${[...worlds.values()].reduce((a, w) => a + w.conns.size, 0)}명`); }, 5 * 60000).unref();
+if (process.env.NEMO_LASTCRASH) console.log('지난번 서버가 멈춘 이유: ' + process.env.NEMO_LASTCRASH.slice(0, 600));
 // memory: the free plan stops the server at 512 MB. Worlds nobody is in keep no chunks in memory, and when the server
 // nears the limit every world lets go of the chunks it isn't changing (they are on disk) - long before it would be stopped
 const MEM_SOFT = (+process.env.MEM_LIMIT_MB || 512) * 0.62 * 1048576;

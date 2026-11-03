@@ -23,11 +23,11 @@ module.exports = async ({ ok, srv, b, lib }) => {
   const at2 = await gst.evaluate(() => [PL.x, PL.z, MP.status, UI.menu]);
   ok(back && Math.hypot(at[0] - at2[0], at[1] - at2[1]) < 3, 'a guest whose connection drops is back in the world at once, where it was', [back, at, at2]);
   // the connection dies without the server noticing (the socket stays open, nothing comes through): the game gives up on
-  // it by itself after 20 s of silence, and its new connection takes over the old one instead of "already playing"
+  // it by itself after 40 s of silence, and its new connection takes over the old one instead of "already playing"
   const g2 = [A, B, C][(await roles()).lastIndexOf('guest')];
   await g2.evaluate(() => { const l = MP.link; window.__oldLink = l; l.ws.onmessage = null; l.ws.send = () => {}; l.ws.close = () => {}; l.ws.onclose = null; }); // nothing in or out, and the socket stays open
-  await g2.waitForFunction(() => !MP.on || UI.menu === 'mp_join', null, { timeout: 15000 }).catch(() => {});
-  let back2 = false; try { await g2.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join' && MP.link !== window.__oldLink, null, { timeout: 40000 }); back2 = true; } catch (e) {}
+  await g2.waitForFunction(() => !MP.on || UI.menu === 'mp_join', null, { timeout: 50000 }).catch(() => {});
+  let back2 = false; try { await g2.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join' && MP.link !== window.__oldLink, null, { timeout: 80000 }); back2 = true; } catch (e) {}
   const names = await A.evaluate(() => [...MP.peers.values()].map(p => p.name));
   ok(back2 && new Set(names).size === names.length, 'a connection that died unnoticed: back in by itself, the old one replaced (not "already playing", no double)', [back2, names, await g2.evaluate(() => MP.status)]);
   ok(![A, B, C].some(P => P.errs.length), 'no page errors', [A.errs, B.errs, C.errs]);
