@@ -19,6 +19,13 @@ module.exports = async ({ ok, srv, b, lib }) => {
     for (let x = -30000; x < 30000; x += 400) for (let z = -30000; z < 30000; z += 400) { const r = G5.column(x, z), k = S.BIOMES[r[2]][8]; (byB[k] = byB[k] || []).push(r[0]); }
     const med = k => { const v = (byB[k] || []).sort((a, b) => a - b); return v.length ? v[v.length >> 1] : null; }, mx = k => Math.max(...(byB[k] || [0]));
     o.h5 = { plains: med('plains'), ocean: med('ocean'), deep: med('deep_ocean'), meadow: med('meadow'), peaks: Math.max(mx('jagged_peaks'), mx('frozen_peaks'), mx('stony_peaks')) };
+    // generator 6: Java's 3D density - the same heights, now and then ground hanging over air, no thin specks in the sky
+    S.setGenVersion(6); const G6 = S.makeGen(12345), b6 = {}, sol = new Uint8Array(256); let over = 0, thin = 0, n6 = 0, same = 0;
+    for (let x = -30000; x < 30000; x += 400) for (let z = -30000; z < 30000; z += 400) { const r = G6.column(x, z), k = S.BIOMES[r[2]][8]; (b6[k] = b6[k] || []).push(r[0]); const r2 = G6.solidCol(x, z, sol); if (r2[0] === r[0] && sol[r[0]] && !sol[r[0] + 1]) same++; n6++;
+      let run = 0, gap = false; for (let y = 6; y <= r[0] + 1; y++) { if (sol[y]) run++; else { if (run && gap && run < 3) thin++; if (run) gap = true; run = 0; } } for (let y = 63; y < r[0]; y++) if (!sol[y]) { over++; break; } }
+    const med6 = k => { const v = (b6[k] || []).sort((a, b) => a - b); return v.length ? v[v.length >> 1] : null; };
+    o.h6 = { plains: med6('plains'), ocean: med6('ocean'), deep: med6('deep_ocean'), over: +(over / n6 * 100).toFixed(2), thin, same: same === n6 };
+    S.setGenVersion(W.gen || 6);
     return o;
   });
   ok(r.md5 === '900150983cd24fb0d6963f7d28e17f72', 'MD5 as Java hashes noise names', r.md5);
@@ -28,5 +35,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(P.beach === 'beach' && P.stonyShore === 'stone_shore' && P.windswept === 'gravelly_mountains' && P.savanna === 'shattered_savanna' && P.meadow === 'meadow', 'the biome table: beach, stony shore, windswept, meadow', P);
   ok(r.ocean > 25 && r.ocean < 45 && r.kinds >= 35, 'a third of the world is ocean, with most biomes found', [r.ocean, r.kinds]);
   const h = r.h5; ok(h.plains >= 63 && h.plains <= 72 && h.ocean >= 42 && h.ocean <= 55 && h.deep >= 28 && h.deep <= 42 && h.meadow > 90 && h.peaks > 190, 'generator 5 heights as Java shapes them: plains, oceans, deep oceans, meadows, peaks', h);
+  const g = r.h6; ok(g.plains >= 63 && g.plains <= 72 && g.ocean >= 42 && g.ocean <= 55 && g.deep >= 28 && g.deep <= 42 && g.over > 0.2 && g.over < 5 && !g.thin && g.same, 'generator 6: 3D ground with Java heights, some overhangs, no floating specks; the height and the rows agree', g);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
