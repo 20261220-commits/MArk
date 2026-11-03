@@ -1772,7 +1772,10 @@ function makeGen(seed) {
     const qx = Math.floor(wx / 4), qz = Math.floor(wz / 4), tx = (wx - qx * 4) / 4, tz = (wz - qz * 4) / 4;
     let h = (cornerH(qx, qz) * (1 - tx) + cornerH(qx + 1, qz) * tx) * (1 - tz) + (cornerH(qx, qz + 1) * (1 - tx) + cornerH(qx + 1, qz + 1) * tx) * tz;
     if (h > 230) h = 230 + 40 * Math.tanh((h - 230) / 40); // Java's top slide
-    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
+    return jFinish(wx, wz, Math.max(6, Math.min(CH0 - 6, Math.floor(h))));
+  }
+  // the biome a block shows over ground of height h (the sea floor takes that climate's ocean), and the badlands' steps
+  function jFinish(wx, wz, h) {
     const cell = jCell(wx, wz), q = JC.at(cell[0], cell[1]); let key = jBiomeKey(q);
     const ti = band(q.T, [-0.45, -0.15, 0.2, 0.55]);
     if (h < SEA - 1 && !/ocean|river|swamp|mushroom/.test(key)) key = OCEANS[h < 40 ? 0 : 1][ti];
@@ -1781,8 +1784,48 @@ function makeGen(seed) {
     if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
     return [h, BB[v], v];
   }
+  // version 6: the ground is Java's 3D density, not a height: at the corners of 4 x 8 x 4 cells (as NoiseChunk) the
+  // sloped cheese 4 x quarterNegative((depth + jaggedness x halfNegative(jagged)) x factor) plus the 3D base noise, then
+  // interpolated through each cell. Where the factor is low the 3D noise wins and the ground hangs over itself: cliffs,
+  // overhangs and arches; where it is high the slopes stay smooth
+  const JD = new Map(), DS3 = 33;
+  const base3 = (x, y, z) => { let t = 0, a = 1, f = 1, s = 0; for (let o = 0; o < 3; o++) { t += nD.n3(x / 90 * f + o * 17.3, y / 32 * f, z / 90 * f - o * 9.1) * a; s += a; a *= 0.5; f *= 2; } return 0.55 * t / s + 0.08 * nX.n3(x / 23, y / 12, z / 23); };
+  const cornerD = (qx, qz) => {
+    const key = qx * 1048576 + qz; let d = JD.get(key); if (d) return d;
+    const q = JC.at(qx, qz), t = TS(q.C, q.E, q.W), x = qx * 4, z = qz * 4, J = JC.jag(x, z), hn = J > 0 ? J : J / 2, f = Math.max(0.3, t.factor), dj = 1.5 + t.offset + t.jaggedness * hn;
+    d = new Float32Array(DS3);
+    for (let k = 0; k < DS3; k++) { const y = k * 8, v = (dj - (y + 64) / 128) * f, g = 4 * (v > 0 ? v : v / 4);
+      d[k] = Math.abs(g) > 1.2 ? g : g + base3(x, y, z); } // far from the surface the noise can't flip it: skipped
+    JD.set(key, d); if (JD.size > 60000) JD.clear(); return d;
+  };
+  const DCOL = new Float32Array(DS3), DROW = new Uint8Array(256);
+  // which rows of the column at (wx, wz) are ground (out, 0..255, may be null); returns the height of the top block.
+  // Bits of ground under 3 blocks thick with air below them are dropped: no specks floating in the sky
+  function solid186(wx, wz, out) {
+    const qx = Math.floor(wx / 4), qz = Math.floor(wz / 4), tx = (wx - qx * 4) / 4, tz = (wz - qz * 4) / 4, o = out || DROW;
+    const a = cornerD(qx, qz), b = cornerD(qx + 1, qz), c = cornerD(qx, qz + 1), e = cornerD(qx + 1, qz + 1);
+    for (let k = 0; k < DS3; k++) DCOL[k] = (a[k] * (1 - tx) + b[k] * tx) * (1 - tz) + (c[k] * (1 - tx) + e[k] * tx) * tz;
+    let top = 6, run = 0;
+    for (let y = CH0 - 1; y >= 0; y--) {
+      let v = -1;
+      if (y < 6) v = 1; else if (y <= CH0 - 6) { const k = y >> 3, f = (y & 7) / 8; v = DCOL[k] * (1 - f) + DCOL[k + 1] * f; if (y > 230) v -= (y - 230) / 20; } // Java's top slide
+      if (v > 0) { o[y] = 1; run++; }
+      else { o[y] = 0; if (run && run < 3) o.fill(0, y + 1, y + 1 + run); run = 0; }
+    }
+    for (let y = CH0 - 1; y > 6; y--) if (o[y]) { top = y; break; }
+    return top;
+  }
+  function column186(wx, wz) { return jFinish(wx, wz, solid186(wx, wz, null)); }
+  // the ground of a column for the chunk maker: rows, with the biome's own top (the badlands' steps) laid over them
+  function solidCol(wx, wz, out) {
+    const t = solid186(wx, wz, out), r = jFinish(wx, wz, t);
+    if (r[0] > t) out.fill(1, t + 1, r[0] + 1); else if (r[0] < t) out.fill(0, r[0] + 1, t + 1);
+    for (let y = r[0] + 1; y < CH0; y++) out[y] = 0;
+    return r;
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (GENV >= 6) return column186(wx, wz);
     if (GENV >= 5) return column185(wx, wz);
     if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
@@ -1874,7 +1917,7 @@ function makeGen(seed) {
     if (add > 0) h = Math.min(CH0 - 6, h + Math.floor(add * fade));
     return [h, b, v];
   }
-  return { column, nD, nX, biomes: BM, climate };
+  return { column, solidCol, nD, nX, biomes: BM, climate };
 }
 // Cave worms (MC-style carvers) are deterministic per origin chunk, so each origin's
 // carve spheres are simulated once and cached; every chunk within 8 reuses them.
@@ -3244,7 +3287,8 @@ function fixConnections(blocks, meta) {
 // upgrades a world)
 const DEEP_N = new Map();
 function deepNoise(seed) { let n = DEEP_N.get(seed); if (!n) { n = [makeNoise(hash32(seed, 18, 1, 1)), makeNoise(hash32(seed, 18, 2, 2)), makeNoise(hash32(seed, 18, 3, 3)), makeNoise(hash32(seed, 18, 4, 4))]; if (DEEP_N.size > 4) DEEP_N.clear(); DEEP_N.set(seed, n); } return n; }
-const TI = (x, y, z) => ((y - MINY) << 8) | (z << 4) | x; // tall-array index of local x, z and world y
+const TI = (x, y, z) => ((y - MINY) << 8) | (z << 4) | x;
+const SOLB = new Uint8Array(256); // a column's ground rows (generator 6) // tall-array index of local x, z and world y
 // a cave at (x, y, z)? cheese (big rounded caverns), spaghetti (long thin tunnels), noodles (thinner still)
 function noiseCave(N, x, y, z) {
   const [a, b, c, d] = N;
@@ -3343,9 +3387,8 @@ function genChunk0(seed, cx, cz, dim, exp) {
     const dsl = 7 + Math.floor(G.nX.n2(wx / 9, wz / 9) * 3);
     const depth = 3 + Math.floor((G.nD.n2(wx / 7, wz / 7) + 1) * 1.2);
     let slope = 0; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) slope = Math.max(slope, Math.abs(hgt[(z + 1 + dz) * 18 + x + 1 + dx] - h));
-    for (let y = 0; y <= h; y++) {
+    const pick = (y, d, h) => { // the block d deep under a surface at height h
       let id = y < dsl ? 76 : STONE;
-      const d = h - y;
       if (v >= K.meadow) { // 1.18 mountains: bare stone where steep, snow above, calcite in the stony peaks, powder snow pockets
         const steepS = slope > 3, pw = gN > 0.42 && d < 2 && !steepS;
         if (v === K.stony_peaks) { if (d < 4 && gN > 0.3) id = 74; else if (d < 3 && gN < -0.55) id = 10; }
@@ -3373,9 +3416,14 @@ function genChunk0(seed, cx, cz, dim, exp) {
       else if (steep && slope > 3 && d < depth) id = STONE; // shattered savanna: bare stone cliffs
       else if (v >= K.giant_tree_taiga && v <= K.giant_spruce_taiga_hills && d === 0 && h >= SEA) id = gN > 0.25 ? 205 : gN > -0.35 ? 203 : 2; // podzol and coarse dirt
       else { if (d === 0) id = h < SEA ? 3 : 2; else if (d < depth) id = 3; }
-      blocks[I(x, y, z)] = id;
-    }
+      return id;
+    };
+    if (GENV >= 6) { // 3D ground: every surface (the floor under an overhang too) gets its own layers; pockets under the sea fill with water
+      G.solidCol(wx, wz, SOLB); let run = -1, hs = h;
+      for (let y = h; y >= 0; y--) { if (!SOLB[y]) { run = -1; if (y <= SEA) blocks[I(x, y, z)] = WATER; continue; } if (run < 0) { run = 0; hs = y; } else run++; blocks[I(x, y, z)] = pick(y, run, hs); }
+    } else for (let y = 0; y <= h; y++) blocks[I(x, y, z)] = pick(y, h - y, h);
     for (let y = h + 1; y <= SEA; y++) blocks[I(x, y, z)] = WATER;
+    if (GENV >= 6 && b === BIO.SWAMP && h === SEA && G.nX.n2(wx / 18 + 40.5, wz / 18) > 0) blocks[I(x, h, z)] = WATER; // Java's swamp surface: pools at the water line
     if ((isOceanBio(b) || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || b === BIO.RIVER) && BIOMES[v][4] <= 0.15 && h < SEA) blocks[I(x, SEA, z)] = 52; // frozen oceans and rivers
     blocks[I(x, 0, z)] = GENV >= 3 ? 76 : 8; // 1.18: the old floor is deepslate the caves cut through (deepFill makes the depths below)
     for (let y = 1; y < 5; y++) if (R() < (5 - y) / 5 && GENV < 3) blocks[I(x, y, z)] = 8;
@@ -19622,7 +19670,7 @@ async function mpAction(a) {
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null, world); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 5, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 6, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const where = ad.value.trim(), up = await mpUpload(where); say(`올렸습니다 (청크 ${up.n}개). 서버 세계로 들어가는 중...`);
       saveAll(true); await new Promise(r => setTimeout(r, 300)); quitToTitle(); showMenu('mp_join'); await mpJoinWs(where, null, up.wid); } // from now on it is played on the server, where it stays
@@ -20028,7 +20076,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 5, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 6, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -20276,7 +20324,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 5; S.setGenVersion(5); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 6; S.setGenVersion(6); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }
