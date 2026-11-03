@@ -266,7 +266,8 @@ const MCMODELS = {
   boat: { tex: 'boat', tw: 128, th: 64, parts: [
     { n: 'bottom', o: [0, 21, 1], r: [Math.PI / 2, 0, 0], b: [[0, 0, -14, -9, -3, 28, 16, 3]] },
     { n: 'back', o: [-15, 20, 4], r: [0, Math.PI * 1.5, 0], b: [[0, 19, -13, -7, -1, 18, 6, 2]] }, { n: 'front', o: [15, 20, 0], r: [0, Math.PI / 2, 0], b: [[0, 27, -8, -7, -1, 16, 6, 2]] },
-    { n: 'right', o: [0, 20, -9], r: [0, Math.PI, 0], b: [[0, 35, -14, -7, -1, 28, 6, 2]] }, { n: 'left', o: [0, 20, 9], b: [[0, 43, -14, -7, -1, 28, 6, 2]] }] },
+    { n: 'right', o: [0, 20, -9], r: [0, Math.PI, 0], b: [[0, 35, -14, -7, -1, 28, 6, 2]] }, { n: 'left', o: [0, 20, 9], b: [[0, 43, -14, -7, -1, 28, 6, 2]] },
+    { n: 'lpaddle', o: [3, 29, 9], r: [0, 0, 0.19634955], b: [[62, 0, -1, 0, -5, 2, 2, 18], [62, 0, -1.001, -3, 8, 1, 6, 7]] }, { n: 'rpaddle', o: [3, 29, -9], r: [0, Math.PI, 0.19634955], b: [[62, 20, -1, 0, -5, 2, 2, 18], [62, 20, -1.001, -3, 8, 1, 6, 7]] }] }, // Java's BoatModel paddles
 };
 const entTex = {};
 function packTexture(key) {
@@ -372,7 +373,31 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+// the fire on a burning entity, drawn as Java's EntityRenderDispatcher.renderFlame does: quads of the fire texture
+// turned to the camera, scaled to 1.4 times the entity's width, stacked 0.45 apart up its height, each 0.9 times narrower
+// and a little nearer the camera, every other pair mirrored
+const FIRE_OVL = { geo: new Map(), mat: null };
+function fireOverlay(o, on, x, y, z, w, h) {
+  if (!on) { if (o.fireOvl) o.fireOvl.visible = false; return; }
+  const key = Math.round(w * 100) + ':' + Math.round(h * 100);
+  let g = FIRE_OVL.geo.get(key);
+  if (!g) {
+    const t = S.T.fire, u0 = (t % S.TPR) / S.TPR, v0 = Math.floor(t / S.TPR) / S.TPR, du = 1 / S.TPR, f = w * 2 * 1.4, pos = [], uv = [], idx = [];
+    let hl = h / f, half = 0.5, yo = 0, zo = 0, i = 0;
+    while (hl > 0) { const m = (i >> 1) % 2 === 0, ua = m ? u0 + du : u0, ub = m ? u0 : u0 + du, b = pos.length / 3;
+      pos.push(-half * f, yo * f, zo * f, half * f, yo * f, zo * f, half * f, (yo + 1.4) * f, zo * f, -half * f, (yo + 1.4) * f, zo * f);
+      uv.push(ua, v0 + du, ub, v0 + du, ub, v0, ua, v0); idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      hl -= 0.45; yo += 0.45; half *= 0.9; zo += 0.03; i++; }
+    g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); FIRE_OVL.geo.set(key, g);
+  }
+  if (!FIRE_OVL.mat) FIRE_OVL.mat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, alphaTest: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  if (!o.fireOvl) { o.fireOvl = new THREE.Mesh(g, FIRE_OVL.mat); o.fireOvl.renderOrder = 3; scene.add(o.fireOvl); }
+  o.fireOvl.geometry = g; o.fireOvl.visible = true;
+  o.fireOvl.position.set(x, y, z); o.fireOvl.rotation.set(0, Math.atan2(camera.position.x - x, camera.position.z - z), 0);
+  o.fireOvl.translateZ(w * 0.9); // in front of the body, toward the camera
+}
+function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOvl = null; } }
+function removeEnt(e) { e.dead = true; dropFireOverlay(e); if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -565,7 +590,7 @@ function mobSafeAhead(e, mx, mz) {
 }
 function mobTick(e) {
   const d = e.def;
-  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y + 0.2; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
+  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y - 0.1; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
@@ -582,7 +607,7 @@ function mobTick(e) {
   }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
-  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
@@ -954,7 +979,7 @@ function entityRender(alpha, now) {
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {
-      e.mesh.position.set(x, y, z);
+      e.mesh.position.set(x, y, z); fireOverlay(e, e.fire > 0 && !e.deathT && !e.def.fireproof, x, y, z, e.w, e.h);
       let yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * alpha;
       e.mesh.rotation.set(0, yaw, e.deathT ? (1 - e.deathT / 20) * Math.PI / 2 : 0);
       const P = e.mesh.userData.parts, sw = Math.sin(e.walk) * 0.9 * e.walkAmt;

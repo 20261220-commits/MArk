@@ -1148,11 +1148,12 @@ function jClimateFor(seed) {
   const pf = JXoro.ofSeed(seed).forkPositional(), mk = (name, first, amps) => jNormal(jFromHash(pf, 'minecraft:' + name), first, amps);
   const T = mk('temperature', -10, [1.5, 0, 1, 0, 0, 0]), H = mk('vegetation', -8, [1, 1, 0, 0, 0, 0]), C = mk('continentalness', -9, [1, 1, 2, 2, 2, 1, 1, 1, 1]);
   const E = mk('erosion', -9, [1, 1, 0, 1, 1]), Wd = mk('ridge', -7, [1, 2, 1, 0, 0, 0]), O = mk('offset', -3, [1, 1, 1, 0]);
+  let Jg = null; const jag = (x, z) => (Jg || (Jg = mk('jagged', -16, new Array(16).fill(1))))(x * 1500, 0, z * 1500); // the jagged peaks' noise (block coordinates, xz scale 1500)
   const cache = new Map();
   // the climate of a quart (4x4 block cell), as Java's NoiseSampler.sample reads it
   const at = (qx, qz) => { const key = qx * 1048576 + qz; let v = cache.get(key); if (v) return v; const x = qx + O(qx, 0, qz) * 4, z = qz + O(qz, qx, 0) * 4;
     v = { T: T(x, 0, z), H: H(x, 0, z), C: C(x, 0, z), E: E(x, 0, z), W: Wd(x, 0, z) }; cache.set(key, v); if (cache.size > 60000) cache.clear(); return v; };
-  c = { at }; JNOISE.set(seed, c); if (JNOISE.size > 2) JNOISE.delete(JNOISE.keys().next().value); return c;
+  c = { at, jag }; JNOISE.set(seed, c); if (JNOISE.size > 2) JNOISE.delete(JNOISE.keys().next().value); return c;
 }
 // Java 1.18's OverworldBiomeBuilder (surface biomes): the same climate boxes in the same order; a point takes the first
 // box nearest to it. Names are this game's (1.17 names where 1.18 renamed a biome)
@@ -1239,6 +1240,64 @@ function jBiomeKey(c) {
   for (const e of JB_TABLE) { let d = 0; for (let k = 0; k < 5; k++) { const x = v[k], lo = e[k * 2], hi = e[k * 2 + 1], o = x < lo ? lo - x : x > hi ? x - hi : 0; d += o * o; if (d >= bd) break; } if (d < bd) { bd = d; best = e[10]; if (d === 0) break; } }
   return best;
 }
+// Java 1.18's TerrainShaper (world generator 5): the cubic splines that turn continentalness, erosion, ridges ("peaks
+// and valleys", folded weirdness) and weirdness into the terrain's offset, factor and jaggedness
+const TS = (() => {
+  const C = 0, E = 1, R = 2, W = 3; // which coordinate a spline reads
+  const sp = (coord, pts) => ({ coord, loc: pts.map(p => p[0]), val: pts.map(p => p[1]), der: pts.map(p => p[2] || 0) });
+  const ev = (s, P) => {
+    if (typeof s === 'number') return s;
+    const x = P[s.coord], L = s.loc, n = L.length; let i = -1; for (let k = 0; k < n; k++) { if (L[k] <= x) i = k; else break; }
+    const v = j => ev(s.val[j], P);
+    if (i < 0) return v(0) + s.der[0] * (x - L[0]);
+    if (i === n - 1) return v(n - 1) + s.der[n - 1] * (x - L[n - 1]);
+    const x1 = L[i], x2 = L[i + 1], t = (x - x1) / (x2 - x1), y1 = v(i), y2 = v(i + 1), d1 = s.der[i], d2 = s.der[i + 1];
+    const a = d1 * (x2 - x1) - (y2 - y1), b = -d2 * (x2 - x1) + (y2 - y1), lp = (t, p, q) => p + t * (q - p);
+    return lp(t, y1, y2) + t * (1 - t) * lp(t, a, b);
+  };
+  const lerp = (t, a, b) => a + t * (b - a), pv = w => -(Math.abs(Math.abs(w) - 0.6666667) - 0.33333334) * 3;
+  const mountainC = (ridges, f, f1) => { const f4 = 1 - (1 - f) * 0.5, f5 = 0.5 * (1 - f), f7 = (ridges + 1.17) * 0.46082947 * f4 - f5; return ridges < f1 ? Math.max(f7, -0.2222) : Math.max(f7, 0); };
+  const zeroPoint = f => { const f3 = 1 - (1 - f) * 0.5, f4 = 0.5 * (1 - f); return f4 / (0.46082947 * f3) - 1.17; };
+  const slope = (y1, y2, x1, x2) => (y2 - y1) / (x2 - x1);
+  const mountainRidge = (f, flag) => {
+    const pts = [], f3 = mountainC(-1, f, -0.7), f5 = mountainC(1, f, -0.7), f6 = zeroPoint(f);
+    if (-0.65 < f6 && f6 < 1) {
+      const f8 = mountainC(-0.65, f, -0.7), f10 = mountainC(-0.75, f, -0.7), f11 = slope(f3, f10, -1, -0.75);
+      pts.push([-1, f3, f11], [-0.75, f10, 0], [-0.65, f8, 0]);
+      const f12 = mountainC(f6, f, -0.7), f13 = slope(f12, f5, f6, 1);
+      pts.push([f6 - 0.01, f12, 0], [f6, f12, f13], [1, f5, f13]);
+    } else {
+      const f15 = slope(f3, f5, -1, 1);
+      if (flag) pts.push([-1, Math.max(0.2, f3), 0], [0, lerp(0.5, f3, f5), f15]); else pts.push([-1, f3, f15]);
+      pts.push([1, f5, f15]);
+    }
+    return sp(R, pts);
+  };
+  const ridgeSpline = (y1, y2, y3, y4, y5, minS) => { const f = Math.max(0.5 * (y2 - y1), minS), f1 = 5 * (y3 - y2); return sp(R, [[-1, y1, f], [-0.4, y2, Math.min(f, f1)], [0, y3, f1], [0.4, y4, 2 * (y4 - y3)], [1, y5, 0.7 * (y5 - y4)]]); };
+  const erosionOffset = (f, f1, f2, f3, f4, f5, flag, flag1) => {
+    const c0 = mountainRidge(lerp(f3, 0.6, 1.5), flag1), c1 = mountainRidge(lerp(f3, 0.6, 1.0), flag1), c2 = mountainRidge(f3, flag1);
+    const c3 = ridgeSpline(f - 0.15, 0.5 * f3, lerp(0.5, 0.5, 0.5) * f3, 0.5 * f3, 0.6 * f3, 0.5), c4 = ridgeSpline(f, f4 * f3, f1 * f3, 0.5 * f3, 0.6 * f3, 0.5);
+    const c5 = ridgeSpline(f, f4, f4, f1, f2, 0.5), c6 = ridgeSpline(f, f4, f4, f1, f2, 0.5), c7 = sp(R, [[-1, f], [-0.4, c5], [0, f2 + 0.07]]), c8 = ridgeSpline(-0.02, f5, f5, f1, f2, 0);
+    const pts = [[-0.85, c0], [-0.7, c1], [-0.4, c2], [-0.35, c3], [-0.1, c4], [0.2, c5]];
+    if (flag) pts.push([0.4, c6], [0.45, c7], [0.55, c7], [0.58, c6]);
+    pts.push([0.7, c8]); return sp(E, pts);
+  };
+  const offset = sp(C, [[-1.1, 0.044], [-1.02, -0.2222], [-0.51, -0.2222], [-0.44, -0.12], [-0.18, -0.12],
+    [-0.16, erosionOffset(-0.15, 0, 0, 0.1, 0, -0.03, false, false)], [-0.15, erosionOffset(-0.15, 0, 0, 0.1, 0, -0.03, false, false)],
+    [-0.1, erosionOffset(-0.1, 0.03, 0.1, 0.1, 0.01, -0.03, false, false)], [0.25, erosionOffset(-0.1, 0.03, 0.1, 0.7, 0.01, -0.03, true, true)], [1, erosionOffset(-0.05, 0.03, 0.1, 1.0, 0.01, 0.01, true, true)]]);
+  const erosionFactor = (f, flag) => {
+    const cs = sp(W, [[-0.2, 6.3], [0.2, f]]), pts = [[-0.6, cs], [-0.5, sp(W, [[-0.05, 6.3], [0.05, 2.67]])], [-0.35, cs], [-0.25, cs], [-0.1, sp(W, [[-0.05, 2.67], [0.05, 6.3]])], [0.03, cs]];
+    if (flag) { const c4 = sp(W, [[0, f], [0.1, 0.625]]), c5 = sp(R, [[-0.9, f], [-0.69, c4]]); pts.push([0.35, f], [0.45, c5], [0.55, c5], [0.62, f]); }
+    else { const c6 = sp(R, [[-0.7, cs], [-0.15, 1.37]]), c7 = sp(R, [[0.45, cs], [0.7, 1.56]]); pts.push([0.05, c7], [0.4, c7], [0.45, c6], [0.55, c6], [0.58, f]); }
+    return sp(E, pts);
+  };
+  const factor = sp(C, [[-0.19, 3.95], [-0.15, erosionFactor(6.25, true)], [-0.1, erosionFactor(5.47, true)], [0.03, erosionFactor(5.08, true)], [0.06, erosionFactor(4.69, false)]]);
+  const wJag = f => sp(W, [[-0.01, 0.63 * f], [0.01, 0.3 * f]]);
+  const ridgeJag = (f, f1) => { const a = pv(0.4), b = pv(0.56666666), m = (a + b) / 2; return sp(R, [[a, 0], [m, f1 > 0 ? wJag(f1) : 0], [1, f > 0 ? wJag(f) : 0]]); };
+  const erosionJag = (f, f1, f2, f3) => { const c = ridgeJag(f, f2), c1 = ridgeJag(f1, f3); return sp(E, [[-1, c], [-0.78, c1], [-0.5775, c1], [-0.375, 0]]); };
+  const jagged = sp(C, [[-0.11, 0], [0.03, erosionJag(1, 0.5, 0, 0)], [0.65, erosionJag(1, 1, 1, 0)]]);
+  return (c, e, w) => { const P = [c, e, pv(w), w]; return { offset: ev(offset, P) - 0.50375, factor: ev(factor, P), jaggedness: ev(jagged, P) }; };
+})();
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
@@ -1353,8 +1412,34 @@ function makeGen(seed) {
     if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
     return [h, BB[v], v];
   }
+  // version 5: the ground as Java 1.18 shapes it. At every cell corner (4 blocks apart, as NoiseChunk does) the
+  // TerrainShaper gives offset, factor and jaggedness from the climate there; the surface is where the density crosses
+  // zero: depth = 1.5 - 3 (y + 64) / 384 + offset + jaggedness x halfNegative(jagged noise), with the 3D noise (here a
+  // 2D stand-in) moving it up by 128 b / factor or down by 32 b / factor; between corners it is interpolated
+  const JCH = new Map();
+  const cornerH = (qx, qz) => {
+    const key = qx * 1048576 + qz; let h = JCH.get(key); if (h != null) return h;
+    const q = JC.at(qx, qz), t = TS(q.C, q.E, q.W), x = qx * 4, z = qz * 4, J = JC.jag(x, z), hn = J > 0 ? J : J / 2;
+    const b = 0.18 * nD.fbm(x / 90, z / 90, 3) + 0.04 * nX.n2(x / 23, z / 23), f = Math.max(0.3, t.factor);
+    h = (1.5 + t.offset + t.jaggedness * hn) * 128 - 64 + (b > 0 ? 128 * b / f : 32 * b / f);
+    JCH.set(key, h); if (JCH.size > 80000) JCH.clear(); return h;
+  };
+  function column185(wx, wz) {
+    const qx = Math.floor(wx / 4), qz = Math.floor(wz / 4), tx = (wx - qx * 4) / 4, tz = (wz - qz * 4) / 4;
+    let h = (cornerH(qx, qz) * (1 - tx) + cornerH(qx + 1, qz) * tx) * (1 - tz) + (cornerH(qx, qz + 1) * (1 - tx) + cornerH(qx + 1, qz + 1) * tx) * tz;
+    if (h > 230) h = 230 + 40 * Math.tanh((h - 230) / 40); // Java's top slide
+    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
+    const cell = jCell(wx, wz), q = JC.at(cell[0], cell[1]); let key = jBiomeKey(q);
+    const ti = band(q.T, [-0.45, -0.15, 0.2, 0.55]);
+    if (h < SEA - 1 && !/ocean|river|swamp|mushroom/.test(key)) key = OCEANS[h < 40 ? 0 : 1][ti];
+    else if (/ocean/.test(key) && h >= SEA) key = ti === 0 ? 'snowy_beach' : ti === 4 ? 'desert' : 'beach';
+    let v = BIOK[key]; if (v == null) v = BIOK.plains;
+    if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
+    return [h, BB[v], v];
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (GENV >= 5) return column185(wx, wz);
     if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
     if (BM) return columnJ(wx, wz);

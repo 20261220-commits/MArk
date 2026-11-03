@@ -382,7 +382,7 @@ function tickBodyYaw(st, s, moveX, moveZ, dtT) {
   st.bodyYaw = s.yaw - hrel; if (hrel * hrel > (50 * DEG) ** 2) st.bodyYaw += hrel * 0.2 * Math.min(1, dtT);
 }
 function updatePlayerModel(dt, x, y, z, visible) {
-  const m = PLM.model; if (!m || !m.userData.mc) return; m.visible = visible; if (!visible) return;
+  const m = PLM.model; if (!m || !m.userData.mc) return; m.visible = visible; fireOverlay(PLM, visible && PL.fire > 0 && !PL.dead && PL.mode !== 'creative' && !PL.inWater, x, y, z, PL.w || 0.3, PL.h || 1.8); if (!visible) return; // burning, seen in third person
   const st = m.userData.st, dtT = dt * 20, s = playerPoseInputs(dt);
   PSTATE.glideT = s.gliding ? PSTATE.glideT + dtT : 0;
   if (s.sleep) { const bx = Math.floor(PL.x), by = Math.floor(PL.y - 0.3), bz = Math.floor(PL.z); const f = getMeta(bx, by, bz) & 3; PSTATE.bedYaw = -f * Math.PI / 2; s.bedYaw = PSTATE.bedYaw; }
