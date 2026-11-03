@@ -176,6 +176,14 @@ function dismount() {
   for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0, 0]]) { const x = e.x + dx, z = e.z + dz; if (!SOLID[getBlock(Math.floor(x), Math.floor(e.y + 0.6), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(e.y + 1.6), Math.floor(z))]) { PL.x = x; PL.y = e.y + 0.6; PL.z = z; break; } }
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0;
 }
+// which way still and flowing water runs here (Java's FlowingFluid.getFlow): toward the lower neighbouring water levels
+function waterFlowAt(x, y, z) {
+  const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z), lvl = (a, b, c) => { const id = getBlock(a, b, c); if (id !== 27) return null; const m = getMeta(a, b, c); return m >= 8 ? 1 : (8 - m) / 9; };
+  const h = lvl(bx, by, bz); if (h == null) return [0, 0];
+  let fx = 0, fz = 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let n = lvl(bx + dx, by, bz + dz); if (n == null) { const nb = getBlock(bx + dx, by, bz + dz); if (SOLID[nb]) continue; n = lvl(bx + dx, by - 1, bz + dz) != null ? h - 0.8889 : 0; if (n === 0) continue; } const d = h - n; fx += dx * d; fz += dz * d; }
+  const l = Math.hypot(fx, fz); return l > 1e-4 && getMeta(bx, by, bz) !== 0 ? [fx / l, fz / l] : [0, 0];
+}
 function boatTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1, deep = fluidAt(e.x, e.y + 0.45, e.z) === 1, under = getBlock(Math.floor(e.x), Math.floor(e.y - 0.1), Math.floor(e.z));
   if (e.hurt > 0) e.hurt--; if (e.dmgAcc > 0) e.dmgAcc = Math.max(0, e.dmgAcc - 1);
@@ -184,6 +192,11 @@ function boatTick(e) {
   // eases off with the same momentum, W pushes 0.04 a tick, S 0.005 back, and turning alone creeps forward
   const sl = BLOCKS[under] && BLOCKS[under].slip, mom = deep ? 0.45 : inW || !under ? 0.9 : sl === 2 ? 0.989 : sl ? 0.98 : 0.6;
   e.drot = e.drot || 0;
+  const rowL = e.rider === PL && ((IN.s > 0 && !(IN.s < 0)) || IN.f > 0), rowR = e.rider === PL && ((IN.s < 0) || IN.f > 0); // Java: a turn rows one paddle, forward both
+  e.row = e.row || [0, 0]; e.row[0] = rowL ? e.row[0] + Math.PI / 8 : 0; e.row[1] = rowR ? e.row[1] + Math.PI / 8 : 0;
+  if ((rowL || rowR) && e.age % 16 === 0 && inW) play('splash', { vol: 0.15 });
+  if (inW) { const fl = waterFlowAt(e.x, e.y + 0.3, e.z); e.vx += fl[0] * 0.014; e.vz += fl[1] * 0.014; } // a current carries the boat along
+  if (e.age % 2 === 0) for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7], [0, 0]]) { const lx = Math.floor(e.x + dx), ly = Math.floor(e.y + 0.4), lz = Math.floor(e.z + dz); if (getBlock(lx, ly, lz) === BID.lily_pad && (!MP.on || MP.role !== 'guest')) { setBlock(lx, ly, lz, 0); dropItem(lx + .5, ly + .3, lz + .5, BID.lily_pad, 1); } } // a boat breaks lily pads it meets
   if (e.rider === PL) {
     e.drot -= IN.s * Math.PI / 180;
     const th = (IN.f > 0 ? 0.04 : IN.f < 0 ? -0.005 : 0) + (IN.s && !IN.f ? 0.005 : 0);
@@ -198,11 +211,16 @@ function boatTick(e) {
     if (!MP.on || MP.role !== 'guest') { removeEnt(e); for (const r of [e.rider, e.rider2]) if (r === PL) dismount(); if (gr('doEntityDrops')) { dropItem(e.x, e.y + .3, e.z, IID[(e.wood || 'oak') + '_planks'] || IID.oak_planks, 3); dropItem(e.x, e.y + .3, e.z, IID.stick, 2); } return; } }
   else if (inW || e.onGround) e.fall = 0;
   e.vx *= mom; e.vz *= mom; e.vy *= 0.98;
-  if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y + 0.18; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
+  if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y - 0.45; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
   if (e.y < voidY()) removeEnt(e);
 }
 function boatRender(e, x, y, z, br) {
-  e.mesh.position.set(x, y - 0.95, z);
+  e.mesh.position.set(x, y, z);
+  const P = e.mesh.userData.parts; if (P && P.lpaddle && P.rpaddle) { // Java's BoatModel.animatePaddle
+    if (!(e.rider === PL)) { const mv = Math.hypot(x - (e.lastRX ?? x), z - (e.lastRZ ?? z)) > 0.02; e.row = e.row || [0, 0]; e.row[0] = mv ? e.row[0] + 0.15 : 0; e.row[1] = e.row[0]; } e.lastRX = x; e.lastRZ = z; // someone else rowing: by how it moves
+    const cl = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+    for (const [k, i] of [['lpaddle', 0], ['rpaddle', 1]]) { const f = (e.row && e.row[i]) || 0, p = P[k]; p.rotation.x = cl(-Math.PI / 3, -Math.PI / 12, (Math.sin(-f) + 1) / 2); const yr = cl(-Math.PI / 4, Math.PI / 4, (Math.sin(-f + 1) + 1) / 2); p.rotation.y = i ? Math.PI - yr : yr; }
+  } // the model's origin is the boat's position, as Java draws it (the hull's floor 3/16 up)
   const yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
   e.mesh.rotation.set(0, yaw + Math.PI / 2, e.hurt > 0 ? Math.sin(e.hurt) * 0.1 : 0);
   for (const m of e.mesh.userData.mats) m.color.setScalar(br);
@@ -214,10 +232,10 @@ function rideTick() {
   if (e.kind === 'boat') { if (e.viewYaw != null && PL.viewBoat === e) PL.yaw += e.yaw - e.viewYaw; e.viewYaw = e.yaw; PL.viewBoat = e; } // the view turns with the boat (Java)
   if (e.rider2 === PL) { // the back seat of a boat: rides along, can't steer; takes the front when the driver gets off
     if (!e.rider && !(e.mpRider && performance.now() - e.mpRideAt < 1500)) { e.rider2 = null; e.rider = PL; }
-    else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y + 0.18; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }
+    else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y - 0.45; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }
   }
   const f = e.kind === 'boat' && seat2Busy(e) ? 0.2 : 0;
-  PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
+  PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : e.kind === 'boat' ? -0.45 : 0.18); /* in a boat: Java's -0.1 seat and a player's -0.35 */ PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
 // Java 1.18's nether spawn lists: [mob, weight, smallest group, largest group]

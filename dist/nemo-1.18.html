@@ -1492,11 +1492,12 @@ function jClimateFor(seed) {
   const pf = JXoro.ofSeed(seed).forkPositional(), mk = (name, first, amps) => jNormal(jFromHash(pf, 'minecraft:' + name), first, amps);
   const T = mk('temperature', -10, [1.5, 0, 1, 0, 0, 0]), H = mk('vegetation', -8, [1, 1, 0, 0, 0, 0]), C = mk('continentalness', -9, [1, 1, 2, 2, 2, 1, 1, 1, 1]);
   const E = mk('erosion', -9, [1, 1, 0, 1, 1]), Wd = mk('ridge', -7, [1, 2, 1, 0, 0, 0]), O = mk('offset', -3, [1, 1, 1, 0]);
+  let Jg = null; const jag = (x, z) => (Jg || (Jg = mk('jagged', -16, new Array(16).fill(1))))(x * 1500, 0, z * 1500); // the jagged peaks' noise (block coordinates, xz scale 1500)
   const cache = new Map();
   // the climate of a quart (4x4 block cell), as Java's NoiseSampler.sample reads it
   const at = (qx, qz) => { const key = qx * 1048576 + qz; let v = cache.get(key); if (v) return v; const x = qx + O(qx, 0, qz) * 4, z = qz + O(qz, qx, 0) * 4;
     v = { T: T(x, 0, z), H: H(x, 0, z), C: C(x, 0, z), E: E(x, 0, z), W: Wd(x, 0, z) }; cache.set(key, v); if (cache.size > 60000) cache.clear(); return v; };
-  c = { at }; JNOISE.set(seed, c); if (JNOISE.size > 2) JNOISE.delete(JNOISE.keys().next().value); return c;
+  c = { at, jag }; JNOISE.set(seed, c); if (JNOISE.size > 2) JNOISE.delete(JNOISE.keys().next().value); return c;
 }
 // Java 1.18's OverworldBiomeBuilder (surface biomes): the same climate boxes in the same order; a point takes the first
 // box nearest to it. Names are this game's (1.17 names where 1.18 renamed a biome)
@@ -1583,6 +1584,64 @@ function jBiomeKey(c) {
   for (const e of JB_TABLE) { let d = 0; for (let k = 0; k < 5; k++) { const x = v[k], lo = e[k * 2], hi = e[k * 2 + 1], o = x < lo ? lo - x : x > hi ? x - hi : 0; d += o * o; if (d >= bd) break; } if (d < bd) { bd = d; best = e[10]; if (d === 0) break; } }
   return best;
 }
+// Java 1.18's TerrainShaper (world generator 5): the cubic splines that turn continentalness, erosion, ridges ("peaks
+// and valleys", folded weirdness) and weirdness into the terrain's offset, factor and jaggedness
+const TS = (() => {
+  const C = 0, E = 1, R = 2, W = 3; // which coordinate a spline reads
+  const sp = (coord, pts) => ({ coord, loc: pts.map(p => p[0]), val: pts.map(p => p[1]), der: pts.map(p => p[2] || 0) });
+  const ev = (s, P) => {
+    if (typeof s === 'number') return s;
+    const x = P[s.coord], L = s.loc, n = L.length; let i = -1; for (let k = 0; k < n; k++) { if (L[k] <= x) i = k; else break; }
+    const v = j => ev(s.val[j], P);
+    if (i < 0) return v(0) + s.der[0] * (x - L[0]);
+    if (i === n - 1) return v(n - 1) + s.der[n - 1] * (x - L[n - 1]);
+    const x1 = L[i], x2 = L[i + 1], t = (x - x1) / (x2 - x1), y1 = v(i), y2 = v(i + 1), d1 = s.der[i], d2 = s.der[i + 1];
+    const a = d1 * (x2 - x1) - (y2 - y1), b = -d2 * (x2 - x1) + (y2 - y1), lp = (t, p, q) => p + t * (q - p);
+    return lp(t, y1, y2) + t * (1 - t) * lp(t, a, b);
+  };
+  const lerp = (t, a, b) => a + t * (b - a), pv = w => -(Math.abs(Math.abs(w) - 0.6666667) - 0.33333334) * 3;
+  const mountainC = (ridges, f, f1) => { const f4 = 1 - (1 - f) * 0.5, f5 = 0.5 * (1 - f), f7 = (ridges + 1.17) * 0.46082947 * f4 - f5; return ridges < f1 ? Math.max(f7, -0.2222) : Math.max(f7, 0); };
+  const zeroPoint = f => { const f3 = 1 - (1 - f) * 0.5, f4 = 0.5 * (1 - f); return f4 / (0.46082947 * f3) - 1.17; };
+  const slope = (y1, y2, x1, x2) => (y2 - y1) / (x2 - x1);
+  const mountainRidge = (f, flag) => {
+    const pts = [], f3 = mountainC(-1, f, -0.7), f5 = mountainC(1, f, -0.7), f6 = zeroPoint(f);
+    if (-0.65 < f6 && f6 < 1) {
+      const f8 = mountainC(-0.65, f, -0.7), f10 = mountainC(-0.75, f, -0.7), f11 = slope(f3, f10, -1, -0.75);
+      pts.push([-1, f3, f11], [-0.75, f10, 0], [-0.65, f8, 0]);
+      const f12 = mountainC(f6, f, -0.7), f13 = slope(f12, f5, f6, 1);
+      pts.push([f6 - 0.01, f12, 0], [f6, f12, f13], [1, f5, f13]);
+    } else {
+      const f15 = slope(f3, f5, -1, 1);
+      if (flag) pts.push([-1, Math.max(0.2, f3), 0], [0, lerp(0.5, f3, f5), f15]); else pts.push([-1, f3, f15]);
+      pts.push([1, f5, f15]);
+    }
+    return sp(R, pts);
+  };
+  const ridgeSpline = (y1, y2, y3, y4, y5, minS) => { const f = Math.max(0.5 * (y2 - y1), minS), f1 = 5 * (y3 - y2); return sp(R, [[-1, y1, f], [-0.4, y2, Math.min(f, f1)], [0, y3, f1], [0.4, y4, 2 * (y4 - y3)], [1, y5, 0.7 * (y5 - y4)]]); };
+  const erosionOffset = (f, f1, f2, f3, f4, f5, flag, flag1) => {
+    const c0 = mountainRidge(lerp(f3, 0.6, 1.5), flag1), c1 = mountainRidge(lerp(f3, 0.6, 1.0), flag1), c2 = mountainRidge(f3, flag1);
+    const c3 = ridgeSpline(f - 0.15, 0.5 * f3, lerp(0.5, 0.5, 0.5) * f3, 0.5 * f3, 0.6 * f3, 0.5), c4 = ridgeSpline(f, f4 * f3, f1 * f3, 0.5 * f3, 0.6 * f3, 0.5);
+    const c5 = ridgeSpline(f, f4, f4, f1, f2, 0.5), c6 = ridgeSpline(f, f4, f4, f1, f2, 0.5), c7 = sp(R, [[-1, f], [-0.4, c5], [0, f2 + 0.07]]), c8 = ridgeSpline(-0.02, f5, f5, f1, f2, 0);
+    const pts = [[-0.85, c0], [-0.7, c1], [-0.4, c2], [-0.35, c3], [-0.1, c4], [0.2, c5]];
+    if (flag) pts.push([0.4, c6], [0.45, c7], [0.55, c7], [0.58, c6]);
+    pts.push([0.7, c8]); return sp(E, pts);
+  };
+  const offset = sp(C, [[-1.1, 0.044], [-1.02, -0.2222], [-0.51, -0.2222], [-0.44, -0.12], [-0.18, -0.12],
+    [-0.16, erosionOffset(-0.15, 0, 0, 0.1, 0, -0.03, false, false)], [-0.15, erosionOffset(-0.15, 0, 0, 0.1, 0, -0.03, false, false)],
+    [-0.1, erosionOffset(-0.1, 0.03, 0.1, 0.1, 0.01, -0.03, false, false)], [0.25, erosionOffset(-0.1, 0.03, 0.1, 0.7, 0.01, -0.03, true, true)], [1, erosionOffset(-0.05, 0.03, 0.1, 1.0, 0.01, 0.01, true, true)]]);
+  const erosionFactor = (f, flag) => {
+    const cs = sp(W, [[-0.2, 6.3], [0.2, f]]), pts = [[-0.6, cs], [-0.5, sp(W, [[-0.05, 6.3], [0.05, 2.67]])], [-0.35, cs], [-0.25, cs], [-0.1, sp(W, [[-0.05, 2.67], [0.05, 6.3]])], [0.03, cs]];
+    if (flag) { const c4 = sp(W, [[0, f], [0.1, 0.625]]), c5 = sp(R, [[-0.9, f], [-0.69, c4]]); pts.push([0.35, f], [0.45, c5], [0.55, c5], [0.62, f]); }
+    else { const c6 = sp(R, [[-0.7, cs], [-0.15, 1.37]]), c7 = sp(R, [[0.45, cs], [0.7, 1.56]]); pts.push([0.05, c7], [0.4, c7], [0.45, c6], [0.55, c6], [0.58, f]); }
+    return sp(E, pts);
+  };
+  const factor = sp(C, [[-0.19, 3.95], [-0.15, erosionFactor(6.25, true)], [-0.1, erosionFactor(5.47, true)], [0.03, erosionFactor(5.08, true)], [0.06, erosionFactor(4.69, false)]]);
+  const wJag = f => sp(W, [[-0.01, 0.63 * f], [0.01, 0.3 * f]]);
+  const ridgeJag = (f, f1) => { const a = pv(0.4), b = pv(0.56666666), m = (a + b) / 2; return sp(R, [[a, 0], [m, f1 > 0 ? wJag(f1) : 0], [1, f > 0 ? wJag(f) : 0]]); };
+  const erosionJag = (f, f1, f2, f3) => { const c = ridgeJag(f, f2), c1 = ridgeJag(f1, f3); return sp(E, [[-1, c], [-0.78, c1], [-0.5775, c1], [-0.375, 0]]); };
+  const jagged = sp(C, [[-0.11, 0], [0.03, erosionJag(1, 0.5, 0, 0)], [0.65, erosionJag(1, 1, 1, 0)]]);
+  return (c, e, w) => { const P = [c, e, pv(w), w]; return { offset: ev(offset, P) - 0.50375, factor: ev(factor, P), jaggedness: ev(jagged, P) }; };
+})();
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
@@ -1697,8 +1756,34 @@ function makeGen(seed) {
     if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
     return [h, BB[v], v];
   }
+  // version 5: the ground as Java 1.18 shapes it. At every cell corner (4 blocks apart, as NoiseChunk does) the
+  // TerrainShaper gives offset, factor and jaggedness from the climate there; the surface is where the density crosses
+  // zero: depth = 1.5 - 3 (y + 64) / 384 + offset + jaggedness x halfNegative(jagged noise), with the 3D noise (here a
+  // 2D stand-in) moving it up by 128 b / factor or down by 32 b / factor; between corners it is interpolated
+  const JCH = new Map();
+  const cornerH = (qx, qz) => {
+    const key = qx * 1048576 + qz; let h = JCH.get(key); if (h != null) return h;
+    const q = JC.at(qx, qz), t = TS(q.C, q.E, q.W), x = qx * 4, z = qz * 4, J = JC.jag(x, z), hn = J > 0 ? J : J / 2;
+    const b = 0.18 * nD.fbm(x / 90, z / 90, 3) + 0.04 * nX.n2(x / 23, z / 23), f = Math.max(0.3, t.factor);
+    h = (1.5 + t.offset + t.jaggedness * hn) * 128 - 64 + (b > 0 ? 128 * b / f : 32 * b / f);
+    JCH.set(key, h); if (JCH.size > 80000) JCH.clear(); return h;
+  };
+  function column185(wx, wz) {
+    const qx = Math.floor(wx / 4), qz = Math.floor(wz / 4), tx = (wx - qx * 4) / 4, tz = (wz - qz * 4) / 4;
+    let h = (cornerH(qx, qz) * (1 - tx) + cornerH(qx + 1, qz) * tx) * (1 - tz) + (cornerH(qx, qz + 1) * (1 - tx) + cornerH(qx + 1, qz + 1) * tx) * tz;
+    if (h > 230) h = 230 + 40 * Math.tanh((h - 230) / 40); // Java's top slide
+    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
+    const cell = jCell(wx, wz), q = JC.at(cell[0], cell[1]); let key = jBiomeKey(q);
+    const ti = band(q.T, [-0.45, -0.15, 0.2, 0.55]);
+    if (h < SEA - 1 && !/ocean|river|swamp|mushroom/.test(key)) key = OCEANS[h < 40 ? 0 : 1][ti];
+    else if (/ocean/.test(key) && h >= SEA) key = ti === 0 ? 'snowy_beach' : ti === 4 ? 'desert' : 'beach';
+    let v = BIOK[key]; if (v == null) v = BIOK.plains;
+    if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
+    return [h, BB[v], v];
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (GENV >= 5) return column185(wx, wz);
     if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
     if (BM) return columnJ(wx, wz);
@@ -8601,7 +8686,8 @@ const MCMODELS = {
   boat: { tex: 'boat', tw: 128, th: 64, parts: [
     { n: 'bottom', o: [0, 21, 1], r: [Math.PI / 2, 0, 0], b: [[0, 0, -14, -9, -3, 28, 16, 3]] },
     { n: 'back', o: [-15, 20, 4], r: [0, Math.PI * 1.5, 0], b: [[0, 19, -13, -7, -1, 18, 6, 2]] }, { n: 'front', o: [15, 20, 0], r: [0, Math.PI / 2, 0], b: [[0, 27, -8, -7, -1, 16, 6, 2]] },
-    { n: 'right', o: [0, 20, -9], r: [0, Math.PI, 0], b: [[0, 35, -14, -7, -1, 28, 6, 2]] }, { n: 'left', o: [0, 20, 9], b: [[0, 43, -14, -7, -1, 28, 6, 2]] }] },
+    { n: 'right', o: [0, 20, -9], r: [0, Math.PI, 0], b: [[0, 35, -14, -7, -1, 28, 6, 2]] }, { n: 'left', o: [0, 20, 9], b: [[0, 43, -14, -7, -1, 28, 6, 2]] },
+    { n: 'lpaddle', o: [3, 29, 9], r: [0, 0, 0.19634955], b: [[62, 0, -1, 0, -5, 2, 2, 18], [62, 0, -1.001, -3, 8, 1, 6, 7]] }, { n: 'rpaddle', o: [3, 29, -9], r: [0, Math.PI, 0.19634955], b: [[62, 20, -1, 0, -5, 2, 2, 18], [62, 20, -1.001, -3, 8, 1, 6, 7]] }] }, // Java's BoatModel paddles
 };
 const entTex = {};
 function packTexture(key) {
@@ -8707,7 +8793,31 @@ const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id
 let entId = 1;
 function Ent(type, x, y, z) { return { id: entId++, type, x, y, z, px: x, py: y, pz: z, vx: 0, vy: 0, vz: 0, w: 0.25, h: 0.5, onGround: false, age: 0, dead: false, yaw: 0, pyaw: 0, mesh: null }; }
 function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
-function removeEnt(e) { e.dead = true; if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
+// the fire on a burning entity, drawn as Java's EntityRenderDispatcher.renderFlame does: quads of the fire texture
+// turned to the camera, scaled to 1.4 times the entity's width, stacked 0.45 apart up its height, each 0.9 times narrower
+// and a little nearer the camera, every other pair mirrored
+const FIRE_OVL = { geo: new Map(), mat: null };
+function fireOverlay(o, on, x, y, z, w, h) {
+  if (!on) { if (o.fireOvl) o.fireOvl.visible = false; return; }
+  const key = Math.round(w * 100) + ':' + Math.round(h * 100);
+  let g = FIRE_OVL.geo.get(key);
+  if (!g) {
+    const t = S.T.fire, u0 = (t % S.TPR) / S.TPR, v0 = Math.floor(t / S.TPR) / S.TPR, du = 1 / S.TPR, f = w * 2 * 1.4, pos = [], uv = [], idx = [];
+    let hl = h / f, half = 0.5, yo = 0, zo = 0, i = 0;
+    while (hl > 0) { const m = (i >> 1) % 2 === 0, ua = m ? u0 + du : u0, ub = m ? u0 : u0 + du, b = pos.length / 3;
+      pos.push(-half * f, yo * f, zo * f, half * f, yo * f, zo * f, half * f, (yo + 1.4) * f, zo * f, -half * f, (yo + 1.4) * f, zo * f);
+      uv.push(ua, v0 + du, ub, v0 + du, ub, v0, ua, v0); idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      hl -= 0.45; yo += 0.45; half *= 0.9; zo += 0.03; i++; }
+    g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); FIRE_OVL.geo.set(key, g);
+  }
+  if (!FIRE_OVL.mat) FIRE_OVL.mat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, alphaTest: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  if (!o.fireOvl) { o.fireOvl = new THREE.Mesh(g, FIRE_OVL.mat); o.fireOvl.renderOrder = 3; scene.add(o.fireOvl); }
+  o.fireOvl.geometry = g; o.fireOvl.visible = true;
+  o.fireOvl.position.set(x, y, z); o.fireOvl.rotation.set(0, Math.atan2(camera.position.x - x, camera.position.z - z), 0);
+  o.fireOvl.translateZ(w * 0.9); // in front of the body, toward the camera
+}
+function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOvl = null; } }
+function removeEnt(e) { e.dead = true; dropFireOverlay(e); if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
 // ---------- items ----------
@@ -8900,7 +9010,7 @@ function mobSafeAhead(e, mx, mz) {
 }
 function mobTick(e) {
   const d = e.def;
-  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y + 0.2; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
+  if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y - 0.1; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
@@ -8917,7 +9027,7 @@ function mobTick(e) {
   }
   if (e.inWater || d.fireproof) e.fire = 0;
   if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
-  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } if (Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 }); }
+  if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
   if (d.water) { squidTick(e); return; }
@@ -9289,7 +9399,7 @@ function entityRender(alpha, now) {
     e.mesh.visible = !far; if (far) continue;
     const br = lightBright(x, y + Math.max(0.3, e.h * 0.6), z);
     if (e.kind === 'mob') {
-      e.mesh.position.set(x, y, z);
+      e.mesh.position.set(x, y, z); fireOverlay(e, e.fire > 0 && !e.deathT && !e.def.fireproof, x, y, z, e.w, e.h);
       let yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * alpha;
       e.mesh.rotation.set(0, yaw, e.deathT ? (1 - e.deathT / 20) * Math.PI / 2 : 0);
       const P = e.mesh.userData.parts, sw = Math.sin(e.walk) * 0.9 * e.walkAmt;
@@ -9899,6 +10009,14 @@ function dismount() {
   for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [0, 0]]) { const x = e.x + dx, z = e.z + dz; if (!SOLID[getBlock(Math.floor(x), Math.floor(e.y + 0.6), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(e.y + 1.6), Math.floor(z))]) { PL.x = x; PL.y = e.y + 0.6; PL.z = z; break; } }
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.vx = PL.vy = PL.vz = 0;
 }
+// which way still and flowing water runs here (Java's FlowingFluid.getFlow): toward the lower neighbouring water levels
+function waterFlowAt(x, y, z) {
+  const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z), lvl = (a, b, c) => { const id = getBlock(a, b, c); if (id !== 27) return null; const m = getMeta(a, b, c); return m >= 8 ? 1 : (8 - m) / 9; };
+  const h = lvl(bx, by, bz); if (h == null) return [0, 0];
+  let fx = 0, fz = 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let n = lvl(bx + dx, by, bz + dz); if (n == null) { const nb = getBlock(bx + dx, by, bz + dz); if (SOLID[nb]) continue; n = lvl(bx + dx, by - 1, bz + dz) != null ? h - 0.8889 : 0; if (n === 0) continue; } const d = h - n; fx += dx * d; fz += dz * d; }
+  const l = Math.hypot(fx, fz); return l > 1e-4 && getMeta(bx, by, bz) !== 0 ? [fx / l, fz / l] : [0, 0];
+}
 function boatTick(e) {
   const inW = fluidAt(e.x, e.y + 0.1, e.z) === 1, deep = fluidAt(e.x, e.y + 0.45, e.z) === 1, under = getBlock(Math.floor(e.x), Math.floor(e.y - 0.1), Math.floor(e.z));
   if (e.hurt > 0) e.hurt--; if (e.dmgAcc > 0) e.dmgAcc = Math.max(0, e.dmgAcc - 1);
@@ -9907,6 +10025,11 @@ function boatTick(e) {
   // eases off with the same momentum, W pushes 0.04 a tick, S 0.005 back, and turning alone creeps forward
   const sl = BLOCKS[under] && BLOCKS[under].slip, mom = deep ? 0.45 : inW || !under ? 0.9 : sl === 2 ? 0.989 : sl ? 0.98 : 0.6;
   e.drot = e.drot || 0;
+  const rowL = e.rider === PL && ((IN.s > 0 && !(IN.s < 0)) || IN.f > 0), rowR = e.rider === PL && ((IN.s < 0) || IN.f > 0); // Java: a turn rows one paddle, forward both
+  e.row = e.row || [0, 0]; e.row[0] = rowL ? e.row[0] + Math.PI / 8 : 0; e.row[1] = rowR ? e.row[1] + Math.PI / 8 : 0;
+  if ((rowL || rowR) && e.age % 16 === 0 && inW) play('splash', { vol: 0.15 });
+  if (inW) { const fl = waterFlowAt(e.x, e.y + 0.3, e.z); e.vx += fl[0] * 0.014; e.vz += fl[1] * 0.014; } // a current carries the boat along
+  if (e.age % 2 === 0) for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7], [0, 0]]) { const lx = Math.floor(e.x + dx), ly = Math.floor(e.y + 0.4), lz = Math.floor(e.z + dz); if (getBlock(lx, ly, lz) === BID.lily_pad && (!MP.on || MP.role !== 'guest')) { setBlock(lx, ly, lz, 0); dropItem(lx + .5, ly + .3, lz + .5, BID.lily_pad, 1); } } // a boat breaks lily pads it meets
   if (e.rider === PL) {
     e.drot -= IN.s * Math.PI / 180;
     const th = (IN.f > 0 ? 0.04 : IN.f < 0 ? -0.005 : 0) + (IN.s && !IN.f ? 0.005 : 0);
@@ -9921,11 +10044,16 @@ function boatTick(e) {
     if (!MP.on || MP.role !== 'guest') { removeEnt(e); for (const r of [e.rider, e.rider2]) if (r === PL) dismount(); if (gr('doEntityDrops')) { dropItem(e.x, e.y + .3, e.z, IID[(e.wood || 'oak') + '_planks'] || IID.oak_planks, 3); dropItem(e.x, e.y + .3, e.z, IID.stick, 2); } return; } }
   else if (inW || e.onGround) e.fall = 0;
   e.vx *= mom; e.vz *= mom; e.vy *= 0.98;
-  if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y + 0.18; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
+  if (e.rider === PL) { const f = seat2Busy(e) ? 0.2 : 0; PL.x = e.x - Math.sin(e.yaw) * f; PL.y = e.y - 0.45; PL.z = e.z - Math.cos(e.yaw) * f; PL.vx = e.vx; PL.vz = e.vz; PL.vy = 0; PL.fallDist = 0; PL.onGround = true; } // with two aboard, the driver sits forward
   if (e.y < voidY()) removeEnt(e);
 }
 function boatRender(e, x, y, z, br) {
-  e.mesh.position.set(x, y - 0.95, z);
+  e.mesh.position.set(x, y, z);
+  const P = e.mesh.userData.parts; if (P && P.lpaddle && P.rpaddle) { // Java's BoatModel.animatePaddle
+    if (!(e.rider === PL)) { const mv = Math.hypot(x - (e.lastRX ?? x), z - (e.lastRZ ?? z)) > 0.02; e.row = e.row || [0, 0]; e.row[0] = mv ? e.row[0] + 0.15 : 0; e.row[1] = e.row[0]; } e.lastRX = x; e.lastRZ = z; // someone else rowing: by how it moves
+    const cl = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+    for (const [k, i] of [['lpaddle', 0], ['rpaddle', 1]]) { const f = (e.row && e.row[i]) || 0, p = P[k]; p.rotation.x = cl(-Math.PI / 3, -Math.PI / 12, (Math.sin(-f) + 1) / 2); const yr = cl(-Math.PI / 4, Math.PI / 4, (Math.sin(-f + 1) + 1) / 2); p.rotation.y = i ? Math.PI - yr : yr; }
+  } // the model's origin is the boat's position, as Java draws it (the hull's floor 3/16 up)
   const yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
   e.mesh.rotation.set(0, yaw + Math.PI / 2, e.hurt > 0 ? Math.sin(e.hurt) * 0.1 : 0);
   for (const m of e.mesh.userData.mats) m.color.setScalar(br);
@@ -9937,10 +10065,10 @@ function rideTick() {
   if (e.kind === 'boat') { if (e.viewYaw != null && PL.viewBoat === e) PL.yaw += e.yaw - e.viewYaw; e.viewYaw = e.yaw; PL.viewBoat = e; } // the view turns with the boat (Java)
   if (e.rider2 === PL) { // the back seat of a boat: rides along, can't steer; takes the front when the driver gets off
     if (!e.rider && !(e.mpRider && performance.now() - e.mpRideAt < 1500)) { e.rider2 = null; e.rider = PL; }
-    else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y + 0.18; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }
+    else { PL.x = e.x + Math.sin(e.yaw) * 0.6; PL.y = e.y - 0.45; PL.z = e.z + Math.cos(e.yaw) * 0.6; PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0; PL.onGround = true; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5; if (IN.sneak) dismount(); return; }
   }
   const f = e.kind === 'boat' && seat2Busy(e) ? 0.2 : 0;
-  PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : 0.18); PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
+  PL.x = e.x - Math.sin(e.yaw || 0) * f; PL.y = e.y + (e.rideY != null ? e.rideY : e.kind === 'boat' ? -0.45 : 0.18); /* in a boat: Java's -0.1 seat and a player's -0.35 */ PL.z = e.z - Math.cos(e.yaw || 0) * f; PL.sprinting = false; PL.eyeH += (1.62 - PL.eyeH) * 0.5;
 }
 // ---------- spawning in each dimension ----------
 // Java 1.18's nether spawn lists: [mob, weight, smallest group, largest group]
@@ -17982,7 +18110,7 @@ function tickBodyYaw(st, s, moveX, moveZ, dtT) {
   st.bodyYaw = s.yaw - hrel; if (hrel * hrel > (50 * DEG) ** 2) st.bodyYaw += hrel * 0.2 * Math.min(1, dtT);
 }
 function updatePlayerModel(dt, x, y, z, visible) {
-  const m = PLM.model; if (!m || !m.userData.mc) return; m.visible = visible; if (!visible) return;
+  const m = PLM.model; if (!m || !m.userData.mc) return; m.visible = visible; fireOverlay(PLM, visible && PL.fire > 0 && !PL.dead && PL.mode !== 'creative' && !PL.inWater, x, y, z, PL.w || 0.3, PL.h || 1.8); if (!visible) return; // burning, seen in third person
   const st = m.userData.st, dtT = dt * 20, s = playerPoseInputs(dt);
   PSTATE.glideT = s.gliding ? PSTATE.glideT + dtT : 0;
   if (s.sleep) { const bx = Math.floor(PL.x), by = Math.floor(PL.y - 0.3), bz = Math.floor(PL.z); const f = getMeta(bx, by, bz) & 3; PSTATE.bedYaw = -f * Math.PI / 2; s.bedYaw = PSTATE.bedYaw; }
@@ -18425,7 +18553,7 @@ async function mpRejoin(url, wid) {
   }
   if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); dropFireOverlay(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
@@ -19165,12 +19293,12 @@ function mpSeatOf(p) {
     const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id, back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At)); // (the driver's claim lapses on its own after 1.5 s without word)
     if (!drv && !back) continue;
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
-    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
+    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? -0.45 : e.rideY != null ? e.rideY : 0.18; // in a boat: the seat 0.1 down and a player's 0.35
     return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
   // it says it rides but no vehicle here knows (its last word came late): the nearest boat or cart it sits by
   const q = p.pos; if (!q) return null; let best = null, bd = 2.5;
   for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart')) continue; const d = Math.hypot(e.mesh.position.x - q[0], e.mesh.position.z - q[2]); if (d < bd) { bd = d; best = e; } }
-  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? 1.13 : best.rideY != null ? best.rideY : 0.18), m.z]; }
+  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? -0.45 : best.rideY != null ? best.rideY : 0.18), m.z]; }
   return null;
 }
 function mpRender(dt) {
@@ -19204,7 +19332,7 @@ function mpRender(dt) {
     for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
-    if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
+    fireOverlay(p, !!s.fire && !s.dead && m.visible, p.pos[0], p.pos[1], p.pos[2], 0.3, s.h || 1.8); // burning: the fire drawn over them, as Java does
     mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects
     const mn = Array.isArray(s.mine) && s.mine.length === 4 && s.mine.every(Number.isInteger) ? s.mine : null, mid = mn && getBlock(mn[0], mn[1], mn[2]); // the cracks in the block they dig
     if (mn && mid && (p.digT = (p.digT || 0) + dtT) > 4) { p.digT = 0; mpGotBfx({ dim: W.dim, x: mn[0], y: mn[1], z: mn[2], id: mid, m: getMeta(mn[0], mn[1], mn[2]), k: 'dig' }); }
@@ -19465,7 +19593,7 @@ async function mpAction(a) {
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null, world); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 4, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 5, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const where = ad.value.trim(), up = await mpUpload(where); say(`올렸습니다 (청크 ${up.n}개). 서버 세계로 들어가는 중...`);
       saveAll(true); await new Promise(r => setTimeout(r, 300)); quitToTitle(); showMenu('mp_join'); await mpJoinWs(where, null, up.wid); } // from now on it is played on the server, where it stays
@@ -19871,7 +19999,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 4, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 5, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -20119,7 +20247,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 4; S.setGenVersion(4); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 5; S.setGenVersion(5); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }

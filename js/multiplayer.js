@@ -243,7 +243,7 @@ async function mpRejoin(url, wid) {
   }
   if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
-function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
+function mpPeerGone(id) { const p = MP.peers.get(id); if (!p) return; mpDropAvatar(p); dropFireOverlay(p); mpDropPeerFx(p); if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } MP.peers.delete(id); chatMsg(p.name + '님이 나갔습니다', '#ffff55'); if (mpRelay()) mpSend({ t: 'gone', id }); }
 
 // ---------- message handling ----------
 function mpHandle(m, from) {
@@ -983,12 +983,12 @@ function mpSeatOf(p) {
     const drv = e.remote ? is(e.riderId) : !!e.mpRider && e.mpRider === id, back = e.kind === 'boat' && (e.remote ? is(e.seat2Id) : !!e.mpRider2 && e.mpRider2 === id && fresh(e.mpRider2At)); // (the driver's claim lapses on its own after 1.5 s without word)
     if (!drv && !back) continue;
     const m = e.mesh.position, yaw = e.yaw || 0, two = e.kind === 'boat' && (e.remote ? !!e.seat2Id : (e.mpRider2 && fresh(e.mpRider2At)) || e.rider2 === PL || e.mob);
-    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? 0.95 + 0.18 : e.rideY != null ? e.rideY : 0.18; // a boat is drawn 0.95 lower than it stands
+    const f = back ? -0.6 : two ? 0.2 : 0, dy = e.kind === 'boat' ? -0.45 : e.rideY != null ? e.rideY : 0.18; // in a boat: the seat 0.1 down and a player's 0.35
     return [m.x - Math.sin(yaw) * f, m.y + dy, m.z - Math.cos(yaw) * f]; }
   // it says it rides but no vehicle here knows (its last word came late): the nearest boat or cart it sits by
   const q = p.pos; if (!q) return null; let best = null, bd = 2.5;
   for (const e of ENT) { if (e.dead || !e.mesh || !(e.kind === 'boat' || e.kind === 'minecart')) continue; const d = Math.hypot(e.mesh.position.x - q[0], e.mesh.position.z - q[2]); if (d < bd) { bd = d; best = e; } }
-  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? 1.13 : best.rideY != null ? best.rideY : 0.18), m.z]; }
+  if (best) { const m = best.mesh.position; return [m.x, m.y + (best.kind === 'boat' ? -0.45 : best.rideY != null ? best.rideY : 0.18), m.z]; }
   return null;
 }
 function mpRender(dt) {
@@ -1022,7 +1022,7 @@ function mpRender(dt) {
     for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
-    if (s.fire && !s.dead && Math.random() < 0.3) R.simpleParticle(p.pos[0] + (Math.random() - .5) * 0.6, p.pos[1] + Math.random() * 1.8, p.pos[2] + (Math.random() - .5) * 0.6, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
+    fireOverlay(p, !!s.fire && !s.dead && m.visible, p.pos[0], p.pos[1], p.pos[2], 0.3, s.h || 1.8); // burning: the fire drawn over them, as Java does
     mpPeerFx(p, s, light); if (Array.isArray(s.ec) && s.ec.length === 3 && !s.dead) effSwirl(p.pos[0], p.pos[1], p.pos[2], 1.8, s.ec, dt); // their potion effects
     const mn = Array.isArray(s.mine) && s.mine.length === 4 && s.mine.every(Number.isInteger) ? s.mine : null, mid = mn && getBlock(mn[0], mn[1], mn[2]); // the cracks in the block they dig
     if (mn && mid && (p.digT = (p.digT || 0) + dtT) > 4) { p.digT = 0; mpGotBfx({ dim: W.dim, x: mn[0], y: mn[1], z: mn[2], id: mid, m: getMeta(mn[0], mn[1], mn[2]), k: 'dig' }); }
@@ -1283,7 +1283,7 @@ async function mpAction(a) {
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null, world); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 4, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 5, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const where = ad.value.trim(), up = await mpUpload(where); say(`올렸습니다 (청크 ${up.n}개). 서버 세계로 들어가는 중...`);
       saveAll(true); await new Promise(r => setTimeout(r, 300)); quitToTitle(); showMenu('mp_join'); await mpJoinWs(where, null, up.wid); } // from now on it is played on the server, where it stays

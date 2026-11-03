@@ -9,7 +9,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(await hit(C, '밥') === 'hit', 'a guest can aim at a guest'); await B.waitForTimeout(1500); ok(await hp(B) < hb, 'guest → guest hit hurts');
   const cp = [X + 1, Y, Z - 4];
   await A.evaluate(p => { MP.local = true; setBlock(p[0], p[1], p[2], BID.chest); MP.local = false; setTile(p[0], p[1], p[2], { type: 'chest', items: new Array(27).fill(null) }); getTile(p[0], p[1], p[2]).items[0] = { id: IID.diamond, n: 10 }; mpTileChanged(p[0], p[1], p[2]); }, cp);
-  await A.waitForTimeout(2000);
+  await A.waitForTimeout(2000); for (const P of [B, C]) await P.waitForFunction(p => !!getTile(p[0], p[1], p[2]), cp, { timeout: 15000 }).catch(() => {}); // (a slow page gets the chest a little later)
   for (const P of [B, C]) await P.evaluate(p => UI.openScreen('chest', { x: p[0], y: p[1], z: p[2] }), cp);
   await Promise.all([B, C].map(P => P.evaluate(() => clickSlot(GUI.slots.findIndex(s => s.group === 'cont'), 0, false))));
   await A.waitForTimeout(2500);

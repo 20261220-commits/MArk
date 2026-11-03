@@ -14,6 +14,11 @@ module.exports = async ({ ok, srv, b, lib }) => {
     S.setGenVersion(4); const G = S.makeGen(12345); let ocean = 0, n = 0; const seen = new Set();
     for (let x = -40000; x < 40000; x += 800) for (let z = -40000; z < 40000; z += 800) { const key = S.BIOMES[G.column(x, z)[2]][8]; seen.add(key); n++; if (/ocean/.test(key)) ocean++; }
     o.ocean = +(ocean / n * 100).toFixed(1); o.kinds = seen.size;
+    // generator 5: the ground from Java's TerrainShaper - plains near 66, ocean floors near 48, deep ones near 35, peaks high
+    S.setGenVersion(5); const G5 = S.makeGen(12345), byB = {};
+    for (let x = -30000; x < 30000; x += 400) for (let z = -30000; z < 30000; z += 400) { const r = G5.column(x, z), k = S.BIOMES[r[2]][8]; (byB[k] = byB[k] || []).push(r[0]); }
+    const med = k => { const v = (byB[k] || []).sort((a, b) => a - b); return v.length ? v[v.length >> 1] : null; }, mx = k => Math.max(...(byB[k] || [0]));
+    o.h5 = { plains: med('plains'), ocean: med('ocean'), deep: med('deep_ocean'), meadow: med('meadow'), peaks: Math.max(mx('jagged_peaks'), mx('frozen_peaks'), mx('stony_peaks')) };
     return o;
   });
   ok(r.md5 === '900150983cd24fb0d6963f7d28e17f72', 'MD5 as Java hashes noise names', r.md5);
@@ -22,5 +27,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(P.frozenPeaks === 'frozen_peaks' && P.jaggedPeaks === 'jagged_peaks' && P.swamp === 'swamp' && P.desert === 'desert' && P.badlands === 'badlands', 'the biome table: peaks, swamp, desert, badlands', P);
   ok(P.beach === 'beach' && P.stonyShore === 'stone_shore' && P.windswept === 'gravelly_mountains' && P.savanna === 'shattered_savanna' && P.meadow === 'meadow', 'the biome table: beach, stony shore, windswept, meadow', P);
   ok(r.ocean > 25 && r.ocean < 45 && r.kinds >= 35, 'a third of the world is ocean, with most biomes found', [r.ocean, r.kinds]);
+  const h = r.h5; ok(h.plains >= 63 && h.plains <= 72 && h.ocean >= 42 && h.ocean <= 55 && h.deep >= 28 && h.deep <= 42 && h.meadow > 90 && h.peaks > 190, 'generator 5 heights as Java shapes them: plains, oceans, deep oceans, meadows, peaks', h);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
