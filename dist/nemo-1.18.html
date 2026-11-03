@@ -17083,6 +17083,8 @@ function showMenu(name, data) {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}<label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
+  } else if (name === 'account' && ACC.user) { // logged in: the nickname others see can change; the account stays the same
+    h = `<h2>계정</h2><p class="muted">로그인한 계정: <b>${esc(ACC.user.name)}</b> — 인벤토리·위치는 이 계정에 그대로 남고, 다른 사람에게는 아래 닉네임으로 보입니다.</p><div class="form"><label>닉네임<input id="accNick" value="${esc(ACC.user.nick || ACC.user.name)}" maxlength="16" onkeydown="if (event.key === 'Enter') accNick()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('닉네임 바꾸기', 'accnick')}${btn('로그아웃', 'accout')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'account') {
     h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
@@ -17151,6 +17153,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'skins') showMenu('skins');
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
+  else if (a === 'accnick') accNick();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
@@ -18404,7 +18407,7 @@ function mpWorldCore(store, out) {
         S.logins = S.logins || {};
         const lg = m.login && typeof m.login.name === 'string' && typeof m.login.cred === 'string' && /^[0-9a-f]{64}$/.test(m.login.cred) ? m.login : null;
         if (lg) {
-          p.name = lg.name.trim().slice(0, 16) || p.name; const k = p.name.toLowerCase(), rec = S.logins[k], now = Date.now();
+          const k = lg.name.trim().slice(0, 16).toLowerCase(), rec = S.logins[k], now = Date.now(); p.name = p.name || lg.name.trim().slice(0, 16); // the nickname shown can differ from the account's name
           const f = fails.get(k); if (f && f.n >= 5 && now - f.t < 30000) { send(p, { t: 'error', msg: '비밀번호를 여러 번 틀렸습니다. 30초 뒤에 다시 해 보세요' }); return; }
           if (rec && mpSha256(rec.salt + lg.cred) !== rec.h) { fails.set(k, { n: (f && now - f.t < 30000 ? f.n : 0) + 1, t: now }); send(p, { t: 'error', msg: `비밀번호가 틀렸습니다 ("${p.name}" 계정은 이 세계에 이미 있습니다)` }); return; }
           fails.delete(k); p.account = k;
@@ -18417,6 +18420,7 @@ function mpWorldCore(store, out) {
             store.saveState(); store.log(`${p.name} 계정을 만들었습니다`);
           }
         }
+        if (p.account && p.name.toLowerCase() !== p.account && S.logins[p.name.toLowerCase()]) { send(p, { t: 'error', msg: `"${p.name}"은(는) 다른 계정의 이름이라 닉네임으로 쓸 수 없습니다` }); return; }
         p.key = p.account ? 'a:' + p.account : p.name;
         p.dev = typeof m.dev === 'string' ? m.dev.slice(0, 40) : null;
         // the same name already in: the same account (its password checked) or the same device coming back after a dropped
@@ -18455,6 +18459,10 @@ function mpWorldCore(store, out) {
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+      case 'nick': { const n = typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''; if (!p.joined || !n || /[\s<>"'&\\]/.test(n)) return; // a new nickname mid-game (an account's, or a guest's)
+        const lo = n.toLowerCase(); if ([...players.values()].some(q => q !== p && q.joined && q.name.toLowerCase() === lo) || (S.logins && S.logins[lo] && lo !== p.account)) { send(p, { t: 'error', msg: `"${n}"은(는) 쓸 수 없는 닉네임입니다 (다른 플레이어나 계정의 이름)` }); return; }
+        const old = p.name; p.name = n; if (!p.account) { if (S.players[old] && !S.players[n]) { S.players[n] = S.players[old]; delete S.players[old]; } p.key = n; store.saveState(); }
+        for (const q of players.values()) if (q.joined) out(q.id, { t: 'nick', id: p.id, name: n, old }); return; }
       case 'away': p.away = !!m.on; if (p.dim != null) pickAuth(p.dim); return; // the game went to a background tab, or came back
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
@@ -18809,6 +18817,7 @@ function mpHandle(m, from) {
     case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } if (p.capeKey && PACKPX.ent[p.capeKey]) { if (entTex[p.capeKey]) { entTex[p.capeKey].dispose(); delete entTex[p.capeKey]; } delete PACKPX.ent[p.capeKey]; } p.capeKey = null; p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
     case 'gone': mpPeerGone(m.id); return;
+    case 'nick': { if (m.id === MP.id) { MP.name = m.name; chatMsg('닉네임이 ' + m.name + '(으)로 바뀌었습니다', '#ffff55'); return; } const p = MP.peers.get(m.id); if (p) { p.name = m.name; mpDropAvatar(p); } chatMsg(m.old + '님이 닉네임을 ' + m.name + '(으)로 바꿨습니다', '#ffff55'); return; } // (the name tag is drawn again)
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
     case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
@@ -19866,12 +19875,22 @@ document.addEventListener('visibilitychange', () => {
 // that player's inventory and place are kept by account. The password itself is never kept or sent: this device keeps
 // a hash of it (the proof), and the world keeps a salted hash of that proof (js/mpcore.js).
 const ACC = { user: null, cred: null }, ACC_KEY = 'nemo-account';
-try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user && typeof a.cred === 'string') Object.assign(ACC, { user: { name: String(a.user.name) }, cred: a.cred }); } catch (e) {} // (a Google sign-in from before is dropped)
+try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user && typeof a.cred === 'string') Object.assign(ACC, { user: { name: String(a.user.name), nick: a.user.nick ? String(a.user.nick) : undefined }, cred: a.cred }); } catch (e) {} // (a Google sign-in from before is dropped)
 function accSave() { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC.user ? ACC : null)); } catch (e) {} }
 const accProof = (name, pw) => mpSha256('nemo-login\n' + name.toLowerCase() + '\n' + pw);
 // what "join" carries: the nickname and its proof, or nothing
 const accLoginMsg = () => ACC.user && ACC.cred ? { name: ACC.user.name, cred: ACC.cred } : null;
-const accName = () => ACC.user ? ACC.user.name : MP.name;
+// the account's name (what it logs in with, and what keeps its things on each world) and the nickname others see, which
+// a logged-in player can change at any time
+const accName = () => ACC.user ? ACC.user.nick || ACC.user.name : MP.name;
+const nickBad = n => !n ? '닉네임을 넣으세요' : n.length > 16 ? '닉네임은 16자까지입니다' : /\s/.test(n) ? '닉네임에는 띄어쓰기를 넣을 수 없습니다' : /[<>"'&\\]/.test(n) ? '닉네임에 < > " \' & \\ 는 쓸 수 없습니다' : null;
+function accNick() {
+  const st = $('accStatus'), n = ($('accNick') ? $('accNick').value : '').trim(), bad = nickBad(n);
+  if (!ACC.user) return; if (bad) { if (st) st.textContent = bad; return; }
+  ACC.user.nick = n === ACC.user.name ? undefined : n; accSave(); MP.name = n; try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {}
+  if (typeof MP !== 'undefined' && MP.on && W.active) { mpSend({ t: 'nick', name: n }); }
+  UI.flash('닉네임을 ' + n + '(으)로 바꿨습니다'); showMenu('account');
+}
 function accLogin() {
   const st = $('accStatus'), name = ($('accName') ? $('accName').value : '').trim(), pw = $('accPass') ? $('accPass').value : '';
   const bad = !name ? '닉네임을 넣으세요' : name.length > 16 ? '닉네임은 16자까지입니다' : /\s/.test(name) ? '닉네임에는 띄어쓰기를 넣을 수 없습니다' : /[<>"'&\\]/.test(name) ? '닉네임에 < > " \' & \\ 는 쓸 수 없습니다' : pw.length < 4 ? '비밀번호는 4자 이상으로 하세요' : '';

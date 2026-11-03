@@ -82,7 +82,7 @@ function mpWorldCore(store, out) {
         S.logins = S.logins || {};
         const lg = m.login && typeof m.login.name === 'string' && typeof m.login.cred === 'string' && /^[0-9a-f]{64}$/.test(m.login.cred) ? m.login : null;
         if (lg) {
-          p.name = lg.name.trim().slice(0, 16) || p.name; const k = p.name.toLowerCase(), rec = S.logins[k], now = Date.now();
+          const k = lg.name.trim().slice(0, 16).toLowerCase(), rec = S.logins[k], now = Date.now(); p.name = p.name || lg.name.trim().slice(0, 16); // the nickname shown can differ from the account's name
           const f = fails.get(k); if (f && f.n >= 5 && now - f.t < 30000) { send(p, { t: 'error', msg: '비밀번호를 여러 번 틀렸습니다. 30초 뒤에 다시 해 보세요' }); return; }
           if (rec && mpSha256(rec.salt + lg.cred) !== rec.h) { fails.set(k, { n: (f && now - f.t < 30000 ? f.n : 0) + 1, t: now }); send(p, { t: 'error', msg: `비밀번호가 틀렸습니다 ("${p.name}" 계정은 이 세계에 이미 있습니다)` }); return; }
           fails.delete(k); p.account = k;
@@ -95,6 +95,7 @@ function mpWorldCore(store, out) {
             store.saveState(); store.log(`${p.name} 계정을 만들었습니다`);
           }
         }
+        if (p.account && p.name.toLowerCase() !== p.account && S.logins[p.name.toLowerCase()]) { send(p, { t: 'error', msg: `"${p.name}"은(는) 다른 계정의 이름이라 닉네임으로 쓸 수 없습니다` }); return; }
         p.key = p.account ? 'a:' + p.account : p.name;
         p.dev = typeof m.dev === 'string' ? m.dev.slice(0, 40) : null;
         // the same name already in: the same account (its password checked) or the same device coming back after a dropped
@@ -133,6 +134,10 @@ function mpWorldCore(store, out) {
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+      case 'nick': { const n = typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''; if (!p.joined || !n || /[\s<>"'&\\]/.test(n)) return; // a new nickname mid-game (an account's, or a guest's)
+        const lo = n.toLowerCase(); if ([...players.values()].some(q => q !== p && q.joined && q.name.toLowerCase() === lo) || (S.logins && S.logins[lo] && lo !== p.account)) { send(p, { t: 'error', msg: `"${n}"은(는) 쓸 수 없는 닉네임입니다 (다른 플레이어나 계정의 이름)` }); return; }
+        const old = p.name; p.name = n; if (!p.account) { if (S.players[old] && !S.players[n]) { S.players[n] = S.players[old]; delete S.players[old]; } p.key = n; store.saveState(); }
+        for (const q of players.values()) if (q.joined) out(q.id, { t: 'nick', id: p.id, name: n, old }); return; }
       case 'away': p.away = !!m.on; if (p.dim != null) pickAuth(p.dim); return; // the game went to a background tab, or came back
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
