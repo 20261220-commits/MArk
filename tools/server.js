@@ -98,9 +98,14 @@ function wsAccept(req, sock, onText, onClose) {
   let buf = Buffer.alloc(0), parts = [], closed = false;
   // drop: a message the next one replaces (positions, mob lists, the clock). When a player's connection can't keep up,
   // these are skipped instead of piling up: a queue that only grows makes everything arrive later and later
-  const c = { send(s, drop) { if (closed || (drop && sock.writableLength > 256 * 1024)) return; sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(); } } };
+  // (the newest of each kind - each player's position, the mob list - is kept and goes out the moment the connection
+  // drains, so the latest state always arrives, only the stale ones in between are skipped)
+  const latest = new Map();
+  const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) sock.write(frame(1, Buffer.from(s))); };
+  sock.on('drain', flush);
+  const c = { send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(); } } };
   sock.on('data', d => {
-    buf = Buffer.concat([buf, d]);
+    seen = Date.now(); buf = buf.length ? Buffer.concat([buf, d]) : d;
     for (;;) {
       if (buf.length < 2) return;
       const fin = buf[0] & 0x80, op = buf[0] & 15, masked = buf[1] & 0x80; let len = buf[1] & 127, p = 2;
@@ -114,8 +119,11 @@ function wsAccept(req, sock, onText, onClose) {
       if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
-  // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself)
-  const ping = setInterval(() => { if (!closed) try { sock.write(frame(9, Buffer.alloc(0))); } catch (e) {} }, 25000);
+  // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself). A connection
+  // that hasn't said anything for 45 s - not even the pong - is dead (a phone that changed networks, a closed laptop):
+  // closed here, so its player leaves at once instead of blocking its own way back in
+  let seen = Date.now();
+  const ping = setInterval(() => { if (closed) return; if (Date.now() - seen > 45000) { try { sock.destroy(); } catch (e) {} return; } try { sock.write(frame(9, Buffer.alloc(0))); } catch (e) {} }, 15000);
   sock.on('close', () => { clearInterval(ping); if (!closed) { closed = true; onClose(); } }); sock.on('error', () => {});
   return c;
 }
@@ -136,8 +144,9 @@ function openWorld(id) {
   w = { id, dir, cdir, state, keys: new Set(), dirty: new Map(), stateDirty: false, conns: new Map(), changedSinceBackup: false, mirrorStateAt: 0, restorer: null };
   w.fileOf = dk => path.join(cdir, encodeURIComponent(dk) + '.json');
   loadWorld(w);
-  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), pending: dk => w.dirty.has(dk), saveState: () => { w.stateDirty = true; w.changedSinceBackup = true; }, /* (players' things count too: the 10-minute backup used to wait for a changed block) */ log: t => console.log(`[${id}] ${t}`) };
-  w.core = mpWorldCore(store, (cid, o) => { const c = w.conns.get(cid); if (c) c.send(JSON.stringify(o), DROPPABLE.has(o.t)); });
+  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), pending: dk => w.dirty.has(dk), drop: cid => { const c = w.conns.get(cid); if (c) setTimeout(() => c.close(), 200); }, /* (after its 'kicked' has gone out) */ saveState: () => { w.stateDirty = true; w.changedSinceBackup = true; }, /* (players' things count too: the 10-minute backup used to wait for a changed block) */ log: t => console.log(`[${id}] ${t}`) };
+  let lastO = null, lastS = ''; // one message to many players is turned into text once
+  w.core = mpWorldCore(store, (cid, o) => { const c = w.conns.get(cid); if (!c) return; if (o !== lastO) { if (lastO === null) queueMicrotask(() => { lastO = null; }); lastO = o; lastS = JSON.stringify(o); } c.send(lastS, DROPPABLE.has(o.t) && o.t + ':' + (o.id != null ? o.id : o.from != null ? o.from : '')); }); // (only within one round of sending: an object changed and sent again later is written afresh)
   worlds.set(id, w); return w;
 }
 function loadWorld(w) {
@@ -284,7 +293,7 @@ server.on('upgrade', (req, sock) => {
       else { roomName = code || 'main'; room = rooms.get(roomName); if (!room || !room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
       c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
-    const dr = DROPPABLE.has(m.t);
+    const dr = DROPPABLE.has(m.t) && m.t + ':' + (m.id != null ? m.id : role === 'guest' ? id : '');
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id }), dr); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s, dr); } else for (const g of room.guests.values()) g.send(s, dr);

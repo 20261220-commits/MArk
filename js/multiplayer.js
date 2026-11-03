@@ -56,17 +56,25 @@ const MP_DROP = new Set(['pl', 'mobs', 'vehs', 'items', 'xps']);
 function mpWsOnce(url, role, extra) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
-    const link = { kind: 'ws', send(o, to) { if (ws.readyState !== 1 || (ws.bufferedAmount > 128 * 1024 && MP_DROP.has(o.t))) return; ws.send(JSON.stringify(to != null ? { ...o, to } : o)); } /* a slow upload skips the next position instead of queueing it */, close() { try { ws.close(); } catch (e) {} } };
+    const late = new Map(), link = { kind: 'ws', send(o, to) { // a slow upload keeps only the newest position (and the like) until it catches up
+      if (ws.readyState !== 1) return; const s = JSON.stringify(to != null ? { ...o, to } : o);
+      if (MP_DROP.has(o.t) && ws.bufferedAmount > 128 * 1024) { late.set(o.t + ':' + (to != null ? to : ''), s); return; }
+      if (late.size && ws.bufferedAmount < 64 * 1024) { for (const v of late.values()) ws.send(v); late.clear(); }
+      ws.send(s); }, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
-    ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
+    ws.onmessage = e => { link.rx = Date.now(); let m; try { m = JSON.parse(e.data); } catch (er) { return; }
       if (!ok) { if (m.t === 'hello') { ok = true; MP.id = m.id; link.hello = m; res(link); } else if (m.t === 'error') { const er = new Error(m.msg); er.fromServer = true; rej(er); ws.close(); } return; }
       if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
+      if (m.t === 'kicked') { MP.noRejoin = true; mpLost(m.msg || '연결이 끊겼습니다'); MP.noRejoin = false; return; } // taken over by a newer connection: no knocking again
       if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
       mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
     ws.onerror = () => { if (!ok) rej(new Error('서버에 연결하지 못했습니다')); };
-    ws.onclose = () => { if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
+    ws.onclose = () => { clearInterval(link.dog); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
+    // nothing from the server for 20 s (it sends the clock every second): the connection is dead even if the browser
+    // hasn't noticed - give it up and connect again at once instead of waiting minutes for the browser's own timeout
+    link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 20000 : 75000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
   });
 }
 // WebRTC data channels, a star around the host; long messages are split (data channels cap message size)
@@ -93,11 +101,13 @@ function mpRtcHostLink() { MP.rtcLinks = new Map(); return { kind: 'rtc', send(o
 // guest: paste the host's invite, hand back the answer; the channel opens once the host enters it
 async function mpAnswerInvite(code) {
   const pc = new RTCPeerConnection(RTC_CFG);
-  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); }; };
+  pc.ondatachannel = e => { const dc = e.channel; dc.onopen = () => { const send = rtcWire(dc, m => mpHandle(m, 0), () => mpLost('호스트와 연결이 끊겼습니다')); MP.link = { kind: 'rtc', send: o => send(o), close: () => { try { pc.close(); } catch (er) {} } }; MP.server = true; MP.rolePending = true; mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() }); }; };
   await pc.setRemoteDescription({ type: 'offer', sdp: await mpUnpack(code) });
   await pc.setLocalDescription(await pc.createAnswer()); await iceDone(pc);
   MP.rtcGuest = pc; return mpPack(pc.localDescription.sdp);
 }
+// this device, for the server to tell its own player coming back after a dropped connection from someone else by that name
+const mpDev = () => { try { let d = localStorage.getItem('nemo-dev'); if (!d) { d = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem('nemo-dev', d); } return d; } catch (e) { return MP.devTmp || (MP.devTmp = Math.random().toString(36).slice(2)); } };
 const mpSend = (o, to) => { if (MP.link) MP.link.send(o, to); };
 // a guest's request to whoever runs its dimension (the host, or in a server world the dimension's runner)
 const MP_AUTH_PLACED = new Set(['blast', 'drop', 'prime', 'summon', 'veh', 'xp']); // (requests that only place something: the server stamps a forwarded one as from the forwarder)
@@ -136,7 +146,7 @@ async function mpHostStart(kind) {
   MP.store = mpHostStore(); MP.core = mpWorldCore(MP.store, mpCoreOut);
   MP.link = { kind: 'local', send(o, to) { MP.core.message(0, to != null ? { ...o, to } : { ...o }); }, close() {} };
   MP.timers = [setInterval(() => MP.core && MP.core.tick(), 1000), setInterval(() => MP.store && MP.store.flush(), 3000)];
-  mpInstall(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
+  mpInstall(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() });
   chatMsg(MP.roomCode ? `멀티플레이가 열렸습니다 · 방 코드 ${MP.roomCode} — 친구는 타이틀 → 멀티플레이 목록에서 "${MP.name}님의 세계"를 누르면 들어와요` : '멀티플레이가 열렸습니다. 친구가 참가할 수 있어요.', '#ffff55');
 }
 // the core's messages: to you (in order, after the current one), or out to a guest
@@ -213,7 +223,7 @@ async function mpJoinWs(url, room, world) {
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
   MIR.host = MP.link.hello.kind === 'world' ? mirHost(url) + '|' + (MP.link.hello.wid || 'world') : null; MP.worldId = MP.link.hello.wid || null;
   if (MP.link.hello.kind === 'world' && !MP.link.hello.world) { if (await mirRestore(MIR.host)) return 'restoring'; showMenu('mp_create'); return 'noworld'; } // 'restored' then joins
-  mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() });
+  mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() });
 }
 function mpStop() {
   if (!MP.on) return; MP.timeAt = 0;
@@ -229,7 +239,7 @@ function mpStop() {
 }
 function mpLost(why) {
   if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
-  const again = MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
+  const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
   if (again) mpRejoin(url, wid, wid ? null : code); // a server world, or a friend's world that is still open: straight back in
@@ -263,7 +273,7 @@ function mpHandle(m, from) {
     }
     case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
-    case 'created': case 'restored': if (m.t === 'restored') chatMsg('저장해 둔 사본으로 서버 세계를 되살렸습니다', '#55ff55'); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg() }); return;
+    case 'created': case 'restored': if (m.t === 'restored') chatMsg('저장해 둔 사본으로 서버 세계를 되살렸습니다', '#55ff55'); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() }); return;
     case 'mirror': mirSave(m); return;
     case 'flushed': if (MIR.closing) MIR.closing(); return;
     case 'auth': mpGotAuth(m.dim, m.id); return;
@@ -526,7 +536,13 @@ async function mpServeChunk(m, from) {
   mpSend(out, from);
 }
 const mpEdits = new Map(), mpTileWait = new Map(); // chunk key -> edits / containers to apply when it loads (guests)
-function mpRequestChunk(cx, cz) { W.pending.set(ckey(cx, cz), 'load'); mpSend({ t: 'chunk', cx, cz, dim: W.dim }); }
+function mpRequestChunk(cx, cz) { W.pending.set(ckey(cx, cz), 'load'); (MP.reqAt || (MP.reqAt = new Map())).set(ckey(cx, cz), [performance.now(), cx, cz, W.dim]); mpSend({ t: 'chunk', cx, cz, dim: W.dim }); }
+// a chunk asked for whose answer never came (sent as the connection broke, or dropped on the way): asked again, so it
+// doesn't stay a hole in the ground
+function mpRetryChunks() {
+  if (!MP.reqAt || !MP.reqAt.size) return; const now = performance.now();
+  for (const [k, [t, cx, cz, dim]] of MP.reqAt) { if (W.pending.get(k) !== 'load' || dim !== W.dim) { MP.reqAt.delete(k); continue; } if (now - t > 8000) { MP.reqAt.set(k, [now, cx, cz, dim]); mpSend({ t: 'chunk', cx, cz, dim }); } }
+}
 function mpGotChunk(m) {
   if (m.dim !== W.dim) return; const key = ckey(m.cx, m.cz);
   if (W.pending.get(key) !== 'load') return; W.pending.delete(key);
@@ -565,6 +581,7 @@ function mpTick() {
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 100 === 0) mpSendPdata(); // every 5 s
+  if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
   if (MP.server && W.tickN % 200 === 100) mpMobSnapshot();
