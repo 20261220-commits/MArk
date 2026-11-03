@@ -62,6 +62,11 @@ function applyGuiPack() {
     css.setProperty('--g-panel', `url(${crop('gui_inv', 0, 0, 176, 166, 256).toDataURL()})`); css.setProperty('--g-slot', `url(${crop('gui_inv', 7, 83, 18, 18, 256).toDataURL()})`);
     document.body.classList.add('vgui');
   }
+  if (PACKPX.ent.gui_recipe) { // the recipe book from gui/recipe_book.png: the book, tabs, recipe buttons, page arrows, the filter switch
+    for (const [k, x, y, w, h] of [['rbook', 1, 1, 147, 166], ['rbtab', 153, 2, 35, 27], ['rbtab1', 188, 2, 35, 27], ['rbok', 29, 206, 25, 25], ['rbno', 54, 206, 25, 25], ['rbnext', 1, 208, 12, 17], ['rbnext1', 1, 226, 12, 17], ['rbf0', 152, 41, 26, 16], ['rbf1', 180, 41, 26, 16], ['rbf0h', 152, 59, 26, 16], ['rbf1h', 180, 59, 26, 16]]) { const c = crop('gui_recipe', x, y, w, h, 256); if (c) css.setProperty('--g-' + k, `url(${c.toDataURL()})`); }
+    document.body.classList.add('vrb');
+  }
+  if (PACKPX.ent.gui_rbbtn) { for (const [k, y] of [['rbbtn', 0], ['rbbtnh', 19]]) { const c = crop('gui_rbbtn', 0, y, 20, 18, 256); if (c) css.setProperty('--g-' + k, `url(${c.toDataURL()})`); } document.body.classList.add('vrbb'); }
   if (PACKPX.ent.gui_furnace) { // progress arrow and flame, empty and full
     for (const [k, x, y, w, h] of [['arrow0', 79, 34, 24, 17], ['arrow1', 176, 14, 24, 17], ['flame0', 56, 36, 14, 14], ['flame1', 176, 0, 14, 14]]) css.setProperty('--g-' + k, `url(${crop('gui_furnace', x, y, w, h, 256).toDataURL()})`);
     document.body.classList.add('vfurn');
@@ -180,9 +185,9 @@ UI.renderScreen = () => {
   let h = '';
   if (T === 'inv' || T === 'craft') { const grid = T === 'inv' ? INV.craft2 : INV.craft3; if (GUI.ghost && grid.some(Boolean)) GUI.ghost = null; }
   if (T === 'inv') {
-    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
+    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}${typeof rbBtnHtml === 'function' ? rbBtnHtml() : ''}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
-    h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
+    h = `<div class="panel"><div class="cap">제작</div><div class="row top">${typeof rbBtnHtml === 'function' ? rbBtnHtml() : ''}<div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
     h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(GUI.slots.length - 36).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(GUI.slots.length - 36)}</div>`;
   } else if (T === 'furnace') {
@@ -229,10 +234,12 @@ UI.renderScreen = () => {
   const cur = INV.cursor;
   // typing in a box (an anvil name, the creative search): the box itself is left alone, everything around it drawn again -
   // a box drawn anew mid-word broke Korean typing (the letters being put together were lost on every key)
-  if ((T === 'inv' || T === 'craft') && typeof rbHtml === 'function') h = `<div class="rbwrap">${rbHtml(T)}${h}</div>`; // the recipe book beside the grid
+  if ((T === 'inv' || T === 'craft') && typeof rbHtml === 'function') h = `<div class="rbwrap">${h}${rbHtml(T)}</div>`; // the recipe book to the right of the panel
   const keepBox = UI.keepBox && $(UI.keepBox); UI.keepBox = null;
-  if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const np = tmp.querySelector('.panel'), op = el.querySelector('.panel');
-    if (np && op && np.children.length === op.children.length) { [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); moveCursorItem(lastMouse.x, lastMouse.y); return; } }
+  if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const nps = [...tmp.querySelectorAll('.panel')], ops = [...el.querySelectorAll('.panel')];
+    if (nps.length && nps.length === ops.length && ops.every((op, k) => !op.contains(keepBox) || nps[k].children.length === op.children.length)) {
+      ops.forEach((op, k) => { const np = nps[k]; if (!op.contains(keepBox)) { op.replaceWith(np); return; } [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); });
+      moveCursorItem(lastMouse.x, lastMouse.y); return; } }
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; UI.keepBox = 'aname'; UI.renderScreen(); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const rs = $('rbsearch'); if (rs) { rs.oninput = () => { RB.q = rs.value; RB.page = 0; UI.keepBox = 'rbsearch'; UI.renderScreen(); }; rs.onkeydown = e => e.stopPropagation(); }
