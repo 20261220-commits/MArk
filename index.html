@@ -108,6 +108,22 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 /* the player's inventory top row as Java lays it out (inventory.png): armour, doll, off hand, crafting, arrow and result
    side by side in the width of the 9 slots below */
 .panel.inv .row.top{gap:0;justify-content:flex-start}
+.rbwrap{display:flex;align-items:flex-start;gap:calc(2 * var(--px))}
+.rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));border:calc(var(--px)) solid #000;background:#3c8a2e;box-shadow:inset var(--px) var(--px) 0 #6fd35a,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #1d4a15;cursor:pointer;padding:0;position:relative}
+.rbbtn::after{content:'';position:absolute;left:25%;top:20%;width:50%;height:60%;background:#c8a96b;border-left:calc(2 * var(--px)) solid #7a4a1d}
+.rbbtn.on{background:#2a6a20}
+.panel.rbook{width:calc(118 * var(--px));padding:calc(4 * var(--px))}
+.rbtop{display:flex;gap:calc(2 * var(--px));margin-bottom:calc(3 * var(--px))}
+.rbtop input{flex:1;min-width:0;font:inherit;font-size:calc(7 * var(--px));padding:var(--px);background:#000;color:#fff;border:var(--px) solid #a0a0a0}
+.rbtop .rbf,.rbpg button{font:inherit;font-size:calc(6 * var(--px));background:#8b8b8b;color:#fff;border:var(--px) solid #000;cursor:pointer;padding:0 calc(2 * var(--px))}
+.rbtop .rbf.on{background:#3c8a2e}
+.rbgrid{display:grid;grid-template-columns:repeat(5, calc(22 * var(--px)));gap:calc(1 * var(--px));min-height:calc(92 * var(--px));align-content:start}
+.rbc{width:calc(22 * var(--px));height:calc(22 * var(--px));display:grid;place-items:center;cursor:pointer;border:var(--px) solid #000}
+.rbc.ok{background:#8fb07a}.rbc.no{background:#b46a6a}.rbc:hover{filter:brightness(1.2)}
+.rbc .ic,.ghostI{pointer-events:none}
+.ghostI{opacity:.35;filter:grayscale(.3)}
+.rbpg{display:flex;justify-content:center;align-items:center;gap:calc(4 * var(--px));margin-top:calc(3 * var(--px));font-size:calc(7 * var(--px))}
+.rbpg button:disabled{opacity:.4}
 .panel.inv .doll{width:calc(51 * var(--px))}
 .offc{align-self:flex-end}
 .panel.inv .cr{margin-left:calc(3 * var(--px))}
@@ -376,6 +392,7 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 <script src="js/stats.js"></script>
 <script src="js/workstations.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/recipebook.js"></script>
 <script src="js/commands.js"></script>
 <script src="js/advancements.js"></script>
 <script src="js/playermodel.js"></script>

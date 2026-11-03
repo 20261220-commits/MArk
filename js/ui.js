@@ -155,7 +155,9 @@ function renderDebug(dt, fps) {
 }
 
 // ---------- container screens ----------
-function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e, s.col) : ''}</div>`; }
+function slotHtml(i, cls = '') { const s = GUI.slots[i].get(); let g = '';
+  if (!s && GUI.ghost && GUI.slots[i].group === 'grid') { const G = GUI.ghost, x = i % G.w, y = Math.floor(i / G.w), id = x < G.pw ? G.cells[y * G.pw + x] : 0; if (id) g = `<div class="ghostI">${icon(id, 1)}</div>`; } // a recipe from the book shown faintly (something is missing)
+  return `<div class="sl ${cls}" data-i="${i}">${s ? icon(s.id, s.n, s.d, s.e, s.col) : g}</div>`; }
 function invRows(start) { let h = '<div class="grid9">'; for (let k = 0; k < 27; k++) h += slotHtml(start + k); h += '</div><div class="grid9 hot">'; for (let k = 0; k < 9; k++) h += slotHtml(start + 27 + k); return h + '</div>'; }
 UI.openScreen = (type, ctx) => {
   if (UI.screen) UI.closeScreen();
@@ -168,7 +170,7 @@ UI.openScreen = (type, ctx) => {
 UI.closeScreen = () => {
   if (!UI.screen) return;
   if (UI.screen === 'chest') { play('door', { vol: 0.5 }); const c = GUI.ctx; for (const [x, y, z] of c && c.x != null ? [[c.x, c.y, c.z], ...(c.pair ? [c.pair] : [])] : []) if (getBlock(x, y, z) === BID.trapped_chest) { setMeta(x, y, z, getMeta(x, y, z) & ~32); rsNotify(x, y, z); rsNotify(x, y - 1, z); } }
-  closeScreenItems(); UI.screen = null; $('screen').hidden = true; $('tooltip').hidden = true; UI.hudDirty = true; grabLock();
+  closeScreenItems(); GUI.ghost = null; UI.screen = null; $('screen').hidden = true; $('tooltip').hidden = true; UI.hudDirty = true; grabLock();
 };
 // creative list: colour/material variants sit right after their base block
 const ALL_ITEMS = () => ITEMS.filter(d => d && d.key !== 'name_tag' && d.key !== 'saddle').map(d => [d.id, d.block && d.place != null ? d.place * 32 + (d.vi || 0) : 1e6 + d.id]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
@@ -176,6 +178,7 @@ UI.renderScreen = () => {
   if (!UI.screen) return;
   const T = UI.screen, el = $('screen');
   let h = '';
+  if (T === 'inv' || T === 'craft') { const grid = T === 'inv' ? INV.craft2 : INV.craft3; if (GUI.ghost && grid.some(Boolean)) GUI.ghost = null; }
   if (T === 'inv') {
     h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
@@ -226,11 +229,13 @@ UI.renderScreen = () => {
   const cur = INV.cursor;
   // typing in a box (an anvil name, the creative search): the box itself is left alone, everything around it drawn again -
   // a box drawn anew mid-word broke Korean typing (the letters being put together were lost on every key)
+  if ((T === 'inv' || T === 'craft') && typeof rbHtml === 'function') h = `<div class="rbwrap">${rbHtml(T)}${h}</div>`; // the recipe book beside the grid
   const keepBox = UI.keepBox && $(UI.keepBox); UI.keepBox = null;
   if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const np = tmp.querySelector('.panel'), op = el.querySelector('.panel');
     if (np && op && np.children.length === op.children.length) { [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); moveCursorItem(lastMouse.x, lastMouse.y); return; } }
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; UI.keepBox = 'aname'; UI.renderScreen(); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
+  const rs = $('rbsearch'); if (rs) { rs.oninput = () => { RB.q = rs.value; RB.page = 0; UI.keepBox = 'rbsearch'; UI.renderScreen(); }; rs.onkeydown = e => e.stopPropagation(); }
   const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; UI.keepBox = 'csearch'; UI.renderScreen(); }; cs.onkeydown = e => e.stopPropagation(); }
   if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();
   moveCursorItem(lastMouse.x, lastMouse.y);
