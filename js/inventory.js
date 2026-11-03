@@ -212,11 +212,15 @@ function anvilResult(c) {
       used = 1;
     } else return null;
   }
-  const nm = (c.name || '').trim();
-  if (nm && nm !== (a.name || da.name)) { out.name = nm; cost++; changed = true; }
+  // the name box (filled with the item's name when it goes in, as Java): another name costs 1, an emptied box takes a
+  // given name off again
+  const nm = c.name == null ? null : String(c.name).trim(); let renamed = false;
+  if (nm != null) { if (!nm) { if (a.name) { delete out.name; renamed = true; } } else if (nm !== (a.name || da.name)) { out.name = nm; renamed = true; } }
+  if (renamed) { cost++; changed = true; }
   if (!changed) return null;
-  out.rp = (a.rp || 0) * 2 + 1;
   if (!out.e) delete out.e;
+  if (!b && renamed) { out.rp = a.rp || 0; return { out, cost: Math.min(39, Math.max(1, cost)), used }; } // only a new name: no extra work counted, and never "too expensive"
+  out.rp = (a.rp || 0) * 2 + 1;
   return { out, cost: Math.max(1, cost), used };
 }
 function anvilTake(c) {

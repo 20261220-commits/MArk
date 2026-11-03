@@ -460,7 +460,7 @@ function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
 }
 // ---------- explosions ----------
 function resistance(b) { const d = BLOCKS[b]; if (!d || d.hard < 0) return 3600000; if (FLUID[b]) return 100; if (b === BID.obsidian) return 1200; if (d.tool === S.TOOL.PICK) return Math.max(3, d.hard * 4); return d.hard * 1.5 + 0.1; }
-let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing
+let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing, and who did it (death messages)
 function explode(x, y, z, power, fire) {
   vibrate(x, y, z);
   const noGrief = MOB_BLAST && !gr('mobGriefing');
@@ -493,7 +493,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', MOB_BLAST && MOB_BLAST.kind ? MOB_BLAST : null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -637,7 +637,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = true; chargedExplode(e); } else { MOB_BLAST = true; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
+      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);

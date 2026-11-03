@@ -108,16 +108,58 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
+  if (attacker && (attacker.kind === 'mob' || cause === 'player')) PL.credit = { e: attacker, at: W.tickN, name: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitBy) || null : null, item: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitWeapon) || null : null }; // who gets the credit for a death soon after (Java's combat tracker)
+  if (cause === 'fall') PL.lastFall = PL.fallDist || 0;
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
     offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
     if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { kind: 'happy', size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
-  if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
+  if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); PL.deathMsg = deathMessage(cause, attacker, from); die(cause); }
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', burn: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+// ---------- death messages, as Java words them (with who did it, their named weapon, and "while fighting" or
+// "trying to escape" when something hurt the player in the last 5 seconds) ----------
+const josa = (w, a, b) => { w = String(w); const c = w.charCodeAt(w.length - 1), d = /\d$/.test(w) ? '0136780'.includes(w[w.length - 1]) : null; // 이/가, 와/과, 을/를 after the last letter (a number as it is read: 일, 삼, 육...)
+  return w + (c >= 0xac00 && c <= 0xd7a3 ? ((c - 0xac00) % 28 ? a : b) : d != null ? (d ? a : b) : a + '(' + b + ')'); };
+const MOB_KO = { creeper: '크리퍼', ender_dragon: '엔더 드래곤', wither: '위더', iron_golem: '철 골렘', snow_golem: '눈 골렘', enderman: '엔더맨', blaze: '블레이즈', ghast: '가스트', drowned: '드라운드', elder_guardian: '엘더 가디언', evoker: '소환사', bee: '벌', cave_spider: '동굴 거미', dolphin: '돌고래', endermite: '엔더마이트', goat: '염소', llama: '라마', fox: '여우', panda: '판다', piglin_brute: '피글린 야수', shulker_bullet: '셜커 탄환', evoker_fangs: '소환사의 송곳니', player: '플레이어' };
+function entKo(e) {
+  if (!e) return null; if (e.name) return String(e.name); if (e.kind === 'peer' || e.s) return e.name || '플레이어';
+  const t = e.type, egg = typeof IID !== 'undefined' && IID[t + '_spawn_egg'] != null && ITEMS[IID[t + '_spawn_egg']]; return egg ? egg.name.replace(/ 생성 알$/, '') : MOB_KO[t] || t || '무언가';
+}
+function deathMessage(cause, attacker, proj) {
+  const me = (typeof accName === 'function' && accName()) || '플레이어', S = josa(me, '이', '가');
+  const cr = !attacker && PL.credit && W.tickN - PL.credit.at < 100 ? PL.credit : null, who = attacker ? (cause === 'player' ? (MP.lastHitBy || '플레이어') : entKo(attacker)) : cr ? (cr.name || entKo(cr.e)) : null;
+  const held = attacker && attacker.held && attacker.held.name ? attacker.held.name : cause === 'player' && MP.lastHitWeapon ? MP.lastHitWeapon : null; // only a named weapon is told (as Java)
+  const by = (direct, alone, fight) => who ? (fight ? fight(who) : direct(who)) : alone;
+  switch (cause) {
+    case 'mob': case 'player': return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 살해당했습니다` : by(w => `${S} ${w}에게 살해당했습니다`, `${S} 살해당했습니다`);
+    case 'arrow': if (proj && proj.trident) return by(w => `${S} ${w}에게 꿰뚫렸습니다`, `${S} 꿰뚫렸습니다`); return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 저격당했습니다` : by(w => `${S} ${w}에게 저격당했습니다`, `${S} 저격당했습니다`);
+    case 'explosion': if (who && attacker && attacker.type === 'ghast') return `${S} ${who}의 화염구에 맞았습니다`; return by(w => `${S} ${w}에 의해 폭파당했습니다`, `${S} 폭파당했습니다`);
+    case 'firework': return `${S} 펑 하고 터졌습니다`;
+    case 'magic': return by(w => `${S} ${w}의 마법에 의해 죽었습니다`, `${S} 마법으로 죽었습니다`);
+    case 'wither': return attacker ? `${S} ${josa(who, "이", "가")} 쏜 해골에 맞았습니다` : by(null, `${S} 말라 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 말라 죽었습니다`);
+    case 'fall': { const high = (PL.lastFall || 0) > 5; return cr ? (high ? `${S} ${w2(who)} 때문에 추락사했습니다` : `${S} ${who}에게서 도망치다 땅에 너무 세게 떨어졌습니다`) : high ? `${S} 높은 곳에서 떨어졌습니다` : `${S} 땅에 너무 세게 떨어졌습니다`; }
+    case 'drown': return by(null, `${S} 익사했습니다`, w => `${S} ${w}에게서 도망치다 익사했습니다`);
+    case 'lava': return by(null, `${S} 용암에서 수영하려 했습니다`, w => `${S} ${w}에게서 도망치려고 용암에서 수영하려 했습니다`);
+    case 'fire': return attacker ? `${S} ${who}의 화염구에 맞았습니다` : by(null, `${S} 불길에 휩싸였습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 불 속으로 걸어 들어갔습니다`);
+    case 'burn': return by(null, `${S} 불에 타 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 바삭하게 구워졌습니다`);
+    case 'cactus': return by(null, `${S} 찔려 죽었습니다`, w => `${S} ${w}에게서 도망치다 선인장에 찔렸습니다`);
+    case 'berry': return by(null, `${S} 달콤한 열매 덤불에 찔려 죽었습니다`, w => `${S} ${w}에게서 도망치다 달콤한 열매 덤불에 찔려 죽었습니다`);
+    case 'suffocate': return by(null, `${S} 벽 속에서 질식했습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 벽 속에서 질식했습니다`);
+    case 'starve': return by(null, `${S} 굶어 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 굶어 죽었습니다`);
+    case 'void': return by(null, `${S} 세계 밖으로 떨어졌습니다`, w => `${S} ${josa(w, '와', '과')} 같은 세계에 있고 싶지 않았습니다`);
+    case 'freeze': return by(null, `${S} 얼어 죽었습니다`, w => `${S} ${w}에 의해 얼어 죽었습니다`);
+    case 'lightning': return by(null, `${S} 벼락에 맞았습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 벼락에 맞았습니다`);
+    case 'stalagmite': return by(null, `${S} 석순에 찔렸습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 석순에 찔렸습니다`);
+    case 'stalactite': return by(null, `${S} 떨어지는 종유석에 꿰뚫렸습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 떨어지는 종유석에 꿰뚫렸습니다`);
+    case 'poison': return by(null, `${S} 독으로 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 독으로 죽었습니다`);
+    case 'kill': return `${S} 죽었습니다`;
+    default: return by(null, `${S} 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 죽었습니다`);
+  }
+  function w2(w) { return w; }
+}
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -128,7 +170,7 @@ function die(cause) {
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
     PL.level = 0; PL.xpP = 0; PL.xpTotal = 0;
   }
-  UI.showDeath('플레이어가 ' + (DEATH_MSG[cause] || '죽었습니다'));
+  UI.showDeath(PL.deathMsg || deathMessage(cause, null)); PL.deathMsg = null; PL.credit = null;
 }
 function respawn() {
   if (PL.spawn && PL.spawnBed && PL.spawnDim === 0) { // a bed: there still, and somewhere to stand beside it (else the world spawn)

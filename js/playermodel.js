@@ -214,6 +214,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light, list = INV.armor) { // list: another player's armour in multiplayer
+  list = list.map(s => s && s.hid ? null : s); // a piece the player chose to hide (O in the inventory) isn't drawn
   const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') + (s.col != null ? '#' + s.col : '') : 0).join(',') + '|' + (ud.capeTex || '');
   if (key !== ud.armorKey) {
     ud.armorKey = key;

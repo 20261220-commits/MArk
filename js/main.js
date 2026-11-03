@@ -90,6 +90,8 @@ addEventListener('keydown', e => {
   if (UI.screen) {
     if (e.code === 'Escape' || (e.code === 'KeyE' && UI.screen !== 'adv') || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; } /* the advancements screen closes with L or Esc only, as in Java */
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
+    // O over a worn piece of armour: shown or hidden on your figure (for you and everyone else); it still protects you
+    if (e.code === 'KeyO' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], st = sl && sl.group === 'armor' && sl.get(); if (st) { if (st.hid) delete st.hid; else st.hid = 1; play('click', { vol: 0.4 }); UI.flash(itemName(st.id) + (st.hid ? ' 숨김 (방어는 그대로)' : ' 보임')); UI.renderScreen(); UI.hudDirty = true; } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d, s); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
