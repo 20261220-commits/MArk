@@ -12,11 +12,11 @@ module.exports = async ({ ok, b, lib }) => {
     const clock = await P.evaluate(async () => { await new Promise(r => setTimeout(r, 3000)); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); const t0 = W.time, r0 = performance.now(); /* both ends read just after a frame: a stalled page's clock is only brought up to date when it draws */ await new Promise(r => setTimeout(r, 40000)); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return { rate: +((W.time - t0) / ((performance.now() - r0) / 1000)).toFixed(1), base: !!MP.timeAt }; });
     ok(clock.base && clock.rate > 18 && clock.rate < 22, 'the day goes at the server\'s 20 ticks a second, however slowly the page draws', clock);
     sp.kill('SIGKILL'); await P.waitForTimeout(3000);
-    const lost = await P.evaluate(() => ({ on: MP.on, menu: UI.menu, st: MP.status }));
-    ok(lost.menu === 'mp_join' && /다시 연결/.test(lost.st), 'when the server goes away the game keeps knocking', lost);
+    const lost = await P.evaluate(() => ({ soft: !!MP.soft, active: !!W.active, menu: UI.menu || null, note: (document.getElementById('mpReconn') || {}).textContent || '' }));
+    ok(lost.soft && lost.active && lost.menu !== 'mp_join' && /다시 연결/.test(lost.note), 'when the server goes away the game stays in the world and keeps knocking underneath', lost);
     await P.waitForTimeout(4000); sp = await start();
-    let back = false; try { await P.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && UI.menu !== 'loading' && UI.menu !== 'mp_join', null, { timeout: 60000 }); back = true; } catch (e) {}
-    ok(back, 'and is back in the same world once the server is up again', await P.evaluate(() => [MP.on, UI.menu, MP.status]));
+    let back = false; try { await P.waitForFunction(() => MP.on && W.active && W.meta && W.meta.server && !MP.soft && MP.link && UI.menu !== 'loading' && UI.menu !== 'mp_join', null, { timeout: 60000 }); back = true; } catch (e) {}
+    ok(back, 'and is back in the same world once the server is up again, without having left it', await P.evaluate(() => [MP.on, UI.menu, MP.status]));
     ok(!P.errs.length, 'no page errors', P.errs);
   } finally { sp.kill(); try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} }
 };

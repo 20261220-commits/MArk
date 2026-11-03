@@ -38,6 +38,16 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await g3.waitForTimeout(4000);
   const st3 = await g3.evaluate(() => [MP.on, !!W.active, UI.menu || null, MP.status]);
   ok(back3 && st3[0] && st3[1] && st3[2] !== 'mp_join', 'a reconnect while the old connection still lived: the new one stays in (not thrown out by the old one\'s "taken over")', [back3, st3]);
+  // while a guest is connecting again (the game held in the world), the runner changes a block: after it is back in, the
+  // guest sees the change (the chunks the world keeps changes of come again)
+  const run2 = [A, B, C][(await roles()).indexOf('host')], g4 = [A, B, C][(await roles()).indexOf('guest')];
+  const spot = await g4.evaluate(() => { const x = Math.floor(PL.x) + 2, y = Math.floor(PL.y), z = Math.floor(PL.z) + 2; return [x, y, z, getBlock(x, y, z)]; });
+  await g4.evaluate(() => { window.__mws = mpWebSocket; mpWebSocket = () => Promise.reject(new Error('offline')); mpLost('시험: 연결 끊김'); });
+  const held = await g4.evaluate(() => [!!MP.soft, !!W.active, UI.menu || null]);
+  await run2.evaluate(([x, y, z]) => { MP.local = true; setBlock(x, y, z, BID.gold_block); MP.local = false; }, spot); await run2.waitForTimeout(3000);
+  await g4.evaluate(() => { mpWebSocket = window.__mws; });
+  let back4 = false; try { await g4.waitForFunction(([x, y, z]) => !MP.soft && MP.link && getBlock(x, y, z) === BID.gold_block, spot, { timeout: 40000 }); back4 = true; } catch (e) {}
+  ok(held[0] && held[1] && held[2] !== 'mp_join' && back4, 'a dropped connection: the game stays in the world while it connects again, and what changed meanwhile is there after', [held, back4, spot]);
   const st = await fetch(srv.url + 'stats').then(r => r.json());
   ok(st.recentDrops.some(d => d.side === 'game' && /응답이 없어/.test(d.why)) && st.recentDrops.some(d => d.side === 'server'), '/stats lists the dropped connections and why (as the server saw it and as the game reported it)', st.recentDrops.slice(0, 6));
   ok(![A, B, C].some(P => P.errs.length), 'no page errors', [A.errs, B.errs, C.errs]);

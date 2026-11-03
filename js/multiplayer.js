@@ -227,7 +227,7 @@ async function mpJoinWs(url, room, world) {
   mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() });
 }
 function mpStop() {
-  if (!MP.on) return; MP.timeAt = 0;
+  if (!MP.on) return; MP.timeAt = 0; MP.soft = null; MP.holdChunk = false; mpSoftNote(false);
   const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
@@ -243,9 +243,49 @@ function mpLost(why) {
     const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why, world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
   if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
   const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
+  if (again && W.active) { chatMsg(why, '#ff5555'); mpSoftRejoin(url, wid, wid ? null : code, why); return; } // in the world as it is: connect again underneath
   mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
   if (again) mpRejoin(url, wid, wid ? null : code); // a server world, or a friend's world that is still open: straight back in
+}
+// a dropped connection while playing: the game goes on as it is (the player held where it stands) while a new connection
+// is made underneath; the welcome then only brings back what may have changed meanwhile (the chunks the world keeps
+// changes of, the other players, who runs the dimension). Only if that fails for minutes does the game leave the world
+function mpSoftNote(on, t) {
+  let el = document.getElementById('mpReconn');
+  if (!on) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'mpReconn'; el.style.cssText = 'position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:60;padding:8px 16px;background:rgba(0,0,0,.6);color:#fff;font:16px monospace;border:2px solid #555;pointer-events:none;text-shadow:2px 2px #000'; document.body.appendChild(el); }
+  el.textContent = t || '서버와 다시 연결하는 중... 잠시만요';
+}
+async function mpSoftRejoin(url, wid, code, why) {
+  const gen = (MP.rejoinGen = (MP.rejoinGen || 0) + 1), wasRunner = MP.role === 'host' && !MP.soft;
+  const old = MP.link; MP.link = null; if (old) { try { clearInterval(old.dog); clearInterval(old.hb); old.close(); } catch (e) {} }
+  for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
+  for (const e of [...ENT]) if (e.remote || (wasRunner && /^(mob|item|xp|boat|minecart)$/.test(e.kind))) { if (PL.riding === e) dismount(); removeEnt(e); } // (what this game ran comes back from the world's store, or from the next runner)
+  MP.role = 'guest'; MP.rolePending = true; MP.auth = {}; MP.lastAuth = null; MP.batch = []; MP.pdataOk = false;
+  if (!MP.soft) MP.soft = { at: Date.now(), hold: [PL.x, PL.y, PL.z], why }; mpSoftNote(true);
+  const t0 = Date.now();
+  while (gen === MP.rejoinGen && MP.on && W.active && Date.now() - MP.soft.at < 5 * 60000) {
+    try { const link = await mpWebSocket(url, 'join', code ? { room: code } : { world: wid });
+      if (gen !== MP.rejoinGen || !W.active || !MP.on) { link.close(); return; }
+      MP.link = link; MP.soft.linked = Date.now(); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() }); return; // its welcome finishes this (mpEnterServerWorld)
+    } catch (e) { if (code && e && e.fromServer) break; }
+    mpSoftNote(true, `서버와 다시 연결하는 중... ${Math.round((Date.now() - MP.soft.at) / 1000)}초`);
+    await new Promise(r => setTimeout(r, Date.now() - t0 < 15000 ? 1500 : 5000));
+  }
+  if (gen === MP.rejoinGen && MP.soft) mpSoftGiveUp();
+}
+function mpSoftGiveUp() { const why = MP.soft && MP.soft.why || '서버와 연결이 끊겼습니다'; MP.soft = null; MP.holdChunk = false; mpSoftNote(false); mpStop(); if (W.active) { quitToTitle(); UI.flash(why + ' — 다시 들어가 주세요'); } }
+// the welcome on a connection made underneath: back in without leaving the world
+function mpSoftWelcome(m) {
+  MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
+  for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
+  const stored = new Set(m.stored); W.saved = stored; W.time = m.time; W.rain = W.rainTarget = m.rain; W.thunderOn = m.thunder;
+  for (const c of [...W.chunks.values()]) if (stored.has(dkey(c.cx, c.cz))) { c.modified = false; if (W.onChunkUnloaded) W.onChunkUnloaded(c); W.chunks.delete(c.key); } // they come again with what changed meanwhile
+  W.lastKey = -1; MP.holdChunk = true;
+  MP.pdataOk = true; mpSendPdata(); mpSend({ t: 'dim', dim: W.dim });
+  MP.soft = null; mpSoftNote(false); chatMsg('서버와 다시 연결되었습니다', '#55ff55');
+  if (typeof mirHave === 'function') mirHave();
 }
 // a server world whose connection dropped (the server restarting, a network blip): knock again every few seconds until
 // it answers (a free host takes a minute or two to come back), as long as the join screen stays open
@@ -580,6 +620,11 @@ function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...
 }
 function mpTick() {
   if (!MP.on || !W.active) return; MP.sndN = 0;
+  if (MP.soft || MP.holdChunk) { // held where it stands while connecting again, and until the ground under it is back
+    if (MP.holdChunk && !MP.soft) { const c = chunkAt(Math.floor(PL.x) >> 4, Math.floor(PL.z) >> 4); if (c && c.mesh) MP.holdChunk = false; }
+    const h = MP.soft ? MP.soft.hold : null; if (h) { PL.x = h[0]; PL.y = h[1]; PL.z = h[2]; } PL.vx = PL.vy = PL.vz = 0; PL.fallDist = 0;
+    if (MP.soft && MP.soft.linked && Date.now() - MP.soft.linked > 60000) mpSoftGiveUp(); // connected but never let back in
+    if (MP.soft) return; }
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
@@ -675,6 +720,7 @@ function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x -
 // back to the server; the others follow as guests. When the runner leaves, the server names the next one.
 const MP_SHARED = ['dragonKilled', 'dragonDone', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
 async function mpEnterServerWorld(m) {
+  if (MP.soft && W.active && W.meta && W.meta.server) { mpSoftWelcome(m); return; }
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta; let d = m.pdata, mine = false;
