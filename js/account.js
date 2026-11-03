@@ -3,11 +3,11 @@
 // that player's inventory and place are kept by account. The password itself is never kept or sent: this device keeps
 // a hash of it (the proof), and the world keeps a salted hash of that proof (js/mpcore.js).
 const ACC = { user: null, cred: null }, ACC_KEY = 'nemo-account';
-try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user && typeof a.cred === 'string') Object.assign(ACC, { user: { name: String(a.user.name), nick: a.user.nick ? String(a.user.nick) : undefined }, cred: a.cred }); } catch (e) {} // (a Google sign-in from before is dropped)
+try { const a = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); if (a && a.user && typeof a.cred === 'string') Object.assign(ACC, { user: { name: String(a.user.name), nick: a.user.nick ? String(a.user.nick) : undefined }, cred: a.cred, prev: Array.isArray(a.prev) ? a.prev.slice(0, 6) : [] }); } catch (e) {} // (a Google sign-in from before is dropped)
 function accSave() { try { localStorage.setItem(ACC_KEY, JSON.stringify(ACC.user ? ACC : null)); } catch (e) {} }
 const accProof = (name, pw) => mpSha256('nemo-login\n' + name.toLowerCase() + '\n' + pw);
 // what "join" carries: the nickname and its proof, or nothing
-const accLoginMsg = () => ACC.user && ACC.cred ? { name: ACC.user.name, cred: ACC.cred } : null;
+const accLoginMsg = () => ACC.user && ACC.cred ? { name: ACC.user.name, cred: ACC.cred, prev: ACC.prev && ACC.prev.length ? ACC.prev : undefined } : null; // (prev: the earlier name and password, for the worlds that don't know the new ones yet)
 // the account's name (what it logs in with, and what keeps its things on each world) and the nickname others see, which
 // a logged-in player can change at any time
 const accName = () => ACC.user ? ACC.user.nick || ACC.user.name : MP.name;
@@ -27,4 +27,18 @@ function accLogin() {
   MP.name = name; try { localStorage.setItem(MP_NAME_KEY, MP.name); } catch (e) {}
   UI.flash(name + '(으)로 로그인했습니다'); showMenu('title');
 }
-function accLogout() { ACC.user = null; ACC.cred = null; accSave(); UI.flash('로그아웃했습니다'); showMenu('title'); }
+// a new account name and/or password, the current password first. Each world learns it the next time this device
+// joins it (the old proof is kept here for that); the inventory and place there go along
+function accChange() {
+  const st = $('accStatus'), id = ($('accNewId') ? $('accNewId').value : '').trim(), pw = $('accNewPw') ? $('accNewPw').value : '', cur = $('accCurPw') ? $('accCurPw').value : '';
+  if (!ACC.user) return;
+  const say = t => { if (st) st.textContent = t; };
+  if (accProof(ACC.user.name, cur) !== ACC.cred) return say('지금 비밀번호가 맞지 않습니다');
+  const name = id || ACC.user.name, bad = nickBad(name); if (bad) return say(bad.replace('닉네임', '아이디'));
+  if (pw && pw.length < 4) return say('새 비밀번호는 4자 이상이어야 합니다');
+  if (name === ACC.user.name && !pw) return say('바꿀 아이디나 비밀번호를 넣으세요');
+  ACC.prev = [{ name: ACC.user.name, cred: ACC.cred }, ...(ACC.prev || [])].slice(0, 6);
+  const nick = ACC.user.nick || ACC.user.name; ACC.user = { name, nick: nick === name ? undefined : nick }; ACC.cred = accProof(name, pw || cur); accSave();
+  UI.flash((id && id !== ACC.prev[0].name ? '아이디' : '') + (id && id !== ACC.prev[0].name && pw ? '와 ' : '') + (pw ? '비밀번호' : '') + '를 바꿨습니다 — 각 세계에 다음에 들어갈 때 적용됩니다'); showMenu('account');
+}
+function accLogout() { ACC.user = null; ACC.cred = null; ACC.prev = []; accSave(); UI.flash('로그아웃했습니다'); showMenu('title'); }

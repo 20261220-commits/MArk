@@ -7,7 +7,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   const A = await lib.page(b, srv, { w: 480, h: 300 });
   const la = await login(A, '앨리스', 'sesame1');
   ok(la.acc === '앨리스' && la.menu === 'title' && la.cred && !la.keptPw, 'logging in keeps the nickname and only a hash of the password', la);
-  ok(await A.evaluate(() => $('menu').textContent.includes('앨리스') && $('menu').textContent.includes('로그아웃') && !/Google/.test($('menu').textContent)), 'the title shows who is logged in (no Google)');
+  ok(await A.evaluate(() => $('menu').textContent.includes('앨리스') && [...$('menu').querySelectorAll('button')].some(b => b.textContent === '계정') && !/Google/.test($('menu').textContent)), 'the title shows who is logged in and an account button (no Google)');
   await join(A, srv.ws);
   await A.evaluate(() => { $('mpSeed').value = '555'; $('mpMode').value = 'survival'; return mpAction('mp_createworld'); }); await enter(A);
   ok(await A.evaluate(() => MP.name === '앨리스' || [...MP.peers.values()].length >= 0) && await A.evaluate(() => W.active), 'a logged-in player joins (and makes the account)');

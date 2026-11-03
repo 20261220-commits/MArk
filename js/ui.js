@@ -311,7 +311,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(ACC.user.name)}</span></div>` : ''}${btn(ACC.user ? '로그아웃' : '로그인', ACC.user ? 'accout' : 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -323,8 +323,11 @@ function showMenu(name, data) {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
     const c = UI.cw;
     h = `<h2>새로운 세계 만들기</h2><div class="form"><label>세계 이름<input id="wname" value="${esc(c.name)}" maxlength="32"></label>${btn('게임 모드: ' + MODE_NAME[c.mode], 'cmode')}<p class="muted">${MODE_DESC[c.mode]}</p>${btn('난이도: ' + DIFF_NAME[c.diff], 'cdiff', c.mode === 'hardcore' ? 'dis' : '')}${btn('명령어 허용: ' + (c.cheats ? '켜짐' : '꺼짐'), 'ccheat')}<label>세계 생성 시드<input id="wseed" value="${esc(c.seed)}" placeholder="비워 두면 무작위"></label></div><div class="btngrid">${btn('새로운 세계 만들기', 'doCreate')}${btn('취소', 'worlds')}</div>`;
-  } else if (name === 'account' && ACC.user) { // logged in: the nickname others see can change; the account stays the same
-    h = `<h2>계정</h2><p class="muted">로그인한 계정: <b>${esc(ACC.user.name)}</b> — 인벤토리·위치는 이 계정에 그대로 남고, 다른 사람에게는 아래 닉네임으로 보입니다.</p><div class="form"><label>닉네임<input id="accNick" value="${esc(ACC.user.nick || ACC.user.name)}" maxlength="16" onkeydown="if (event.key === 'Enter') accNick()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('닉네임 바꾸기', 'accnick')}${btn('로그아웃', 'accout')}${btn('돌아가기', 'title')}</div>`;
+  } else if (name === 'account' && ACC.user) { // logged in: the nickname others see, the account's name and password
+    h = `<h2>계정</h2><p class="muted">로그인한 계정 아이디: <b>${esc(ACC.user.name)}</b> — 인벤토리·위치는 이 계정에 남고, 다른 사람에게는 닉네임으로 보입니다.</p>
+<div class="form"><label>닉네임<input id="accNick" value="${esc(ACC.user.nick || ACC.user.name)}" maxlength="16" onkeydown="if (event.key === 'Enter') accNick()"></label></div><div class="btncol">${btn('닉네임 바꾸기', 'accnick')}</div>
+<h3>아이디 · 비밀번호 바꾸기</h3><div class="form"><label>새 아이디 (그대로면 비워 두기)<input id="accNewId" maxlength="16" autocomplete="username"></label><label>새 비밀번호 (그대로면 비워 두기)<input id="accNewPw" type="password" maxlength="64" autocomplete="new-password"></label><label>지금 비밀번호<input id="accCurPw" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accChange()"></label></div>
+<p class="muted" id="accStatus"></p><div class="btncol">${btn('아이디·비밀번호 바꾸기', 'accchange')}${btn('로그아웃', 'accout')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'account') {
     h = `<h2>로그인</h2><p class="muted">멀티플레이에서 쓸 닉네임과 비밀번호를 정하세요. 어떤 세계에 이 닉네임으로 처음 들어가면 그 세계에 계정이 만들어지고, 그 뒤로는 같은 비밀번호로만 이 닉네임을 쓸 수 있습니다(인벤토리·위치도 계정에 저장). 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.</p><div class="form"><label>닉네임<input id="accName" value="${esc(ACC.user ? ACC.user.name : MP.name)}" maxlength="16" autocomplete="username"></label><label>비밀번호<input id="accPass" type="password" maxlength="64" autocomplete="current-password" onkeydown="if (event.key === 'Enter') accLogin()"></label></div><p class="muted" id="accStatus"></p><div class="btncol">${btn('로그인', 'acclogin')}${btn('돌아가기', 'title')}</div>`;
   } else if (name === 'skins') {
@@ -394,6 +397,7 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'account') showMenu('account');
   else if (a === 'acclogin') accLogin();
   else if (a === 'accnick') accNick();
+  else if (a === 'accchange') accChange();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
