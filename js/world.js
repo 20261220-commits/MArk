@@ -588,6 +588,25 @@ function lootStack(key, n, x, wx, wz, seed) {
   }
   return st;
 }
+// Villages built from Mojang's pieces filled the ground under a desert (badlands, beach) piece with iron ore instead of
+// sand (block 12 was sand in the old numbering). A saved chunk of such a village gets sand back: only iron ore above the
+// natural ground there (ore never generates above it) and inside the village
+function fixVillageIron(c) {
+  if (!S.villageAt || !S.hasStructs || !S.hasStructs()) return false;
+  const G = W.genCache || (W.genCache = S.makeGen(W.seed)), x0 = c.cx * 16, z0 = c.cz * 16, R = S.VREG * 16, IRON = BID.iron_ore, SAND = BID.sand, B = S.BIO;
+  const sandy = b => b === B.DESERT || b === B.BADLANDS || b === B.BEACH; let n = 0;
+  if (![...c.biome].some(sandy)) return false;
+  for (let i = Math.floor((x0 - 160) / R); i <= Math.floor((x0 + 175) / R); i++) for (let j = Math.floor((z0 - 160) / R); j <= Math.floor((z0 + 175) / R); j++) {
+    const v = S.villageAt(W.seed, G, i, j); if (!v || !v.jig || !v.core) continue;
+    const [ax, az, bx, bz] = v.core, M = 12; if (x0 + 15 < ax - M || x0 > bx + M || z0 + 15 < az - M || z0 > bz + M) continue;
+    for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+      const wx = x0 + lx, wz = z0 + lz; if (wx < ax - M || wx > bx + M || wz < az - M || wz > bz + M || !sandy(c.biome[lz * 16 + lx])) continue;
+      const h = G.column(wx, wz)[0];
+      for (let y = h + 1; y < h + 40 && y < MAXY; y++) { const k = BI(wx, y, wz); if (c.blocks[k] === IRON) { c.blocks[k] = SAND; c.meta[k] = 0; n++; } }
+    }
+  }
+  return n > 0;
+}
 function addChunk(cx, cz, d, tiles) {
   const c = new Chunk(cx, cz, d);
   W.chunks.set(c.key, c); W.lastKey = -1;
@@ -602,6 +621,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
+  if (d.fromSave && W.dim === 0 && fixVillageIron(c)) c.modified = c.edited = true; // saved with the old desert-village bug: iron ore where sand should be
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
