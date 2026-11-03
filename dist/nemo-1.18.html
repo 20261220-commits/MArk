@@ -108,6 +108,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 /* the player's inventory top row as Java lays it out (inventory.png): armour, doll, off hand, crafting, arrow and result
    side by side in the width of the 9 slots below */
 .panel.inv .row.top{gap:0;justify-content:flex-start}
+.newver{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:#3a2a00;color:#ffe680;border:2px solid #ffd000;padding:6px 12px;font-size:14px;z-index:5}.newver button{margin-left:8px;font:inherit}
 .rbwrap{display:flex;align-items:flex-start;gap:calc(1 * var(--px))}
 /* the green book button beside the crafting grid (gui/recipe_button.png when a jar is loaded) */
 .rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));align-self:center;margin-left:calc(4 * var(--px));border:0;padding:0;cursor:pointer;position:relative;background:#5e8a3a;box-shadow:inset var(--px) var(--px) 0 #9fd16f,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #2e4a18,0 0 0 var(--px) #000}
@@ -374,6 +375,11 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 // environment (SERVER_URL); on a static host such as GitHub Pages, write them here.
 //   server: the multiplayer server the game offers first, e.g. 'my-server.onrender.com' (empty: the page's own host)
 var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
+
+</script>
+<script>/* js/version.js */
+// written by tools/build.js: when this game was built (Korean time)
+const NEMO_VERSION = '2026.11.03 22:37';
 
 </script>
 <script>/* js/shared.js */
@@ -17112,13 +17118,19 @@ setInterval(() => { if (UI.screen === 'furnace' || UI.screen === 'hopper' || UI.
 // ---------- menus ----------
 const SPLASHES = ['동굴과 절벽!', '구리도 산화돼요!', '자수정 정동 발견!', '100% 순수 자바스크립트!', '크롬북에서도 쌩쌩!', '염소가 들이받아요!', '망원경으로 멀리!', '크리퍼 조심!', '다이아몬드!', '블록 위의 블록!', '오프라인에서도 OK!', '눈가루에 빠지지 마세요!'];
 function btn(label, act, cls = '') { return `<button class="mb ${cls}" data-act="${act}">${label}</button>`; }
+// a newer game on the site than the one open (a browser that kept old files): told on the title, with a button to load it
+function checkNewVersion() {
+  if (typeof NEMO_VERSION === 'undefined' || !/^https?:$/.test(location.protocol) || /\/dist\//.test(location.pathname)) return;
+  fetch('js/version.js?' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => { const m = /NEMO_VERSION = '([^']+)'/.exec(t), el = $('newVer');
+    if (m && m[1] !== NEMO_VERSION && el && UI.menu === 'title') { el.hidden = false; el.innerHTML = `새 버전(${esc(m[1])})이 있습니다 — 지금 열린 것은 ${esc(NEMO_VERSION)} <button onclick="location.reload()">새로고침</button>`; } }).catch(() => {});
+}
 function showMenu(name, data) {
   UI.menu = name; const m = $('menu'); m.hidden = !name; m.className = name ? 'm-' + name : '';
   if (!name) { return; }
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트</div>`;
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트${typeof NEMO_VERSION !== 'undefined' ? ' · 버전 ' + NEMO_VERSION : ''}</div><div id="newVer" class="newver" hidden></div>`; setTimeout(checkNewVersion, 300);
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -18899,7 +18911,7 @@ function mpStop() {
 }
 function mpLost(why) {
   try { if (MP.on && MP.lastUrl && MP.link && MP.link.kind === 'ws') { // tell the server why (it shows the last ones on /stats), for finding what drops players
-    const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why, world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
+    const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why: why + (typeof NEMO_VERSION !== 'undefined' ? ' [' + NEMO_VERSION + ']' : ''), world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
   if (!MP.on) return; const srvW = MP.server && !MP.isHost, guest = MP.role === 'guest' || srvW, url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
   const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   if (again && W.active) { chatMsg(why, '#ff5555'); mpSoftRejoin(url, wid, wid ? null : code, why); return; } // in the world as it is: connect again underneath

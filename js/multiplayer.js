@@ -240,7 +240,7 @@ function mpStop() {
 }
 function mpLost(why) {
   try { if (MP.on && MP.lastUrl && MP.link && MP.link.kind === 'ws') { // tell the server why (it shows the last ones on /stats), for finding what drops players
-    const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why, world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
+    const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why: why + (typeof NEMO_VERSION !== 'undefined' ? ' [' + NEMO_VERSION + ']' : ''), world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
   if (!MP.on) return; const srvW = MP.server && !MP.isHost, guest = MP.role === 'guest' || srvW, url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
   const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   if (again && W.active) { chatMsg(why, '#ff5555'); mpSoftRejoin(url, wid, wid ? null : code, why); return; } // in the world as it is: connect again underneath

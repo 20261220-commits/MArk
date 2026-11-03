@@ -1,7 +1,7 @@
 // Offline play: once the game has been opened, every file it uses is kept here, so it starts again without internet
 // (worlds are already in this browser's IndexedDB). With a connection the newest files are always fetched first, and the
 // copy is refreshed; without one, or when the network is too slow, the kept copy answers.
-const CACHE = 'nemo-offline-v1';
+const CACHE = 'nemo-offline-v2';
 const NETWORK_WAIT = 4000; // ms before a slow network gives way to the kept copy
 
 // on install: the page itself and every script, style and font it names
@@ -28,7 +28,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET' || skip(url)) return;
   e.respondWith((async () => {
     const c = await caches.open(CACHE);
-    const net = fetch(req).then(res => { if (res.ok && res.type === 'basic') c.put(req, res.clone()).catch(() => {}); return res; });
+    const net = fetch(req, { cache: 'no-cache' }).then(res => { if (res.ok && res.type === 'basic') c.put(req, res.clone()).catch(() => {}); return res; });
     const kept = c.match(req, { ignoreSearch: true }).then(r => r || (req.mode === 'navigate' ? c.match('index.html') : null));
     // the network first; the kept copy if it fails or takes too long
     const slow = new Promise(r => setTimeout(r, NETWORK_WAIT, 'slow'));
