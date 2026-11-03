@@ -8956,7 +8956,7 @@ function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
 }
 // ---------- explosions ----------
 function resistance(b) { const d = BLOCKS[b]; if (!d || d.hard < 0) return 3600000; if (FLUID[b]) return 100; if (b === BID.obsidian) return 1200; if (d.tool === S.TOOL.PICK) return Math.max(3, d.hard * 4); return d.hard * 1.5 + 0.1; }
-let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing
+let MOB_BLAST = false; // set around explosions caused by mobs (creepers, ghast fireballs, withers): mobGriefing, and who did it (death messages)
 function explode(x, y, z, power, fire) {
   vibrate(x, y, z);
   const noGrief = MOB_BLAST && !gr('mobGriefing');
@@ -8989,7 +8989,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', MOB_BLAST && MOB_BLAST.kind ? MOB_BLAST : null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
@@ -9133,7 +9133,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = true; chargedExplode(e); } else { MOB_BLAST = true; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
+      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -15453,11 +15453,15 @@ function anvilResult(c) {
       used = 1;
     } else return null;
   }
-  const nm = (c.name || '').trim();
-  if (nm && nm !== (a.name || da.name)) { out.name = nm; cost++; changed = true; }
+  // the name box (filled with the item's name when it goes in, as Java): another name costs 1, an emptied box takes a
+  // given name off again
+  const nm = c.name == null ? null : String(c.name).trim(); let renamed = false;
+  if (nm != null) { if (!nm) { if (a.name) { delete out.name; renamed = true; } } else if (nm !== (a.name || da.name)) { out.name = nm; renamed = true; } }
+  if (renamed) { cost++; changed = true; }
   if (!changed) return null;
-  out.rp = (a.rp || 0) * 2 + 1;
   if (!out.e) delete out.e;
+  if (!b && renamed) { out.rp = a.rp || 0; return { out, cost: Math.min(39, Math.max(1, cost)), used }; } // only a new name: no extra work counted, and never "too expensive"
+  out.rp = (a.rp || 0) * 2 + 1;
   return { out, cost: Math.max(1, cost), used };
 }
 function anvilTake(c) {
@@ -15700,16 +15704,58 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
+  if (attacker && (attacker.kind === 'mob' || cause === 'player')) PL.credit = { e: attacker, at: W.tickN, name: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitBy) || null : null, item: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitWeapon) || null : null }; // who gets the credit for a death soon after (Java's combat tracker)
+  if (cause === 'fall') PL.lastFall = PL.fallDist || 0;
   play('hurt');
   if (PL.health <= 0 && cause !== 'void' && cause !== 'kill') { // totem of undying, in either hand
     offUnswap(); const k = PL.held() && PL.held().id === IID.totem_of_undying ? INV.sel : INV.off && INV.off.id === IID.totem_of_undying ? 'off' : -1;
     if (k !== -1) { if (typeof advGrant === 'function') advGrant('adventure/totem_of_undying'); if (k === 'off') INV.off = null; else INV.slots[k] = null; PL.health = 1; clearEffects(PL); addEffect(PL, 'regeneration', 900, 1); addEffect(PL, 'absorption', 100, 1); addEffect(PL, 'fire_resistance', 800, 0); PL.fire = 0; play('levelup'); for (let i = 0; i < 40; i++) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.4 + Math.random() * 0.4, 0.9, 0.2], { kind: 'happy', size: 0.15, vy: 2 + Math.random() * 2, vx: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3, grav: 0.4, life: 1.5 }); UI.flash('불사의 토템이 발동했습니다!'); UI.hudDirty = true; return true; }
   }
-  if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); die(cause); }
+  if (PL.health <= 0) { PL.lastAttacker = attacker; if (attacker && typeof ADVT !== 'undefined') ADVT.killedBy(attacker); PL.deathMsg = deathMessage(cause, attacker, from); die(cause); }
   UI.hudDirty = true;
   return true;
 }
-const DEATH_MSG = { player: '다른 플레이어에게 살해당했습니다', fall: '높은 곳에서 떨어졌습니다', mob: '몹에게 살해당했습니다', arrow: '화살에 맞았습니다', explosion: '폭발했습니다', drown: '익사했습니다', lava: '용암에서 수영하려 했습니다', fire: '불에 타 죽었습니다', burn: '불에 타 죽었습니다', starve: '굶어 죽었습니다', void: '세계 밖으로 떨어졌습니다', suffocate: '벽 속에서 질식했습니다', cactus: '선인장에 찔려 죽었습니다', magic: '마법으로 죽었습니다', wither: '말라 죽었습니다', poison: '독으로 죽었습니다', freeze: '얼어 죽었습니다', lightning: '벼락에 맞았습니다', stalagmite: '석순에 찔렸습니다', stalactite: '떨어지는 종유석에 찔렸습니다', berry: '달콤한 열매 덤불에 찔려 죽었습니다', kill: '죽었습니다' };
+// ---------- death messages, as Java words them (with who did it, their named weapon, and "while fighting" or
+// "trying to escape" when something hurt the player in the last 5 seconds) ----------
+const josa = (w, a, b) => { w = String(w); const c = w.charCodeAt(w.length - 1), d = /\d$/.test(w) ? '0136780'.includes(w[w.length - 1]) : null; // 이/가, 와/과, 을/를 after the last letter (a number as it is read: 일, 삼, 육...)
+  return w + (c >= 0xac00 && c <= 0xd7a3 ? ((c - 0xac00) % 28 ? a : b) : d != null ? (d ? a : b) : a + '(' + b + ')'); };
+const MOB_KO = { creeper: '크리퍼', ender_dragon: '엔더 드래곤', wither: '위더', iron_golem: '철 골렘', snow_golem: '눈 골렘', enderman: '엔더맨', blaze: '블레이즈', ghast: '가스트', drowned: '드라운드', elder_guardian: '엘더 가디언', evoker: '소환사', bee: '벌', cave_spider: '동굴 거미', dolphin: '돌고래', endermite: '엔더마이트', goat: '염소', llama: '라마', fox: '여우', panda: '판다', piglin_brute: '피글린 야수', shulker_bullet: '셜커 탄환', evoker_fangs: '소환사의 송곳니', player: '플레이어' };
+function entKo(e) {
+  if (!e) return null; if (e.name) return String(e.name); if (e.kind === 'peer' || e.s) return e.name || '플레이어';
+  const t = e.type, egg = typeof IID !== 'undefined' && IID[t + '_spawn_egg'] != null && ITEMS[IID[t + '_spawn_egg']]; return egg ? egg.name.replace(/ 생성 알$/, '') : MOB_KO[t] || t || '무언가';
+}
+function deathMessage(cause, attacker, proj) {
+  const me = (typeof accName === 'function' && accName()) || '플레이어', S = josa(me, '이', '가');
+  const cr = !attacker && PL.credit && W.tickN - PL.credit.at < 100 ? PL.credit : null, who = attacker ? (cause === 'player' ? (MP.lastHitBy || '플레이어') : entKo(attacker)) : cr ? (cr.name || entKo(cr.e)) : null;
+  const held = attacker && attacker.held && attacker.held.name ? attacker.held.name : cause === 'player' && MP.lastHitWeapon ? MP.lastHitWeapon : null; // only a named weapon is told (as Java)
+  const by = (direct, alone, fight) => who ? (fight ? fight(who) : direct(who)) : alone;
+  switch (cause) {
+    case 'mob': case 'player': return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 살해당했습니다` : by(w => `${S} ${w}에게 살해당했습니다`, `${S} 살해당했습니다`);
+    case 'arrow': if (proj && proj.trident) return by(w => `${S} ${w}에게 꿰뚫렸습니다`, `${S} 꿰뚫렸습니다`); return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 저격당했습니다` : by(w => `${S} ${w}에게 저격당했습니다`, `${S} 저격당했습니다`);
+    case 'explosion': if (who && attacker && attacker.type === 'ghast') return `${S} ${who}의 화염구에 맞았습니다`; return by(w => `${S} ${w}에 의해 폭파당했습니다`, `${S} 폭파당했습니다`);
+    case 'firework': return `${S} 펑 하고 터졌습니다`;
+    case 'magic': return by(w => `${S} ${w}의 마법에 의해 죽었습니다`, `${S} 마법으로 죽었습니다`);
+    case 'wither': return attacker ? `${S} ${josa(who, "이", "가")} 쏜 해골에 맞았습니다` : by(null, `${S} 말라 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 말라 죽었습니다`);
+    case 'fall': { const high = (PL.lastFall || 0) > 5; return cr ? (high ? `${S} ${w2(who)} 때문에 추락사했습니다` : `${S} ${who}에게서 도망치다 땅에 너무 세게 떨어졌습니다`) : high ? `${S} 높은 곳에서 떨어졌습니다` : `${S} 땅에 너무 세게 떨어졌습니다`; }
+    case 'drown': return by(null, `${S} 익사했습니다`, w => `${S} ${w}에게서 도망치다 익사했습니다`);
+    case 'lava': return by(null, `${S} 용암에서 수영하려 했습니다`, w => `${S} ${w}에게서 도망치려고 용암에서 수영하려 했습니다`);
+    case 'fire': return attacker ? `${S} ${who}의 화염구에 맞았습니다` : by(null, `${S} 불길에 휩싸였습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 불 속으로 걸어 들어갔습니다`);
+    case 'burn': return by(null, `${S} 불에 타 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 바삭하게 구워졌습니다`);
+    case 'cactus': return by(null, `${S} 찔려 죽었습니다`, w => `${S} ${w}에게서 도망치다 선인장에 찔렸습니다`);
+    case 'berry': return by(null, `${S} 달콤한 열매 덤불에 찔려 죽었습니다`, w => `${S} ${w}에게서 도망치다 달콤한 열매 덤불에 찔려 죽었습니다`);
+    case 'suffocate': return by(null, `${S} 벽 속에서 질식했습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 벽 속에서 질식했습니다`);
+    case 'starve': return by(null, `${S} 굶어 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 굶어 죽었습니다`);
+    case 'void': return by(null, `${S} 세계 밖으로 떨어졌습니다`, w => `${S} ${josa(w, '와', '과')} 같은 세계에 있고 싶지 않았습니다`);
+    case 'freeze': return by(null, `${S} 얼어 죽었습니다`, w => `${S} ${w}에 의해 얼어 죽었습니다`);
+    case 'lightning': return by(null, `${S} 벼락에 맞았습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 벼락에 맞았습니다`);
+    case 'stalagmite': return by(null, `${S} 석순에 찔렸습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 석순에 찔렸습니다`);
+    case 'stalactite': return by(null, `${S} 떨어지는 종유석에 꿰뚫렸습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 떨어지는 종유석에 꿰뚫렸습니다`);
+    case 'poison': return by(null, `${S} 독으로 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 독으로 죽었습니다`);
+    case 'kill': return `${S} 죽었습니다`;
+    default: return by(null, `${S} 죽었습니다`, w => `${S} ${josa(w, '와', '과')} 싸우다 죽었습니다`);
+  }
+  function w2(w) { return w; }
+}
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
@@ -15720,7 +15766,7 @@ function die(cause) {
     const xp = Math.min(100, PL.level * 7); if (xp) spawnXP(PL.x, PL.y + 1, PL.z, xp);
     PL.level = 0; PL.xpP = 0; PL.xpTotal = 0;
   }
-  UI.showDeath('플레이어가 ' + (DEATH_MSG[cause] || '죽었습니다'));
+  UI.showDeath(PL.deathMsg || deathMessage(cause, null)); PL.deathMsg = null; PL.credit = null;
 }
 function respawn() {
   if (PL.spawn && PL.spawnBed && PL.spawnDim === 0) { // a bed: there still, and somewhere to stand beside it (else the world spawn)
@@ -16899,6 +16945,7 @@ UI.renderScreen = () => {
   } else if (T === 'dispenser') {
     h = `<div class="panel"><div class="cap">${GUI.ctx.title || '발사기'}</div><div class="row top" style="justify-content:center"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div></div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'anvil') {
+    { const a0 = GUI.ctx.items[0]; if (a0 !== GUI.ctx.nameFor) { GUI.ctx.nameFor = a0; GUI.ctx.name = a0 ? (a0.name || ITEMS[a0.id].name) : ''; } } // the item's name goes in the box
     const r = anvilResult(GUI.ctx), cost = r ? r.cost : 0, ok = r && (creative() || (PL.level >= cost && cost < 40));
     h = `<div class="panel"><div class="cap">수리 및 이름 짓기</div><input id="aname" maxlength="35" placeholder="${GUI.ctx.items[0] ? (GUI.ctx.items[0].name || ITEMS[GUI.ctx.items[0].id].name).replace(/"/g, '') : ''}" value="${(GUI.ctx.name || '').replace(/"/g, '')}" autocomplete="off" ${GUI.ctx.items[0] ? '' : 'disabled'}><div class="row top">${slotHtml(0)}<b class="plus">+</b>${slotHtml(1)}<div class="arrow"></div>${slotHtml(2, 'big')}</div><p class="tip acost ${ok ? '' : 'bad'}">${r ? (cost >= 40 && !creative() ? '너무 비쌉니다!' : '마법 부여 비용: ' + cost) : ''}</p><div class="cap">인벤토리</div>${invRows(3)}</div>`;
   } else if (T === 'adv') { h = advScreenHtml();
@@ -16919,9 +16966,14 @@ UI.renderScreen = () => {
     h = `<div class="panel creative"><div class="row"><div class="cap">크리에이티브 인벤토리</div><input id="csearch" placeholder="아이템 검색" value="${GUI.search.replace(/"/g, '')}" autocomplete="off"></div><div class="cgrid">${list.map(id => `<div class="sl" data-c="${id}">${icon(id, 1)}</div>`).join('')}</div><div class="row"><div class="grid9 hot">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="sl trash" data-trash="1" title="아이템 삭제"></div></div><p class="tip">클릭: 한 묶음 · 우클릭: 1개 · Shift+클릭: 단축바로 · 휴지통: 삭제</p></div>`;
   } else if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T]) h = CUSTOM_SCREENS[T].html();
   const cur = INV.cursor;
+  // typing in a box (an anvil name, the creative search): the box itself is left alone, everything around it drawn again -
+  // a box drawn anew mid-word broke Korean typing (the letters being put together were lost on every key)
+  const keepBox = UI.keepBox && $(UI.keepBox); UI.keepBox = null;
+  if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const np = tmp.querySelector('.panel'), op = el.querySelector('.panel');
+    if (np && op && np.children.length === op.children.length) { [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); moveCursorItem(lastMouse.x, lastMouse.y); return; } }
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
-  const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; const pos = an.selectionStart; UI.renderScreen(); const n = $('aname'); n.focus(); n.setSelectionRange(pos, pos); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
-  const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; const pos = cs.selectionStart; UI.renderScreen(); const n = $('csearch'); n.focus(); n.setSelectionRange(pos, pos); }; cs.onkeydown = e => e.stopPropagation(); }
+  const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; UI.keepBox = 'aname'; UI.renderScreen(); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
+  const cs = $('csearch'); if (cs) { cs.oninput = () => { GUI.search = cs.value; UI.keepBox = 'csearch'; UI.renderScreen(); }; cs.onkeydown = e => e.stopPropagation(); }
   if (typeof CUSTOM_SCREENS !== 'undefined' && CUSTOM_SCREENS[T] && CUSTOM_SCREENS[T].bind) CUSTOM_SCREENS[T].bind();
   moveCursorItem(lastMouse.x, lastMouse.y);
 };
@@ -16936,7 +16988,7 @@ function screenMouse(e) {
   let id = null, st = null;
   if (el && el.dataset.i != null) { st = GUI.slots[+el.dataset.i] && GUI.slots[+el.dataset.i].get(); id = st && st.id; GUI.hover = +el.dataset.i; }
   else if (el && el.dataset.c) { id = +el.dataset.c; GUI.hover = -1; } else GUI.hover = -1;
-  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur && UI.advTips ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}${UI.advTips ? `<small class="lore">minecraft:${d.key}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
+  if (id && !INV.cursor) { const d = ITEMS[id]; tip.hidden = false; tip.innerHTML = `<span${st && st.e ? ' class="ench"' : ''}>${st && st.name ? '<i>' + st.name.replace(/</g, '&lt;') + '</i>' : d.name}</span>${enchText(st).map(t => `<small>${t}</small>`).join('')}${st && st.hid ? '<small style="color:#aaa">숨김 (O: 보이기)</small>' : GUI.slots[GUI.hover] && GUI.slots[GUI.hover].group === 'armor' ? '<small style="color:#777">O: 숨기기</small>' : ''}${(d.lore || []).map(t => `<small class="lore">${t}</small>`).join('')}${st && st.ch ? `<small>장전됨: ${ITEMS[st.ch].name}</small>` : ''}${d.dur && UI.advTips ? `<small>내구도: ${d.dur - (st && st.d || 0)} / ${d.dur}</small>` : ''}${d.tool ? `<small class="g">공격 피해 ${d.tool.dmg} · 공격 속도 ${d.tool.as}</small>` : ''}${d.armor ? `<small class="g">방어 +${d.armor.pts}</small>` : ''}${d.food ? `<small class="g">허기 +${d.food[0]}</small>` : ''}${UI.advTips ? `<small class="lore">minecraft:${d.key}</small>` : ''}`; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 26) + 'px'; }
   else tip.hidden = true;
   if (GUI.drag && INV.cursor && el && el.dataset.i != null && !GUI.drag.list.includes(+el.dataset.i)) {
     const sl = GUI.slots[+el.dataset.i]; const s2 = sl.get();
@@ -18018,6 +18070,7 @@ function rebuildPlayer() {
 }
 // armour as skinned meshes bound to the player's own bones, so they follow every pose
 function updateArmor(m, light, list = INV.armor) { // list: another player's armour in multiplayer
+  list = list.map(s => s && s.hid ? null : s); // a piece the player chose to hide (O in the inventory) isn't drawn
   const ud = m.userData, key = list.map(s => s ? s.id + (s.e ? 'e' : '') + (s.col != null ? '#' + s.col : '') : 0).join(',') + '|' + (ud.capeTex || '');
   if (key !== ud.armorKey) {
     ud.armorKey = key;
@@ -19034,7 +19087,7 @@ function mpTick() {
     if (MP.soft) return; }
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
-    armor: INV.armor.map(s => s ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
+    armor: INV.armor.map(s => s && !s.hid ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 100 === 0) mpSendPdata(); // every 5 s
   if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
@@ -19603,7 +19656,7 @@ function mpInstall() {
   if (typeof horseTame === 'function') { const ht = horseTame; horseTame = function (e) { ht.apply(this, arguments); if (e.remote) mpToAuth({ t: 'tame', e: e.rid }); }; } // tamed by riding it, on a guest's screen
   const rc = raycast; raycast = function () { const r = rc.apply(this, arguments); if (!MP.on) return r; const h = mpRayPeer(); return h && (!r || h.t < r.t) ? h : r; };
   const ae0 = attackEntity; attackEntity = e => e.kind === 'peer' ? mpAttackPeer(e.peer) : ae0(e);
-  const sd = UI.showDeath; UI.showDeath = msg => { if (MP.on) { msg = PL.lastHurtBy === 'player' && MP.lastHitBy ? MP.name + '님이 ' + MP.lastHitBy + '님에게 살해당했습니다' : msg.replace(/^플레이어가 /, MP.name + '님이 '); mpSend({ t: 'sys', text: msg }); } return sd(msg); };
+  const sd = UI.showDeath; UI.showDeath = msg => { if (MP.on && gr('showDeathMessages')) mpSend({ t: 'sys', text: msg }); return sd(msg); }; // everyone reads it in the chat, as in Java
 }
 
 // ---------- players hitting each other ----------
@@ -19624,7 +19677,7 @@ function mpAttackPeer(p) {
   const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
-  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
+  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, wn: h && h.name ? h.name : undefined, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
   if (performance.now() - (p.myHitAt || 0) >= 450) { p.myHitAt = performance.now(); if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); } // a hit into the other player's moment of invulnerability doesn't wear it
@@ -19632,7 +19685,7 @@ function mpAttackPeer(p) {
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
   const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer' };
-  MP.lastHitBy = att ? att.name : null;
+  MP.lastHitBy = att ? att.name : null; MP.lastHitWeapon = typeof m.wn === 'string' ? m.wn.slice(0, 50) : null;
   if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
   mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });
   if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
@@ -20091,6 +20144,8 @@ addEventListener('keydown', e => {
   if (UI.screen) {
     if (e.code === 'Escape' || (e.code === 'KeyE' && UI.screen !== 'adv') || (e.code === 'KeyL' && UI.screen === 'adv')) { UI.closeScreen(); e.preventDefault(); return; } /* the advancements screen closes with L or Esc only, as in Java */
     if (/^Digit[1-9]$/.test(e.code) && GUI.hover >= 0) { const k = +e.code.slice(5) - 1, sl = GUI.slots[GUI.hover]; if (sl && !sl.output) { const a = sl.get(), b = INV.slots[k]; if (!sl.accepts || sl.accepts(b)) { sl.set(b); INV.slots[k] = a; sl.onTake && a && sl.onTake(); afterClick(); } } return; }
+    // O over a worn piece of armour: shown or hidden on your figure (for you and everyone else); it still protects you
+    if (e.code === 'KeyO' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], st = sl && sl.group === 'armor' && sl.get(); if (st) { if (st.hid) delete st.hid; else st.hid = 1; play('click', { vol: 0.4 }); UI.flash(itemName(st.id) + (st.hid ? ' 숨김 (방어는 그대로)' : ' 보임')); UI.renderScreen(); UI.hudDirty = true; } return; }
     if (e.code === 'KeyF' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover]; if (sl && !sl.output && sl.group !== 'off' && (!sl.accepts || sl.accepts(INV.off))) { const a = sl.get(); sl.set(INV.off); INV.off = a; UI.renderScreen(); } return; } // F: swap with the off hand
     if (e.code === 'KeyQ' && GUI.hover >= 0) { const sl = GUI.slots[GUI.hover], s = sl.get(); if (s && !sl.output) { const n = e.ctrlKey ? s.n : 1; dropItem(PL.x, PL.y + 1.3, PL.z, s.id, n, lookDir().map(v => v * 0.3), 40, s.d, s); s.n -= n; if (!s.n) sl.set(null); afterClick(); } return; }
     return;
