@@ -359,7 +359,7 @@ function endermanAI(e, dist) {
     if (dist < 1.6 && Math.abs(PL.y - e.y) < 2.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, d.dmg, mx, mz); }
     if (dist > 12 && Math.random() < 0.02) endermanTeleport(e, PL.x, PL.z);
   } else {
-    if (!e.goal && Math.random() < 1 / 100) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
+    if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 7);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   walkPhysics(e, mx, mz, speed);
@@ -376,6 +376,7 @@ function endermanTeleport(e, cx = e.x, cz = e.z) {
 }
 function walkPhysics(e, mx, mz, speed) {
   const inF = e.inWater || e.inLava, d = e.def;
+  if (e.inWater && !d.sinks && !d.swim && !d.water && !e.target && !e.rider && e.age % 20 === 0 && (!e.goal || (e.goal.length === 2 && waterCol(e.goal[0], e.goal[1])))) { const g = landSeek(e); if (g) { e.goal = g; const gx = g[0] - e.x, gz = g[1] - e.z, gl = Math.hypot(gx, gz) || 1; if (!mx && !mz) { mx = gx / gl; mz = gz / gl; speed = speed || d.speed; } } } // out of the water, to a bank (Java's float and stroll goals)
   // the same good sense the common mobs have (entities.js): a stroll to a far spot follows a path around walls and holes,
   // no step over a drop of more than three blocks or into lava, fire or cactus, and two seconds against a wall gives up
   // on that spot
@@ -385,11 +386,11 @@ function walkPhysics(e, mx, mz, speed) {
   }
   if ((mx || mz) && e.onGround && !inF && !d.fly && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } }
   if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0;
-  e.lastX = e.x; e.lastZ = e.z;
+  e.lastX = e.x; e.lastZ = e.z; if (e.goal && !e.target) { const pr = e.prog || (e.prog = [e.x, e.z, W.tickN]); if (W.tickN - pr[2] >= 40) { if (Math.hypot(e.x - pr[0], e.z - pr[1]) < 0.5) { if (e.onGround && !e.progJ) { e.vy = 0.42; e.progJ = 1; } else { e.goal = null; e.path = null; e.progJ = 0; } } else e.progJ = 0; e.prog = [e.x, e.z, W.tickN]; } } else e.prog = null; /* two seconds with less than half a block gained: a hop, then somewhere else */
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = 0.42; e.jumpCd = 10; }
-  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz) e.vy += 0.04; e.vy *= 0.8; }
+  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if (mx || mz) e.vy += 0.04; if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, up the bank where it meets one
   turn(e);
   { const hv = Math.hypot(e.vx, e.vz); if (hv > 0.003 && hv < 0.15 && e.onGround && !inF && !d.fly && !(e.hurt > 0) && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, e.vx / hv, e.vz / hv)) { e.vx *= -0.2; e.vz *= -0.2; } }
   physMove(e, e.vx, e.vy, e.vz, 0.6);
@@ -409,7 +410,7 @@ function golemAI(e, dist) {
       if (t === PL) { if (hurtPlayer(diffDmg(dmg), 'mob', e)) PL.vy = 0.6; } else { hurtMob(t, dmg, e, 0, 0); t.vy = 0.6; }
     }
   } else {
-    if (!e.goal && Math.random() < 1 / 200) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12];
+    if (!e.goal && Math.random() < 1 / 200) e.goal = wanderGoal(e, 6);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.8) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   if (e.swing > 0) e.swing--;

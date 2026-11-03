@@ -60,7 +60,7 @@ function snowGolemAI(e) {
     if (d > 6) [mx, mz] = pathDir(e, t.x, t.y, t.z);
     if (e.attackCd <= 0 && d < 10) { e.attackCd = 20; const ty = t.y + t.h / 2 - (e.y + 1.4), v = 1.2; const s = shootArrow(e.x + dx / d * 0.5, e.y + 1.4, e.z + dz / d * 0.5, dx / d * v, ty / d * v + d * 0.02, dz / d * v, e, 0); s.thrown = IID.snowball; scene.remove(s.mesh); s.mesh = R.itemMesh(IID.snowball); s.mesh.scale.setScalar(0.3); scene.add(s.mesh); play('bow', { vol: 0.3 }); }
   } else {
-    if (!e.goal && Math.random() < 1 / 100) e.goal = [e.x + (Math.random() - .5) * 10, e.z + (Math.random() - .5) * 10];
+    if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 5);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   walkPhysics(e, mx, mz, 0.06);

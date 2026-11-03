@@ -376,7 +376,7 @@ function mpHandle(m, from) {
       if (m.e != null) { if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'mob'); if (e) { e.vx = (e.vx || 0) + v[0]; e.vy = (e.vy || 0) + v[1]; e.vz = (e.vz || 0) + v[2]; } } return; } // a guest's fishing rod pulls the runner's mob
       if (m.tgt != null && m.tgt !== MP.id && mpRelay()) { mpSend({ ...m }, m.tgt); return; } // the host passes a guest's pull on
       PL.vx += v[0]; PL.vy += v[1]; PL.vz += v[2]; return; } // someone reeled you in
-    case 'snd': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite) && typeof m.n === 'string') { const d = Math.hypot(PL.x - m.x, PL.y - m.y, PL.z - m.z), o = m.o && typeof m.o === 'object' ? m.o : {}; if (d < 16) { MP.sndIn = true; try { play(m.n, { mat: o.mat, pitch: isFinite(o.pitch) ? +o.pitch : undefined, vol: (isFinite(o.vol) ? +o.vol : 1) * (1 - d / 16) }); } finally { MP.sndIn = false; } } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
+    case 'snd': if (m.dim === W.dim && [m.x, m.y, m.z].every(isFinite) && typeof m.n === 'string') { const d = Math.hypot(PL.x - m.x, PL.y - m.y, PL.z - m.z), o = m.o && typeof m.o === 'object' ? m.o : {}; if (d < (m.n === 'goat_horn' ? 128 : 16)) { MP.sndIn = true; try { play(m.n, { mat: o.mat, pitch: isFinite(o.pitch) ? +o.pitch : undefined, vol: (isFinite(o.vol) ? +o.vol : 1) * (1 - d / (m.n === 'goat_horn' ? 128 : 16)) }); } finally { MP.sndIn = false; } } } if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'bolt': if (!host && m.dim === W.dim && [m.x, m.y, m.z].every(isFinite)) mpBoltFx(+m.x, +m.y, +m.z); return;
     case 'strike': if (host && m.dim === W.dim && [m.x, m.y, m.z].every(Number.isInteger)) strikeLightning(m.x, m.y, m.z, !!m.rod); return;
     case 'ignite': if (!host) PL.fire = Math.max(PL.fire || 0, Math.min(200, +m.f || 0)); return;
@@ -712,7 +712,7 @@ function mpPuppetTick(e) {
   if (e.fire > 0 && Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
 }
 // what the runner's mobs look like right now (anger, creeper fuse, sitting, sleeping, spells, fire, boss health...)
-const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name'];
+const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name', 'lostHorns', 'owner'];
 function mpMobVis(e) {
   const v = {}; for (const k of MP_MOBV) { const x = e[k]; if (x != null && x !== false && x !== 0 && (typeof x !== 'object')) v[k] = typeof x === 'number' ? +x.toFixed(2) : x; }
   if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp); const ec = effSwirlColor(e.eff); if (ec) v.ec = ec;
@@ -875,6 +875,7 @@ function mpRiddenTick(e) { if (performance.now() - e.mpRideAt > 3000) { e.mpRide
 // Mob AI reads PL; for a mob whose nearest player is a guest, PL stands where that guest is for the length of the mob's
 // tick, and damage, knockback and effects meant for "PL" go to the guest instead
 const PROXY_KEYS = ['x', 'y', 'z', 'px', 'py', 'pz', 'vx', 'vy', 'vz', 'mode', 'dead', 'eff', 'h', 'sneaking', 'onGround', 'fire'];
+function mpPeerByName(n) { for (const p of MP.peers.values()) if (p.name === n && p.s && p.s.dim === W.dim && performance.now() - p.at < 5000) return p; return null; }
 function mpNearestGuest(e) {
   let best = null, bd = PL.dead || PL.mode === 'creative' || PL.mode === 'spectator' ? Infinity : (PL.x - e.x) ** 2 + (PL.y - e.y) ** 2 + (PL.z - e.z) ** 2;
   for (const p of MP.peers.values()) { const s = p.s; if (!s || s.dim !== W.dim || s.dead || s.mode === 'creative' || s.mode === 'spectator' || performance.now() - p.at > 5000) continue;
@@ -1147,7 +1148,7 @@ function mpInstall() {
   const urd = useRod; useRod = function () { const b = ENT.find(e => e.kind === 'bobber' && !e.dead); if (MP.on && b && b.hookPeer != null) { const p = MP.peers.get(b.hookPeer); if (p && p.pos) { const dx = PL.x - p.pos[0], dy = PL.y - p.pos[1], dz = PL.z - p.pos[2]; mpSend({ t: 'pull', tgt: p.id, vx: dx * 0.1, vy: dy * 0.1 + Math.sqrt(Math.hypot(dx, dy, dz)) * 0.08, vz: dz * 0.1 }, MP.server ? p.id : (MP.role === 'host' ? p.id : undefined)); } b.hookPeer = null; swing(); removeEnt(b); damageItem(INV.slots, INV.sel, 5); return; } return urd.apply(this, arguments); };
   const oth = onThrownHit; onThrownHit = function (e) { const a0 = MP.act; MP.act = e.owner === PL; try { return oth.apply(this, arguments); } finally { MP.act = a0; } }; // your egg's chick, your pearl's endermite
   for (const n of ['useItem', 'golemCheck', 'witherCheck', 'breakBlock']) { const f = window[n]; if (typeof f === 'function') window[n] = function () { const a0 = MP.act; MP.act = true; try { return f.apply(this, arguments); } finally { MP.act = a0; } }; } // player actions whose mobs are real
-  const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
+  const mt = mobTick, mt2 = e => { if (e.remote) return mpPuppetTick(e); if (e.mpRider && performance.now() - e.mpRideAt < 1500) return; /* a guest steers it */ if (MP.role === 'host' && MP.peers.size && !e.deathT) { if (e.owner === 'player' && e.ownerP && e.ownerP !== MP.name) { const o = mpPeerByName(e.ownerP); if (o) return mpProxy(o, () => mt(e)); const s0 = e.sitting; e.sitting = 1; try { return mt(e); } finally { e.sitting = s0; } } /* a pet follows its own player (and waits while they're away) */ if (e.owner === 'player') return mt(e); const g = mpNearestGuest(e); if (g) return mpProxy(g, () => mt(e)); } return mt(e); };
   mobTick = e => { MP.tickMob = e; if (!(e.love > 0)) e.loveBy = undefined; try { return mt2(e); } finally { MP.tickMob = null; } };
   // whatever a guest did through the runner (a kill, taming, breeding, a trade...) counts for that guest, not the runner
   const ag = advGrant; advGrant = function (id, crit) {
@@ -1254,8 +1255,8 @@ function mpLeashHolder(l) { // {p: id}: that player (yourself included) while in
 function mpRemoteUse(p, e, st, sneak) {
   const sel = INV.sel, keep = INV.slots[sel], keepT = TARGET;
   INV.slots[sel] = st ? { ...st } : null; TARGET = { type: 'ent', e, t: 1 }; MP.useFor = p;
-  const love0 = e.love, l0 = e.leash; if (l0 && l0.p === p.id) e.leash = 'player'; // the guest's own lead, as the item code knows it
-  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; if (e.leash === 'player' && l0 !== 'player') e.leash = { p: p.id }; }
+  const love0 = e.love, own0 = e.owner, l0 = e.leash; if (l0 && l0.p === p.id) e.leash = 'player'; // the guest's own lead, as the item code knows it
+  try { mpProxy(p, () => { PL.sneaking = !!sneak; useItem(true); }); if (e.love > 0 && !(love0 > 0)) e.loveBy = p.id; if (e.owner === 'player' && !own0) e.ownerP = p.name; /* tamed by this guest: its pet */ if (e.leash === 'player' && l0 !== 'player') e.leash = { p: p.id }; }
   finally { const after = INV.slots[sel]; INV.slots[sel] = keep; TARGET = keepT; MP.useFor = null; mpSend({ t: 'held', st: after || null, was: st ? st.id : 0 }, p.id); }
 }
 // the night passes when everyone in the world is asleep (the host decides, and wakes the guests)

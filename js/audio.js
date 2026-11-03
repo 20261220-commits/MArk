@@ -83,6 +83,8 @@ function play(name, opt = {}) {
     case 'anvil': tone(t, 0.3, 1800, 1700, 'triangle', 0.15 * v); noiseHit(t, 0.08, 3000, 3, 'bandpass', 0.3 * v); break;
     case 'boat': noiseHit(t, 0.2, 900, 1, 'lowpass', 0.15 * v); break;
     case 'note': { const f = 370 * (opt.pitch || 1) * (opt.inst === 'bass' ? 0.25 : 1); if (opt.inst === 'snare') noiseHit(t, 0.12, 2500, 1, 'highpass', 0.35 * v); else { tone(t, opt.inst === 'bass' ? 0.5 : 0.7, f, f, 'triangle', 0.25 * v); tone(t, 0.3, f * 2, f * 2, 'sine', 0.06 * v); } break; }
+    case 'goat_horn': { const c = AU.ctx, o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(); o.type = 'sawtooth'; o2.type = 'square'; o.frequency.setValueAtTime(196, t); o.frequency.linearRampToValueAtTime(220, t + 0.3); o.frequency.setValueAtTime(220, t + 2); o.frequency.linearRampToValueAtTime(185, t + 3.2); o2.frequency.setValueAtTime(98, t); o2.frequency.linearRampToValueAtTime(110, t + 0.3); f.type = 'lowpass'; f.frequency.value = 1100; f.Q.value = 3;
+      g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(0.35 * v, t + 0.25); g.gain.setValueAtTime(0.3 * v, t + 2); g.gain.exponentialRampToValueAtTime(0.001, t + 3.4); o.connect(f); o2.connect(f); f.connect(g); g.connect(AU.master); o.start(t); o2.start(t); o.stop(t + 3.5); o2.stop(t + 3.5); break; }
     case 'thunder': noiseHit(t, 2.5, 120, 0.4, 'lowpass', 1.0 * v, 0.3); break;
   }
 }

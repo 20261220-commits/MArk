@@ -159,7 +159,7 @@ const MOBDEF = {
     parts: [['body', [0, 8, 0], [-3, -3, -4, 6, 6, 8], [0, 9]], ['head', [0, 9, -4], [-2, 0, -2, 4, 6, 3], [0, 0]], ['beak', [0, 9, -4], [-2, 2, -4, 4, 2, 2], [14, 0]], ['wattle', [0, 9, -4], [-1, 0, -3, 2, 2, 2], [14, 4]],
       ['rleg', [1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['lleg', [-1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['rwing', [3, 10, 0], [0, -4, -3, 1, 4, 6], [24, 13]], ['lwing', [-3, 10, 0], [-1, -4, -3, 1, 4, 6], [24, 13]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xf4f4f4); paintBox(g, 0, 9, 6, 6, 8, w, r, .06); paintBox(g, 0, 0, 4, 6, 3, w, r, .06, { front: (g, x, y) => { px(g, x, y + 1, '#000'); px(g, x + 3, y + 1, '#000'); } }); paintBox(g, 14, 0, 4, 2, 2, () => hex(0xf2b43a), r); paintBox(g, 14, 4, 2, 2, 2, () => hex(0xd82020), r); paintBox(g, 26, 0, 2, 5, 2, () => hex(0xf2b43a), r); paintBox(g, 24, 13, 1, 4, 6, w, r, .06); }) },
-  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1, fallReduce: 10,
+  goat: { hp: 10, w: 0.45, h: 1.3, speed: 0.06, xp: 2, snd: 'bleat', drops: [], food: 'wheat', jumpy: 1, fallReduce: 10, save: e => ({ lostHorns: e.lostHorns || 0 }), init: (e, o) => { e.lostHorns = o.lostHorns || 0; }, gear: e => goatHornsShow(e),
     parts: [...QUAD(10, 15, [-4, -4, -8, 9, 8, 16], [0, 18, -7], [-3, -3, -7, 6, 6, 7], 3, -5, 6), ['horn', [0, 18, -7], [-3, 3, -3, 1, 6, 1], [22, 0]], ['horn2', [0, 18, -7], [2, 3, -3, 1, 6, 1], [22, 0]], ['beard', [0, 18, -7], [-1, -6, -7, 2, 3, 1], [24, 0]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xe8e2d6); paintBox(g, 28, 0, 9, 8, 16, w, r, .1); paintBox(g, 0, 0, 6, 6, 7, w, r, .1, { front: (g, x, y) => { px(g, x, y + 2, '#c8a83a'); px(g, x + 5, y + 2, '#c8a83a'); px(g, x + 1, y + 2, '#000'); px(g, x + 4, y + 2, '#000'); } }); paintBox(g, 0, 32, 4, 10, 4, (k, x, y) => y > 8 ? hex(0x5a5048) : w(), r, .1); paintBox(g, 22, 0, 1, 6, 1, () => hex(0xa8a294), r); paintBox(g, 24, 0, 2, 3, 1, () => hex(0xd8d0c0), r); }) },
   squid: { hp: 10, w: 0.4, h: 0.8, speed: 0.04, xp: 2, snd: 'splash', drops: [['ink_sac', 1, 3]], water: 1,
@@ -397,6 +397,31 @@ function fireOverlay(o, on, x, y, z, w, h) {
   o.fireOvl.translateZ(w * 0.9); // in front of the body, toward the camera
 }
 function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOvl = null; } }
+// ---------- the good sense of animals (Java's stroll, float and panic goals) ----------
+// water at the top of a column (a stroll never ends there; an animal in the water heads for a bank)
+function waterCol(x, z) { const ix = Math.floor(x), iz = Math.floor(z); if (!isLoaded(ix, iz)) return true; const y = topY(ix, iz); return !!FLUID[getBlock(ix, y, iz)]; }
+// a random spot on land within r, not far up or down (Java's WaterAvoidingRandomStrollGoal), or null
+function wanderGoal(e, r) {
+  for (let k = 0; k < 8; k++) { const gx = e.x + (Math.random() - .5) * 2 * r, gz = e.z + (Math.random() - .5) * 2 * r, ix = Math.floor(gx), iz = Math.floor(gz);
+    if (!isLoaded(ix, iz)) continue; const y = topY(ix, iz); if (FLUID[getBlock(ix, y, iz)] || Math.abs(y + 1 - e.y) > 4) continue; return [gx, gz]; }
+  return null;
+}
+// the nearest bank from the water: a dry block to stand on near the water's level
+function landSeek(e) {
+  const x0 = Math.floor(e.x), z0 = Math.floor(e.z), y0 = Math.floor(e.y);
+  for (let r = 1; r <= 12; r++) for (let k = 0; k < 8 * r; k++) { const a = k / (8 * r) * Math.PI * 2, x = x0 + Math.round(Math.cos(a) * r), z = z0 + Math.round(Math.sin(a) * r);
+    for (let y = y0 + 2; y >= y0 - 2; y--) { const b = getBlock(x, y, z); if (SOLID[b] && !FLUID[b] && !getBlock(x, y + 1, z) && !getBlock(x, y + 2, z)) return [x + .5, z + .5]; } }
+  return null;
+}
+// goats: a ram that ends in a log, stone, packed ice or an ore knocks one of its two horns off (Java 1.17)
+const GOAT_SNAP = /(_log|_wood)$|^stone$|^packed_ice$|^(iron|coal|copper|emerald)_ore$/;
+function goatRamBlock(e, mx, mz) {
+  play('hit', { pitch: 0.7 });
+  if ((e.lostHorns || 0) >= 2) return;
+  for (const dy of [0, 1]) { const b = getBlock(Math.floor(e.x + mx * (e.w + 0.4)), Math.floor(e.y + dy + 0.2), Math.floor(e.z + mz * (e.w + 0.4))), bd = BLOCKS[b];
+    if (bd && GOAT_SNAP.test(bd.key)) { e.lostHorns = (e.lostHorns || 0) + 1; dropItem(e.x, e.y + 1, e.z, IID.goat_horn, 1); play('break', { pitch: 1.4 }); return; } }
+}
+function goatHornsShow(e) { const u = e.mesh && e.mesh.userData, P = u && u.parts, n = e.lostHorns || 0; if (!P || u.hornsShown === n) return; u.hornsShown = n; for (const [k, gone] of [['horn', n >= 2], ['horn2', n >= 1]]) if (P[k]) { P[k].visible = !gone; const s = gone ? 0 : 1; P[k].scale.set(s, s, s); } }
 function removeEnt(e) { e.dead = true; dropFireOverlay(e); if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
@@ -514,7 +539,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   e.sheared = !!opts.sheared; e.persistent = !d.hostile; e.idleSnd = 200 + Math.random() * 400; e.deathT = 0; e.jumpCd = 0;
   if (e.baby) { e.w *= 0.5; e.h *= 0.5; }
   if (d.slime) { e.size = opts.size || [1, 2, 4][Math.floor(Math.random() * 3)]; e.w = 0.26 * e.size; e.h = 0.52 * e.size; e.hp = e.size * e.size; }
-  if (opts.owner) { e.owner = opts.owner; e.persistent = true; if (type === 'wolf') { e.def = { ...d, hp: 20 }; e.hp = 20; } } if (opts.sitting) e.sitting = 1; // a tame wolf has 20 health (its own copy of the definition)
+  if (opts.owner) { e.owner = opts.owner; e.persistent = true; if (opts.ownerP) e.ownerP = opts.ownerP; if (type === 'wolf') { e.def = { ...d, hp: 20 }; e.hp = 20; } } if (opts.sitting) e.sitting = 1; // a tame wolf has 20 health (its own copy of the definition)
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
@@ -540,11 +565,12 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (attacker === PL) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting
     if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
+    if (e.type === 'wolf' && !e.owner) { e.target = PL; e.angerT = 400 + Math.floor(Math.random() * 400); for (const o of ENT) if (o.type === 'wolf' && o !== e && !o.owner && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) { o.target = PL; o.angerT = e.angerT; } } // a wild wolf hit: it and its pack turn on the player (red eyes)
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
     if (e.type === 'villager') { e.rep = (e.rep || 0) - 25; for (const v of ENT) if (v.type === 'villager' && v !== e && Math.hypot(v.x - e.x, v.z - e.z) < 16) v.rep = (v.rep || 0) - 5; } // gossip: minor_negative, heard by neighbours
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
-  } else if (attacker && attacker.kind === 'mob' && e.type === 'iron_golem') e.target = attacker;
+  } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
   if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
   play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
@@ -649,14 +675,15 @@ function mobTick(e) {
     if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = d.speed * 2.2; }
     else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
-    else if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
+    else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 7); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
     else if (plVisible && dist < 8 && !e.rider) { if (!(e.lookT > 0) && Math.random() < 0.02) e.lookT = 40 + Math.floor(Math.random() * 40); if (e.lookT > 0) { e.lookT--; e.yawTarget = Math.atan2(-dx, -dz); } } // now and then looks at a player nearby
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
       if (e.ram > 0) { e.ram--; const l = Math.hypot(dx, dz) || 1; mx = dx / l; mz = dz / l; speed = 0.22; e.yawTarget = Math.atan2(-dx, -dz);
-        if (dist < 1.3) { e.ram = 0; if (hurtPlayer([0, 2, 2, 3][PL.difficulty], 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
+        if (e.hitH && e.ram < 34) { e.ram = 0; goatRamBlock(e, mx, mz); } // missed: it hit a wall instead
+        else if (dist < 1.3) { e.ram = 0; if (hurtPlayer([0, 2, 2, 3][PL.difficulty], 'mob', e)) { PL.vx += dx / l * 1.2; PL.vz += dz / l * 1.2; PL.vy = 0.4; play('hit'); } } }
       else if (dist > 4 && dist < 12 && Math.random() < 1 / 1500) { e.ram = 40; play('bleat'); }
     }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
@@ -669,14 +696,15 @@ function mobTick(e) {
   if (e.baby > 0 && !e.target && !(e.panic > 0) && d.food && e.age % 20 === 0) { let par = null, pd = 16; for (const o of ENT) if (o !== e && o.type === e.type && !o.dead && !(o.baby > 0)) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < pd) { pd = dd; par = o; } } if (par && pd > 3) e.goal = [par.x, par.z]; }
   if (d.climb && e.hitH && (mx || mz)) e.vy = Math.max(e.vy, 0.2);
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }
+  if (e.inWater && !d.sinks && !d.swim && !e.target && e.age % 20 === 0 && (!e.goal || waterCol(e.goal[0], e.goal[1]))) { const g = landSeek(e); if (g) e.goal = g; } // out of the water: to the nearest bank
   // movement physics
   const inF = e.inWater || e.inLava;
   if ((mx || mz) && e.onGround && !inF && !d.fly && !mobSafeAhead(e, mx, mz)) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } } // a ledge or lava ahead: stop (and pick somewhere else to go)
-  if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0; e.lastX = e.x; e.lastZ = e.z; // walking into a wall for two seconds: give up on that spot
+  if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0; e.lastX = e.x; e.lastZ = e.z; if (e.goal && !e.target) { const pr = e.prog || (e.prog = [e.x, e.z, W.tickN]); if (W.tickN - pr[2] >= 40) { if (Math.hypot(e.x - pr[0], e.z - pr[1]) < 0.5) { if (e.onGround && !e.progJ) { e.vy = 0.42; e.progJ = 1; } else { e.goal = null; e.path = null; e.progJ = 0; } } else e.progJ = 0; e.prog = [e.x, e.z, W.tickN]; } } else e.prog = null; /* two seconds with less than half a block gained: a hop, then somewhere else */ // walking into a wall for two seconds: give up on that spot
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = d.jumpy ? 0.6 : 0.42; e.jumpCd = 10; }
-  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz || e.target) e.vy += 0.04; e.vy *= 0.8; }
+  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if (mx || mz) e.vy += 0.04; if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, and up the bank where it meets one
   // entity cramming: push away from the player and nearby mobs
   const push = (o, ow, oh) => { const ddx = e.x - o.x, ddz = e.z - o.z, r = e.w + ow; if (Math.abs(ddx) < r && Math.abs(ddz) < r && e.y < o.y + oh && o.y < e.y + e.h) { const l = Math.hypot(ddx, ddz) || 0.01, f = 0.05; e.vx += ddx / l * f; e.vz += ddz / l * f; return [ddx / l * f, ddz / l * f]; } return null; };
   if (!PL.dead && !spectator()) { const pp = push(PL, PL.w, PL.h); if (pp) { PL.vx -= pp[0] * 0.5; PL.vz -= pp[1] * 0.5; } }
@@ -911,7 +939,7 @@ function chunkKeep(c, remove) {
   for (const e of ENT) {
     if (e.dead || e.remote) continue;
     if (Math.floor(e.x) >> 4 !== c.cx || Math.floor(e.z) >> 4 !== c.cz) continue;
-    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0, name: e.name || null }]); // persistent monsters (structures, curing, charged) and leads survive unloading
+    if (e.kind === 'mob' && (!e.def.hostile || e.persistent) && !e.def.boss && !e.deathT) keep.push([e.type, e.x, e.y, e.z, e.baby ? 1 : 0, e.sheared ? 1 : 0, { ...(e.def.villager ? { vtype: e.vtype, prof: e.prof, trades: e.trades, skin: e.skin, rep: e.rep || 0, ...(e.def.save ? e.def.save(e) : null) } : { skin: e.skin, owner: e.owner || null, ownerP: e.ownerP || null, sitting: e.sitting || 0, variant: e.variant, ...(e.def.save ? e.def.save(e) : null) }), persist: e.persistent ? 1 : 0, leash: e.leash || null, hp: e.hp, charged: e.charged ? 1 : 0, name: e.name || null }]); // persistent monsters (structures, curing, charged) and leads survive unloading
     else if (e.kind === 'minecart') keep.push(['minecart', e.x, e.y, e.z, 0, 0, cartSave(e)]);
     else if (e.kind === 'boat') keep.push(['boat', e.x, e.y, e.z, 0, 0, { yaw: e.yaw, wood: e.wood }]);
     else if (e.kind === 'frame') keep.push(['frame', e.ax, e.ay, e.az, 0, 0, { f: e.f, glow: e.glow, item: e.item, rot: e.rot }]);

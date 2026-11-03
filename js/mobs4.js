@@ -172,7 +172,7 @@ function catAI(e, dist) {
   } else if (!tame && tempt && PL.sneaking) { faceTo(e, PL.x, PL.z); if (dist > 1.5) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = 0.06; }
   else if (!tame && dist < 6 && !PL.sneaking && !PL.dead && !spectator()) { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1; mx = (e.x - PL.x) / l; mz = (e.z - PL.z) / l; e.yawTarget = Math.atan2(-mx, -mz); sp = 0.13; } // strays keep their distance
   else {
-    if (!e.goal && Math.random() < 1 / 100) e.goal = [e.x + (Math.random() - .5) * 10, e.z + (Math.random() - .5) * 10];
+    if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 5);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === 'cat' && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { faceTo(e, mate.x, mate.z); [mx, mz] = pathDir(e, mate.x, mate.y, mate.z); if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.2) { e.love = mate.love = 0; spawnMob('cat', e.x, e.y, e.z, { baby: true, owner: 'player', variant: Math.random() < 0.5 ? e.variant : mate.variant }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
@@ -230,7 +230,7 @@ function rabbitAI(e, dist) {
   else if (tempt) { faceTo(e, PL.x, PL.z); if (dist > 1.5) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
   else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === 'rabbit' && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { [mx, mz] = pathDir(e, mate.x, mate.y, mate.z); if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1) { e.love = mate.love = 0; spawnMob('rabbit', e.x, e.y, e.z, { baby: true, variant: e.variant }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
   else {
-    if (!e.goal && Math.random() < 1 / 80) e.goal = [e.x + (Math.random() - .5) * 10, e.z + (Math.random() - .5) * 10];
+    if (!e.goal && Math.random() < 1 / 80) e.goal = wanderGoal(e, 5);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; } }
     // nibble ripe carrots
     if (e.age % 40 === 0 && Math.random() < 0.1) { const bx = Math.floor(e.x), by = Math.floor(e.y), bz = Math.floor(e.z), b = getBlock(bx, by, bz); if (b === BID.crops2 && ((getMeta(bx, by, bz) >> 3) & 3) === 0 && (getMeta(bx, by, bz) & 7) > 0) setMeta(bx, by, bz, getMeta(bx, by, bz) - 1); }
@@ -275,7 +275,7 @@ function foxAI(e, dist) {
     if (!e.mouth && e.age % 10 === 0) { const it = ENT.find(o => o.kind === 'item' && !o.dead && o.pickup <= 0 && Math.hypot(o.x - e.x, o.z - e.z) < 6 && Math.abs(o.y - e.y) < 2); if (it) { if (Math.hypot(it.x - e.x, it.z - e.z) < 0.9) { e.mouth = { ...it.stack, n: 1 }; it.stack.n--; if (it.stack.n <= 0) removeEnt(it); foxMouth(e); } else e.goal = [it.x, it.z]; } }
     // eat sweet berries held in the mouth to heal
     if (e.mouth && e.mouth.id === IID.sweet_berries && e.hp < e.def.hp && Math.random() < 0.01) { e.mouth = null; e.hp = Math.min(e.def.hp, e.hp + 4); play('eat', { vol: 0.5 }); foxMouth(e); }
-    if (!e.goal && Math.random() < 1 / 100) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
+    if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 7);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === 'fox' && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { [mx, mz] = pathDir(e, mate.x, mate.y, mate.z); if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1) { e.love = mate.love = 0; spawnMob('fox', e.x, e.y, e.z, { baby: true, owner: 'player', variant: e.variant }); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } } // foxes bred by the player trust them
