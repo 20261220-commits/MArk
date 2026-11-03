@@ -7377,7 +7377,6 @@ function fallCheck(x, y, z, b) {
   if (y > MINY && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { const m = getMeta(x, y, z); setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); }
 }
 function tickScheduled() {
-  W.tickN++;
   let n = 0;
   for (const [k, t] of W.sched) {
     if (t > W.tickN) continue;
@@ -18275,17 +18274,26 @@ function mpSha256(str) {
 function mpWorldCore(store, out) {
   const S = store.state, players = new Map(), auth = new Map(), cache = new Map(), fails = new Map();
   const blank = () => ({ rec: null, edits: [], tiles: {} });
-  const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
+  // chunks read from the store stay cached while in use; past a limit the longest unused ones that are already on disk go
+  // (a server that kept every chunk anyone ever visited ran out of memory and restarted, dropping everyone)
+  const CACHE_MAX = 1200;
+  const entry = dk => { let p = cache.get(dk);
+    if (p) { cache.delete(dk); cache.set(dk, p); return p; }
+    p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p);
+    if (cache.size > CACHE_MAX && store.pending) for (const k of cache.keys()) { if (cache.size <= CACHE_MAX * 0.9) break; if (k !== dk && !store.pending(k)) cache.delete(k); }
+    return p; };
   const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
   const prefix = dim => ({ '-1': 'n', 1: 'e' }[dim] || '');
   const tmy = () => S.meta && S.meta.my != null ? +S.meta.my : -64; // the bottom row of the world's tile indices (worlds made before this was kept are 1.18's -64)
   const chunkKey = (dim, x, z) => prefix(dim) + (x >> 4) + ',' + (z >> 4);
   const send = (p, o) => out(p.id, o);
   const others = (p, o, sameDim) => { for (const q of players.values()) if (q !== p && q.joined && (!sameDim || q.dim === p.dim)) out(q.id, o); };
+  // the dimension's runner: whoever is there, but not a player whose game is in a background tab (the browser all but
+  // stops it, and everyone else there would freeze) while someone with the game in front can take over
   function pickAuth(dim) {
-    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim);
-    if (cur != null && here.some(q => q.id === cur)) return;
-    if (here.length) auth.set(dim, here[0].id); else auth.delete(dim);
+    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim), awake = here.filter(q => !q.away);
+    if (cur != null && here.some(q => q.id === cur) && !(players.get(cur).away && awake.length)) return;
+    if (here.length) auth.set(dim, (awake[0] || here[0]).id); else auth.delete(dim);
     const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
   }
   function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
@@ -18362,6 +18370,7 @@ function mpWorldCore(store, out) {
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+      case 'away': p.away = !!m.on; if (p.dim != null) pickAuth(p.dim); return; // the game went to a background tab, or came back
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
     if (m.t === 'pl' && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z)) { p.lastPl = { x: m.x, y: m.y, z: m.z, yaw: +m.yaw || 0, pitch: +m.pitch || 0, dim: m.dim | 0 }; p.plAt = Date.now(); }
@@ -18439,10 +18448,11 @@ async function mpWebSocket(url, role, extra) {
     }
   }
 }
+const MP_DROP = new Set(['pl', 'mobs', 'vehs', 'items', 'xps']);
 function mpWsOnce(url, role, extra) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
-    const link = { kind: 'ws', send(o, to) { if (ws.readyState === 1) ws.send(JSON.stringify(to != null ? { ...o, to } : o)); }, close() { try { ws.close(); } catch (e) {} } };
+    const link = { kind: 'ws', send(o, to) { if (ws.readyState !== 1 || (ws.bufferedAmount > 128 * 1024 && MP_DROP.has(o.t))) return; ws.send(JSON.stringify(to != null ? { ...o, to } : o)); } /* a slow upload skips the next position instead of queueing it */, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
@@ -18614,19 +18624,20 @@ function mpStop() {
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
-  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, again = MP.server && !MP.isHost && url && wid && MP.link && MP.link.kind === 'ws';
+  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
+  const again = MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
-  if (again) mpRejoin(url, wid);
+  if (again) mpRejoin(url, wid, wid ? null : code); // a server world, or a friend's world that is still open: straight back in
 }
 // a server world whose connection dropped (the server restarting, a network blip): knock again every few seconds until
 // it answers (a free host takes a minute or two to come back), as long as the join screen stays open
-async function mpRejoin(url, wid) {
+async function mpRejoin(url, wid, code) {
   const t0 = Date.now(), gen = (MP.rejoinGen = (MP.rejoinGen || 0) + 1); showMenu('mp_join');
   while (gen === MP.rejoinGen && UI.menu === 'mp_join' && Date.now() - t0 < 5 * 60000) {
     const s = Math.round((Date.now() - t0) / 1000); MP.status = `서버와 다시 연결하는 중... ${s}초 (서버가 다시 켜지는 데 1~2분 걸릴 수 있어요)`; const el = $('mpStatus'); if (el) el.textContent = MP.status;
-    try { await mpJoinWs(url, null, wid); MP.status = ''; return; } catch (e) {}
-    await new Promise(r => setTimeout(r, 5000));
+    try { await mpJoinWs(url, code || null, wid); MP.status = ''; return; } catch (e) { if (code && e && e.fromServer) break; } // the friend closed the world: nothing to come back to
+    await new Promise(r => setTimeout(r, Date.now() - t0 < 15000 ? 1500 : 5000)); // a blip comes back at once; a restarting server takes a while
   }
   if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
@@ -19686,6 +19697,14 @@ async function mpAction(a) {
 // closing the tab or the window (or the Chromebook lid): what you have and where you are go to the server world first
 for (const ev of ['pagehide', 'beforeunload']) addEventListener(ev, () => { try { if (MP.on && MP.server) { mpSendPdata(); if (MP.role === 'host' && typeof mpSendShared === 'function') mpSendShared(); } } catch (e) {} });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && MP.on && MP.server) try { mpSendPdata(); } catch (e) {} });
+// the game in a background tab for a few seconds: the browser slows it to a crawl, so another player there runs the
+// dimension meanwhile (the mobs as they are now go along first)
+let mpAwayT = null;
+document.addEventListener('visibilitychange', () => {
+  if (!MP.on || !MP.server) return; clearTimeout(mpAwayT);
+  if (document.visibilityState === 'hidden') mpAwayT = setTimeout(() => { if (!MP.on || document.visibilityState !== 'hidden') return; try { if (MP.role === 'host' && typeof mpMobSnapshot === 'function') mpMobSnapshot(); } catch (e) {} MP.away = true; mpSend({ t: 'away', on: 1 }); }, 4000);
+  else if (MP.away) { MP.away = false; mpSend({ t: 'away', on: 0 }); }
+});
 
 </script>
 <script>/* js/account.js */
@@ -20188,6 +20207,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sav
 
 // ---------- game tick ----------
 function gameTick() {
+  W.tickN++; // the game's tick count advances for everyone (a guest, whose scheduled ticks the host runs, too: every "each N ticks" check reads it)
   if (gr('doDaylightCycle')) W.time = MP.on && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // in a server world everyone (the dimension's runner too) follows the server's clock in real time (no jumps when frames are slow)
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);

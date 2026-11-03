@@ -28,17 +28,26 @@ function mpSha256(str) {
 function mpWorldCore(store, out) {
   const S = store.state, players = new Map(), auth = new Map(), cache = new Map(), fails = new Map();
   const blank = () => ({ rec: null, edits: [], tiles: {} });
-  const entry = dk => { let p = cache.get(dk); if (!p) { p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p); } return p; };
+  // chunks read from the store stay cached while in use; past a limit the longest unused ones that are already on disk go
+  // (a server that kept every chunk anyone ever visited ran out of memory and restarted, dropping everyone)
+  const CACHE_MAX = 1200;
+  const entry = dk => { let p = cache.get(dk);
+    if (p) { cache.delete(dk); cache.set(dk, p); return p; }
+    p = store.keys.has(dk) ? Promise.resolve(store.load(dk)).then(c => c || blank(), () => blank()) : Promise.resolve(blank()); cache.set(dk, p);
+    if (cache.size > CACHE_MAX && store.pending) for (const k of cache.keys()) { if (cache.size <= CACHE_MAX * 0.9) break; if (k !== dk && !store.pending(k)) cache.delete(k); }
+    return p; };
   const touch = (dk, e) => { store.keys.add(dk); store.save(dk, e); };
   const prefix = dim => ({ '-1': 'n', 1: 'e' }[dim] || '');
   const tmy = () => S.meta && S.meta.my != null ? +S.meta.my : -64; // the bottom row of the world's tile indices (worlds made before this was kept are 1.18's -64)
   const chunkKey = (dim, x, z) => prefix(dim) + (x >> 4) + ',' + (z >> 4);
   const send = (p, o) => out(p.id, o);
   const others = (p, o, sameDim) => { for (const q of players.values()) if (q !== p && q.joined && (!sameDim || q.dim === p.dim)) out(q.id, o); };
+  // the dimension's runner: whoever is there, but not a player whose game is in a background tab (the browser all but
+  // stops it, and everyone else there would freeze) while someone with the game in front can take over
   function pickAuth(dim) {
-    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim);
-    if (cur != null && here.some(q => q.id === cur)) return;
-    if (here.length) auth.set(dim, here[0].id); else auth.delete(dim);
+    const cur = auth.get(dim), here = [...players.values()].filter(q => q.joined && q.dim === dim), awake = here.filter(q => !q.away);
+    if (cur != null && here.some(q => q.id === cur) && !(players.get(cur).away && awake.length)) return;
+    if (here.length) auth.set(dim, (awake[0] || here[0]).id); else auth.delete(dim);
     const o = { t: 'auth', dim, id: auth.has(dim) ? auth.get(dim) : null }; for (const q of players.values()) if (q.joined) out(q.id, o);
   }
   function setDim(p, dim) { if (p.dim === dim) return; const old = p.dim; p.dim = dim; if (old != null) pickAuth(old); pickAuth(dim); send(p, { t: 'auth', dim, id: auth.get(dim) }); }
@@ -115,6 +124,7 @@ function mpWorldCore(store, out) {
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
+      case 'away': p.away = !!m.on; if (p.dim != null) pickAuth(p.dim); return; // the game went to a background tab, or came back
     }
     // anything else: to one player, to the dimension's runner, to the dimension, or to everyone
     if (m.t === 'pl' && Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z)) { p.lastPl = { x: m.x, y: m.y, z: m.z, yaw: +m.yaw || 0, pitch: +m.pitch || 0, dim: m.dim | 0 }; p.plAt = Date.now(); }
