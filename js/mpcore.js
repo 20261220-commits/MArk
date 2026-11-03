@@ -82,8 +82,16 @@ function mpWorldCore(store, out) {
         S.logins = S.logins || {};
         const lg = m.login && typeof m.login.name === 'string' && typeof m.login.cred === 'string' && /^[0-9a-f]{64}$/.test(m.login.cred) ? m.login : null;
         if (lg) {
-          const k = lg.name.trim().slice(0, 16).toLowerCase(), rec = S.logins[k], now = Date.now(); p.name = p.name || lg.name.trim().slice(0, 16); // the nickname shown can differ from the account's name
+          const k = lg.name.trim().slice(0, 16).toLowerCase(), now = Date.now(); let rec = S.logins[k]; p.name = p.name || lg.name.trim().slice(0, 16); // the nickname shown can differ from the account's name
           const f = fails.get(k); if (f && f.n >= 5 && now - f.t < 30000) { send(p, { t: 'error', msg: '비밀번호를 여러 번 틀렸습니다. 30초 뒤에 다시 해 보세요' }); return; }
+          // the account's earlier name and password (changed on the player's device): this world's account follows it the
+          // first time it comes back - the old proof still matches here, so the record moves to the new name and password
+          const prevs = (Array.isArray(lg.prev) ? lg.prev : []).filter(q => q && typeof q.name === 'string' && typeof q.cred === 'string' && /^[0-9a-f]{64}$/.test(q.cred)).slice(0, 6);
+          const proves = (r, cred) => r && mpSha256(r.salt + cred) === r.h;
+          if (rec && !proves(rec, lg.cred)) { const old = prevs.find(q => q.name.trim().toLowerCase() === k && proves(rec, q.cred)); if (old) { rec.h = mpSha256(rec.salt + lg.cred); store.saveState(); store.log(`${k} 계정의 비밀번호가 바뀌었습니다`); } }
+          if (!rec) for (const q of prevs) { const ok2 = q.name.trim().slice(0, 16).toLowerCase(), r = S.logins[ok2]; if (ok2 === k || !proves(r, q.cred)) continue;
+            r.h = mpSha256(r.salt + lg.cred); S.logins[k] = r; delete S.logins[ok2]; if (S.players['a:' + ok2] && !S.players['a:' + k]) { S.players['a:' + k] = S.players['a:' + ok2]; delete S.players['a:' + ok2]; }
+            rec = r; store.saveState(); store.log(`${ok2} 계정이 ${k}(으)로 바뀌었습니다`); break; }
           if (rec && mpSha256(rec.salt + lg.cred) !== rec.h) { fails.set(k, { n: (f && now - f.t < 30000 ? f.n : 0) + 1, t: now }); send(p, { t: 'error', msg: `비밀번호가 틀렸습니다 ("${p.name}" 계정은 이 세계에 이미 있습니다)` }); return; }
           fails.delete(k); p.account = k;
           if (!rec) { // a new account takes over what that name had saved here
