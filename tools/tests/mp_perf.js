@@ -48,6 +48,13 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await g4.evaluate(() => { mpWebSocket = window.__mws; });
   let back4 = false; try { await g4.waitForFunction(([x, y, z]) => !MP.soft && MP.link && getBlock(x, y, z) === BID.gold_block, spot, { timeout: 40000 }); back4 = true; } catch (e) {}
   ok(held[0] && held[1] && held[2] !== 'mp_join' && back4, 'a dropped connection: the game stays in the world while it connects again, and what changed meanwhile is there after', [held, back4, spot]);
+  // a connection given up on (taken over elsewhere): the reason on its own screen, with a way back; a tab the browser
+  // started again mid-game says so on the next start
+  const g5 = [A, B, C][(await roles()).lastIndexOf('guest')];
+  const dc = await g5.evaluate(() => { MP.noRejoin = true; mpLost('시험: 다른 곳에서 접속'); MP.noRejoin = false; return [UI.menu, (document.querySelector('#menu') || {}).textContent || '']; });
+  await g5.evaluate(() => { sessionStorage.setItem('nemo-mp-live', JSON.stringify({ url: 'ws://x/mp', wid: 'w1', at: Date.now() })); }); await g5.reload(); await g5.waitForFunction(() => window.__game && UI.menu, null, { timeout: 60000 });
+  const crash = await g5.evaluate(() => [UI.menu, (document.querySelector('#menu') || {}).textContent || '']);
+  ok(dc[0] === 'mpdc' && /다른 곳에서 접속/.test(dc[1]) && /다시 접속/.test(dc[1]) && crash[0] === 'mpdc' && /다시 시작되었습니다/.test(crash[1]), 'a lost connection shows why on a screen of its own (with 다시 접속); a tab started again mid-game says so', [dc[0], crash]);
   const st = await fetch(srv.url + 'stats').then(r => r.json());
   ok(st.recentDrops.some(d => d.side === 'game' && /응답이 없어/.test(d.why)) && st.recentDrops.some(d => d.side === 'server'), '/stats lists the dropped connections and why (as the server saw it and as the game reported it)', st.recentDrops.slice(0, 6));
   ok(![A, B, C].some(P => P.errs.length), 'no page errors', [A.errs, B.errs, C.errs]);

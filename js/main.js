@@ -523,7 +523,7 @@ function javaItemModels() {
   await dbOpen();
   if (isTouch) document.body.classList.add('touch');
   buildHud();
-  showMenu('title'); startPanorama();
+  showMenu('title'); startPanorama(); if (typeof mpLiveCheck === 'function') mpLiveCheck(); // (a multiplayer game this tab was in when it started again)
   requestAnimationFrame(t => { last = t; frame(t); });
   window.__game = { W, PL, INV, R, S, ENT, startWorld, createWorld, runCommand, UI, PERF, PERFMAX };
   // offline play: sw.js keeps the game's files so it opens again without internet; worlds stay in IndexedDB, and asking

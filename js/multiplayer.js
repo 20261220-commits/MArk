@@ -68,7 +68,7 @@ function mpWsOnce(url, role, extra) {
       if (MP.core && role === 'host') { if (m.t === 'leave') MP.core.leave(m.from); else MP.core.message(m.from, m); return; } // a guest of your world: the world core takes it
       if (m.t === 'leave') { mpPeerGone(m.from); return; } if (m.t === 'hostgone') { mpLost('호스트가 세계를 닫았습니다'); return; }
       if (m.t === 'kicked') { if (MP.link !== link) return; /* (meant for an old connection this game already left: the new one stays) */ MP.noRejoin = true; mpLost(m.msg || '연결이 끊겼습니다'); MP.noRejoin = false; return; } // taken over by a newer connection: no knocking again
-      if (m.t === 'error') { MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
+      if (m.t === 'error') { if (MP.soft) MP.soft.err = m.msg; MP.status = m.msg; const el = $('mpStatus'); if (el) el.textContent = m.msg; else chatMsg(m.msg, '#ff5555'); return; }
       mpHandle(m, MP.server || MP.role === 'host' ? m.from : 0); };
     ws.onerror = () => { if (!ok) rej(new Error('서버에 연결하지 못했습니다')); };
     ws.onclose = () => { clearInterval(link.dog); clearInterval(link.hb); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
@@ -227,7 +227,7 @@ async function mpJoinWs(url, room, world) {
   mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() });
 }
 function mpStop() {
-  if (!MP.on) return; MP.timeAt = 0; MP.soft = null; MP.holdChunk = false; mpSoftNote(false);
+  if (!MP.on) return; MP.timeAt = 0; mpLiveMark(false); MP.soft = null; MP.holdChunk = false; mpSoftNote(false);
   const host = MP.isHost, ran = MP.role === 'host', st = MP.store;
   if (MP.server) mpServerLeave(host); else if (MP.role === 'host') mpSend({ t: 'bye' }); else { mpGuestSave(); mpSend({ t: 'leave' }); }
   if (host) { for (const id of MP.core.players.keys()) if (id !== 0) MP.relay.send({ t: 'bye' }, id); for (const t of MP.timers || []) clearInterval(t); MP.core.store = null;
@@ -241,11 +241,11 @@ function mpStop() {
 function mpLost(why) {
   try { if (MP.on && MP.lastUrl && MP.link && MP.link.kind === 'ws') { // tell the server why (it shows the last ones on /stats), for finding what drops players
     const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'); fetch(u, { method: 'POST', body: JSON.stringify({ name: accName(), why, world: W.meta && W.meta.name, secs: Math.round((Date.now() - (MP.link.rx || Date.now())) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e) {}
-  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
+  if (!MP.on) return; const srvW = MP.server && !MP.isHost, guest = MP.role === 'guest' || srvW, url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
   const again = !MP.noRejoin && MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   if (again && W.active) { chatMsg(why, '#ff5555'); mpSoftRejoin(url, wid, wid ? null : code, why); return; } // in the world as it is: connect again underneath
   mpStop(); chatMsg(why, '#ff5555');
-  if (guest && W.active) { quitToTitle(); UI.flash(why); }
+  if (guest && W.active) { quitToTitle(); mpShowDc(why, url, wid, code); return; } // the reason on its own screen (a flash on the title was never seen)
   if (again) mpRejoin(url, wid, wid ? null : code); // a server world, or a friend's world that is still open: straight back in
 }
 // a dropped connection while playing: the game goes on as it is (the player held where it stands) while a new connection
@@ -275,7 +275,17 @@ async function mpSoftRejoin(url, wid, code, why) {
   }
   if (gen === MP.rejoinGen && MP.soft) mpSoftGiveUp();
 }
-function mpSoftGiveUp() { const why = MP.soft && MP.soft.why || '서버와 연결이 끊겼습니다'; MP.soft = null; MP.holdChunk = false; mpSoftNote(false); mpStop(); if (W.active) { quitToTitle(); UI.flash(why + ' — 다시 들어가 주세요'); } }
+function mpSoftGiveUp() { const why = (MP.soft && MP.soft.why || '서버와 연결이 끊겼습니다') + (MP.soft && MP.soft.linked ? ' (다시 연결은 됐지만 세계에 들어가지 못했습니다' + (MP.soft.err ? ': ' + MP.soft.err : '') + ')' : ' (5분 동안 다시 연결하지 못했습니다)'), url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode;
+  MP.soft = null; MP.holdChunk = false; mpSoftNote(false); mpStop(); if (W.active) { quitToTitle(); mpShowDc(why, url, wid, code); } }
+// the connection-lost screen, and what it said kept for the next start too
+function mpShowDc(why, url, wid, code) { const d = { why, url, wid, code, at: new Date().toLocaleString() }; try { sessionStorage.removeItem('nemo-mp-live'); localStorage.setItem('nemo-mp-lastdc', JSON.stringify(d)); } catch (e) {} showMenu('mpdc', d); }
+// while playing with others the tab says so: a tab the browser started again (out of memory, a crash) is told on the next start
+function mpLiveMark(on) { try { if (on) sessionStorage.setItem('nemo-mp-live', JSON.stringify({ url: MP.lastUrl, wid: MP.worldId, code: MP.roomCode, at: Date.now(), world: W.meta && W.meta.name })); else sessionStorage.removeItem('nemo-mp-live'); } catch (e) {} }
+function mpLiveCheck() { try { const l = JSON.parse(sessionStorage.getItem('nemo-mp-live') || 'null'); if (!l) return; sessionStorage.removeItem('nemo-mp-live');
+  const why = '게임 페이지가 저절로 다시 시작되었습니다 — 브라우저가 이 탭을 새로고침했습니다 (메모리가 모자랐거나, 탭이 오래 뒤에 있었거나, 브라우저가 멈췄을 때 그렇습니다)';
+  if (l.url) fetch(l.url.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report'), { method: 'POST', body: JSON.stringify({ name: accName(), why: '페이지가 다시 시작됨 (탭 새로고침)', world: l.world, secs: Math.round((Date.now() - l.at) / 1000) }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {});
+  mpShowDc(why, l.url, l.wid, l.code); } catch (e) {} }
+setInterval(() => { if (MP.on && W.active && MP.link) mpLiveMark(true); }, 5000); // (refreshed: also says when)
 // the welcome on a connection made underneath: back in without leaving the world
 function mpSoftWelcome(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();

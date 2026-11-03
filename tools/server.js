@@ -348,7 +348,7 @@ server.on('upgrade', (req, sock) => {
   const id = nextId++; let role = null, wp = false;
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
-    if (m.t === 'hb') return; // a player's game saying it is still there (in a background tab too)
+    if (m.t === 'hb' && !wp && role !== 'guest') return; // a player's game saying it is still there (in a background tab too): the world (or the host's) marks it seen
     if (wp) {
       if (m.t === 'restore') { restorePart(w, id, m); return; }
       if (m.t === 'mirrorhave') { mirrorFill(w, id, m); return; }
