@@ -1825,7 +1825,7 @@ function makeGen(seed) {
   }
   // column: [height, biome]
   function column(wx, wz) {
-    if (GENV >= 6) return column186(wx, wz);
+    if (GENV >= 6) return column186(wx, wz); // (7: the same ground, with Java's outpost rule)
     if (GENV >= 5) return column185(wx, wz);
     if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
@@ -2307,10 +2307,13 @@ function outpostAt(seed, G, rx, rz) {
   const r = rng(hash32(seed, rx, rz, 71)); let out = null;
   if (r() < 0.6) {
     const cx = rx * OREG + 4 + r.int(OREG - 8), cz = rz * OREG + 4 + r.int(OREG - 8), x = cx * 16 + 8, z = cz * 16 + 8, [h, b] = G.column(x, z);
-    const okB = b === BIO.PLAINS || b === BIO.DESERT || b === BIO.SAVANNA || b === BIO.TAIGA || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA;
+    // Java 1.18's outpost biomes: desert, plains, savanna, snowy plains, taiga, and the new mountains (meadow, grove,
+    // snowy slopes, the three peaks)
+    const bk = BIOMES[G.column(x, z)[2]][8], J = GENV >= 7, okB = b === BIO.PLAINS || b === BIO.DESERT || b === BIO.SAVANNA || b === BIO.TAIGA || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || (J && /^(meadow|grove|snowy_slopes|jagged_peaks|frozen_peaks|stony_peaks)$/.test(bk)); // (worlds made before generator 7 keep their outposts as they were: no half outposts at the edge of what was explored)
+    // as Java: no outpost where a village starts within 10 chunks either way (the same square Java checks)
     let nearVillage = false;
-    for (let i = Math.floor((cx - 12) / VREG); i <= Math.floor((cx + 12) / VREG) && !nearVillage; i++) for (let j = Math.floor((cz - 12) / VREG); j <= Math.floor((cz + 12) / VREG); j++) { const v = villageAt(seed, G, i, j); if (v && Math.hypot(v.x - x, v.z - z) < 200) { nearVillage = true; break; } }
-    if (okB && h > SEA + 1 && h < 100 && !nearVillage) out = { x, y: h, z, seed: r.int(1 << 30) };
+    const RR = J ? 10 : 12; for (let i = Math.floor((cx - RR) / VREG); i <= Math.floor((cx + RR) / VREG) && !nearVillage; i++) for (let j = Math.floor((cz - RR) / VREG); j <= Math.floor((cz + RR) / VREG); j++) { const v = villageAt(seed, G, i, j); if (v && (J ? Math.abs((v.x >> 4) - cx) <= 10 && Math.abs((v.z >> 4) - cz) <= 10 : Math.hypot(v.x - x, v.z - z) < 200)) { nearVillage = true; break; } }
+    if (okB && h > SEA + 1 && h < (J ? CH0 - 40 : 100) && !nearVillage) out = { x, y: h, z, seed: r.int(1 << 30) };
   }
   OP_CACHE.set(key, out); return out;
 }
@@ -7596,6 +7599,25 @@ function lootStack(key, n, x, wx, wz, seed) {
   }
   return st;
 }
+// Villages built from Mojang's pieces filled the ground under a desert (badlands, beach) piece with iron ore instead of
+// sand (block 12 was sand in the old numbering). A saved chunk of such a village gets sand back: only iron ore above the
+// natural ground there (ore never generates above it) and inside the village
+function fixVillageIron(c) {
+  if (!S.villageAt || !S.hasStructs || !S.hasStructs()) return false;
+  const G = W.genCache || (W.genCache = S.makeGen(W.seed)), x0 = c.cx * 16, z0 = c.cz * 16, R = S.VREG * 16, IRON = BID.iron_ore, SAND = BID.sand, B = S.BIO;
+  const sandy = b => b === B.DESERT || b === B.BADLANDS || b === B.BEACH; let n = 0;
+  if (![...c.biome].some(sandy)) return false;
+  for (let i = Math.floor((x0 - 160) / R); i <= Math.floor((x0 + 175) / R); i++) for (let j = Math.floor((z0 - 160) / R); j <= Math.floor((z0 + 175) / R); j++) {
+    const v = S.villageAt(W.seed, G, i, j); if (!v || !v.jig || !v.core) continue;
+    const [ax, az, bx, bz] = v.core, M = 12; if (x0 + 15 < ax - M || x0 > bx + M || z0 + 15 < az - M || z0 > bz + M) continue;
+    for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+      const wx = x0 + lx, wz = z0 + lz; if (wx < ax - M || wx > bx + M || wz < az - M || wz > bz + M || !sandy(c.biome[lz * 16 + lx])) continue;
+      const h = G.column(wx, wz)[0];
+      for (let y = h + 1; y < h + 40 && y < MAXY; y++) { const k = BI(wx, y, wz); if (c.blocks[k] === IRON) { c.blocks[k] = SAND; c.meta[k] = 0; n++; } }
+    }
+  }
+  return n > 0;
+}
 function addChunk(cx, cz, d, tiles) {
   const c = new Chunk(cx, cz, d);
   W.chunks.set(c.key, c); W.lastKey = -1;
@@ -7610,6 +7632,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
+  if (d.fromSave && W.dim === 0 && fixVillageIron(c)) c.modified = c.edited = true; // saved with the old desert-village bug: iron ore where sand should be
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
   if (d.fromSave && typeof rodScan === 'function') rodScan(c);
@@ -19811,7 +19834,7 @@ async function mpAction(a) {
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null, world); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
     else if (a === 'mp_joinws') { say('접속하는 중...'); const r = await mpJoinWs(ad.value.trim()); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }
-    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 6, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
+    else if (a === 'mp_createworld') { const sd = ($('mpSeed').value || '').trim(); mpSend({ t: 'create', meta: { name: ($('mpWName').value || '서버 세계').trim(), seed: seedFrom(sd || String(Math.floor(Math.random() * 1e9))), gen: 7, my: MINY, mode: $('mpMode').value, diff: 2, cheats: $('mpCheats').checked, exp: true } }); say('세계를 만드는 중...'); }
     else if (a === 'mp_cancel') { mpStop(); showMenu('title'); }
     else if (a === 'mp_upload') { say('서버에 올리는 중...'); const where = ad.value.trim(), up = await mpUpload(where); say(`올렸습니다 (청크 ${up.n}개). 서버 세계로 들어가는 중...`);
       saveAll(true); await new Promise(r => setTimeout(r, 300)); quitToTitle(); showMenu('mp_join'); await mpJoinWs(where, null, up.wid); } // from now on it is played on the server, where it stays
@@ -20227,7 +20250,7 @@ if (isTouch) {
 function seedFrom(s) { s = (s || '').trim(); if (!s) return (Math.random() * 2 ** 31) | 0; if (/^-?\d+$/.test(s)) return (+s) | 0; let h = 0; for (const ch of s) h = Math.imul(h, 31) + ch.charCodeAt(0) | 0; return h; }
 async function createWorld(c) {
   const id = 'w' + Date.now().toString(36);
-  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 6, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
+  const meta = { id, name: c.name, seed: seedFrom(c.seed), gen: 7, mode: c.mode === 'hardcore' ? 'survival' : c.mode, hardcore: c.mode === 'hardcore', diff: c.mode === 'hardcore' ? 3 : c.diff, cheats: c.cheats && c.mode !== 'hardcore', exp: !!c.exp, created: Date.now(), last: Date.now(), player: null };
   await putWorld(meta);
   startWorld(id, meta);
 }
@@ -20476,7 +20499,7 @@ function frame(now) {
 const PANO_SEED = 11711;
 function startPanorama() {
   resetWorld(); for (const e of ENT) removeEnt(e); ENT.length = 0;
-  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 6; S.setGenVersion(6); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
+  W.pano = true; W.id = ''; W.dim = 0; W.seed = PANO_SEED; W.gen = 7; S.setGenVersion(7); W.genCache = null; W.time = 1500; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
   const sp = findSpawn(PANO_SEED); PL.x = sp[0] + .5; PL.z = sp[2] + .5; PL.y = Math.max(sp[1] + 6, 80); PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.yaw = 0; PL.pitch = -0.12; PL.eyeH = 1.62;
   document.body.classList.add('pano'); $('hud').hidden = true;
 }

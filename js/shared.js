@@ -1481,7 +1481,7 @@ function makeGen(seed) {
   }
   // column: [height, biome]
   function column(wx, wz) {
-    if (GENV >= 6) return column186(wx, wz);
+    if (GENV >= 6) return column186(wx, wz); // (7: the same ground, with Java's outpost rule)
     if (GENV >= 5) return column185(wx, wz);
     if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
@@ -1963,10 +1963,13 @@ function outpostAt(seed, G, rx, rz) {
   const r = rng(hash32(seed, rx, rz, 71)); let out = null;
   if (r() < 0.6) {
     const cx = rx * OREG + 4 + r.int(OREG - 8), cz = rz * OREG + 4 + r.int(OREG - 8), x = cx * 16 + 8, z = cz * 16 + 8, [h, b] = G.column(x, z);
-    const okB = b === BIO.PLAINS || b === BIO.DESERT || b === BIO.SAVANNA || b === BIO.TAIGA || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA;
+    // Java 1.18's outpost biomes: desert, plains, savanna, snowy plains, taiga, and the new mountains (meadow, grove,
+    // snowy slopes, the three peaks)
+    const bk = BIOMES[G.column(x, z)[2]][8], J = GENV >= 7, okB = b === BIO.PLAINS || b === BIO.DESERT || b === BIO.SAVANNA || b === BIO.TAIGA || b === BIO.TUNDRA || b === BIO.SNOWY_TAIGA || (J && /^(meadow|grove|snowy_slopes|jagged_peaks|frozen_peaks|stony_peaks)$/.test(bk)); // (worlds made before generator 7 keep their outposts as they were: no half outposts at the edge of what was explored)
+    // as Java: no outpost where a village starts within 10 chunks either way (the same square Java checks)
     let nearVillage = false;
-    for (let i = Math.floor((cx - 12) / VREG); i <= Math.floor((cx + 12) / VREG) && !nearVillage; i++) for (let j = Math.floor((cz - 12) / VREG); j <= Math.floor((cz + 12) / VREG); j++) { const v = villageAt(seed, G, i, j); if (v && Math.hypot(v.x - x, v.z - z) < 200) { nearVillage = true; break; } }
-    if (okB && h > SEA + 1 && h < 100 && !nearVillage) out = { x, y: h, z, seed: r.int(1 << 30) };
+    const RR = J ? 10 : 12; for (let i = Math.floor((cx - RR) / VREG); i <= Math.floor((cx + RR) / VREG) && !nearVillage; i++) for (let j = Math.floor((cz - RR) / VREG); j <= Math.floor((cz + RR) / VREG); j++) { const v = villageAt(seed, G, i, j); if (v && (J ? Math.abs((v.x >> 4) - cx) <= 10 && Math.abs((v.z >> 4) - cz) <= 10 : Math.hypot(v.x - x, v.z - z) < 200)) { nearVillage = true; break; } }
+    if (okB && h > SEA + 1 && h < (J ? CH0 - 40 : 100) && !nearVillage) out = { x, y: h, z, seed: r.int(1 << 30) };
   }
   OP_CACHE.set(key, out); return out;
 }
