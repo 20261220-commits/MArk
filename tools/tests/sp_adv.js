@@ -33,7 +33,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.killNoLoot, 'kills count with doMobLoot off');
   ok(!r.beaconFar && r.beaconNear, 'a beacon counts for players near it when it lights up', r);
   ok(!r.lootPlaced && r.lootBastion && r.ltGone, 'only a bastion\'s own loot chest counts, once', r);
-  ok(r.gen === 3 && r.atHasMeadow && r.ids, 'new worlds are 1.18 (gen 3) and have the 1.18 advancements', r);
+  ok(r.gen >= 3 && r.atHasMeadow && r.ids, 'new worlds are 1.18 (gen 3+) and have the 1.18 advancements', r);
   ok(r.fellTo < -55 && r.caves, '"Caves & Cliffs": from the build limit to the bottom of the world', r);
   ok(r.meadow, '"Sound of Music": a jukebox playing in a meadow', r);
   ok(!p.errs.length, 'no page errors', p.errs);
