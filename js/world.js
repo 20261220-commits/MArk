@@ -369,7 +369,6 @@ function fallCheck(x, y, z, b) {
   if (y > MINY && (below === 0 || FLUID[below] || (REPL[below] && below !== b))) { const m = getMeta(x, y, z); setBlock(x, y, z, 0); if (W.onFall) W.onFall(x, y, z, b, m); }
 }
 function tickScheduled() {
-  W.tickN++;
   let n = 0;
   for (const [k, t] of W.sched) {
     if (t > W.tickN) continue;

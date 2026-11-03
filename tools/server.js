@@ -96,7 +96,9 @@ function wsAccept(req, sock, onText, onClose) {
   const acc = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + '\r\n\r\n');
   let buf = Buffer.alloc(0), parts = [], closed = false;
-  const c = { send(s) { if (!closed) sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(); } } };
+  // drop: a message the next one replaces (positions, mob lists, the clock). When a player's connection can't keep up,
+  // these are skipped instead of piling up: a queue that only grows makes everything arrive later and later
+  const c = { send(s, drop) { if (closed || (drop && sock.writableLength > 256 * 1024)) return; sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(); } } };
   sock.on('data', d => {
     buf = Buffer.concat([buf, d]);
     for (;;) {
@@ -123,6 +125,7 @@ function wsAccept(req, sock, onText, onClose) {
 // worlds: every world made or uploaded here stays, is listed for everyone and can be joined at any time, with or without
 // whoever made it. WORLD names the world an older game (one without the world list) joins.
 const { mpWorldCore } = require(path.join(root, 'js', 'mpcore.js'));
+const DROPPABLE = new Set(['pl', 'mobs', 'vehs', 'items', 'xps', 'time']);
 const WORLD_ID = /^[\w\-가-힣]{1,40}$/;
 const worlds = new Map(); // id -> world
 const newWorldId = () => { for (;;) { const id = 'w' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'); if (!worlds.has(id) && !fs.existsSync(path.join(WORLDS, id))) return id; } };
@@ -133,8 +136,8 @@ function openWorld(id) {
   w = { id, dir, cdir, state, keys: new Set(), dirty: new Map(), stateDirty: false, conns: new Map(), changedSinceBackup: false, mirrorStateAt: 0, restorer: null };
   w.fileOf = dk => path.join(cdir, encodeURIComponent(dk) + '.json');
   loadWorld(w);
-  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), saveState: () => { w.stateDirty = true; w.changedSinceBackup = true; }, /* (players' things count too: the 10-minute backup used to wait for a changed block) */ log: t => console.log(`[${id}] ${t}`) };
-  w.core = mpWorldCore(store, (cid, o) => { const c = w.conns.get(cid); if (c) c.send(JSON.stringify(o)); });
+  const store = { state, keys: w.keys, load: dk => { try { return JSON.parse(fs.readFileSync(w.fileOf(dk), 'utf8')); } catch (e) { return null; } }, save: (dk, c) => w.dirty.set(dk, c), pending: dk => w.dirty.has(dk), saveState: () => { w.stateDirty = true; w.changedSinceBackup = true; }, /* (players' things count too: the 10-minute backup used to wait for a changed block) */ log: t => console.log(`[${id}] ${t}`) };
+  w.core = mpWorldCore(store, (cid, o) => { const c = w.conns.get(cid); if (c) c.send(JSON.stringify(o), DROPPABLE.has(o.t)); });
   worlds.set(id, w); return w;
 }
 function loadWorld(w) {
@@ -281,9 +284,10 @@ server.on('upgrade', (req, sock) => {
       else { roomName = code || 'main'; room = rooms.get(roomName); if (!room || !room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
       c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
-    if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id })); return; }
+    const dr = DROPPABLE.has(m.t);
+    if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id }), dr); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
-    if (to != null) { const g = room.guests.get(to); if (g) g.send(s); } else for (const g of room.guests.values()) g.send(s);
+    if (to != null) { const g = room.guests.get(to); if (g) g.send(s, dr); } else for (const g of room.guests.values()) g.send(s, dr);
   }, () => {
     if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
     if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }

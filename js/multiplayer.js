@@ -52,10 +52,11 @@ async function mpWebSocket(url, role, extra) {
     }
   }
 }
+const MP_DROP = new Set(['pl', 'mobs', 'vehs', 'items', 'xps']);
 function mpWsOnce(url, role, extra) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
-    const link = { kind: 'ws', send(o, to) { if (ws.readyState === 1) ws.send(JSON.stringify(to != null ? { ...o, to } : o)); }, close() { try { ws.close(); } catch (e) {} } };
+    const link = { kind: 'ws', send(o, to) { if (ws.readyState !== 1 || (ws.bufferedAmount > 128 * 1024 && MP_DROP.has(o.t))) return; ws.send(JSON.stringify(to != null ? { ...o, to } : o)); } /* a slow upload skips the next position instead of queueing it */, close() { try { ws.close(); } catch (e) {} } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (er) { return; }
@@ -227,19 +228,20 @@ function mpStop() {
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
-  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, again = MP.server && !MP.isHost && url && wid && MP.link && MP.link.kind === 'ws';
+  if (!MP.on) return; const guest = MP.role === 'guest', url = MP.lastUrl, wid = MP.worldId, code = MP.roomCode, closed = /닫았/.test(why);
+  const again = MP.server && !MP.isHost && url && (wid || (code && !closed)) && MP.link && MP.link.kind === 'ws';
   mpStop(); chatMsg(why, '#ff5555');
   if (guest && W.active) { quitToTitle(); UI.flash(why); }
-  if (again) mpRejoin(url, wid);
+  if (again) mpRejoin(url, wid, wid ? null : code); // a server world, or a friend's world that is still open: straight back in
 }
 // a server world whose connection dropped (the server restarting, a network blip): knock again every few seconds until
 // it answers (a free host takes a minute or two to come back), as long as the join screen stays open
-async function mpRejoin(url, wid) {
+async function mpRejoin(url, wid, code) {
   const t0 = Date.now(), gen = (MP.rejoinGen = (MP.rejoinGen || 0) + 1); showMenu('mp_join');
   while (gen === MP.rejoinGen && UI.menu === 'mp_join' && Date.now() - t0 < 5 * 60000) {
     const s = Math.round((Date.now() - t0) / 1000); MP.status = `서버와 다시 연결하는 중... ${s}초 (서버가 다시 켜지는 데 1~2분 걸릴 수 있어요)`; const el = $('mpStatus'); if (el) el.textContent = MP.status;
-    try { await mpJoinWs(url, null, wid); MP.status = ''; return; } catch (e) {}
-    await new Promise(r => setTimeout(r, 5000));
+    try { await mpJoinWs(url, code || null, wid); MP.status = ''; return; } catch (e) { if (code && e && e.fromServer) break; } // the friend closed the world: nothing to come back to
+    await new Promise(r => setTimeout(r, Date.now() - t0 < 15000 ? 1500 : 5000)); // a blip comes back at once; a restarting server takes a while
   }
   if (gen === MP.rejoinGen && UI.menu === 'mp_join') { MP.status = '서버에 다시 연결하지 못했습니다 — 목록에서 다시 들어가 보세요'; const el = $('mpStatus'); if (el) el.textContent = MP.status; }
 }
@@ -1299,3 +1301,11 @@ async function mpAction(a) {
 // closing the tab or the window (or the Chromebook lid): what you have and where you are go to the server world first
 for (const ev of ['pagehide', 'beforeunload']) addEventListener(ev, () => { try { if (MP.on && MP.server) { mpSendPdata(); if (MP.role === 'host' && typeof mpSendShared === 'function') mpSendShared(); } } catch (e) {} });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && MP.on && MP.server) try { mpSendPdata(); } catch (e) {} });
+// the game in a background tab for a few seconds: the browser slows it to a crawl, so another player there runs the
+// dimension meanwhile (the mobs as they are now go along first)
+let mpAwayT = null;
+document.addEventListener('visibilitychange', () => {
+  if (!MP.on || !MP.server) return; clearTimeout(mpAwayT);
+  if (document.visibilityState === 'hidden') mpAwayT = setTimeout(() => { if (!MP.on || document.visibilityState !== 'hidden') return; try { if (MP.role === 'host' && typeof mpMobSnapshot === 'function') mpMobSnapshot(); } catch (e) {} MP.away = true; mpSend({ t: 'away', on: 1 }); }, 4000);
+  else if (MP.away) { MP.away = false; mpSend({ t: 'away', on: 0 }); }
+});
