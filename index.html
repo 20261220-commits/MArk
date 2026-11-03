@@ -108,22 +108,41 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 /* the player's inventory top row as Java lays it out (inventory.png): armour, doll, off hand, crafting, arrow and result
    side by side in the width of the 9 slots below */
 .panel.inv .row.top{gap:0;justify-content:flex-start}
-.rbwrap{display:flex;align-items:flex-start;gap:calc(2 * var(--px))}
-.rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));border:calc(var(--px)) solid #000;background:#3c8a2e;box-shadow:inset var(--px) var(--px) 0 #6fd35a,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #1d4a15;cursor:pointer;padding:0;position:relative}
-.rbbtn::after{content:'';position:absolute;left:25%;top:20%;width:50%;height:60%;background:#c8a96b;border-left:calc(2 * var(--px)) solid #7a4a1d}
-.rbbtn.on{background:#2a6a20}
-.panel.rbook{width:calc(118 * var(--px));padding:calc(4 * var(--px))}
-.rbtop{display:flex;gap:calc(2 * var(--px));margin-bottom:calc(3 * var(--px))}
-.rbtop input{flex:1;min-width:0;font:inherit;font-size:calc(7 * var(--px));padding:var(--px);background:#000;color:#fff;border:var(--px) solid #a0a0a0}
-.rbtop .rbf,.rbpg button{font:inherit;font-size:calc(6 * var(--px));background:#8b8b8b;color:#fff;border:var(--px) solid #000;cursor:pointer;padding:0 calc(2 * var(--px))}
-.rbtop .rbf.on{background:#3c8a2e}
-.rbgrid{display:grid;grid-template-columns:repeat(5, calc(22 * var(--px)));gap:calc(1 * var(--px));min-height:calc(92 * var(--px));align-content:start}
-.rbc{width:calc(22 * var(--px));height:calc(22 * var(--px));display:grid;place-items:center;cursor:pointer;border:var(--px) solid #000}
-.rbc.ok{background:#8fb07a}.rbc.no{background:#b46a6a}.rbc:hover{filter:brightness(1.2)}
-.rbc .ic,.ghostI{pointer-events:none}
+.rbwrap{display:flex;align-items:flex-start;gap:calc(1 * var(--px))}
+/* the green book button beside the crafting grid (gui/recipe_button.png when a jar is loaded) */
+.rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));align-self:center;margin-left:calc(4 * var(--px));border:0;padding:0;cursor:pointer;position:relative;background:#5e8a3a;box-shadow:inset var(--px) var(--px) 0 #9fd16f,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #2e4a18,0 0 0 var(--px) #000}
+.rbbtn::after{content:'';position:absolute;left:30%;top:18%;width:42%;height:64%;background:#d9c08a;border-left:calc(2 * var(--px)) solid #6b3f17;box-shadow:inset 0 calc(-2 * var(--px)) 0 #b0925a}
+.rbbtn:hover{filter:brightness(1.15)}
+body.vrbb .rbbtn{background:var(--g-rbbtn) 0 0/100% 100%;box-shadow:none;image-rendering:pixelated}body.vrbb .rbbtn::after{display:none}body.vrbb .rbbtn:hover{background-image:var(--g-rbbtnh);filter:none}
+.panel .row.top>.rbbtn:first-child{margin:0 calc(4 * var(--px)) 0 0}
+/* the book: 147 x 166 like Java's, recipe buttons 25 x 25 at 11 + 25 i, 31 + 25 j; tabs stick out on the right */
+.panel.rbook{position:relative;width:calc(147 * var(--px));height:calc(166 * var(--px));padding:0;box-sizing:border-box;flex:none;margin-right:calc(30 * var(--px))}
+body.vrb .panel.rbook{background:var(--g-rbook) 0 0/100% 100%;border:0;border-image:none;box-shadow:none;image-rendering:pixelated}
+.rbs{position:absolute;left:calc(25 * var(--px));top:calc(13 * var(--px));width:calc(81 * var(--px));height:calc(12 * var(--px))}
+.rbs input{width:100%;height:100%;box-sizing:border-box;font:inherit;font-size:calc(8 * var(--px));line-height:1;padding:0 calc(2 * var(--px));background:#000;color:#fff;border:var(--px) solid #a0a0a0;outline:0}
+.rbs input::placeholder{color:#808080;font-style:italic}
+body.vrb .rbs input{border:0;background:transparent}
+.rbs::before{content:'';position:absolute;left:calc(-11 * var(--px));top:calc(2 * var(--px));width:calc(5 * var(--px));height:calc(5 * var(--px));border:var(--px) solid #3f3f3f;border-radius:50%}body.vrb .rbs::before{display:none}
+.rbf{position:absolute;left:calc(110 * var(--px));top:calc(12 * var(--px));width:calc(26 * var(--px));height:calc(16 * var(--px));padding:0;border:var(--px) solid #000;background:#6f6f6f;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #3a3a3a;cursor:pointer}
+.rbf::after{content:'';position:absolute;left:28%;top:22%;width:44%;height:56%;background:#8d6a3a;box-shadow:inset 0 calc(2 * var(--px)) 0 #b58c52}.rbf.on::after{background:#5da34a;box-shadow:inset 0 calc(2 * var(--px)) 0 #8fe07a}
+body.vrb .rbf{border:0;box-shadow:none;background:var(--g-rbf0) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbf.on{background-image:var(--g-rbf1)}body.vrb .rbf:hover{background-image:var(--g-rbf0h)}body.vrb .rbf.on:hover{background-image:var(--g-rbf1h)}body.vrb .rbf::after{display:none}
+.rbc{position:absolute;width:calc(25 * var(--px));height:calc(25 * var(--px));display:grid;place-items:center;cursor:pointer;box-sizing:border-box;border:var(--px) solid #000;border-radius:calc(2 * var(--px));background:#a8a8a8;box-shadow:inset var(--px) var(--px) 0 #e0e0e0,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #5e5e5e}
+.rbc.no{background:#a84a4a;box-shadow:inset var(--px) var(--px) 0 #d78080,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #5e2020}
+body.vrb .rbc{border:0;border-radius:0;box-shadow:none;background:var(--g-rbok) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbc.no{background-image:var(--g-rbno)}
+.rbc:hover{filter:brightness(1.18)}
+.rbc .ic,.rbtab .ic,.ghostI{pointer-events:none}
+.rbnone{position:absolute;left:calc(11 * var(--px));top:calc(60 * var(--px));width:calc(125 * var(--px));text-align:center;color:#404040;font-size:calc(7 * var(--px))}
+.rbtab{position:absolute;left:calc(142 * var(--px));width:calc(32 * var(--px));height:calc(27 * var(--px));display:grid;place-items:center;padding-left:calc(4 * var(--px));box-sizing:border-box;cursor:pointer;background:#8b8b8b;border:var(--px) solid #000;border-left:0;border-radius:0 calc(3 * var(--px)) calc(3 * var(--px)) 0;box-shadow:inset 0 var(--px) 0 #c6c6c6,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #555;z-index:0}
+.rbtab.on{background:#c6c6c6;width:calc(35 * var(--px));z-index:2;box-shadow:inset 0 var(--px) 0 #fff,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #555}
+body.vrb .rbtab{border:0;border-radius:0;box-shadow:none;width:calc(35 * var(--px));background:var(--g-rbtab) 0 0/100% 100%;transform:scaleX(-1);image-rendering:pixelated}body.vrb .rbtab.on{background-image:var(--g-rbtab1);left:calc(144 * var(--px))}body.vrb .rbtab>*{transform:scaleX(-1)}
+.rbpg{position:absolute;top:calc(137 * var(--px));width:calc(12 * var(--px));height:calc(17 * var(--px));padding:0;border:0;background:transparent;cursor:pointer}
+.rbpg.prev{left:calc(38 * var(--px))}.rbpg.next{left:calc(93 * var(--px))}
+.rbpg::after{content:'';position:absolute;top:calc(3 * var(--px));border-style:solid;border-color:transparent;border-width:calc(6 * var(--px)) calc(8 * var(--px))}
+.rbpg.next::after{left:calc(2 * var(--px));border-left-color:#fff;border-right-width:0}.rbpg.prev::after{right:calc(2 * var(--px));border-right-color:#fff;border-left-width:0}
+.rbpg:hover::after{filter:drop-shadow(0 0 var(--px) #ff0)}.rbpg:disabled{visibility:hidden}
+body.vrb .rbpg{background:var(--g-rbnext) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbpg:hover{background-image:var(--g-rbnext1)}body.vrb .rbpg.prev{transform:scaleX(-1)}body.vrb .rbpg::after{display:none}
+.rbpn{position:absolute;left:calc(53 * var(--px));top:calc(141 * var(--px));width:calc(38 * var(--px));text-align:center;color:#fff;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .ghostI{opacity:.35;filter:grayscale(.3)}
-.rbpg{display:flex;justify-content:center;align-items:center;gap:calc(4 * var(--px));margin-top:calc(3 * var(--px));font-size:calc(7 * var(--px))}
-.rbpg button:disabled{opacity:.4}
 .panel.inv .doll{width:calc(51 * var(--px))}
 .offc{align-self:flex-end}
 .panel.inv .cr{margin-left:calc(3 * var(--px))}

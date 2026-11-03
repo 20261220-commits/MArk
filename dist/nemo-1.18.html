@@ -108,22 +108,41 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 /* the player's inventory top row as Java lays it out (inventory.png): armour, doll, off hand, crafting, arrow and result
    side by side in the width of the 9 slots below */
 .panel.inv .row.top{gap:0;justify-content:flex-start}
-.rbwrap{display:flex;align-items:flex-start;gap:calc(2 * var(--px))}
-.rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));border:calc(var(--px)) solid #000;background:#3c8a2e;box-shadow:inset var(--px) var(--px) 0 #6fd35a,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #1d4a15;cursor:pointer;padding:0;position:relative}
-.rbbtn::after{content:'';position:absolute;left:25%;top:20%;width:50%;height:60%;background:#c8a96b;border-left:calc(2 * var(--px)) solid #7a4a1d}
-.rbbtn.on{background:#2a6a20}
-.panel.rbook{width:calc(118 * var(--px));padding:calc(4 * var(--px))}
-.rbtop{display:flex;gap:calc(2 * var(--px));margin-bottom:calc(3 * var(--px))}
-.rbtop input{flex:1;min-width:0;font:inherit;font-size:calc(7 * var(--px));padding:var(--px);background:#000;color:#fff;border:var(--px) solid #a0a0a0}
-.rbtop .rbf,.rbpg button{font:inherit;font-size:calc(6 * var(--px));background:#8b8b8b;color:#fff;border:var(--px) solid #000;cursor:pointer;padding:0 calc(2 * var(--px))}
-.rbtop .rbf.on{background:#3c8a2e}
-.rbgrid{display:grid;grid-template-columns:repeat(5, calc(22 * var(--px)));gap:calc(1 * var(--px));min-height:calc(92 * var(--px));align-content:start}
-.rbc{width:calc(22 * var(--px));height:calc(22 * var(--px));display:grid;place-items:center;cursor:pointer;border:var(--px) solid #000}
-.rbc.ok{background:#8fb07a}.rbc.no{background:#b46a6a}.rbc:hover{filter:brightness(1.2)}
-.rbc .ic,.ghostI{pointer-events:none}
+.rbwrap{display:flex;align-items:flex-start;gap:calc(1 * var(--px))}
+/* the green book button beside the crafting grid (gui/recipe_button.png when a jar is loaded) */
+.rbbtn{width:calc(20 * var(--px));height:calc(18 * var(--px));align-self:center;margin-left:calc(4 * var(--px));border:0;padding:0;cursor:pointer;position:relative;background:#5e8a3a;box-shadow:inset var(--px) var(--px) 0 #9fd16f,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #2e4a18,0 0 0 var(--px) #000}
+.rbbtn::after{content:'';position:absolute;left:30%;top:18%;width:42%;height:64%;background:#d9c08a;border-left:calc(2 * var(--px)) solid #6b3f17;box-shadow:inset 0 calc(-2 * var(--px)) 0 #b0925a}
+.rbbtn:hover{filter:brightness(1.15)}
+body.vrbb .rbbtn{background:var(--g-rbbtn) 0 0/100% 100%;box-shadow:none;image-rendering:pixelated}body.vrbb .rbbtn::after{display:none}body.vrbb .rbbtn:hover{background-image:var(--g-rbbtnh);filter:none}
+.panel .row.top>.rbbtn:first-child{margin:0 calc(4 * var(--px)) 0 0}
+/* the book: 147 x 166 like Java's, recipe buttons 25 x 25 at 11 + 25 i, 31 + 25 j; tabs stick out on the right */
+.panel.rbook{position:relative;width:calc(147 * var(--px));height:calc(166 * var(--px));padding:0;box-sizing:border-box;flex:none;margin-right:calc(30 * var(--px))}
+body.vrb .panel.rbook{background:var(--g-rbook) 0 0/100% 100%;border:0;border-image:none;box-shadow:none;image-rendering:pixelated}
+.rbs{position:absolute;left:calc(25 * var(--px));top:calc(13 * var(--px));width:calc(81 * var(--px));height:calc(12 * var(--px))}
+.rbs input{width:100%;height:100%;box-sizing:border-box;font:inherit;font-size:calc(8 * var(--px));line-height:1;padding:0 calc(2 * var(--px));background:#000;color:#fff;border:var(--px) solid #a0a0a0;outline:0}
+.rbs input::placeholder{color:#808080;font-style:italic}
+body.vrb .rbs input{border:0;background:transparent}
+.rbs::before{content:'';position:absolute;left:calc(-11 * var(--px));top:calc(2 * var(--px));width:calc(5 * var(--px));height:calc(5 * var(--px));border:var(--px) solid #3f3f3f;border-radius:50%}body.vrb .rbs::before{display:none}
+.rbf{position:absolute;left:calc(110 * var(--px));top:calc(12 * var(--px));width:calc(26 * var(--px));height:calc(16 * var(--px));padding:0;border:var(--px) solid #000;background:#6f6f6f;box-shadow:inset var(--px) var(--px) 0 #aaa,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #3a3a3a;cursor:pointer}
+.rbf::after{content:'';position:absolute;left:28%;top:22%;width:44%;height:56%;background:#8d6a3a;box-shadow:inset 0 calc(2 * var(--px)) 0 #b58c52}.rbf.on::after{background:#5da34a;box-shadow:inset 0 calc(2 * var(--px)) 0 #8fe07a}
+body.vrb .rbf{border:0;box-shadow:none;background:var(--g-rbf0) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbf.on{background-image:var(--g-rbf1)}body.vrb .rbf:hover{background-image:var(--g-rbf0h)}body.vrb .rbf.on:hover{background-image:var(--g-rbf1h)}body.vrb .rbf::after{display:none}
+.rbc{position:absolute;width:calc(25 * var(--px));height:calc(25 * var(--px));display:grid;place-items:center;cursor:pointer;box-sizing:border-box;border:var(--px) solid #000;border-radius:calc(2 * var(--px));background:#a8a8a8;box-shadow:inset var(--px) var(--px) 0 #e0e0e0,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #5e5e5e}
+.rbc.no{background:#a84a4a;box-shadow:inset var(--px) var(--px) 0 #d78080,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #5e2020}
+body.vrb .rbc{border:0;border-radius:0;box-shadow:none;background:var(--g-rbok) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbc.no{background-image:var(--g-rbno)}
+.rbc:hover{filter:brightness(1.18)}
+.rbc .ic,.rbtab .ic,.ghostI{pointer-events:none}
+.rbnone{position:absolute;left:calc(11 * var(--px));top:calc(60 * var(--px));width:calc(125 * var(--px));text-align:center;color:#404040;font-size:calc(7 * var(--px))}
+.rbtab{position:absolute;left:calc(142 * var(--px));width:calc(32 * var(--px));height:calc(27 * var(--px));display:grid;place-items:center;padding-left:calc(4 * var(--px));box-sizing:border-box;cursor:pointer;background:#8b8b8b;border:var(--px) solid #000;border-left:0;border-radius:0 calc(3 * var(--px)) calc(3 * var(--px)) 0;box-shadow:inset 0 var(--px) 0 #c6c6c6,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #555;z-index:0}
+.rbtab.on{background:#c6c6c6;width:calc(35 * var(--px));z-index:2;box-shadow:inset 0 var(--px) 0 #fff,inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #555}
+body.vrb .rbtab{border:0;border-radius:0;box-shadow:none;width:calc(35 * var(--px));background:var(--g-rbtab) 0 0/100% 100%;transform:scaleX(-1);image-rendering:pixelated}body.vrb .rbtab.on{background-image:var(--g-rbtab1);left:calc(144 * var(--px))}body.vrb .rbtab>*{transform:scaleX(-1)}
+.rbpg{position:absolute;top:calc(137 * var(--px));width:calc(12 * var(--px));height:calc(17 * var(--px));padding:0;border:0;background:transparent;cursor:pointer}
+.rbpg.prev{left:calc(38 * var(--px))}.rbpg.next{left:calc(93 * var(--px))}
+.rbpg::after{content:'';position:absolute;top:calc(3 * var(--px));border-style:solid;border-color:transparent;border-width:calc(6 * var(--px)) calc(8 * var(--px))}
+.rbpg.next::after{left:calc(2 * var(--px));border-left-color:#fff;border-right-width:0}.rbpg.prev::after{right:calc(2 * var(--px));border-right-color:#fff;border-left-width:0}
+.rbpg:hover::after{filter:drop-shadow(0 0 var(--px) #ff0)}.rbpg:disabled{visibility:hidden}
+body.vrb .rbpg{background:var(--g-rbnext) 0 0/100% 100%;image-rendering:pixelated}body.vrb .rbpg:hover{background-image:var(--g-rbnext1)}body.vrb .rbpg.prev{transform:scaleX(-1)}body.vrb .rbpg::after{display:none}
+.rbpn{position:absolute;left:calc(53 * var(--px));top:calc(141 * var(--px));width:calc(38 * var(--px));text-align:center;color:#fff;font-size:calc(8 * var(--px));text-shadow:var(--px) var(--px) 0 #3f3f3f}
 .ghostI{opacity:.35;filter:grayscale(.3)}
-.rbpg{display:flex;justify-content:center;align-items:center;gap:calc(4 * var(--px));margin-top:calc(3 * var(--px));font-size:calc(7 * var(--px))}
-.rbpg button:disabled{opacity:.4}
 .panel.inv .doll{width:calc(51 * var(--px))}
 .offc{align-self:flex-end}
 .panel.inv .cr{margin-left:calc(3 * var(--px))}
@@ -4971,7 +4990,7 @@ for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
 // the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
-Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', gui_inv: 'gui/container/inventory', gui_furnace: 'gui/container/furnace', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
+Object.assign(ENT, { gui_icons: 'gui/icons', gui_widgets: 'gui/widgets', gui_inv: 'gui/container/inventory', gui_furnace: 'gui/container/furnace', gui_recipe: 'gui/recipe_book', gui_rbbtn: 'gui/recipe_button', env_sun: 'environment/sun', env_moon: 'environment/moon_phases', env_clouds: 'environment/clouds',
   env_rain: 'environment/rain', env_snow: 'environment/snow', env_end_sky: 'environment/end_sky', glint: 'misc/enchanted_item_glint', map_icons: 'map/map_icons', map_bg: 'map/map_background',
   pumpkinblur: 'misc/pumpkinblur', powder_snow_outline: 'misc/powder_snow_outline', vignette: 'misc/vignette', underwater: 'misc/underwater', spyglass_scope: 'misc/spyglass_scope',
   banner_base: 'entity/banner_base', shield_base: 'entity/shield_base', shield_nopattern: 'entity/shield_base_nopattern', end_portal_ent: 'entity/end_portal', ench_book: 'entity/enchanting_table_book',
@@ -16843,6 +16862,11 @@ function applyGuiPack() {
     css.setProperty('--g-panel', `url(${crop('gui_inv', 0, 0, 176, 166, 256).toDataURL()})`); css.setProperty('--g-slot', `url(${crop('gui_inv', 7, 83, 18, 18, 256).toDataURL()})`);
     document.body.classList.add('vgui');
   }
+  if (PACKPX.ent.gui_recipe) { // the recipe book from gui/recipe_book.png: the book, tabs, recipe buttons, page arrows, the filter switch
+    for (const [k, x, y, w, h] of [['rbook', 1, 1, 147, 166], ['rbtab', 153, 2, 35, 27], ['rbtab1', 188, 2, 35, 27], ['rbok', 29, 206, 25, 25], ['rbno', 54, 206, 25, 25], ['rbnext', 1, 208, 12, 17], ['rbnext1', 1, 226, 12, 17], ['rbf0', 152, 41, 26, 16], ['rbf1', 180, 41, 26, 16], ['rbf0h', 152, 59, 26, 16], ['rbf1h', 180, 59, 26, 16]]) { const c = crop('gui_recipe', x, y, w, h, 256); if (c) css.setProperty('--g-' + k, `url(${c.toDataURL()})`); }
+    document.body.classList.add('vrb');
+  }
+  if (PACKPX.ent.gui_rbbtn) { for (const [k, y] of [['rbbtn', 0], ['rbbtnh', 19]]) { const c = crop('gui_rbbtn', 0, y, 20, 18, 256); if (c) css.setProperty('--g-' + k, `url(${c.toDataURL()})`); } document.body.classList.add('vrbb'); }
   if (PACKPX.ent.gui_furnace) { // progress arrow and flame, empty and full
     for (const [k, x, y, w, h] of [['arrow0', 79, 34, 24, 17], ['arrow1', 176, 14, 24, 17], ['flame0', 56, 36, 14, 14], ['flame1', 176, 0, 14, 14]]) css.setProperty('--g-' + k, `url(${crop('gui_furnace', x, y, w, h, 256).toDataURL()})`);
     document.body.classList.add('vfurn');
@@ -16961,9 +16985,9 @@ UI.renderScreen = () => {
   let h = '';
   if (T === 'inv' || T === 'craft') { const grid = T === 'inv' ? INV.craft2 : INV.craft3; if (GUI.ghost && grid.some(Boolean)) GUI.ghost = null; }
   if (T === 'inv') {
-    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
+    h = `<div class="panel inv"><div class="row top"><div class="col">${[4, 5, 6, 7].map(i => slotHtml(i + 1, 'armor a' + (i - 4))).join('')}</div><div class="doll"><div class="dollIn">${dollHtml()}</div></div><div class="col offc">${slotHtml(GUI.slots.length - 1, 'armor aoff')}</div><div class="cr"><div class="cap">제작</div><div class="g2">${[0, 1, 2, 3].map(i => slotHtml(i)).join('')}</div></div><div class="arrow"></div>${slotHtml(4, 'big')}${typeof rbBtnHtml === 'function' ? rbBtnHtml() : ''}</div><div class="cap">인벤토리</div>${invRows(9)}</div>`;
   } else if (T === 'craft') {
-    h = `<div class="panel"><div class="cap">제작</div><div class="row top"><div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
+    h = `<div class="panel"><div class="cap">제작</div><div class="row top">${typeof rbBtnHtml === 'function' ? rbBtnHtml() : ''}<div class="g3">${[...Array(9).keys()].map(i => slotHtml(i)).join('')}</div><div class="arrow"></div>${slotHtml(9, 'big')}</div><div class="cap">인벤토리</div>${invRows(10)}</div>`;
   } else if (T === 'chest') {
     h = `<div class="panel"><div class="cap">${GUI.ctx.title || '상자'}</div><div class="grid9">${[...Array(GUI.slots.length - 36).keys()].map(i => slotHtml(i)).join('')}</div><div class="cap">인벤토리</div>${invRows(GUI.slots.length - 36)}</div>`;
   } else if (T === 'furnace') {
@@ -17010,10 +17034,12 @@ UI.renderScreen = () => {
   const cur = INV.cursor;
   // typing in a box (an anvil name, the creative search): the box itself is left alone, everything around it drawn again -
   // a box drawn anew mid-word broke Korean typing (the letters being put together were lost on every key)
-  if ((T === 'inv' || T === 'craft') && typeof rbHtml === 'function') h = `<div class="rbwrap">${rbHtml(T)}${h}</div>`; // the recipe book beside the grid
+  if ((T === 'inv' || T === 'craft') && typeof rbHtml === 'function') h = `<div class="rbwrap">${h}${rbHtml(T)}</div>`; // the recipe book to the right of the panel
   const keepBox = UI.keepBox && $(UI.keepBox); UI.keepBox = null;
-  if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const np = tmp.querySelector('.panel'), op = el.querySelector('.panel');
-    if (np && op && np.children.length === op.children.length) { [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); moveCursorItem(lastMouse.x, lastMouse.y); return; } }
+  if (keepBox) { const tmp = document.createElement('div'); tmp.innerHTML = h; const nps = [...tmp.querySelectorAll('.panel')], ops = [...el.querySelectorAll('.panel')];
+    if (nps.length && nps.length === ops.length && ops.every((op, k) => !op.contains(keepBox) || nps[k].children.length === op.children.length)) {
+      ops.forEach((op, k) => { const np = nps[k]; if (!op.contains(keepBox)) { op.replaceWith(np); return; } [...np.children].forEach((c, i) => { const o = op.children[i]; if (!o.contains(keepBox)) o.replaceWith(c); }); });
+      moveCursorItem(lastMouse.x, lastMouse.y); return; } }
   el.innerHTML = h + `<div id="cursorItem" class="sl ghost">${cur ? icon(cur.id, cur.n, cur.d, cur.e, cur.col) : ''}</div>`;
   const an = $('aname'); if (an) { an.oninput = () => { GUI.ctx.name = an.value; UI.keepBox = 'aname'; UI.renderScreen(); }; an.onkeydown = e => e.stopPropagation(); an.onpointerdown = e => e.stopPropagation(); }
   const rs = $('rbsearch'); if (rs) { rs.oninput = () => { RB.q = rs.value; RB.page = 0; UI.keepBox = 'rbsearch'; UI.renderScreen(); }; rs.onkeydown = e => e.stopPropagation(); }
@@ -17340,7 +17366,7 @@ $('screen').addEventListener('click', e => {
 </script>
 <script>/* js/recipebook.js */
 // ---------- the recipe book (as Java's): beside the inventory's and the crafting table's grid ----------
-// The green book button opens a list of the recipes this player knows (every recipe with an ingredient it has held, kept
+// The green book button (beside the grid) opens, to the right of the panel, the list of the recipes this player knows (every recipe with an ingredient it has held, kept
 // per world; all of them in creative), the ones it can make now in green, the rest red. A click lays the ingredients out
 // in the grid from the inventory (shift: as many as there are), or shows the recipe faintly in the grid when something is
 // missing. "제작 가능만" hides what can't be made; the search box finds by name; pages of 20.
@@ -17386,14 +17412,26 @@ function rbList(T) {
   out.sort((a, b) => (b.ok - a.ok)); // what can be made now first
   return out;
 }
+// Java's tabs: everything, equipment, building blocks, everything else, redstone
+const RB_TABS = [['all', '검색', 'compass'], ['equip', '장비', 'iron_axe'], ['build', '건축 블록', 'bricks'], ['misc', '기타', 'lava_bucket'], ['red', '레드스톤', 'redstone']];
+function rbCat(id) {
+  const d = ITEMS[id], k = d.key;
+  if (/redstone|repeater|comparator|piston|lever|_button$|pressure_plate|observer|dropper|dispenser|hopper|daylight|tripwire|note_block|^target$|rail$|^tnt$|lectern|trapped_chest|_lamp$|^bell$|lightning_rod/.test(k)) return 'red';
+  if (d.tool || d.armor || /sword|^bow$|arrow|shield|trident|crossbow|fishing_rod|shears|flint_and_steel|^clock$|compass|^lead$|spyglass|bucket|carrot_on_a_stick|fungus_on_a_stick/.test(k)) return 'equip';
+  if (d.block && !d.sprite) return 'build';
+  return 'misc';
+}
+// the green book button, inside the inventory's (or crafting table's) panel beside the grid
+function rbBtnHtml() { return `<button class="rbbtn ${OPT.rb ? 'on' : ''}" data-rbtoggle="1" title="제작법 책"></button>`; }
+// the book itself, to the right of the panel: tabs, search, the craftable-only switch, 5 x 4 recipes, pages
 function rbHtml(T) {
-  if (T !== 'inv' && T !== 'craft') return '';
-  const book = `<button class="rbbtn ${OPT.rb ? 'on' : ''}" data-rbtoggle="1" title="제작법 책"></button>`;
-  if (!OPT.rb) return book;
-  rbLearn();
-  const list = rbList(T), pages = Math.max(1, Math.ceil(list.length / 20)); RB.page = Math.min(RB.page, pages - 1);
-  const cells = list.slice(RB.page * 20, RB.page * 20 + 20).map(x => `<div class="rbc ${x.ok ? 'ok' : 'no'}" data-rb="${x.i}" title="${esc(itemName(x.r.out))}${x.r.n > 1 ? ' ×' + x.r.n : ''}">${icon(x.r.out, x.r.n)}</div>`).join('');
-  return book + `<div class="panel rbook"><div class="rbtop"><input id="rbsearch" placeholder="검색" value="${esc(RB.q)}" autocomplete="off"><button class="rbf ${OPT.rbOnly ? 'on' : ''}" data-rbf="1" title="제작 가능한 것만">${OPT.rbOnly ? '가능만' : '전체'}</button></div><div class="rbgrid">${cells || '<p class="tip">아는 제작법이 없습니다</p>'}</div><div class="rbpg"><button data-rbpg="-1" ${RB.page ? '' : 'disabled'}>◀</button><span>${RB.page + 1}/${pages}</span><button data-rbpg="1" ${RB.page < pages - 1 ? '' : 'disabled'}>▶</button></div></div>`;
+  if ((T !== 'inv' && T !== 'craft') || !OPT.rb) return '';
+  rbLearn(); RB.tab = RB.tab || 'all';
+  const list = rbList(T).filter(x => RB.tab === 'all' || rbCat(x.r.out) === RB.tab), pages = Math.max(1, Math.ceil(list.length / 20)); RB.page = Math.min(RB.page, pages - 1);
+  const U = n => `calc(${n} * var(--px))`;
+  const cells = list.slice(RB.page * 20, RB.page * 20 + 20).map((x, k) => `<div class="rbc ${x.ok ? 'ok' : 'no'}" style="left:${U(11 + 25 * (k % 5))};top:${U(31 + 25 * Math.floor(k / 5))}" data-rb="${x.i}" title="${esc(itemName(x.r.out))}${x.r.n > 1 ? ' ×' + x.r.n : ''}">${icon(x.r.out, 1)}</div>`).join('');
+  const tabs = RB_TABS.map(([k, n, ic], t) => `<div class="rbtab ${RB.tab === k ? 'on' : ''}" style="top:${U(3 + 27 * t)}" data-rbtab="${k}" title="${n}">${IID[ic] != null ? icon(IID[ic], 1) : ''}</div>`).join('');
+  return `<div class="panel rbook">${tabs}<div class="rbs"><input id="rbsearch" placeholder="검색..." value="${esc(RB.q)}" autocomplete="off"></div><button class="rbf ${OPT.rbOnly ? 'on' : ''}" data-rbf="1" title="${OPT.rbOnly ? '제작할 수 있는 것만 표시 중' : '모든 제작법 표시 중'}"></button><div class="rbcells">${cells || '<p class="rbnone">아는 제작법이 없습니다</p>'}</div>${pages > 1 ? `<button class="rbpg prev" data-rbpg="-1" ${RB.page ? '' : 'disabled'}></button><span class="rbpn">${RB.page + 1}/${pages}</span><button class="rbpg next" data-rbpg="1" ${RB.page < pages - 1 ? '' : 'disabled'}></button>` : ''}</div>`;
 }
 // a recipe clicked: the grid's things go back to the inventory, then the ingredients are laid out
 function rbUse(i, all) {
@@ -17417,12 +17455,13 @@ function rbUse(i, all) {
 document.addEventListener('DOMContentLoaded', () => {
   const sc = $('screen'); if (!sc) return;
   sc.addEventListener('pointerdown', e => {
-    const t = e.target.closest('[data-rbtoggle],[data-rb],[data-rbf],[data-rbpg],#rbsearch'); if (!t) return;
+    const t = e.target.closest('[data-rbtoggle],[data-rb],[data-rbf],[data-rbpg],[data-rbtab],#rbsearch'); if (!t) return;
     if (t.id === 'rbsearch') { e.stopPropagation(); return; } // (typing, not clicking a slot)
     e.preventDefault(); e.stopPropagation();
     if (t.dataset.rbtoggle) { OPT.rb = !OPT.rb; saveOpt(); GUI.ghost = null; }
     else if (t.dataset.rbf) { OPT.rbOnly = !OPT.rbOnly; saveOpt(); RB.page = 0; }
     else if (t.dataset.rbpg) RB.page = Math.max(0, RB.page + +t.dataset.rbpg);
+    else if (t.dataset.rbtab) { RB.tab = t.dataset.rbtab; RB.page = 0; play('click', { vol: 0.3 }); }
     else if (t.dataset.rb) { rbUse(+t.dataset.rb, e.shiftKey); return; }
     UI.renderScreen();
   }, true);
