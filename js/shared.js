@@ -4226,7 +4226,7 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
     const M = 7; // an even slope around the piece instead of a sheer column: up to the piece below it, down to it above
     for (let wx = Math.max(x0, p.box[0] - M); wx <= Math.min(x0 + 15, p.box[3] + M); wx++) for (let wz = Math.max(z0, p.box[2] - M); wz <= Math.min(z0 + 15, p.box[5] + M); wz++) {
       const d = Math.max(p.box[0] - wx, wx - p.box[3], p.box[2] - wz, wz - p.box[5], 0), ft = p.oy - 1 - d;
-      const bio = BB[G.column(wx, wz)[2]], sandy = bio === BIO.DESERT || bio === BIO.BADLANDS || bio === BIO.BEACH, topB = sandy ? 12 : 2, fillB = sandy ? 12 : 3;
+      const bio = BB[G.column(wx, wz)[2]], sandy = bio === BIO.DESERT || bio === BIO.BADLANDS || bio === BIO.BEACH, topB = sandy ? BID.sand : 2, fillB = sandy ? BID.sand : 3; // (by name: 12 once was sand in the old numbering and is iron ore now)
       for (let y = ft; y > 1 && y >= p.oy - 20; y--) { const b = st.get(wx, y, wz); if (b > 0 && !REPL[b] && !FLUID[b]) break; st(wx, y, wz, d && y === ft ? topB : fillB, 0); }
       const cut = d ? p.oy + d : p.oy; let lowest = -1;
       for (let y = cut; y <= top; y++) { const b = st.get(wx, y, wz); if (b > 0 && NATURAL[b]) { st(wx, y, wz, 0, 0); if (lowest < 0) lowest = y; } }
