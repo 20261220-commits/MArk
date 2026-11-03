@@ -33,8 +33,11 @@ module.exports = async ({ ok, srv, b, lib }) => {
   for (const P of [A, B, C]) await P.evaluate(() => { if (PL.riding) dismount(); });
   // a dropped item: one gets it
   await A.evaluate(p => dropItem(p[0] + 0.5, p[1] + 0.2, p[2] + 2.5, IID.emerald, 5, [0, 0, 0], 40), pos); await A.waitForTimeout(1500);
-  for (const P of [B, C]) await P.evaluate(p => { PL.x = p[0] + 0.5; PL.y = p[1]; PL.z = p[2] + 2.5; }, pos); await A.waitForTimeout(4000);
-  const em = await Promise.all([A, B, C].map(P => P.evaluate(() => INV.count(IID.emerald))));
+  for (const P of [B, C]) await P.evaluate(p => { PL.x = p[0] + 0.5; PL.y = p[1]; PL.z = p[2] + 2.5; }, pos);
+  const emAll = () => Promise.all([A, B, C].map(P => P.evaluate(() => INV.count(IID.emerald))));
+  for (let t = 0; t < 40 && (await emAll()).every(v => !v); t++) await A.waitForTimeout(500); // (a slow page sends its item list less often)
+  await A.waitForTimeout(2500); // then time for a second pickup, which must not happen
+  const em = await emAll();
   ok(em.reduce((a, v) => a + v, 0) === 5, 'a dropped stack goes to exactly one player', em);
   // a zombie goes for a guest; a guest kills it
   await C.evaluate(() => { PL.health = 20; PL.mode = 'survival'; }); await A.evaluate(p => { W.time = 18000; const z = spawnMob('zombie', p[0] + 0.5, p[1], p[2] + 6); z.persistent = true; window.__z = z; PL.mode = 'creative'; }, pos);

@@ -67,6 +67,7 @@ function mpWorldCore(store, out) {
   }
   function message(id, m) {
     let p = players.get(id); if (!p) { p = { id, name: null, dim: null, joined: false, s: null }; players.set(id, p); }
+    p.seenAt = Date.now(); // (a player sends its position every tick: a long silence means a dead connection)
     const from = id; m.from = from;
     switch (m.t) {
       case 'create': // a new world, or the start of an upload of an existing one
@@ -95,7 +96,15 @@ function mpWorldCore(store, out) {
           }
         }
         p.key = p.account ? 'a:' + p.account : p.name;
-        for (const q of players.values()) if (q !== p && q.joined && (q.name.toLowerCase() === p.name.toLowerCase() || q.key === p.key)) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
+        p.dev = typeof m.dev === 'string' ? m.dev.slice(0, 40) : null;
+        // the same name already in: the same account (its password checked) or the same device coming back after a dropped
+        // connection the server hadn't noticed yet, or a player gone silent - the new connection takes over (as Java's
+        // "logged in from another location"); anyone else with that name is refused
+        for (const q of [...players.values()]) if (q !== p && q.joined && (q.name.toLowerCase() === p.name.toLowerCase() || q.key === p.key)) {
+          const same = (p.account && q.key === p.key) || (p.dev && q.dev === p.dev && q.key === p.key) || Date.now() - (q.seenAt || 0) > 20000;
+          if (!same) { send(p, { t: 'error', msg: p.account && q.key === p.key ? '이 계정으로 이미 접속해 있습니다' : '같은 이름의 플레이어가 이미 있습니다' }); return; }
+          send(q, { t: 'kicked', msg: '다른 곳(또는 다시 연결한 이 기기)에서 같은 이름으로 접속했습니다' }); leave(q.id); if (store.drop) store.drop(q.id);
+        }
         if (!p.account && S.logins[p.name.toLowerCase()]) { send(p, { t: 'error', msg: `"${p.name}" 이름에는 비밀번호가 걸려 있습니다. 타이틀 → 로그인에서 이 이름과 비밀번호로 로그인한 뒤 접속하세요` }); return; }
         p.joined = true;
         send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.key] || null, stored: [...store.keys],
