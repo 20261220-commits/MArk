@@ -1085,6 +1085,160 @@ function makeBiomeMap(worldSeed) {
 let GENV = 2; const setGenVersion = v => { GENV = v || 1; };
 const BMAPS = new Map();
 const biomeMapFor = seed => { let m = BMAPS.get(seed); if (!m) { m = makeBiomeMap(seed); BMAPS.set(seed, m); if (BMAPS.size > 2) BMAPS.delete(BMAPS.keys().next().value); } return m; };
+// ---------- Java 1.18 climate noise (world generator 4) ----------
+// The random numbers and noise of Java's world generator, so the climate - and with it the biomes - is laid out by the
+// same rules and at the same scales: Xoroshiro128++ seeded as RandomSupport does, positional randoms from the MD5 of a
+// name, ImprovedNoise / PerlinNoise / NormalNoise, and the noise parameters of the overworld (temperature, vegetation,
+// continentalness, erosion, ridges and the offset that shifts where they are read)
+const J64 = (1n << 64n) - 1n;
+const jRotl = (x, k) => ((x << k) | (x >> (64n - k))) & J64;
+const jMix13 = z => { z = ((z ^ (z >> 30n)) * 0xBF58476D1CE4E5B9n) & J64; z = ((z ^ (z >> 27n)) * 0x94D049BB133111EBn) & J64; return z ^ (z >> 31n); };
+function jMd5(str) { // the 16 bytes of MD5 of an ASCII string
+  const K = [], s = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21];
+  for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0;
+  const bytes = []; for (let i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i) & 255);
+  const len = bytes.length; bytes.push(0x80); while (bytes.length % 64 !== 56) bytes.push(0); const bits = len * 8; for (let i = 0; i < 8; i++) bytes.push(i < 4 ? (bits >>> (8 * i)) & 255 : 0);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let o = 0; o < bytes.length; o += 64) {
+    const M = []; for (let i = 0; i < 16; i++) M[i] = bytes[o + i * 4] | (bytes[o + i * 4 + 1] << 8) | (bytes[o + i * 4 + 2] << 16) | (bytes[o + i * 4 + 3] << 24);
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) { let F, g; if (i < 16) { F = (B & C) | (~B & D); g = i; } else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; } else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; } else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+      F = (F + A + K[i] + M[g]) | 0; A = D; D = C; C = B; B = (B + ((F << s[i]) | (F >>> (32 - s[i])))) | 0; }
+    a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+  }
+  const out = []; for (const w of [a0, b0, c0, d0]) for (let i = 0; i < 4; i++) out.push((w >>> (8 * i)) & 255); return out;
+}
+class JXoro {
+  constructor(lo, hi) { this.lo = lo & J64; this.hi = hi & J64; if (!this.lo && !this.hi) { this.lo = 0x9E3779B97F4A7C15n; this.hi = 0x6A09E667F3BCC909n; } }
+  static ofSeed(seed) { const s = BigInt.asUintN(64, BigInt(seed)), l = s ^ 0x6A09E667F3BCC909n, l1 = (l + 0x9E3779B97F4A7C15n) & J64; return new JXoro(jMix13(l), jMix13(l1)); }
+  nextLong() { const s0 = this.lo; let s1 = this.hi; const r = (jRotl((s0 + s1) & J64, 17n) + s0) & J64; s1 ^= s0; this.lo = jRotl(s0, 49n) ^ s1 ^ ((s1 << 21n) & J64); this.hi = jRotl(s1, 28n); return r; }
+  nextU32() { return Number(this.nextLong() & 0xFFFFFFFFn); }
+  nextInt(bound) { let l = this.nextU32(), l1 = l * bound, l2 = l1 % 4294967296; if (l2 < bound) { const i = (4294967296 - bound) % bound; while (l2 < i) { l = this.nextU32(); l1 = l * bound; l2 = l1 % 4294967296; } } return Math.floor(l1 / 4294967296); }
+  nextDouble() { return Number(this.nextLong() >> 11n) * 1.1102230246251565e-16; }
+  forkPositional() { return { lo: this.nextLong(), hi: this.nextLong() }; }
+}
+const jFromHash = (pf, name) => { const b = jMd5(name); let l = 0n, l1 = 0n; for (let i = 0; i < 8; i++) { l = (l << 8n) | BigInt(b[i]); l1 = (l1 << 8n) | BigInt(b[8 + i]); } return new JXoro(l ^ pf.lo, l1 ^ pf.hi); };
+function jImproved(r) {
+  const xo = r.nextDouble() * 256, yo = r.nextDouble() * 256, zo = r.nextDouble() * 256, p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 0; i < 256; i++) { const j = r.nextInt(256 - i), t = p[i]; p[i] = p[i + j]; p[i + j] = t; }
+  const P = i => p[i & 255], gd = (h, x, y, z) => { const g = JGRAD[h & 15]; return g[0] * x + g[1] * y + g[2] * z; }, sm = t => t * t * t * (t * (t * 6 - 15) + 10), lp = (t, a, b) => a + t * (b - a);
+  return (x, y, z) => {
+    const d0 = x + xo, d1 = y + yo, d2 = z + zo, i = Math.floor(d0), j = Math.floor(d1), k = Math.floor(d2), dx = d0 - i, dy = d1 - j, dz = d2 - k;
+    const a = P(i), b = P(i + 1), c = P(a + j), d = P(a + j + 1), e = P(b + j), f = P(b + j + 1);
+    const v0 = gd(P(c + k), dx, dy, dz), v1 = gd(P(e + k), dx - 1, dy, dz), v2 = gd(P(d + k), dx, dy - 1, dz), v3 = gd(P(f + k), dx - 1, dy - 1, dz);
+    const v4 = gd(P(c + k + 1), dx, dy, dz - 1), v5 = gd(P(e + k + 1), dx - 1, dy, dz - 1), v6 = gd(P(d + k + 1), dx, dy - 1, dz - 1), v7 = gd(P(f + k + 1), dx - 1, dy - 1, dz - 1);
+    const sx = sm(dx), sy = sm(dy), sz = sm(dz);
+    return lp(sz, lp(sy, lp(sx, v0, v1), lp(sx, v2, v3)), lp(sy, lp(sx, v4, v5), lp(sx, v6, v7)));
+  };
+}
+function jPerlin(r, first, amps) {
+  const pf = r.forkPositional(), n = amps.length, levels = amps.map((a, k) => a !== 0 ? jImproved(jFromHash(pf, 'octave_' + (first + k))) : null);
+  const f0 = Math.pow(2, first), v0 = Math.pow(2, n - 1) / (Math.pow(2, n) - 1), wrap = d => d - Math.floor(d / 33554432 + 0.5) * 33554432;
+  return (x, y, z) => { let s = 0, f = f0, v = v0; for (let i = 0; i < n; i++) { const L = levels[i]; if (L) s += amps[i] * L(wrap(x * f), wrap(y * f), wrap(z * f)) * v; f *= 2; v /= 2; } return s; };
+}
+function jNormal(r, first, amps) {
+  const a = jPerlin(r, first, amps), b = jPerlin(r, first, amps); let lo = Infinity, hi = -Infinity; amps.forEach((v, i) => { if (v !== 0) { lo = Math.min(lo, i); hi = Math.max(hi, i); } });
+  const vf = (1 / 6) / (0.1 * (1 + 1 / (hi - lo + 1))), k = 1.0181268882175227;
+  return (x, y, z) => (a(x, y, z) + b(x * k, y * k, z * k)) * vf;
+}
+const JNOISE = new Map();
+function jClimateFor(seed) {
+  let c = JNOISE.get(seed); if (c) return c;
+  const pf = JXoro.ofSeed(seed).forkPositional(), mk = (name, first, amps) => jNormal(jFromHash(pf, 'minecraft:' + name), first, amps);
+  const T = mk('temperature', -10, [1.5, 0, 1, 0, 0, 0]), H = mk('vegetation', -8, [1, 1, 0, 0, 0, 0]), C = mk('continentalness', -9, [1, 1, 2, 2, 2, 1, 1, 1, 1]);
+  const E = mk('erosion', -9, [1, 1, 0, 1, 1]), Wd = mk('ridge', -7, [1, 2, 1, 0, 0, 0]), O = mk('offset', -3, [1, 1, 1, 0]);
+  const cache = new Map();
+  // the climate of a quart (4x4 block cell), as Java's NoiseSampler.sample reads it
+  const at = (qx, qz) => { const key = qx * 1048576 + qz; let v = cache.get(key); if (v) return v; const x = qx + O(qx, 0, qz) * 4, z = qz + O(qz, qx, 0) * 4;
+    v = { T: T(x, 0, z), H: H(x, 0, z), C: C(x, 0, z), E: E(x, 0, z), W: Wd(x, 0, z) }; cache.set(key, v); if (cache.size > 60000) cache.clear(); return v; };
+  c = { at }; JNOISE.set(seed, c); if (JNOISE.size > 2) JNOISE.delete(JNOISE.keys().next().value); return c;
+}
+// Java 1.18's OverworldBiomeBuilder (surface biomes): the same climate boxes in the same order; a point takes the first
+// box nearest to it. Names are this game's (1.17 names where 1.18 renamed a biome)
+const JB_TABLE = (() => {
+  const P = (a, b) => [a, b], span = (a, b) => [a[0], b[1]], FULL = [-1, 1];
+  const T = [P(-1, -0.45), P(-0.45, -0.15), P(-0.15, 0.2), P(0.2, 0.55), P(0.55, 1)], Hm = [P(-1, -0.35), P(-0.35, -0.1), P(-0.1, 0.1), P(0.1, 0.3), P(0.3, 1)];
+  const E = [P(-1, -0.78), P(-0.78, -0.375), P(-0.375, -0.2222), P(-0.2222, 0.05), P(0.05, 0.45), P(0.45, 0.55), P(0.55, 1)];
+  const FROZEN = T[0], UNFROZEN = span(T[1], T[4]);
+  const mush = P(-1.2, -1.05), deepO = P(-1.05, -0.455), ocean = P(-0.455, -0.19), coast = P(-0.19, -0.11), inland = P(-0.11, 0.55), near = P(-0.11, 0.03), mid = P(0.03, 0.3), far = P(0.3, 1);
+  const OCEANS = [['deep_frozen_ocean', 'deep_cold_ocean', 'deep_ocean', 'deep_lukewarm_ocean', 'warm_ocean'], ['frozen_ocean', 'cold_ocean', 'ocean', 'lukewarm_ocean', 'warm_ocean']];
+  const MID = [['snowy_tundra', 'snowy_tundra', 'snowy_tundra', 'snowy_taiga', 'taiga'], ['plains', 'plains', 'forest', 'taiga', 'giant_spruce_taiga'], ['flower_forest', 'plains', 'forest', 'birch_forest', 'dark_forest'], ['savanna', 'savanna', 'forest', 'jungle', 'jungle'], ['desert', 'desert', 'desert', 'desert', 'desert']];
+  const MIDV = [['ice_spikes', null, 'snowy_taiga', null, null], [null, null, null, null, 'giant_tree_taiga'], ['sunflower_plains', null, null, 'tall_birch_forest', null], [null, null, 'plains', 'jungle_edge', 'bamboo_jungle'], [null, null, null, null, null]];
+  const PLAT = [['snowy_tundra', 'snowy_tundra', 'snowy_tundra', 'snowy_taiga', 'snowy_taiga'], ['meadow', 'meadow', 'forest', 'taiga', 'giant_spruce_taiga'], ['meadow', 'meadow', 'meadow', 'meadow', 'dark_forest'], ['savanna_plateau', 'savanna_plateau', 'forest', 'forest', 'jungle'], ['badlands', 'badlands', 'badlands', 'wooded_badlands_plateau', 'wooded_badlands_plateau']];
+  const PLATV = [['ice_spikes', null, null, null, null], [null, null, 'meadow', 'meadow', 'giant_tree_taiga'], [null, null, 'forest', 'birch_forest', null], [null, null, null, null, null], ['eroded_badlands', 'eroded_badlands', null, null, null]];
+  const SHAT = [['gravelly_mountains', 'gravelly_mountains', 'mountains', 'wooded_mountains', 'wooded_mountains'], ['gravelly_mountains', 'gravelly_mountains', 'mountains', 'wooded_mountains', 'wooded_mountains'], ['mountains', 'mountains', 'mountains', 'wooded_mountains', 'wooded_mountains'], [null, null, null, null, null], [null, null, null, null, null]];
+  const neg = w => w[1] < 0;
+  const middle = (t, h, w) => neg(w) ? MID[t][h] : MIDV[t][h] || MID[t][h];
+  const badlands = (h, w) => h < 2 ? (neg(w) ? 'eroded_badlands' : 'badlands') : h < 3 ? 'badlands' : 'wooded_badlands_plateau';
+  const midBad = (t, h, w) => t === 4 ? badlands(h, w) : middle(t, h, w);
+  const plateau = (t, h, w) => neg(w) ? PLAT[t][h] : PLATV[t][h] || PLAT[t][h];
+  const slope = (t, h, w) => t >= 3 ? plateau(t, h, w) : h <= 1 ? 'snowy_slopes' : 'grove';
+  const midBadSlope = (t, h, w) => t === 0 ? slope(t, h, w) : midBad(t, h, w);
+  const savannaOr = (t, h, w, u) => t > 1 && h < 4 && !neg(w) ? 'shattered_savanna' : u;
+  const beach = (t) => t === 0 ? 'snowy_beach' : t === 4 ? 'desert' : 'beach';
+  const shattered = (t, h, w) => SHAT[t][h] || middle(t, h, w);
+  const shatCoast = (t, h, w) => savannaOr(t, h, w, !neg(w) ? middle(t, h, w) : beach(t));
+  const peak = (t, h, w) => t <= 2 ? (neg(w) ? 'jagged_peaks' : 'frozen_peaks') : t === 3 ? 'stony_peaks' : badlands(h, w);
+  const L = [], add = (t, h, c, e, w, b) => L.push([t[0], t[1], h[0], h[1], c[0], c[1], e[0], e[1], w[0], w[1], b]);
+  // off the coast
+  add(FULL, FULL, mush, FULL, FULL, 'mushroom_fields');
+  for (let i = 0; i < 5; i++) { add(T[i], FULL, deepO, FULL, FULL, OCEANS[0][i]); add(T[i], FULL, ocean, FULL, FULL, OCEANS[1][i]); }
+  const each = f => { for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) f(i, j, T[i], Hm[j]); };
+  const midSlice = w => {
+    add(FULL, FULL, coast, span(E[0], E[2]), w, 'stone_shore'); add(UNFROZEN, FULL, span(near, far), E[6], w, 'swamp');
+    each((i, j, t, h) => {
+      const m = middle(i, j, w), mb = midBad(i, j, w), mbs = midBadSlope(i, j, w), sh = shattered(i, j, w), pl = plateau(i, j, w), be = beach(i), sv = savannaOr(i, j, w, m), sc = shatCoast(i, j, w), sl = slope(i, j, w);
+      add(t, h, span(near, far), E[0], w, sl); add(t, h, span(near, mid), E[1], w, mbs); add(t, h, far, E[1], w, i === 0 ? sl : pl);
+      add(t, h, near, E[2], w, m); add(t, h, mid, E[2], w, mb); add(t, h, far, E[2], w, pl);
+      add(t, h, span(coast, near), E[3], w, m); add(t, h, span(mid, far), E[3], w, mb);
+      if (neg(w)) { add(t, h, coast, E[4], w, be); add(t, h, span(near, far), E[4], w, m); } else add(t, h, span(coast, far), E[4], w, m);
+      add(t, h, coast, E[5], w, sc); add(t, h, near, E[5], w, sv); add(t, h, span(mid, far), E[5], w, sh);
+      add(t, h, coast, E[6], w, neg(w) ? be : m); if (i === 0) add(t, h, span(near, far), E[6], w, m);
+    });
+  };
+  const highSlice = w => each((i, j, t, h) => {
+    const m = middle(i, j, w), mb = midBad(i, j, w), mbs = midBadSlope(i, j, w), pl = plateau(i, j, w), sh = shattered(i, j, w), sv = savannaOr(i, j, w, m), sl = slope(i, j, w), pk = peak(i, j, w);
+    add(t, h, coast, span(E[0], E[1]), w, m); add(t, h, near, E[0], w, sl); add(t, h, span(mid, far), E[0], w, pk);
+    add(t, h, near, E[1], w, mbs); add(t, h, span(mid, far), E[1], w, sl);
+    add(t, h, span(coast, near), span(E[2], E[3]), w, m); add(t, h, span(mid, far), E[2], w, pl); add(t, h, mid, E[3], w, mb); add(t, h, far, E[3], w, pl);
+    add(t, h, span(coast, far), E[4], w, m); add(t, h, span(coast, near), E[5], w, sv); add(t, h, span(mid, far), E[5], w, sh); add(t, h, span(coast, far), E[6], w, m);
+  });
+  const peaks = w => each((i, j, t, h) => {
+    const m = middle(i, j, w), mb = midBad(i, j, w), mbs = midBadSlope(i, j, w), pl = plateau(i, j, w), sh = shattered(i, j, w), sv = savannaOr(i, j, w, m), pk = peak(i, j, w);
+    add(t, h, span(coast, far), E[0], w, pk); add(t, h, span(coast, near), E[1], w, mbs); add(t, h, span(mid, far), E[1], w, pk);
+    add(t, h, span(coast, near), span(E[2], E[3]), w, m); add(t, h, span(mid, far), E[2], w, pl); add(t, h, mid, E[3], w, mb); add(t, h, far, E[3], w, pl);
+    add(t, h, span(coast, far), E[4], w, m); add(t, h, span(coast, near), E[5], w, sv); add(t, h, span(mid, far), E[5], w, sh); add(t, h, span(coast, far), E[6], w, m);
+  });
+  const lowSlice = w => {
+    add(FULL, FULL, coast, span(E[0], E[2]), w, 'stone_shore'); add(UNFROZEN, FULL, span(near, far), E[6], w, 'swamp');
+    each((i, j, t, h) => {
+      const m = middle(i, j, w), mb = midBad(i, j, w), mbs = midBadSlope(i, j, w), be = beach(i), sv = savannaOr(i, j, w, m), sc = shatCoast(i, j, w), sh = shattered(i, j, w);
+      add(t, h, near, span(E[0], E[1]), w, mb); add(t, h, span(mid, far), span(E[0], E[1]), w, mbs);
+      add(t, h, near, span(E[2], E[3]), w, m); add(t, h, span(mid, far), span(E[2], E[3]), w, mb);
+      add(t, h, coast, span(E[3], E[4]), w, be); add(t, h, span(near, far), E[4], w, m);
+      add(t, h, coast, E[5], w, sc); add(t, h, near, E[5], w, sv); add(t, h, span(mid, far), E[5], w, sh);
+      add(t, h, coast, E[6], w, be); if (i === 0) add(t, h, span(near, far), E[6], w, m);
+    });
+  };
+  const valleys = w => {
+    add(FROZEN, FULL, coast, span(E[0], E[1]), w, neg(w) ? 'stone_shore' : 'frozen_river'); add(UNFROZEN, FULL, coast, span(E[0], E[1]), w, neg(w) ? 'stone_shore' : 'river');
+    add(FROZEN, FULL, near, span(E[0], E[1]), w, 'frozen_river'); add(UNFROZEN, FULL, near, span(E[0], E[1]), w, 'river');
+    add(FROZEN, FULL, span(coast, far), span(E[2], E[5]), w, 'frozen_river'); add(UNFROZEN, FULL, span(coast, far), span(E[2], E[5]), w, 'river');
+    add(FROZEN, FULL, coast, E[6], w, 'frozen_river'); add(UNFROZEN, FULL, coast, E[6], w, 'river');
+    add(UNFROZEN, FULL, span(inland, far), E[6], w, 'swamp'); add(FROZEN, FULL, span(inland, far), E[6], w, 'frozen_river');
+    each((i, j, t, h) => add(t, h, span(mid, far), span(E[0], E[1]), w, midBad(i, j, w)));
+  };
+  midSlice(P(-1, -0.93333334)); highSlice(P(-0.93333334, -0.7666667)); peaks(P(-0.7666667, -0.56666666)); highSlice(P(-0.56666666, -0.4)); midSlice(P(-0.4, -0.26666668)); lowSlice(P(-0.26666668, -0.05));
+  valleys(P(-0.05, 0.05)); lowSlice(P(0.05, 0.26666668)); midSlice(P(0.26666668, 0.4)); highSlice(P(0.4, 0.56666666)); peaks(P(0.56666666, 0.7666667)); highSlice(P(0.7666667, 0.93333334)); midSlice(P(0.93333334, 1));
+  return L;
+})();
+// the biome (this game's key) for a climate point at the surface
+function jBiomeKey(c) {
+  const v = [c.T, c.H, c.C, c.E, c.W]; let best = null, bd = Infinity;
+  for (const e of JB_TABLE) { let d = 0; for (let k = 0; k < 5; k++) { const x = v[k], lo = e[k * 2], hi = e[k * 2 + 1], o = x < lo ? lo - x : x > hi ? x - hi : 0; d += o * o; if (d >= bd) break; } if (d < bd) { bd = d; best = e[10]; if (d === 0) break; } }
+  return best;
+}
 // ---------- terrain ----------
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 function makeGen(seed) {
@@ -1156,8 +1310,52 @@ function makeGen(seed) {
     if (key === 'shattered_savanna') h = Math.min(CH0 - 6, h + Math.floor(Math.max(0, nD.n2(wx / 9, wz / 9)) * 6));
     return [h, BB[v], v];
   }
+  // version 4: Java 1.18's own climate noise and biome table (jClimateFor, JB_TABLE). The ground follows the same
+  // climate the way Java's terrain splines do: continentalness sets the coast and how far inland rises, low erosion
+  // lifts mountains (the peaks where the ridges peak), middle erosion plateaus, erosion 0.45-0.55 the windswept hills,
+  // the highest erosion flat swamps, and the valleys of the ridges carve the rivers
+  const JC = GENV >= 4 ? jClimateFor(seed) : null, JZS = GENV >= 4 ? sha256Long(seed) : 0n, JFID = new Map();
+  const jFiddle = (x, y, z) => {
+    const key = ((x + 2097152) * 4194304 + z + 2097152) * 2 + (y & 1); let f = JFID.get(key); if (f) return f;
+    const X = BigInt(x), Y = BigInt(y), Z = BigInt(z), g = l => (Number(((l >> 24n) % 1024n + 1024n) % 1024n) / 1024 - 0.5) * 0.9;
+    let l = lnext(JZS, X); l = lnext(l, Y); l = lnext(l, Z); l = lnext(l, X); l = lnext(l, Y); l = lnext(l, Z); const a = g(l); l = lnext(l, JZS); const b = g(l); l = lnext(l, JZS);
+    f = [a, b, g(l)]; JFID.set(key, f); if (JFID.size > 40000) JFID.clear(); return f;
+  };
+  const jCell = (x, z) => { // BiomeManager's fuzzy zoom: which quart's biome a block shows (read at y 64)
+    const i = x - 2, j = 62, k = z - 2, l = i >> 2, mm = j >> 2, nn = k >> 2, d = (i & 3) / 4, e = (j & 3) / 4, f = (k & 3) / 4; let best = 0, bd = Infinity;
+    for (let p = 0; p < 8; p++) { const bx = (p & 4) === 0, by = (p & 2) === 0, bz = (p & 1) === 0, fd = jFiddle(bx ? l : l + 1, by ? mm : mm + 1, bz ? nn : nn + 1), h = (bx ? d : d - 1) + fd[0], t = (by ? e : e - 1) + fd[1], u = (bz ? f : f - 1) + fd[2], v = h * h + t * t + u * u; if (bd > v) { best = p; bd = v; } }
+    return [(best & 4) === 0 ? l : l + 1, (best & 1) === 0 ? nn : nn + 1];
+  };
+  const JBASE = [[-1.05, 32], [-0.455, 40], [-0.19, 56], [-0.16, 61], [-0.11, 64], [0.03, 67], [0.3, 73], [1, 82]];
+  const jBase = c => { if (c <= JBASE[0][0]) return JBASE[0][1]; for (let i = 1; i < JBASE.length; i++) if (c <= JBASE[i][0]) return lerp(JBASE[i - 1][1], JBASE[i][1], (c - JBASE[i - 1][0]) / (JBASE[i][0] - JBASE[i - 1][0])); return JBASE[JBASE.length - 1][1]; };
+  function column184(wx, wz) {
+    const qxf = (wx - 2) / 4, qzf = (wz - 2) / 4, qx = Math.floor(qxf), qz = Math.floor(qzf), tx = qxf - qx, tz = qzf - qz;
+    const a = JC.at(qx, qz), b = JC.at(qx + 1, qz), c = JC.at(qx, qz + 1), d = JC.at(qx + 1, qz + 1), bl = k => (a[k] * (1 - tx) + b[k] * tx) * (1 - tz) + (c[k] * (1 - tx) + d[k] * tx) * tz;
+    const C = bl('C'), E = bl('E'), Wd = bl('W'), T = bl('T'), PV = -(Math.abs(Math.abs(Wd) - 0.6667) - 0.3333) * 3;
+    const hills = nD.fbm(wx / 130, wz / 130, 4), detail = nD.n2(wx / 28, wz / 28), ridge = 1 - Math.abs(nM.n2(wx / 200, wz / 200)), jag = Math.abs(nX.n2(wx / 23, wz / 23)) + Math.abs(nD.n2(wx / 11, wz / 11)) * 0.4;
+    const inland = smooth(-0.11, 0.3, C);
+    let h = jBase(C) + hills * lerp(2, 9, inland) + detail * 1.2;
+    const mtn = smooth(-0.2, -0.78, E) * smooth(-0.11, 0.1, C), peak = smooth(0, 0.8, PV);
+    h += mtn * (20 + peak * (100 + ridge * ridge * 60) + jag * peak * 20);
+    h += smooth(-0.15, -0.35, E) * smooth(0.02, 0.25, C) * (1 - mtn) * 18; // plateaus
+    const ws = smooth(0.43, 0.47, E) * smooth(0.57, 0.53, E) * smooth(-0.13, 0, C); h += ws * (12 + jag * 25 + Math.max(0, PV) * 20); // windswept hills
+    const river = PV < -0.82 && C > -0.19 && !(C > 0.03 && E < -0.375), rk = river ? smooth(-0.82, -0.97, PV) : 0;
+    if (river) h = lerp(h, SEA - 3 + detail, rk);
+    if (E > 0.55 && C > -0.11 && T > -0.45) h = lerp(h, SEA + 0.5 + detail * 0.8, smooth(0.55, 0.6, E) * 0.85); // swamps lie flat at the water
+    if (C < -1.03) h = lerp(h, SEA + 3 + hills * 3, smooth(-1.03, -1.1, C)); // mushroom fields: islands far out at sea
+    if (h > 180) h = 180 + 66 * Math.tanh((h - 180) / 66);
+    h = Math.max(6, Math.min(CH0 - 6, Math.floor(h)));
+    const cell = jCell(wx, wz), q = JC.at(cell[0], cell[1]); let key = jBiomeKey(q);
+    const ti = band(q.T, [-0.45, -0.15, 0.2, 0.55]);
+    if (h < SEA - 1 && !/ocean|river|swamp|mushroom/.test(key)) key = OCEANS[h < 40 ? 0 : 1][ti]; // under the sea: the ocean of that climate
+    else if (/ocean/.test(key) && h >= SEA) key = ti === 0 ? 'snowy_beach' : ti === 4 ? 'desert' : 'beach';
+    let v = BIOK[key]; if (v == null) v = BIOK.plains;
+    if (key === 'badlands' || key === 'wooded_badlands_plateau' || key === 'eroded_badlands') { if (h > 72) h = 72 + Math.round((h - 72) / 4) * 4; if (key === 'eroded_badlands') { const sp = Math.abs(nX.n2(wx / 14, wz / 14)) + Math.abs(nD.n2(wx / 7, wz / 7)) * 0.3; if (sp > 0.55) h = Math.min(CH0 - 6, h + Math.min(40, Math.floor((sp - 0.55) * 120))); } }
+    return [h, BB[v], v];
+  }
   // column: [height, biome]
   function column(wx, wz) {
+    if (GENV >= 4) return column184(wx, wz);
     if (GENV >= 3) return column18(wx, wz);
     if (BM) return columnJ(wx, wz);
     const cont = nC.fbm(wx / 900, wz / 900, 4) * 1.6 + 0.12;
@@ -4085,7 +4283,7 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { vanillaState, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

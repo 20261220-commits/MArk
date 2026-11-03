@@ -24,7 +24,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     o.crit = [Math.min(...ds), Math.max(...ds)];
     // mobs on a small platform in the air stay on it
     clear(); PL.mode = 'creative'; PL.flying = true; PL.y = Y + 20; for (let a = -3; a <= 3; a++) for (let c = -3; c <= 3; c++) setBlock(X + a, Y - 1, Z + c, BID.stone);
-    const ms = ['cow', 'pig', 'sheep', 'chicken'].map((t, i) => { const e = spawnMob(t, X - 1 + i * 0.7, Y, Z + .5); e.persistent = true; return e; });
+    const ms = ['cow', 'pig', 'sheep', 'chicken', 'cat', 'panda', 'polar_bear', 'llama', 'horse'].filter(t => MOBDEF[t]).map((t, i) => { const e = spawnMob(t, X - 2 + (i % 5), Y, Z - 1 + Math.floor(i / 5) * 2); e.persistent = true; return e; });
     tick(1500); o.platform = ms.map(e => e.dead ? 'dead' : +(e.y - Y).toFixed(1));
     // commands
     clear(); for (let a = -8; a <= 8; a++) for (let c = -8; c <= 8; c++) setBlock(X + a, Y - 1, Z + c, BID.stone); PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.yaw = 0; PL.pitch = 0; PL.flying = false;
@@ -51,7 +51,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.boatTurn[0] < -60 && Math.abs(r.boatTurn[1]) < 1 && r.boatSpeed > 6 && r.boatSpeed < 8.5, 'a boat turns as in Java and the view turns with it; ~7 m/s on water', [r.boatTurn, r.boatSpeed]);
   ok(r.fistHits === 5, 'a boat breaks after five punches', r.fistHits);
   ok(r.arrow[0] && !r.arrow[1] && r.crit[0] >= 6 && r.crit[1] <= 10 && r.crit[1] > 6, 'arrows: a target\'s box grows 0.3; a critical arrow does 6-10', [r.arrow, r.crit]);
-  ok(r.platform.every(v => v === 0), 'animals don\'t wander off a platform in the air', r.platform);
+  ok(r.platform.every(v => v === 0), 'animals (and mobs with their own AI: cats, pandas, polar bears, llamas, horses) don\'t wander off a platform in the air', r.platform);
   const c = r.cmd;
   ok(c.give === 70 && c.clear === 65 && c.tp[0] === 0.5 && c.tp[1] === 3 && c.rel === -0.5, '/give, /clear, /tp with ~ and ^', c);
   ok(c.yaw90[0] === -1 && c.summon === 1 && c.kill === 0 && c.effect && c.stair, '/tp yaw (90 = west), /summon, /kill @e[type=..], /effect on @e[..], /setblock with a block state', c);

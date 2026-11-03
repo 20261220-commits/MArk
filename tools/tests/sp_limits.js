@@ -23,13 +23,13 @@ module.exports = async ({ ok, srv, b, lib }) => {
     // the Nether: water boils, lava spreads 7, spawns follow Java's lists
     switchDim(-1, PL.x, 80, PL.z, 'spawn'); for (let i = 0; i < 300 && (UI.menu === 'loading' || W.dim !== -1); i++) await wait(100); showMenu(null); UI.paused = false;
     const x = Math.floor(PL.x), y = 100, z = Math.floor(PL.z);
-    for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) { setBlock(x + a, y - 1, z + c, BID.netherrack); for (let k = 0; k < 3; k++) setBlock(x + a, y + k, z + c, 0); }
-    PL.x = x + .5; PL.y = y + 4; PL.z = z + .5; PL.flying = true; PL.mode = 'survival';
+    for (let a = -11; a <= 11; a++) for (let c = -11; c <= 11; c++) { setBlock(x + a, y - 1, z + c, BID.netherrack); const wall = Math.abs(a) === 11 || Math.abs(c) === 11; for (let k = 0; k < 6; k++) setBlock(x + a, y + k, z + c, wall || k === 5 ? BID.netherrack : 0); } // walled and roofed: the Nether's own lava stays out
+    PL.x = x + .5; PL.y = y + 3; PL.z = z + .5; PL.flying = true; PL.mode = 'survival';
     INV.slots[INV.sel] = { id: IID.water_bucket, n: 1 }; TARGET = { type: 'block', x: x + 3, y: y - 1, z, id: BID.netherrack, m: 0, nx: 0, ny: 1, nz: 0, t: 2 }; USE.placeCd = 0; useItem(true);
     o.boiled = { block: getBlock(x + 3, y, z), held: INV.slots[INV.sel] && ITEMS[INV.slots[INV.sel].id].key };
     PL.mode = 'creative'; setBlock(x, y, z, BID.lava, 0); schedule(x, y, z, 1);
     for (let i = 0; i < 160; i++) { UI.paused = false; await wait(100); }
-    let far = 0; for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) if (getBlock(x + a, y, z + c) === BID.lava) far = Math.max(far, Math.abs(a) + Math.abs(c)); o.lavaFar = far;
+    let far = 0; for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) if (getBlock(x + a, y, z + c) === BID.lava) far = Math.max(far, Math.abs(a) + Math.abs(c)); o.lavaFar = far; o.lavaAt = []; for (let a = -10; a <= 10; a++) for (let c = -10; c <= 10; c++) if (getBlock(x + a, y, z + c) === BID.lava && Math.abs(a) + Math.abs(c) > 7) o.lavaAt.push([a, c, getMeta(x + a, y, z + c)]); o.lavaAt = o.lavaAt.slice(0, 8); o.dim = W.dim; o.y = y;
     setBlock(x + 6, y - 1, z + 6, BID.soul_soil); setBlock(x + 7, y, z + 6, BID.blue_ice); setBlock(x + 6, y, z + 6, BID.lava, 0); schedule(x + 6, y, z + 6, 1);
     for (let i = 0; i < 20; i++) { UI.paused = false; await wait(100); } o.basalt = getBlock(x + 6, y, z + 6) === BID.basalt;
     const kinds = {}; for (let i = 0; i < 400; i++) { const t = mobsForDimension(x, y, z, 0, BID.netherrack); if (t) kinds[t[0]] = (kinds[t[0]] || 0) + 1; } o.kinds = kinds;
@@ -41,7 +41,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.washed && r.after.col == null && r.after.lv === 2, 'a water cauldron washes the dye out and loses a level', r.after);
   ok(r.dyedOffers.length >= 4 && r.dyedOffers.every(Boolean) && r.horse.every(Boolean), 'the leatherworker sells dyed leather armour', r.dyedOffers);
   ok(r.boiled.block === 0 && r.boiled.held === 'bucket', 'water poured in the Nether boils away', r.boiled);
-  ok(r.lavaFar === 7, 'lava runs 7 blocks in the Nether', r.lavaFar);
+  ok(r.lavaFar === 7, 'lava runs 7 blocks in the Nether', [r.lavaFar, r.lavaAt, r.dim, r.y]);
   ok(Object.keys(r.kinds).length >= 2 && Object.keys(r.kinds).every(k => ['ghast', 'zombified_piglin', 'magma_cube', 'enderman', 'piglin', 'skeleton', 'hoglin'].includes(k)), 'Nether spawns follow the biome lists', r.kinds);
   ok(['blaze', 'zombified_piglin', 'wither_skeleton', 'skeleton', 'magma_cube'].includes(r.fortress), 'nether bricks spawn fortress mobs', r.fortress);
   ok(r.zomb, 'a piglin brought to the Overworld zombifies', r.zomb);

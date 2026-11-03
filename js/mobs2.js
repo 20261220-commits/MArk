@@ -357,11 +357,23 @@ function endermanTeleport(e, cx = e.x, cz = e.z) {
   return false;
 }
 function walkPhysics(e, mx, mz, speed) {
-  const inF = e.inWater || e.inLava, acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
+  const inF = e.inWater || e.inLava, d = e.def;
+  // the same good sense the common mobs have (entities.js): a stroll to a far spot follows a path around walls and holes,
+  // no step over a drop of more than three blocks or into lava, fire or cactus, and two seconds against a wall gives up
+  // on that spot
+  if ((mx || mz) && e.goal && e.goal.length === 2 && !e.target && !d.fly && typeof pathDir === 'function') {
+    const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz), ml = Math.hypot(mx, mz);
+    if (gl > 2.5 && (gx * mx + gz * mz) / (gl * ml) > 0.8) { const pd = pathDir(e, e.goal[0], e.y, e.goal[1]); if (pd[0] || pd[1]) { mx = pd[0] * ml; mz = pd[1] * ml; e.yawTarget = Math.atan2(-pd[0], -pd[1]); } }
+  }
+  if ((mx || mz) && e.onGround && !inF && !d.fly && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } }
+  if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0;
+  e.lastX = e.x; e.lastZ = e.z;
+  const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = 0.42; e.jumpCd = 10; }
   if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (mx || mz) e.vy += 0.04; e.vy *= 0.8; }
   turn(e);
+  { const hv = Math.hypot(e.vx, e.vz); if (hv > 0.003 && hv < 0.15 && e.onGround && !inF && !d.fly && !(e.hurt > 0) && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, e.vx / hv, e.vz / hv)) { e.vx *= -0.2; e.vz *= -0.2; } }
   physMove(e, e.vx, e.vy, e.vz, 0.6);
   if (!inF) e.vy = (e.vy - 0.08) * 0.98;
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }

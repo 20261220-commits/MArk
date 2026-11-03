@@ -24,7 +24,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     o.nether = { rack: d2.blocks[at(5, 1)] === BID.netherrack, below: d2.blocks.subarray(0, 64 << 8).every(v => v === 0) };
     return o;
   });
-  ok(r.minY === -64 && r.maxY === 320 && r.gen === 3, 'the world is 1.18: y -64..319, the 1.18 generator', r);
+  ok(r.minY === -64 && r.maxY === 320 && r.gen >= 3, 'the world is 1.18: y -64..319, the 1.18 generator', r);
   ok(r.old.len && r.old.diamond && r.old.glass && r.old.tile, 'an older save keeps its blocks and chests at the same heights', r.old);
   ok(r.old.deep && r.old.floor && r.old.oldFloor, 'below y 0 it gets the 1.18 depths; the old bedrock floor turns to deepslate', r.old);
   ok(r.v128.gold && r.v128.sky, 'a save from the 128-high version loads too', r.v128);

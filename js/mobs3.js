@@ -148,6 +148,10 @@ function wolfAI(e, dist) {
   // a tame wolf fights whatever hurt its owner or whatever the owner hits
   if (tame && !e.target && PL.lastAttacked && !PL.lastAttacked.dead && PL.lastAttacked !== e && Math.hypot(PL.lastAttacked.x - e.x, PL.lastAttacked.z - e.z) < 16) e.target = PL.lastAttacked;
   if (e.target && e.target !== PL && e.target.dead) e.target = null;
+  if (!e.target && !e.sitting && e.age % 20 === 0) { // Java: every wolf goes for skeletons; a wild one hunts sheep, rabbits and foxes now and then
+    let best = null, bd = 12; for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e && ((o.type === 'skeleton' || o.type === 'stray' || o.type === 'wither_skeleton') || (!tame && (o.type === 'sheep' || o.type === 'rabbit' || o.type === 'fox') && Math.random() < 0.1))) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < bd) { bd = dd; best = o; } }
+    if (best) e.target = best; }
+  if (e.target && e.target !== PL && Math.hypot(e.target.x - e.x, e.target.z - e.z) > 20) e.target = null;
   let mx = 0, mz = 0, sp = 0.1;
   if (e.sitting) { walkPhysics(e, 0, 0, 0); return; }
   if (e.target) {

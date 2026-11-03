@@ -636,6 +636,13 @@ function mobTick(e) {
     }
     if (e.type === 'chicken' && Math.random() < 1 / 6000) dropItem(e.x, e.y + .3, e.z, IID.egg, 1);
   }
+  // Java's other goals for these mobs: burning undead look for shade, skeletons keep away from wolves, babies follow
+  // a grown-up of their kind, spiders climb whatever wall they walk into
+  if (d.burn && e.fire > 0 && !e.target && !e.inWater && (e.age % 10 === 0 || !e.goal)) { const sky = (x, y, z) => getLight(Math.floor(x), Math.floor(y), Math.floor(z)) >> 4; if (sky(e.x, e.y + e.h, e.z) === 15) { for (let i = 0; i < 10; i++) { const gx = e.x + (Math.random() - .5) * 20, gz = e.z + (Math.random() - .5) * 20, gy = topY(Math.floor(gx), Math.floor(gz)); if (Math.abs(gy - e.y) < 4 && sky(gx, e.y + 1, gz) < 15) { e.goal = [gx, gz]; e.path = null; break; } } } if (e.goal) speed = d.speed * 1.4; }
+  if ((e.type === 'skeleton' || e.type === 'stray') && e.age % 5 === 0) { const w = ENT.find(o => o.type === 'wolf' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 6); if (w) { const fx = e.x - w.x, fz = e.z - w.z, l = Math.hypot(fx, fz) || 1; e.goal = [e.x + fx / l * 8, e.z + fz / l * 8]; e.fleeT = 20; } }
+  if (e.fleeT > 0) { e.fleeT--; if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz) || 1; mx = gx / gl; mz = gz / gl; speed = d.speed * 1.3; } }
+  if (e.baby > 0 && !e.target && !(e.panic > 0) && d.food && e.age % 20 === 0) { let par = null, pd = 16; for (const o of ENT) if (o !== e && o.type === e.type && !o.dead && !(o.baby > 0)) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < pd) { pd = dd; par = o; } } if (par && pd > 3) e.goal = [par.x, par.z]; }
+  if (d.climb && e.hitH && (mx || mz)) e.vy = Math.max(e.vy, 0.2);
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }
   // movement physics
   const inF = e.inWater || e.inLava;
