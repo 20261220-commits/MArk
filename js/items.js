@@ -743,6 +743,7 @@ for (const e of ('axolotl,아홀로틀,FBC1E3,A62D74;bat,박쥐,4C3E30,0F0F0F;be
   'zombie_villager,좀비 주민,563C33,799C65;zombified_piglin,좀비화 피글린,EA9393,4C7129').split(';')) {
   const [k, n, a, b] = e.split(','); item(k + '_spawn_egg', n + ' 생성 알', { egg: k, eggCol: [parseInt(a, 16), parseInt(b, 16)] });
 }
+item('goat_horn', '염소 뿔', { stack: 1, lore: ['숙고'] }); // (added last: earlier ids stay as they were)
 // block key (including variant keys) -> [block id, meta]
 const VKEY = {}; for (const b of BLOCKS) if (b) { VKEY[b.key] = [b.id, 0]; if (b.vk) b.vk.forEach((k, i) => { VKEY[k] = [b.id, i << (b.vshift || 0)]; }); }
 const ITEM_KEYS = Array.from(ITEMS, d => d ? d.key : null);

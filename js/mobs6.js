@@ -78,7 +78,7 @@ function witchAI(e, dist) {
       }
     }
   } else {
-    if (!e.goal && Math.random() < 1 / 100) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12];
+    if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 6);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
     if (e.raid) raidMarch(e);
   }
@@ -142,7 +142,7 @@ function illagerAI(e, dist) {
     if (!e.yell && Math.random() < 0.01) { e.yell = 200; play('hmm', { pitch: 0.6, vol: 0.6 }); }
   } else if (e.raid) raidMarch(e);
   else {
-    if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 14, e.z + (Math.random() - .5) * 14];
+    if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 7);
     if (e.patrolGoal && !e.captain) { const cap = e.patrolGoal; e.goal = [cap.x + (Math.random() - .5) * 4, cap.z + (Math.random() - .5) * 4]; if (cap.dead) e.patrolGoal = null; }
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }

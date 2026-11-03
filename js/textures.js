@@ -614,6 +614,7 @@ const SPR = {
   clay_ball: () => sprite(p => blob(p, 8, 8.5, 5, 4.5, [hex(0xc0c6d4), hex(0xa0a6b4), hex(0x7a8090), hex(0x4a5060)], jag)),
   brick: () => sprite(p => { const pts = []; for (let y = 5; y < 12; y++) for (let x = 2 + Math.max(0, 7 - y); x < 14 - Math.max(0, y - 9); x++) pts.push([x, y]); maskDraw(p, pts, [hex(0xd8806a), hex(0xb05a44), hex(0x8a3a28), hex(0x5a1a10)]); }),
   amethyst_shard: () => sprite(p => { const pts = []; for (let t = 0; t < 10; t++) { pts.push([4 + t, 12 - t], [5 + t, 12 - t], [4 + t, 11 - t]); } maskDraw(p, pts, [hex(0xe8c8fa), hex(0xb18de6), hex(0x7f55b4), hex(0x4a2a80)]); }),
+  goat_horn: () => sprite(p => { for (let t = 0; t <= 10; t++) { const x = 3 + t, y = Math.round(12 - t * 0.9 - Math.sin(t / 10 * 3) * 2), w = t < 3 ? 2 : 1; for (let k = 0; k <= w; k++) p(x, y + k, t > 7 ? hex(0x6e6658) : hex(k ? 0x9c9282 : 0xd8d0c0)); } p(2, 12, hex(0x4a443a)); p(2, 13, hex(0x4a443a)); }),
   spyglass: () => sprite(p => { line(p, 3, 12, 12, 3, hex(0xd67a4a)); line(p, 4, 12, 13, 3, hex(0x9c4d2f)); line(p, 3, 11, 12, 2, hex(0xf6b48a)); p(12, 2, hex(0xb18de6)); p(13, 2, hex(0x7f55b4)); p(13, 3, hex(0x7f55b4)); p(5, 10, hex(0x4a2a1a)); p(6, 9, hex(0x4a2a1a)); }),
   shears: () => sprite(p => { line(p, 3, 4, 11, 12, hex(0xd8d8d8)); line(p, 4, 4, 12, 12, hex(0x8a8a8a)); line(p, 11, 4, 3, 12, hex(0xd8d8d8)); for (const [x, y] of [[2, 12], [3, 13], [12, 12], [13, 13], [2, 13], [13, 12]]) p(x, y, hex(0xa02a1a)); }),
   saddle: () => sprite(p => blob(p, 8, 9, 6, 4, MATC.leather)),

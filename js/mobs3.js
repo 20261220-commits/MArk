@@ -100,7 +100,7 @@ function piglinAI(e, dist) {
   let mx = 0, mz = 0;
   if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.def.dmg, mx, mz); } }
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
-  else { if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12]; if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
+  else { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
   walkPhysics(e, mx, mz, e.target ? 0.12 : 0.06);
 }
 function striderAI(e) {
@@ -143,7 +143,8 @@ function bulletTick(e) {
 }
 function wolfAI(e, dist) {
   const tame = e.owner === 'player';
-  if (!tame && e.target === PL && (!plTargetable() || dist > 24)) e.target = null;
+  if (!tame && e.target === PL && (!plTargetable() || dist > 24 || !(e.angerT > 0))) e.target = null;
+  if (e.angerT > 0) e.angerT--;
   if (tame && e.target === PL) e.target = null;
   // a tame wolf fights whatever hurt its owner or whatever the owner hits
   if (tame && !e.target && PL.lastAttacked && !PL.lastAttacked.dead && PL.lastAttacked !== e && Math.hypot(PL.lastAttacked.x - e.x, PL.lastAttacked.z - e.z) < 16) e.target = PL.lastAttacked;
@@ -160,7 +161,7 @@ function wolfAI(e, dist) {
   } else if (tame && dist > 4) {
     if (dist > 14 && PL.onGround) { e.x = e.px = PL.x + (Math.random() - .5); e.y = e.py = PL.y; e.z = e.pz = PL.z + (Math.random() - .5); e.path = null; }
     else { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = 0.13; }
-  } else if (!tame) { if (!e.goal && Math.random() < 1 / 120) e.goal = [e.x + (Math.random() - .5) * 12, e.z + (Math.random() - .5) * 12]; if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
+  } else if (!tame) { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
   walkPhysics(e, mx, mz, sp);
 }
 function wolfAnim(e, P) {
@@ -186,7 +187,7 @@ function mobInteract(e, h, d) {
   if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
-    if (d && h.id === IID.bone && !e.target) { consume(); swing(); if (Math.random() < 1 / 3) { e.owner = 'player'; e.persistent = true; e.def = { ...e.def, hp: 20 }; e.hp = 20; /* this wolf only: the shared definition stays at 8 */ e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
+    if (d && h.id === IID.bone && e.target === PL) return false; /* an angry wolf won't take it */ if (d && h.id === IID.bone) { consume(); swing(); play('eat', { vol: 0.5 }); if (Math.random() < 1 / 3) { e.target = null; e.goal = null; e.path = null; e.owner = 'player'; e.persistent = true; e.def = { ...e.def, hp: 20 }; e.hp = 20; /* this wolf only: the shared definition stays at 8 */ e.sitting = 1; for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.15, vy: 1, grav: 0 }); ADVT.tamed(e); } else for (let i = 0; i < 7; i++) R.simpleParticle(e.x, e.y + 1, e.z, [0.3, 0.3, 0.3], { kind: 'smoke', size: 0.15, vy: 1, grav: 0 }); return true; }
   }
   return false;
 }

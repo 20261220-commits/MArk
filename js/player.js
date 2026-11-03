@@ -663,6 +663,7 @@ function useItem(first) {
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
   if (first && items6Use(t, h, d)) return;
+  if (d && h.id === IID.goat_horn && !(t && t.type === 'block' && interactBlock(t, true)) && !(t && t.type === 'ent')) { if (first && !(PL.hornT > performance.now())) { PL.hornT = performance.now() + 7000; play('goat_horn'); swing(); UI.flash('염소 뿔을 불었습니다'); } else if (first) UI.flash('염소 뿔을 다시 불려면 잠시 기다리세요'); return; } // 7 seconds between calls (Java)
   if (d && d.egg && MOBDEF[d.egg] && t) {
     if (t.type === 'ent' && t.e.kind === 'mob' && t.e.type === d.egg) { const b = spawnMob(d.egg, t.e.x, t.e.y, t.e.z, { baby: true }); if (b) b.baby = true; }
     else if (t.type === 'block' && t.id === BID.spawner) { const tile = getTile(t.x, t.y, t.z); if (tile) { tile.mob = d.egg; tile.delay = 200; } else setTile(t.x, t.y, t.z, { type: 'spawner', mob: d.egg, delay: 200 }); }

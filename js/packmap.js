@@ -100,7 +100,7 @@ for (const k of ('honeycomb tropical_fish tropical_fish_bucket fermented_spider_
   'trident rabbit cooked_rabbit rabbit_stew leather_horse_armor iron_horse_armor golden_horse_armor diamond_horse_armor phantom_membrane scute turtle_helmet heart_of_the_sea nautilus_shell map filled_map ' +
   'minecart chest_minecart hopper_minecart tnt_minecart furnace_minecart writable_book written_book firework_rocket firework_star carrot_on_a_stick warped_fungus_on_a_stick suspicious_stew item_frame ' +
   'oak_sign spruce_sign birch_sign jungle_sign acacia_sign dark_oak_sign crimson_sign warped_sign kelp seagrass bamboo sea_pickle cake campfire soul_campfire bell flower_pot ' +
-  'pufferfish_bucket cod_bucket salmon_bucket').split(' ')) ITEM[k] = 'item/' + k;
+  'pufferfish_bucket cod_bucket salmon_bucket goat_horn').split(' ')) ITEM[k] = 'item/' + k;
 Object.assign(ITEM, { crossbow: 'item/crossbow_standby', tripwire_hook: 'block/tripwire_hook', rail: 'block/rail', powered_rail: 'block/powered_rail', detector_rail: 'block/detector_rail', activator_rail: 'block/activator_rail',
   // potion bottles and tipped arrows are tinted by the game with each potion's colour (base + overlay)
   _potion: 'item/potion', _splash_potion: 'item/splash_potion', _lingering_potion: 'item/lingering_potion', _potion_overlay: 'item/potion_overlay', _spawn_egg: 'item/spawn_egg', _spawn_egg_overlay: 'item/spawn_egg_overlay', _arrow_base: 'item/tipped_arrow_base', _arrow_head: 'item/tipped_arrow_head', glass_bottle: 'item/glass_bottle' });
