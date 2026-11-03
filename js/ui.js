@@ -319,6 +319,7 @@ function checkNewVersion() {
     if (m && m[1] !== NEMO_VERSION && el && UI.menu === 'title') { el.hidden = false; el.innerHTML = `새 버전(${esc(m[1])})이 있습니다 — 지금 열린 것은 ${esc(NEMO_VERSION)} <button onclick="location.reload()">새로고침</button>`; } }).catch(() => {});
 }
 function showMenu(name, data) {
+  if (name !== 'controls' && typeof KB !== 'undefined') KB.wait = null; // (a key being chosen is let go when the screen changes)
   UI.menu = name; const m = $('menu'); m.hidden = !name; m.className = name ? 'm-' + name : '';
   if (!name) { return; }
   releaseLock();
@@ -360,18 +361,11 @@ function showMenu(name, data) {
     h = `<h2>설정</h2><div class="optgrid">${sl('fov', '시야', 30, 110, 1, v => v == 70 ? '보통' : v == 110 ? 'Quake 프로' : v)}${sl('rd', '렌더 거리', 2, 12, 1, v => v + ' 청크')}${sl('sim', '시뮬레이션 거리', 3, 12, 1, v => v + ' 청크')}${sl('sens', '마우스 감도', 10, 200, 5, v => v + '%')}${sl('gamma', '밝기', 0, 100, 5, v => v == 0 ? '어둡게' : v == 100 ? '밝게' : v + '%')}${sl('vol', '음량', 0, 100, 5, v => v + '%')}${sl('gui', 'GUI 크기', 0, 4, 1, v => v == 0 ? '자동' : v)}${tg('fancy', '그래픽', '화려하게', '빠르게')}${tg('smooth', '부드러운 조명')}${tg('clouds', '구름')}${tg('bob', '화면 흔들림')}${tg('dynLight', '손에 든 광원 빛')}${tg('autoRes', '자동 해상도 (끊김 방지)')}${tg('coords', '좌표 표시')}${tg('showFps', 'FPS 표시')}${tg('invertY', '마우스 반전')}${tg('fullscreen', '전체 화면 + 키 잠금')}${tg('toggleSprint', '달리기', '전환', '누르기')}${tg('toggleSneak', '웅크리기', '전환', '누르기')}</div><p class="muted">크롬북 권장: 렌더 거리 4~6, 그래픽 빠르게, 자동 해상도 켜짐 · Ctrl로 달릴 때 Ctrl+W로 탭이 닫히지 않게 하려면 \"전체 화면 + 키 잠금\"을 켜세요</p><div class="btncol">${btn('스킨: ' + ({ steve: '스티브', alex: '알렉스', custom: '내 스킨' }[OPT.skin] || '스티브'), 'skin')}${btn('스킨 파일 고르기...', 'skinfile')}${btn('주로 쓰는 손: ' + (OPT.mainHand === 'left' ? '왼손' : '오른손'), 'mainhand')}${btn('리소스 팩...', 'packs')}${btn('완료', 'optDone')}</div>`;
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
-  } else if (name === 'controls') {
-    const K = t => t.split('+').map(k => `<kbd>${k}</kbd>`).join('+');
-    const rows = [['이동', 'W A S D', 'W A S D'], ['달리기', 'Ctrl · W 두 번', 'Ctrl · W 두 번 · R'], ['점프 · 수영 · (크리에이티브) 두 번 눌러 비행', 'Space', 'Space'], ['웅크리기 · 비행 중 하강', 'Shift', 'Shift'],
-      ['캐기 · 공격', '좌클릭', '터치패드 누르기'], ['놓기 · 사용', '우클릭', '두 손가락 탭 · Alt+누르기'], ['블록 고르기', '휠 클릭', 'G'], ['단축바', '1-9 · 휠', '1-9 · 두 손가락 스크롤'],
-      ['인벤토리', 'E', 'E'], ['버리기 (묶음)', 'Q (Ctrl+Q)', 'Q (Ctrl+Q)'], ['보조 손과 바꾸기', 'F', 'F'], ['채팅 · 명령어', 'T · /', 'T · /'],
-      ['HUD 숨기기', 'F1', '← (뒤로) · H'], ['스크린샷', 'F2', '→ (앞으로) · 화면 캡처 키'], ['디버그 화면 · F3 조합', 'F3', '↻ (새로고침) · `'], ['시점 전환', 'F5', '창 보기 키 · V'], ['전체 화면', 'F11', '전체 화면 키'],
-      ['일시 정지', 'Esc', 'Esc']];
-    h = `<h2>조작법</h2><table class="keytab"><tr><th>동작</th><th>PC 키보드</th><th>크롬북 키보드</th></tr>${rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b.split(' · ').map(K).join(' · ')}</td><td>${c.split(' · ').map(K).join(' · ')}</td></tr>`).join('')}</table>
-      <ul class="keys"><li>크롬북 윗줄 키는 같은 자리의 PC F키로 동작합니다 (검색 키 + 윗줄 키, 또는 크롬북 설정의 "윗줄 키를 기능 키로 사용"으로 보내는 진짜 F키도 그대로 됩니다)</li>
-      <li>F3 조합: F3(크롬북 ↻)을 누른 채로 A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말</li>
-      <li>크롬북에서 <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫습니다. Ctrl로 달리려면 설정에서 <b>전체 화면 + 키 잠금</b>을 켜세요 (켜지 않으면 <kbd>R</kbd>이나 <kbd>W</kbd> 두 번으로 달리기). 실수로 탭을 닫으려 하면 나가기 전에 확인 창이 뜹니다</li>
-      <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손</li></ul><div class="btncol">${btn('완료', UI.paused ? 'pause' : 'title')}</div>`;
+  } else if (name === 'controls') { // Java's 조작 설정: every key can be changed (js/keybinds.js); the notes for Chromebooks below
+    h = kbHtml() + `<ul class="keys"><li>크롬북 윗줄 키는 같은 자리의 PC F키로 동작합니다 (← 뒤로 = F1, → 앞으로 = F2, ↻ 새로고침 = F3, 창 보기 = F5)</li>
+      <li>F3 조합: F3을 누른 채로 A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말</li>
+      <li>크롬북에서 <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫습니다. Ctrl로 달리려면 설정에서 <b>전체 화면 + 키 잠금</b>을 켜거나 달리기 키를 바꾸세요 (R이나 W 두 번으로도 달립니다)</li>
+      <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손 · O 갑옷 숨기기</li></ul>`;
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${PL.sleeping ? btn('침대에서 나가기', 'leavebed') : ''}${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
@@ -417,6 +411,9 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'accchange') accChange();
   else if (a === 'leavebed') { wakeUp(); resumeGame(); }
   else if (a === 'accout') accLogout();
+  else if (a.startsWith('kbset_')) { KB.wait = a.slice(6); showMenu('controls'); }
+  else if (a.startsWith('kbreset_')) kbReset(a.slice(8));
+  else if (a === 'kbresetall') kbReset();
   else if (a.startsWith('skinset_')) { OPT.skin = a.slice(8); saveOpt(); const go = () => { rebuildPlayer(); showMenu('skins'); mpSkinChanged(); }; if (OPT.skin === 'custom') loadCustomSkin(go); else go(); }
   else if (a.startsWith('skinwear_')) skinWear(+a.slice(9));
   else if (a.startsWith('skindel_')) skinDelete(+a.slice(8));
