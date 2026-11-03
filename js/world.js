@@ -154,6 +154,7 @@ function setBlock(x, y, z, id, meta = 0, opts = {}) {
   if (id === BID.oak_sign && !c.tiles.has(i)) c.tiles.set(i, { type: 'sign', lines: ['', '', '', ''] });
   const oe = S.emitOf(old, oldM), ne = S.emitOf(id, meta);
   if (old !== id || oe !== ne) relight(x, y, z, old, id, oe, ne);
+  if (old !== id && (S.LOGAX[old] || S.LEAF[old]) && !S.LOGAX[id] && !S.LEAF[id]) leafQueue(x, y, z);
   markDirty(x, z);
   if ((old === BID.chain || id === BID.chain) && typeof rodTrack === 'function') rodTrack(x, y, z, S.isRod(id, meta));
   if (old !== id && (TRACKED.has(old) || TRACKED.has(id))) { const k = x + ',' + y + ',' + z; if (TRACKED.has(old)) TRACKED.get(old).delete(k); if (TRACKED.has(id)) TRACKED.get(id).add(k); }
@@ -447,26 +448,47 @@ const stack = (x, y, z, b, m) => {
 RANDOM_TICK[BID.sugar_cane] = stack; RANDOM_TICK[BID.cactus] = stack;
 for (const lv of [22, 23, 24, BID.jungle_leaves, BID.acacia_leaves, BID.dark_oak_leaves, BID.azalea_leaves, BID.flowering_azalea_leaves]) RANDOM_TICK[lv] = (x, y, z, b, m) => {
   if (m & 1) return;
-  // search for a log within 4 blocks through leaves (flat typed queue, 9x9x9 visited grid)
-  if (leafSearch(x, y, z)) return;
+  // as in Java, only leaves whose distance changed (a log or leaf near them went) can decay: generated trees never rot
+  const lc = W.leafCheck, k = x + ',' + y + ',' + z; if (!lc || !lc.has(k)) return;
+  lc.delete(k);
+  if (leafSearch(x, y, z)) return; // a log within 6 steps through leaves keeps it (Java leaf distance)
   breakNaturally(x, y, z, b, m);
 };
-const LQ = new Int16Array(729 * 4), LSEEN = new Uint8Array(729); let lstamp = 0;
+// Java's leaf distance: a leaf stays while a log is at most 6 steps away through leaves (13x13x13 visited grid)
+const LQ = new Int16Array(2197 * 4), LSEEN = new Uint8Array(2197); let lstamp = 0;
 function leafSearch(x, y, z) {
   if (++lstamp > 250) { lstamp = 1; LSEEN.fill(0); }
-  let h = 0, t = 0; LQ[t++] = 4; LQ[t++] = 4; LQ[t++] = 4; LQ[t++] = 0; LSEEN[364] = lstamp;
+  let h = 0, t = 0; LQ[t++] = 6; LQ[t++] = 6; LQ[t++] = 6; LQ[t++] = 0; LSEEN[1098] = lstamp;
   while (h < t) {
     const px = LQ[h], py = LQ[h + 1], pz = LQ[h + 2], d = LQ[h + 3]; h += 4;
     for (let k = 0; k < 6; k++) {
       const n = N6[k], nx = px + n[0], ny = py + n[1], nz = pz + n[2];
-      if (nx < 0 || ny < 0 || nz < 0 || nx > 8 || ny > 8 || nz > 8) continue;
-      const i = nx * 81 + ny * 9 + nz; if (LSEEN[i] === lstamp) continue; LSEEN[i] = lstamp;
-      const tb = getBlock(x + nx - 4, y + ny - 4, z + nz - 4);
+      if (nx < 0 || ny < 0 || nz < 0 || nx > 12 || ny > 12 || nz > 12) continue;
+      const i = nx * 169 + ny * 13 + nz; if (LSEEN[i] === lstamp) continue; LSEEN[i] = lstamp;
+      const tb = getBlock(x + nx - 6, y + ny - 6, z + nz - 6);
       if (S.LOGAX[tb] && tb !== BID.hay_block) return true;
-      if (S.LEAF[tb] && d < 4) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
+      if (S.LEAF[tb] && d < 5) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
     }
   }
   return false;
+}
+// a log or leaf went: the leaves within 6 steps of it (through leaves) may now be too far from a log
+function leafQueue(x, y, z) {
+  const lc = W.leafCheck || (W.leafCheck = new Set()); if (lc.size > 20000) lc.clear();
+  if (++lstamp > 250) { lstamp = 1; LSEEN.fill(0); }
+  let h = 0, t = 0; LQ[t++] = 6; LQ[t++] = 6; LQ[t++] = 6; LQ[t++] = 0; LSEEN[1098] = lstamp;
+  while (h < t) {
+    const px = LQ[h], py = LQ[h + 1], pz = LQ[h + 2], d = LQ[h + 3]; h += 4;
+    for (let k = 0; k < 6; k++) {
+      const n = N6[k], nx = px + n[0], ny = py + n[1], nz = pz + n[2];
+      if (nx < 0 || ny < 0 || nz < 0 || nx > 12 || ny > 12 || nz > 12) continue;
+      const i = nx * 169 + ny * 13 + nz; if (LSEEN[i] === lstamp) continue; LSEEN[i] = lstamp;
+      const wx = x + nx - 6, wy = y + ny - 6, wz = z + nz - 6;
+      if (!S.LEAF[getBlock(wx, wy, wz)] || getMeta(wx, wy, wz) & 1) continue;
+      lc.add(wx + ',' + wy + ',' + wz);
+      if (d < 5) { LQ[t++] = nx; LQ[t++] = ny; LQ[t++] = nz; LQ[t++] = d + 1; }
+    }
+  }
 }
 RANDOM_TICK[BID.farmland] = (x, y, z, b, m) => {
   let wet = false;
@@ -738,16 +760,22 @@ function unloadChunk(c) {
   W.chunks.delete(c.key); W.lastKey = -1;
 }
 // streaming: called every frame with player chunk position
-let spiral = null, spiralR = -1;
+let spiral = null, spiralR = -1, ordered = null, orderedHead = null;
 function buildSpiral(r) { const a = []; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if (dx * dx + dz * dz <= (r + 0.5) * (r + 0.5)) a.push([dx, dz, dx * dx + dz * dz]); a.sort((p, q) => p[2] - q[2]); return a; }
 function streamChunks(px, pz, rd, meshOpts, budget) {
   const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4, r = rd + 1;
-  if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; }
+  if (spiralR !== r) { spiral = buildSpiral(r); spiralR = r; ordered = null; }
+  // the order chunks are asked for: nearest first, but what lies ahead (where you look and where you are going) before
+  // what is behind, so the ground in front of you is there when you get to it; re-sorted when the heading turns
+  const mv = Math.hypot(PL.vx || 0, PL.vz || 0) > 0.15, hx = mv ? PL.vx : -Math.sin(PL.yaw), hz = mv ? PL.vz : -Math.cos(PL.yaw), hl = Math.hypot(hx, hz) || 1, head = Math.round(Math.atan2(hz, hx) / (Math.PI / 8));
+  if (!ordered || head !== orderedHead) { orderedHead = head; const ux = hx / hl, uz = hz / hl; ordered = spiral.map(([dx, dz, d2]) => { const l = Math.sqrt(d2) || 1, dot = (dx * ux + dz * uz) / l; return [dx, dz, d2 * (d2 <= 4 ? 1 : dot > 0.5 ? 0.45 : dot > 0 ? 0.75 : dot > -0.5 ? 1.4 : 2)]; }).sort((a, b) => a[2] - b[2]); }
+  // moving fast (flying, a boat on ice, an elytra): the chunks a little past the view distance ahead are asked for too
+  const ahead = Math.hypot(PL.vx || 0, PL.vz || 0) > 0.5 ? 2 : 0; // (within the unload margin)
   // chunks the player just changed come first, even while an older mesh of them is still on its way
   for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const c = chunkAt(pcx + dx, pcz + dz); if (c && c.urgent && c.dirty && meshable(c)) requestMesh(c, meshOpts, true); }
   // meshing first (nearest first): visible chunks beat far terrain generation
   let sent = 0;
-  for (const [dx, dz] of spiral) {
+  for (const [dx, dz] of ordered) {
     if (dx * dx + dz * dz > rd * rd + rd) continue;
     const c = chunkAt(pcx + dx, pcz + dz);
     if (!c || !c.dirty || c.meshing || !meshable(c)) continue;
@@ -755,7 +783,8 @@ function streamChunks(px, pz, rd, meshOpts, budget) {
     if (++sent >= budget) break;
   }
   let reqs = 0;
-  for (const [dx, dz] of spiral) {
+  const extra = ahead ? (() => { const l = Math.hypot(PL.vx, PL.vz), ux = PL.vx / l, uz = PL.vz / l, L = []; for (let i = r + 1; i <= r + ahead; i++) for (let w = -2; w <= 2; w++) L.push([Math.round(ux * i - uz * w), Math.round(uz * i + ux * w)]); return L; })() : [];
+  for (const [dx, dz] of extra.length ? ordered.concat(extra) : ordered) {
     const cx = pcx + dx, cz = pcz + dz, k = ckey(cx, cz);
     if (W.chunks.has(k) || W.pending.has(k)) continue;
     if (W.saved.has(dkey(cx, cz))) { loadChunk(cx, cz); if (++reqs > 4) break; continue; }
@@ -786,6 +815,6 @@ function processInbox(budgetMs, maxMeshes) {
 }
 function resetWorld(keepSaved) {
   for (const c of W.chunks.values()) if (W.onChunkUnloaded) W.onChunkUnloaded(c);
-  W.chunks.clear(); W.pending.clear(); W.pendingMobs.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; if (!keepSaved) W.saved = new Set();
+  W.chunks.clear(); W.pending.clear(); W.pendingMobs.clear(); W.inbox.length = 0; W.meshInbox.length = 0; W.sched.clear(); W.lastKey = -1; W.leafCheck = null; if (!keepSaved) W.saved = new Set();
   if (typeof RS !== 'undefined') { RS.dirty.clear(); RS.sched.clear(); }
 }
