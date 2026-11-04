@@ -240,7 +240,7 @@ function updateArmor(m, light, list = INV.armor) { // list: another player's arm
       if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });
-    if (ud.mat2) { ud.mat2.visible = elytra; // the elytra: drawn with the player's cape when they have one (Java's ElytraLayer: a cape picture holds its own elytra part)
+    ud.elytraOn = elytra; if (ud.mat2) { ud.mat2.visible = elytra; // the elytra: drawn with the player's cape when they have one (Java's ElytraLayer: a cape picture holds its own elytra part)
       const capeT = elytra && ud.capeTex && packTexture(ud.capeTex), want = capeT || ud.elytraTex0 || ud.mat2.map; if (!ud.elytraTex0) ud.elytraTex0 = ud.mat2.map;
       if (ud.mat2.map !== want) { ud.mat2.map = want; ud.mat2.needsUpdate = true; } }
     const ct = !elytra && ud.capeTex && packTexture(ud.capeTex); // a cape (not with an elytra on)
