@@ -97,7 +97,11 @@ function mpWorldCore(store, out) {
           if (!rec) { // a new account takes over what that name had saved here
             const salt = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
             S.logins[k] = { salt, h: mpSha256(salt + lg.cred), at: now };
-            const old = Object.keys(S.players).find(n => n.toLowerCase() === k) || (S.accounts && S.accounts[p.name] ? 'g:' + S.accounts[p.name] : null);
+            // what this player had here before: under the account's earlier names (an ID change; a world that keeps no passwords - a
+            // friend's open world, or one brought back from a copy - can't check them, but its records were never locked either),
+            // the account's name or its nickname before logging in
+            const prevK = prevs.map(q => 'a:' + q.name.trim().slice(0, 16).toLowerCase()).filter(n => n !== 'a:' + k && S.players[n] && !(S.logins[n.slice(2)]));
+            const old = prevK[0] || Object.keys(S.players).find(n => n.toLowerCase() === k) || Object.keys(S.players).find(n => !n.includes(':') && n.toLowerCase() === p.name.toLowerCase()) || (S.accounts && S.accounts[p.name] ? 'g:' + S.accounts[p.name] : null);
             if (old && S.players[old] && !S.players['a:' + k]) { S.players['a:' + k] = S.players[old]; delete S.players[old]; }
             if (S.accounts) delete S.accounts[p.name];
             store.saveState(); store.log(`${p.name} 계정을 만들었습니다`);
