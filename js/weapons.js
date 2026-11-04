@@ -11,7 +11,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
   play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
-  if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // axes knock the shield away for 5 s
+  if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe && Math.random() < 0.25) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // an axe knocks the shield away for 5 s, one time in four (Java's Mob.maybeDisableShield)
   return true;
 }
 

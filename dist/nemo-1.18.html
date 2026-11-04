@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.04 14:30';
+const NEMO_VERSION = '2026.11.04 14:52';
 
 </script>
 <script>/* js/shared.js */
@@ -10450,7 +10450,8 @@ function bossBar(e, name) {
 }
 function dragonHurt(e, dmg, attacker) {
   if (e.phase === 'dying' || e.inv > 0) return false;
-  dmg = e.phase === 'perch' ? dmg : dmg / 4 + 1;
+  if (e.phase === 'perch' && HURTPROJ && HURTPROJ.kind === 'arrow') { HURTPROJ.fire = Math.max(HURTPROJ.fire || 0, 20); return false; } // (Java's sitting phases: arrows and tridents glance off it)
+  dmg = e.phase === 'perch' ? dmg : dmg / 4 + Math.min(dmg, 1); // (Java: the body takes a quarter, plus up to 1; perched, its head is in reach)
   e.hp -= dmg; e.hurt = 10; e.inv = 10; play('growl', { vol: 0.6 });
   if (e.phase === 'perch' && Math.random() < 0.3) e.phaseT = 0;
   if (e.hp <= 0) { e.hp = 0; e.phase = 'dying'; e.phaseT = 0; }
@@ -11805,7 +11806,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
   play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
-  if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // axes knock the shield away for 5 s
+  if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe && Math.random() < 0.25) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // an axe knocks the shield away for 5 s, one time in four (Java's Mob.maybeDisableShield)
   return true;
 }
 
@@ -13470,10 +13471,18 @@ function witherAI(e, dist) {
   if (t && e.attackCd <= 0 && Math.hypot(t.x - e.x, t.z - e.z) < 32) {
     e.attackCd = 40;
     const sx = e.x, sy = e.y + 2.6, sz = e.z, ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y + t.h / 2) - sy, az = t.z - sz, al = Math.hypot(ax, ay, az) || 1;
-    spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, Math.random() < 0.1);
-    if (Math.random() < 0.3) { e.attackCd2 = 10; }
+    spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, Math.random() < 0.001); // (Java: the middle head's skull is blue one time in a thousand)
   }
-  if (e.attackCd2 > 0 && --e.attackCd2 === 0 && t) { const s = Math.random() < 0.5 ? -1 : 1, sx = e.x + s * 0.8, sy = e.y + 2.3, ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y) - sy, az = t.z - e.z, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, e.z, ax / al, ay / al, az / al, e, false); }
+  // the two side heads (Java's WitherBoss.customServerAiStep): each fires at the target every 2-3 seconds; on Normal and
+  // Hard a head with nothing to shoot at now and then sends a blue skull at a random spot nearby
+  if (!e.heads) e.heads = [20 + (Math.random() * 20 | 0), 30 + (Math.random() * 20 | 0)];
+  for (let h = 0; h < 2; h++) {
+    if (--e.heads[h] > 0) continue;
+    const s = h ? 1 : -1, c = Math.cos(e.yaw), sn = Math.sin(e.yaw), sx = e.x + c * s * 1.3, sy = e.y + 2.2, sz = e.z - sn * s * 1.3;
+    if (t && Math.hypot(t.x - e.x, t.z - e.z) < 30) { e.heads[h] = 40 + (Math.random() * 20 | 0); const ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y + t.h / 2) - sy, az = t.z - sz, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, false); }
+    else if (PL.difficulty >= 2 && Math.random() < 0.06) { e.heads[h] = 40 + (Math.random() * 20 | 0); const ax = (Math.random() - .5) * 20, ay = -(Math.random() * 6 + 2), az = (Math.random() - .5) * 20, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, true); }
+    else e.heads[h] = 10;
+  }
 }
 function witherAnim(e, P, now) {
   const armored = e.hp < e.def.hp / 2 && !(e.charge > 0);
@@ -16307,7 +16316,7 @@ function attackEntity(e) {
   const base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
-  const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;

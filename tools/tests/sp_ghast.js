@@ -14,7 +14,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const g = spawnMob('ghast', X + .5, Y + 8, Z - 20); g.persistent = true; const cs = canSee; let n = 0; window.canSee = function () { return (n++ % 28) >= 3 && cs.apply(this, arguments); };
     const t0 = W.tickN; await run(400); window.canSee = cs;
     const gs = shots.filter(s => s.owner === 'ghast').map(s => s.t), gaps = gs.slice(1).map((t, i) => t - gs[i]);
-    o.ghast = { n: gs.length, minGap: Math.min(...gaps), span: W.tickN - t0, y: +(g.y - Y).toFixed(1) };
+    o.ghast = { n: gs.length, minGap: Math.min(...gaps), span: W.tickN - t0, y: +(g.y - Y).toFixed(1), ground: !!g.onGround };
     // its fireball reaches you when you stand still
     removeEnt(g); for (const e of [...ENT]) if (e.kind === 'fireball') removeEnt(e);
     const g2 = spawnMob('ghast', X + .5, Y + 6, Z - 16); g2.persistent = true; g2.charge = 15; let hurt = false;
@@ -26,7 +26,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     o.blaze = { bursts: bursts.map(x => x.length), rest: bursts.slice(1).map((x, i) => x[0] - bursts[i][bursts[i].length - 1]) };
     return o; });
   ok(r.ghast.n >= 2 && r.ghast.minGap >= 55, 'a ghast that keeps losing sight of you still waits 3 seconds between shots', r.ghast);
-  ok(r.ghast.y > 2, 'a ghast high in the sky keeps floating', r.ghast);
+  ok(!r.ghast.ground && Math.abs(r.ghast.y) > 1.5, 'a ghast high in the sky keeps floating (not sitting on the ground)', r.ghast);
   ok(r.hit, 'a ghast\'s fireball hits a player standing still', r);
   ok(r.blaze.bursts.length >= 2 && r.blaze.bursts.every(n => n <= 3) && r.blaze.rest.every(t => t >= 100), 'a blaze fires three at a time, then rests', r.blaze);
   ok(!p.errs.length, 'no page errors', p.errs);

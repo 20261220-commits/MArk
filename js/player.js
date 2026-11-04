@@ -429,7 +429,7 @@ function attackEntity(e) {
   const base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
-  const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0;
   const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
