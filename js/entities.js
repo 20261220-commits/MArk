@@ -402,8 +402,12 @@ function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOv
 function waterCol(x, z) { const ix = Math.floor(x), iz = Math.floor(z); if (!isLoaded(ix, iz)) return true; const y = topY(ix, iz); return !!FLUID[getBlock(ix, y, iz)]; }
 // a random spot on land within r, not far up or down (Java's WaterAvoidingRandomStrollGoal), or null
 function wanderGoal(e, r) {
-  for (let k = 0; k < 8; k++) { const gx = e.x + (Math.random() - .5) * 2 * r, gz = e.z + (Math.random() - .5) * 2 * r, ix = Math.floor(gx), iz = Math.floor(gz);
-    if (!isLoaded(ix, iz)) continue; const y = topY(ix, iz); if (FLUID[getBlock(ix, y, iz)] || Math.abs(y + 1 - e.y) > 4) continue; return [gx, gz]; }
+  // Java's RandomStroll: a spot up to r out and a few blocks up or down that can be stood on, so under a roof (a cave,
+  // a house) it's a spot there, not the ground above
+  const y0 = Math.floor(e.y + 0.01), h = Math.ceil(e.h || 1), shun = e.def.burn && !e.baby && W.dim === 0 && dayFactor() > 0.6 && W.rain < 0.2; // (Java's RestrictSunGoal: undead keep to the shade by day)
+  for (let k = 0; k < 10; k++) { const gx = e.x + (Math.random() - .5) * 2 * r, gz = e.z + (Math.random() - .5) * 2 * r, ix = Math.floor(gx), iz = Math.floor(gz);
+    if (!isLoaded(ix, iz)) continue;
+    for (let dy = 0; dy <= 8; dy++) { const y = y0 + (dy & 1 ? -(dy + 1 >> 1) : dy >> 1); if (typeof pfWalkable === 'function' ? pfWalkable(ix, y, iz, h) && !FLUID[getBlock(ix, y - 1, iz)] && !FLUID[getBlock(ix, y, iz)] && !(shun && (getLight(ix, y + h - 1, iz) >> 4) === 15) : true) return [gx, gz]; } }
   return null;
 }
 // the nearest bank from the water: a dry block to stand on near the water's level
@@ -649,9 +653,12 @@ function mobTick(e) {
   // AI
   let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
-  const hostileNow = d.hostile && !d.neutral && !(d.neutralDay && dayFactor() > 0.6 && e.target == null);
-  if (hostileNow && plVisible && dist < (effLv(PL, 'invisibility') ? 2 : 16) && (e.target === PL || canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z))) e.target = PL;
-  if (e.target && (!plVisible || dist > 24 || e.repel > 0)) e.target = null; // (hoglins backing off from warped fungus: nether.js)
+  const fr = mobFollowRange(e), bright = d.neutralDay ? mobBrightLight(e) : false;
+  const hostileNow = d.hostile && !d.neutral && !(bright && e.target == null);
+  if (hostileNow && !e.target && plVisible && e.age % 2 === 0 && dist < fr * mobSeeScale() && canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z)) { e.target = PL; e.unseen = 0; }
+  if (e.target === PL && e.age % 5 === 0) e.unseen = canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z) ? 0 : (e.unseen || 0) + 5;
+  if (e.target && bright && Math.random() < 0.01) e.target = null; // (a spider in bright light gives up now and then)
+  if (e.target && (!plVisible || dist > fr || e.unseen > 60 || e.repel > 0)) { e.target = null; e.unseen = 0; } // (hoglins backing off from warped fungus: nether.js)
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
     e.yawTarget = Math.atan2(-dx, -dz);
@@ -659,7 +666,7 @@ function mobTick(e) {
       if (dist > 10) { mx = tx; mz = tz; } else if (dist < 5) { mx = -tx; mz = -tz; }
       else { mx = -tz * 0.5; mz = tx * 0.5; }
       if (e.attackCd <= 0 && dist < 15 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z)) {
-        e.attackCd = 40 + Math.floor(Math.random() * 20);
+        e.attackCd = 20 + (PL.difficulty === 3 ? 20 : 40);
         const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + PL.h / 3 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz); // MC aims at 1/3 of target height
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
         shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, mobArrowBase());
@@ -670,7 +677,9 @@ function mobTick(e) {
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
-      if (dist < (d.w + 1.2) && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
+      if (dist * dist <= (4 * e.w) * (4 * e.w) + 0.6 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
+      if (d.climb && e.onGround && dist * dist >= 4 && dist * dist <= 16 && Math.random() < 0.2 && !(e.leapCd > 0)) { const l = Math.hypot(dx, dz) || 1; e.vx = dx / l * 0.4 + e.vx * 0.2; e.vz = dz / l * 0.4 + e.vz * 0.2; e.vy = 0.4; e.leapCd = 10; } // Java's LeapAtTargetGoal
+      if (e.leapCd > 0) e.leapCd--;
       if (d.climb && e.hitH) { e.vy = 0.2; }
     }
   } else {
@@ -693,7 +702,12 @@ function mobTick(e) {
   }
   // Java's other goals for these mobs: burning undead look for shade, skeletons keep away from wolves, babies follow
   // a grown-up of their kind, spiders climb whatever wall they walk into
-  if (d.burn && e.fire > 0 && !e.target && !e.inWater && (e.age % 10 === 0 || !e.goal)) { const sky = (x, y, z) => getLight(Math.floor(x), Math.floor(y), Math.floor(z)) >> 4; if (sky(e.x, e.y + e.h, e.z) === 15) { for (let i = 0; i < 10; i++) { const gx = e.x + (Math.random() - .5) * 20, gz = e.z + (Math.random() - .5) * 20, gy = topY(Math.floor(gx), Math.floor(gz)); if (Math.abs(gy - e.y) < 4 && sky(gx, e.y + 1, gz) < 15) { e.goal = [gx, gz]; e.path = null; break; } } } if (e.goal) speed = d.speed * 1.4; }
+  if (d.burn && e.fire > 0 && !e.target && !e.inWater && (e.age % 10 === 0 || !e.goal)) { // Java's FleeSunGoal: ten tries at a spot within 10 across and 3 up or down that the sky can't see
+    const sky = (x, y, z) => getLight(Math.floor(x), Math.floor(y), Math.floor(z)) >> 4, hh = Math.ceil(e.h);
+    if (sky(e.x, e.y + e.h, e.z) === 15 && !(e.goal && e.shadeGoal)) for (let i = 0; i < 10; i++) { const gx = Math.floor(e.x + (Math.random() - .5) * 20), gz = Math.floor(e.z + (Math.random() - .5) * 20), gy = Math.floor(e.y) + Math.floor(Math.random() * 7) - 3;
+      if (pfWalkable(gx, gy, gz, hh) && sky(gx, gy + hh - 1, gz) < 15) { e.goal = [gx + .5, gz + .5]; e.path = null; e.shadeGoal = 1; break; } }
+    if (e.goal) speed = d.speed * 1.4; }
+  if (e.shadeGoal && (!e.goal || e.fire <= 0)) e.shadeGoal = 0;
   if ((e.type === 'skeleton' || e.type === 'stray') && e.age % 5 === 0) { const w = ENT.find(o => o.type === 'wolf' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 6); if (w) { const fx = e.x - w.x, fz = e.z - w.z, l = Math.hypot(fx, fz) || 1; e.goal = [e.x + fx / l * 8, e.z + fz / l * 8]; e.fleeT = 20; } }
   if (e.fleeT > 0) { e.fleeT--; if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz) || 1; mx = gx / gl; mz = gz / gl; speed = d.speed * 1.3; } }
   if (e.baby > 0 && !e.target && !(e.panic > 0) && d.food && e.age % 20 === 0) { let par = null, pd = 16; for (const o of ENT) if (o !== e && o.type === e.type && !o.dead && !(o.baby > 0)) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < pd) { pd = dd; par = o; } } if (par && pd > 3) e.goal = [par.x, par.z]; }

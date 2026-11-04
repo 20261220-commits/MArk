@@ -45,27 +45,39 @@ function pfWalkable(x, y, z, h) {
   for (let k = 1; k < h; k++) if (SOLID[getBlock(x, y + k, z)]) return false;
   const u = getBlock(x, y - 1, z); return SOLID[u] && u !== BID.cactus && u !== BID.magma_block || u === BID.water || b === BID.water;
 }
-function findPath(e, tx, ty, tz, maxN = 360) {
+// Java's WalkNodeEvaluator, roughly: the eight neighbours (a diagonal only when both sides are clear, so no corner is cut),
+// a step up of one block, drops of up to three; cobwebs, berry bushes and powder snow cost more (Java's maluses), so they're
+// gone around when there's another way. Up to 800 nodes (Java: 16 per block of follow range), so a wall is walked around to
+// a gap well to the side instead of being pressed against.
+const PF_COST = () => PF.cost || (PF.cost = new Map([[BID.cobweb, 8], [BID.sweet_berry_bush, 8], [BID.powder_snow, 8], [BID.water, 2], [BID.wither_rose, 8]].filter(([k]) => k != null)));
+function findPath(e, tx, ty, tz, maxN = 800) {
   const h = Math.ceil(e.h), sx = Math.floor(e.x), sy = Math.floor(e.y + 0.01), sz = Math.floor(e.z);
   tx = Math.floor(tx); ty = Math.floor(ty); tz = Math.floor(tz);
   const key = (x, y, z) => ((x - sx + 512) * 1024 + (z - sz + 512)) * 512 + y;
-  const open = [], came = new Map(), g = new Map(), H = (x, y, z) => Math.abs(x - tx) + Math.abs(y - ty) * 1.5 + Math.abs(z - tz);
+  const H = (x, y, z) => { const ax = Math.abs(x - tx), az = Math.abs(z - tz); return (ax + az + (Math.SQRT2 - 2) * Math.min(ax, az)) * 1.001 + Math.abs(y - ty) * 1.5; }; // (octile distance; the hair over 1 breaks ties toward the goal)
+  const open = [], came = new Map(), g = new Map(), cost = PF_COST();
   const push = n => { open.push(n); let i = open.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (open[p].f <= n.f) break; open[i] = open[p]; i = p; } open[i] = n; };
   const pop = () => { const top = open[0], last = open.pop(); if (open.length) { let i = 0; for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < open.length && open[l].f < (m === i ? last.f : open[m].f)) m = l; if (r < open.length && open[r].f < (m === i ? last.f : open[m].f)) m = r; if (m === i) break; open[i] = open[m]; i = m; } open[i] = last; } return top; };
   push({ x: sx, y: sy, z: sz, f: H(sx, sy, sz) }); g.set(key(sx, sy, sz), 0);
   let best = null, bestH = Infinity, n = 0;
+  const step = (c, nx, nz) => { // the height a neighbour column is stood on, or null
+    if (pfWalkable(nx, c.y, nz, h)) return c.y;
+    if (pfWalkable(nx, c.y + 1, nz, h) && !SOLID[getBlock(c.x, c.y + h, c.z)]) return c.y + 1;
+    if (!SOLID[getBlock(nx, c.y, nz)] && !SOLID[getBlock(nx, c.y + 1, nz)]) for (let d = 1; d <= 3; d++) { if (pfWalkable(nx, c.y - d, nz, h)) return c.y - d; if (SOLID[getBlock(nx, c.y - d, nz)]) break; }
+    return null;
+  };
+  const NB = [[0, -1, 1], [1, 0, 1], [0, 1, 1], [-1, 0, 1], [1, -1, Math.SQRT2], [1, 1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
   while (open.length && n++ < maxN) {
     const c = pop(), ck = key(c.x, c.y, c.z), cg = g.get(ck), ch = H(c.x, c.y, c.z);
+    if (cg == null || c.f > cg + ch + 1e-6) continue; // (an entry left from before a cheaper way was found)
     if (ch < bestH) { bestH = ch; best = c; }
     if (ch < 1.5) { best = c; break; }
-    for (const [dx, , dz] of DIRS) {
+    for (const [dx, dz, len] of NB) {
       const nx = c.x + dx, nz = c.z + dz;
-      let ny = null;
-      if (pfWalkable(nx, c.y, nz, h)) ny = c.y;
-      else if (pfWalkable(nx, c.y + 1, nz, h) && !SOLID[getBlock(c.x, c.y + h, c.z)]) ny = c.y + 1;
-      else if (!SOLID[getBlock(nx, c.y, nz)] && !SOLID[getBlock(nx, c.y + 1, nz)]) { for (let d = 1; d <= 3; d++) if (pfWalkable(nx, c.y - d, nz, h)) { ny = c.y - d; break; } }
-      if (ny == null) continue;
-      const nk = key(nx, ny, nz), ng = cg + 1 + (ny !== c.y ? 0.5 : 0);
+      let ny;
+      if (dx && dz) { if (!pfWalkable(c.x + dx, c.y, c.z, h) || !pfWalkable(c.x, c.y, c.z + dz, h) || !pfWalkable(nx, c.y, nz, h)) continue; ny = c.y; } // diagonals on the level only, both sides clear
+      else { ny = step(c, nx, nz); if (ny == null) continue; }
+      const nk = key(nx, ny, nz), ng = cg + len + (ny > c.y ? 0.5 : ny < c.y ? 0.3 * (c.y - ny) : 0) + (cost.get(getBlock(nx, ny, nz)) || 0);
       if (g.has(nk) && g.get(nk) <= ng) continue;
       g.set(nk, ng); came.set(nk, c); push({ x: nx, y: ny, z: nz, f: ng + H(nx, ny, nz) });
     }
