@@ -252,7 +252,7 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 .dot.on{background:#5f5}.dot.off{background:#f55}.dot.wait{background:#fc5;animation:dotb 1s steps(2) infinite}
 @keyframes dotb{50%{opacity:.3}}
 .mpl{height:auto;min-height:calc(40 * var(--px));max-height:min(calc(140 * var(--px)),42vh);display:flex;flex-direction:column;gap:calc(2 * var(--px))}
-.mpi{display:flex;align-items:center;gap:calc(4 * var(--px));padding:calc(3 * var(--px)) calc(4 * var(--px));background:rgba(255,255,255,.05);border:var(--px) solid #0008}
+.mpi.lost{border-color:#ffdd55;background:rgba(255,221,85,.12)}.mpi.lost b{color:#ffee88}.mpi{display:flex;align-items:center;gap:calc(4 * var(--px));padding:calc(3 * var(--px)) calc(4 * var(--px));background:rgba(255,255,255,.05);border:var(--px) solid #0008}
 .mpi>div{flex:1;display:flex;flex-direction:column;gap:var(--px);min-width:0}
 .mpi b{font-weight:400;font-size:calc(8 * var(--px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mpi span{font-size:calc(6 * var(--px));color:#9a9a9a}
 .mpempty{padding:calc(10 * var(--px)) 0}
@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.04 18:00';
+const NEMO_VERSION = '2026.11.04 19:01';
 
 </script>
 <script>/* js/shared.js */
@@ -20293,14 +20293,20 @@ function mpSrvLine() {
   const dot = { ok: '<i class="dot on"></i>', err: '<i class="dot off"></i>' }[MPL.state] || '<i class="dot wait"></i>';
   return `${dot}서버 ${esc(mpShortAddr(a))}${MPL.state === 'ok' ? '' : MPL.msg ? ' · ' + esc(MPL.msg) : ''}`;
 }
+function mpLostWorlds(list) { // [world id, name] of this browser's copies the server no longer has
+  if (!MPL.data) return []; const h = mirHost(MPL.addr || mpDefaultAddr()) + '|', have = new Set(list.map(wd => wd.id || 'world')), out = [];
+  for (const [k, name] of MIR.known) if (k.startsWith(h) && !have.has(k.slice(h.length))) out.push([k.slice(h.length), name]);
+  return out;
+}
 function mpListHtml() {
   const d = MPL.data, rows = [];
   // every server world stays on the list, as single-player worlds do; an older server sends just one (d.world)
   const list = d ? d.worlds || (d.world ? [{ ...d.world, id: null }] : []) : [];
+  // worlds this browser has played on this server that the server no longer has (its disk was wiped): first, so they are
+  // brought back before anyone starts over in a new world (your things and where you were are in that copy)
+  const lost = mpLostWorlds(list); MPL.lost = lost.length;
+  for (const [id, name] of lost) rows.push(`<div class="mpi lost"><div><b>🔄 ${esc(name)} — 되살려 주세요</b><span>서버가 다시 시작되며 지워진, 내가 하던 서버 세계예요. 이 브라우저에 저장된 사본으로 되살리면 건물·내 아이템·위치가 그대로 돌아옵니다</span></div>${btn('되살리기', 'mp_go:@' + esc(id), 'sm')}</div>`);
   for (const wd of list) rows.push(`<div class="mpi"><div><b>🌍 ${esc(wd.name)}</b><span>서버 세계 · ${MODE_NAME[wd.mode] || '서바이벌'} · ${wd.players ? wd.players + '명 접속 중' : '지금은 아무도 없어요'} · 언제든 들어갈 수 있어요</span></div>${btn('참가', 'mp_go:' + (wd.id ? '@' + esc(wd.id) : ''), 'sm')}</div>`);
-  // worlds this browser has played on this server that the server no longer has (its disk was wiped): bring them back
-  if (d) { const h = mirHost(MPL.addr || mpDefaultAddr()) + '|', have = new Set(list.map(wd => wd.id || 'world'));
-    for (const [k, name] of MIR.known) if (k.startsWith(h) && !have.has(k.slice(h.length))) rows.push(`<div class="mpi"><div><b>🔄 ${esc(name)}</b><span>서버가 다시 시작되며 지워진 서버 세계예요. 이 브라우저에 저장된 사본으로 되살리고 들어갑니다</span></div>${btn('되살리기', 'mp_go:@' + esc(k.slice(h.length)), 'sm')}</div>`); }
   if (d) for (const r of d.rooms || []) rows.push(`<div class="mpi"><div><b>🏠 ${esc(r.host)}님의 세계${r.world ? ' "' + esc(r.world) + '"' : ''}</b><span>방 코드 ${esc(r.code)} · ${MODE_NAME[r.mode] || '서바이벌'} · ${r.players}명</span></div>${btn('참가', 'mp_go:' + esc(r.code), 'sm')}</div>`);
   if (d) rows.push(`<div class="mpi"><div><b>🌱 새 서버 세계 만들기</b><span>서버에 계속 남는 새 세계를 만듭니다. 만든 사람이 없어도 누구나 언제든 들어올 수 있어요</span></div>${btn('만들기', d.worlds ? 'mp_go:@+' : 'mp_go:', 'sm')}</div>`);
   if (rows.length) return rows.join('');
@@ -20341,6 +20347,7 @@ async function mpAction(a) {
     else if (a.startsWith('mp_go:') || a === 'mp_code') {
       let room = a === 'mp_code' ? ($('mpRoom').value || '').trim().toUpperCase() : a.slice(6), world = null;
       if (room.startsWith('@')) { world = room.slice(1); room = ''; } // a server world by its id
+      if (world === '+' && MPL.lost && !confirm('이 서버에서 지워진, 내가 하던 세계가 있어요 (목록 맨 위 🔄). 새 세계를 만들면 그 세계와는 따로 새로 시작합니다. 그래도 새로 만들까요?')) return;
       if (a === 'mp_code' && !room) { say('방 코드를 넣어 주세요'); return; }
       const where = (MPL.addr || (ad && ad.value.trim()) || mpDefaultAddr()).trim(); try { localStorage.setItem(MP_ADDR_KEY, where); } catch (e) {}
       say('접속하는 중...'); const r = await mpJoinWs(where, room || null, world); if (r !== 'noworld') say('접속했습니다. 세계를 받는 중...'); }

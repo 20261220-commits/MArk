@@ -252,7 +252,7 @@ body.pano #menu.m-options,body.pano #menu.m-controls,body.pano #menu.m-worlds,bo
 .dot.on{background:#5f5}.dot.off{background:#f55}.dot.wait{background:#fc5;animation:dotb 1s steps(2) infinite}
 @keyframes dotb{50%{opacity:.3}}
 .mpl{height:auto;min-height:calc(40 * var(--px));max-height:min(calc(140 * var(--px)),42vh);display:flex;flex-direction:column;gap:calc(2 * var(--px))}
-.mpi{display:flex;align-items:center;gap:calc(4 * var(--px));padding:calc(3 * var(--px)) calc(4 * var(--px));background:rgba(255,255,255,.05);border:var(--px) solid #0008}
+.mpi.lost{border-color:#ffdd55;background:rgba(255,221,85,.12)}.mpi.lost b{color:#ffee88}.mpi{display:flex;align-items:center;gap:calc(4 * var(--px));padding:calc(3 * var(--px)) calc(4 * var(--px));background:rgba(255,255,255,.05);border:var(--px) solid #0008}
 .mpi>div{flex:1;display:flex;flex-direction:column;gap:var(--px);min-width:0}
 .mpi b{font-weight:400;font-size:calc(8 * var(--px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mpi span{font-size:calc(6 * var(--px));color:#9a9a9a}
 .mpempty{padding:calc(10 * var(--px)) 0}
