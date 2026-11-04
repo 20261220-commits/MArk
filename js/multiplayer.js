@@ -1100,7 +1100,7 @@ function mpRender(dt) {
     m.visible = !s.dead && !ghost; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
     mpPlaceTag(p, s, ps, light);
-    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = mt === m.userData.mat2 ? !!m.userData.elytraOn : !s.inv; } // invisible: only the armour and what's in the hands show (the elytra layer shows only when one is worn: it was made visible here every frame, so everyone seemed to wear wings)
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     fireOverlay(p, !!s.fire && !s.dead && m.visible, p.pos[0], p.pos[1], p.pos[2], 0.3, s.h || 1.8); // burning: the fire drawn over them, as Java does

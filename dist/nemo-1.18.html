@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.04 15:53';
+const NEMO_VERSION = '2026.11.04 17:06';
 
 </script>
 <script>/* js/shared.js */
@@ -18596,7 +18596,7 @@ function updateArmor(m, light, list = INV.armor) { // list: another player's arm
       if (st.e) { const gm = new THREE.SkinnedMesh(geo, R.glintMaterial(true)); gm.bind(ud.skel, ud.main.bindMatrix); gm.frustumCulled = false; gm.userData.glint = true; m.add(gm); ud.armor.push(gm); } // enchanted armour shimmers
       if (a.mat === 'leather') { const o = packTexture('armor_leather_' + layer + 'o'); if (o) add(o, null); }
     });
-    if (ud.mat2) { ud.mat2.visible = elytra; // the elytra: drawn with the player's cape when they have one (Java's ElytraLayer: a cape picture holds its own elytra part)
+    ud.elytraOn = elytra; if (ud.mat2) { ud.mat2.visible = elytra; // the elytra: drawn with the player's cape when they have one (Java's ElytraLayer: a cape picture holds its own elytra part)
       const capeT = elytra && ud.capeTex && packTexture(ud.capeTex), want = capeT || ud.elytraTex0 || ud.mat2.map; if (!ud.elytraTex0) ud.elytraTex0 = ud.mat2.map;
       if (ud.mat2.map !== want) { ud.mat2.map = want; ud.mat2.needsUpdate = true; } }
     const ct = !elytra && ud.capeTex && packTexture(ud.capeTex); // a cape (not with an elytra on)
@@ -20076,7 +20076,7 @@ function mpRender(dt) {
     m.visible = !s.dead && !ghost; posePlayer(m, ps); placePlayer(m, ps, p.pos[0], p.pos[1], p.pos[2]);
     const light = lightBright(p.pos[0], p.pos[1] + 1, p.pos[2]), hurt = p.hurtFx > 0; if (hurt) p.hurtFx -= dtT;
     mpPlaceTag(p, s, ps, light);
-    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = !s.inv; } // invisible: only the armour and what's in the hands show
+    for (const mt of m.userData.mats) { mt.color.setScalar(light); if (hurt) mt.color.multiply(MP_HURT); mt.visible = mt === m.userData.mat2 ? !!m.userData.elytraOn : !s.inv; } // invisible: only the armour and what's in the hands show (the elytra layer shows only when one is worn: it was made visible here every frame, so everyone seemed to wear wings)
     updateArmor(m, light, (s.armor || []).map(a => a ? { id: a[0], n: 1, e: a[1] ? { protection: 1 } : null, col: typeof a[2] === 'number' ? a[2] & 0xffffff : undefined } : null).map(a => a && ITEMS[a.id] ? a : null));
     updateHeld(m, [s.held && ITEMS[s.held] ? { id: s.held, n: 1 } : null, s.off && ITEMS[s.off] ? { id: s.off, n: 1 } : null], light, !s.lh);
     fireOverlay(p, !!s.fire && !s.dead && m.visible, p.pos[0], p.pos[1], p.pos[2], 0.3, s.h || 1.8); // burning: the fire drawn over them, as Java does
