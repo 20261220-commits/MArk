@@ -10,8 +10,22 @@ function releaseLock() { if (document.pointerLockElement) document.exitPointerLo
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === canvas;
   if (locked && !was) LOCK_AT.t = performance.now(), LOCK_AT.first = true;
-  if (was && !locked && W.active && !UI.screen && !UI.chatOpen && !UI.menu && !PL.dead) pauseGame();
+  relockHint(false);
+  if (was && !locked && W.active && !UI.screen && !UI.chatOpen && !UI.menu && !PL.dead) {
+    // the browser lets the mouse go on Esc (its rule); with pausing moved to another key, that's not a pause: the game
+    // goes on and a click takes the mouse back. Leaving the tab or window still pauses.
+    if (typeof kbGet === 'function' && kbGet('pause') !== 'Escape' && document.visibilityState === 'visible' && document.hasFocus()) relockHint(true);
+    else pauseGame();
+  }
 });
+function relockHint(on) {
+  let el = document.getElementById('relock');
+  if (!on) { if (el) el.style.display = 'none'; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'relock'; el.style.cssText = 'position:fixed;left:50%;top:38%;transform:translateX(-50%);padding:6px 12px;background:rgba(0,0,0,.55);color:#fff;font:14px sans-serif;pointer-events:none;z-index:5;border-radius:3px'; document.body.appendChild(el); }
+  el.textContent = '화면을 클릭하면 마우스가 다시 잡힙니다 · 일시 정지: ' + (typeof kbName === 'function' ? kbName(kbGet('pause')) : kbGet('pause'));
+  el.style.display = 'block';
+}
+window.addEventListener('blur', () => { const el = document.getElementById('relock'); if (el && el.style.display === 'block' && W.active && !UI.menu && !UI.screen) { el.style.display = 'none'; pauseGame(); } });
 canvas.addEventListener('click', () => { if (W.active && !locked && !UI.menu && !UI.screen) grabLock(); });
 function clearInput() { IN.f = IN.s = 0; IN.jump = IN.sneak = IN.attack = IN.use = IN.sprintKey = false; keys.clear(); if (USE.kind) onUseRelease(); }
 
@@ -265,7 +279,7 @@ function saveWorldMeta() {
   putWorld(W.meta);
 }
 function saveAll(sync) { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c, false, sync === true); }
-function pauseGame() { if (!W.active || UI.menu) return; if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
+function pauseGame() { if (!W.active || UI.menu) return; relockHint(false); if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
 function resumeGame() {
   if (PL.dead) return; if (!W.active) { UI.paused = false; showMenu('title'); return; } UI.paused = false; showMenu(null);
   if (OPT.fullscreen && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().then(() => { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {}); grabLock(); }).catch(() => grabLock());
