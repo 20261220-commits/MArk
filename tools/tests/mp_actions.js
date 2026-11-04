@@ -7,7 +7,8 @@ module.exports = async ({ ok, srv, b, lib }) => {
   const use = (P, item, x, y, z, n = [0, 1, 0], place = true) => P.evaluate(([item, x, y, z, n, place]) => { PL.mode = 'survival'; INV.slots[INV.sel] = item ? { id: IID[item], n: 4 } : null; const tx = place ? x - n[0] : x, ty = place ? y - n[1] : y, tz = place ? z - n[2] : z;
     TARGET = { type: 'block', x: tx, y: ty, z: tz, id: getBlock(tx, ty, tz), m: getMeta(tx, ty, tz), nx: n[0], ny: n[1], nz: n[2], t: 2 }; USE.placeCd = 0; MP.local = true; try { useItem(true); } finally { MP.local = false; } return [getBlock(x, y, z), getMeta(x, y, z)]; }, [item, x, y, z, n, place]);
   await B.evaluate(([X, Y, Z]) => { PL.x = X + 4.5; PL.z = Z + 6.5; PL.y = Y; }, pos);
-  await use(B, 'oak_door', X + 4, Y, Z + 4); await wait(1200);
+  await use(B, 'oak_door', X + 4, Y, Z + 4);
+  for (const P of [A, C]) await until(P, ([x, y, z]) => getBlock(x, y, z) === BID.oak_door && getBlock(x, y + 1, z) === BID.oak_door, [X + 4, Y, Z + 4]); // (slow machines: wait for it to arrive)
   const d = [await blk(A, X + 4, Y, Z + 4), await blk(A, X + 4, Y + 1, Z + 4), await blk(C, X + 4, Y + 1, Z + 4)];
   ok(d[0][0] === d[1][0] && d[1][0] === d[2][0] && d[0][0] === (await A.evaluate(() => BID.oak_door)), 'a guest\'s door stands on every screen (both halves)', d);
   await use(B, null, X + 4, Y, Z + 4, [0, 0, 1], false);
@@ -51,7 +52,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   { const r = await board(B); ok(r === 'driver', 'the first one in a boat drives', [r, await bstate(B)]); } await wait(1500);
   { const r = await board(C); ok(r === 'back', 'the second sits in the back', [r, await bstate(C), await bstate(A)]); } await wait(1500);
   ok(await board(A) === 'no', 'a third can\'t get in');
-  await B.evaluate(() => dismount()); await until(C, () => PL.riding && PL.riding.rider === PL, null, 8000); ok(await seat(C) === 'driver', 'when the driver gets off the back seat takes the front', [await seat(B), await seat(C), await C.evaluate(() => { const e = PL.riding; return e && [e.rider === PL ? 'me' : e.rider, e.mpRider, e.seat2Other]; }), await A.evaluate(() => { const e = ENT.find(q => q.kind === 'boat' && !q.dead); return [e.rider === PL, e.mpRider, e.mpRider2]; })]);
+  await B.evaluate(() => dismount()); await until(C, () => PL.riding && PL.riding.rider === PL, null, 8000); ok(await seat(C) === 'driver', 'when the driver gets off the back seat takes the front', [await seat(B), await seat(C), await C.evaluate(() => { const e = PL.riding; return e && [e.rider === PL ? 'me' : e.rider, e.mpRider, e.seat2Other, { sleeping: PL.sleeping, dead: PL.dead, paused: UI.paused, menu: UI.menu, tick: W.tickN }]; }), await A.evaluate(() => { const e = ENT.find(q => q.kind === 'boat' && !q.dead); return [e.rider === PL, e.mpRider, e.mpRider2]; })]);
   for (const P of [A, B, C]) await P.evaluate(() => { if (PL.riding) dismount(); }); await wait(2000);
   await Promise.all([board(B), board(C)]); await wait(4000);
   const both = [await seat(B), await seat(C)].sort().join();

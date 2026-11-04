@@ -166,6 +166,7 @@ function placeBoat(x, y, z, yaw, wood) {
 function boatHit(e) { if (creative()) { removeEnt(e); if (PL.riding === e) dismount(); return; } const h = PL.held(), t = h && ITEMS[h.id] && ITEMS[h.id].tool; e.dmgAcc = (e.dmgAcc || 0) + (t ? t.dmg : 1) * 10; e.hurt = 10; play('hit', { vol: 0.5 }); /* Java: damage x10 builds up and wears off; over 40 breaks it (a fist: five quick hits, a sword: one) */ if (e.dmgAcc > 40) { removeEnt(e); if (PL.riding === e) dismount(); dropItem(e.x, e.y + 0.5, e.z, IID[e.wood + '_boat'] || IID.oak_boat, 1); } }
 const seat2Busy = e => !!(e.mob || e.rider2 || e.seat2Other || (e.mpRider2 && performance.now() - e.mpRider2At < 1500));
 function mount(e) {
+  if (PL.sleeping && typeof wakeUp === 'function') wakeUp(); // still in bed (a guest whose morning message came late): up first, or riding never ticks
   if (e.rider || (e.mpRider && performance.now() - e.mpRideAt < 1500)) { // someone is driving (multiplayer): a boat has a back seat
     if (e.kind !== 'boat' || seat2Busy(e)) return;
     PL.riding = e; e.rider2 = PL; PL.flying = false; PL.sneaking = false; play('boat'); return;
