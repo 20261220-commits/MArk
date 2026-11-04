@@ -438,7 +438,8 @@ function bossBar(e, name) {
 }
 function dragonHurt(e, dmg, attacker) {
   if (e.phase === 'dying' || e.inv > 0) return false;
-  dmg = e.phase === 'perch' ? dmg : dmg / 4 + 1;
+  if (e.phase === 'perch' && HURTPROJ && HURTPROJ.kind === 'arrow') { HURTPROJ.fire = Math.max(HURTPROJ.fire || 0, 20); return false; } // (Java's sitting phases: arrows and tridents glance off it)
+  dmg = e.phase === 'perch' ? dmg : dmg / 4 + Math.min(dmg, 1); // (Java: the body takes a quarter, plus up to 1; perched, its head is in reach)
   e.hp -= dmg; e.hurt = 10; e.inv = 10; play('growl', { vol: 0.6 });
   if (e.phase === 'perch' && Math.random() < 0.3) e.phaseT = 0;
   if (e.hp <= 0) { e.hp = 0; e.phase = 'dying'; e.phaseT = 0; }

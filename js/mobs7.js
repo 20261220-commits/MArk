@@ -57,10 +57,18 @@ function witherAI(e, dist) {
   if (t && e.attackCd <= 0 && Math.hypot(t.x - e.x, t.z - e.z) < 32) {
     e.attackCd = 40;
     const sx = e.x, sy = e.y + 2.6, sz = e.z, ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y + t.h / 2) - sy, az = t.z - sz, al = Math.hypot(ax, ay, az) || 1;
-    spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, Math.random() < 0.1);
-    if (Math.random() < 0.3) { e.attackCd2 = 10; }
+    spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, Math.random() < 0.001); // (Java: the middle head's skull is blue one time in a thousand)
   }
-  if (e.attackCd2 > 0 && --e.attackCd2 === 0 && t) { const s = Math.random() < 0.5 ? -1 : 1, sx = e.x + s * 0.8, sy = e.y + 2.3, ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y) - sy, az = t.z - e.z, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, e.z, ax / al, ay / al, az / al, e, false); }
+  // the two side heads (Java's WitherBoss.customServerAiStep): each fires at the target every 2-3 seconds; on Normal and
+  // Hard a head with nothing to shoot at now and then sends a blue skull at a random spot nearby
+  if (!e.heads) e.heads = [20 + (Math.random() * 20 | 0), 30 + (Math.random() * 20 | 0)];
+  for (let h = 0; h < 2; h++) {
+    if (--e.heads[h] > 0) continue;
+    const s = h ? 1 : -1, c = Math.cos(e.yaw), sn = Math.sin(e.yaw), sx = e.x + c * s * 1.3, sy = e.y + 2.2, sz = e.z - sn * s * 1.3;
+    if (t && Math.hypot(t.x - e.x, t.z - e.z) < 30) { e.heads[h] = 40 + (Math.random() * 20 | 0); const ax = t.x - sx, ay = (t === PL ? PL.y + 1 : t.y + t.h / 2) - sy, az = t.z - sz, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, false); }
+    else if (PL.difficulty >= 2 && Math.random() < 0.06) { e.heads[h] = 40 + (Math.random() * 20 | 0); const ax = (Math.random() - .5) * 20, ay = -(Math.random() * 6 + 2), az = (Math.random() - .5) * 20, al = Math.hypot(ax, ay, az) || 1; spawnWitherSkull(sx, sy, sz, ax / al, ay / al, az / al, e, true); }
+    else e.heads[h] = 10;
+  }
 }
 function witherAnim(e, P, now) {
   const armored = e.hp < e.def.hp / 2 && !(e.charge > 0);
