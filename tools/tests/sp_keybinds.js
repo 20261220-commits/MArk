@@ -26,14 +26,22 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.dup === 2 && r.none[0] === 'Unbound' && r.none[1] === '없음', 'a key used twice shows red; Esc while choosing leaves no key', [r.dup, r.none]);
   ok(r.fwdNew === 1 && r.fwdOld === 0 && r.invOld === null && r.invNew === 'inv', 'in the game the new keys work and the old ones do nothing', r);
   ok(r.saved && r.saved.forward === 'ArrowUp' && r.reset === null, 'kept for the next start; reset all', [r.saved, r.reset]);
-  // pausing on another key: P pauses and closes screens, Esc no longer does (while the mouse isn't held by the browser);
-  // with pausing left without a key Esc still works (never locked out of the menu)
+  // pausing and closing windows are two keys: with pause on P, P pauses and Esc no longer does, but Esc still closes
+  // the inventory and P doesn't; with close on C, C closes it, Esc doesn't, and Esc still pauses
   const pz = await p.evaluate(async () => { const key = (code, type = 'keydown') => document.body.dispatchEvent(new KeyboardEvent(type, { code, key: code, bubbles: true }));
     OPT.keys = { pause: 'KeyP' }; showMenu(null); UI.paused = false; const o = {};
     key('Escape'); o.escOld = UI.menu || null; key('KeyP'); o.pNew = UI.menu || null; resumeGame(); showMenu(null); UI.paused = false;
-    UI.openScreen('inv'); key('KeyP'); o.pClose = UI.screen || null;
+    UI.openScreen('inv'); key('KeyP'); o.pKeep = UI.screen || null; key('Escape'); o.escClose = UI.screen || null;
+    OPT.keys = { close: 'KeyC' }; showMenu(null); UI.paused = false;
+    UI.openScreen('inv'); key('Escape'); o.escKeep = UI.screen || null; key('KeyC'); o.cClose = UI.screen || null;
+    key('Escape'); o.escPause = UI.menu || null; resumeGame(); showMenu(null); UI.paused = false;
     showMenu('controls'); document.querySelector('[data-act="kbset_pause"]').click(); key('Escape'); o.backToEsc = OPT.keys ? OPT.keys.pause || 'default' : 'default';
-    OPT.keys = { pause: 'Unbound' }; showMenu(null); UI.paused = false; key('Escape'); o.safe = UI.menu || null; delete OPT.keys; resumeGame(); return o; });
-  ok(pz.escOld === null && pz.pNew === 'pause' && pz.pClose === null && pz.backToEsc === 'default' && pz.safe === 'pause', 'pausing can move to another key (it closes screens too); Esc while choosing it goes back to Esc; with no key Esc still pauses', pz);
+    OPT.keys = { close: 'KeyC' }; showMenu('controls'); document.querySelector('[data-act="kbset_close"]').click(); key('Escape'); o.closeBack = OPT.keys ? OPT.keys.close || 'default' : 'default';
+    o.red = document.querySelectorAll('.kbkey.dup, .kbdup').length;
+    OPT.keys = { pause: 'Unbound', close: 'Unbound' }; showMenu(null); UI.paused = false; key('Escape'); o.safe = UI.menu || null; resumeGame(); showMenu(null); UI.paused = false;
+    UI.openScreen('inv'); key('Escape'); o.safeClose = UI.screen || null; delete OPT.keys; resumeGame(); return o; });
+  ok(pz.escOld === null && pz.pNew === 'pause' && pz.pKeep === 'inv' && pz.escClose === null && pz.escKeep === 'inv' && pz.cClose === null && pz.escPause === 'pause'
+    && pz.backToEsc === 'default' && pz.closeBack === 'default' && pz.red === 0 && pz.safe === 'pause' && pz.safeClose === null,
+    'pausing and closing windows are separate keys; Esc while choosing either goes back to Esc; with no key Esc still does both', pz);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
