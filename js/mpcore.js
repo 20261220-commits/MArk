@@ -93,7 +93,7 @@ function mpWorldCore(store, out) {
             r.h = mpSha256(r.salt + lg.cred); S.logins[k] = r; delete S.logins[ok2]; if (S.players['a:' + ok2] && !S.players['a:' + k]) { S.players['a:' + k] = S.players['a:' + ok2]; delete S.players['a:' + ok2]; }
             rec = r; store.saveState(); store.log(`${ok2} 계정이 ${k}(으)로 바뀌었습니다`); break; }
           if (rec && mpSha256(rec.salt + lg.cred) !== rec.h) { fails.set(k, { n: (f && now - f.t < 30000 ? f.n : 0) + 1, t: now }); send(p, { t: 'error', msg: `비밀번호가 틀렸습니다 ("${p.name}" 계정은 이 세계에 이미 있습니다)` }); return; }
-          fails.delete(k); p.account = k;
+          fails.delete(k); p.account = k; p.prevNames = prevs.map(q => q.name.trim().slice(0, 16).toLowerCase()).filter(n => n && n !== k);
           if (!rec) { // a new account takes over what that name had saved here
             const salt = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
             S.logins[k] = { salt, h: mpSha256(salt + lg.cred), at: now };
@@ -120,7 +120,9 @@ function mpWorldCore(store, out) {
         }
         if (!p.account && S.logins[p.name.toLowerCase()]) { send(p, { t: 'error', msg: `"${p.name}" 이름에는 비밀번호가 걸려 있습니다. 타이틀 → 로그인에서 이 이름과 비밀번호로 로그인한 뒤 접속하세요` }); return; }
         p.joined = true;
-        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.key] || null, stored: [...store.keys],
+        // records left under the account's earlier IDs (made before this world knew of the change): offered to the player
+        const prevRec = (p.prevNames || []).filter(n => S.players['a:' + n] && !S.logins[n] && 'a:' + n !== p.key);
+        send(p, { t: 'welcome', you: from, meta: S.meta, time: S.time, rain: S.rain, thunder: S.thunder, pdata: S.players[p.key] || null, prevRec, stored: [...store.keys],
           players: [...players.values()].filter(q => q !== p && q.joined).map(q => ({ id: q.id, name: q.name, skin: q.skin })), auth: Object.fromEntries(auth) });
         others(p, { t: 'peer', id: from, name: p.name, skin: p.skin }); store.log(`${p.name} 접속 (${[...players.values()].filter(q => q.joined).length}명)`); return;
       }
@@ -145,6 +147,9 @@ function mpWorldCore(store, out) {
         others(p, m, true); return;
       case 'tile': if (typeof m.dk === 'string' && m.tile) { const i = ((m.y - tmy()) << 8) | ((m.z & 15) << 4) | (m.x & 15); /* as the game keeps tiles: rows from the world's bottom */ entry(m.dk).then(c => { c.tiles[i] = m.tile; touch(m.dk, c); }); } others(p, m, true); return;
       case 'skin': if (p.joined && m.skin && typeof m.skin === 'object' && JSON.stringify(m.skin).length < 200000) { p.skin = m.skin; others(p, { t: 'skin', id: from, skin: p.skin }); } return; // a new skin mid-game: everyone sees it (and so do later arrivals)
+      case 'takeprev': { // the player chose the record left under an earlier ID of the account: it becomes theirs (the one in use is dropped)
+        const n = typeof m.name === 'string' ? m.name.toLowerCase() : ''; if (!p.joined || !p.account || !(p.prevNames || []).includes(n) || !S.players['a:' + n] || S.logins[n]) return;
+        S.players[p.key] = S.players['a:' + n]; delete S.players['a:' + n]; store.saveState(); store.log(`${p.name}: 이전 아이디(${n})의 기록을 이어받았습니다`); send(p, { t: 'tookprev' }); return; }
       case 'hb': return; // a game saying it's still there (seenAt is set above)
       case 'chat': case 'sys': case 'hitfx': others(p, m); return;
       case 'nick': { const n = typeof m.name === 'string' ? m.name.trim().slice(0, 16) : ''; if (!p.joined || !n || /[\s<>"'&\\]/.test(n)) return; // a new nickname mid-game (an account's, or a guest's)

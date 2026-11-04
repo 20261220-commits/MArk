@@ -332,6 +332,7 @@ function mpHandle(m, from) {
     case 'auth': mpGotAuth(m.dim, m.id); return;
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
+    case 'tookprev': mpTookPrev(); return;
     case 'pdataok': { const loc = pdLoad(); if (loc && loc.dirty === m.seq) pdStore({ at: m.at, dirty: 0 }); else if (loc) pdStore({ at: Math.max(loc.at || 0, m.at || 0) }); return; } // the server has kept it
     case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } if (p.capeKey && PACKPX.ent[p.capeKey]) { if (entTex[p.capeKey]) { entTex[p.capeKey].dispose(); delete entTex[p.capeKey]; } delete PACKPX.ent[p.capeKey]; } p.capeKey = null; p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
@@ -749,6 +750,21 @@ async function mpEnterServerWorld(m) {
   mpSend({ t: 'dim', dim: W.dim });
   chatMsg(sm.name + ' 서버 세계에 들어왔습니다', '#ffff55');
   mirHave(); // the server fills in this browser's copy of the world
+  if (Array.isArray(m.prevRec) && m.prevRec.length) setTimeout(() => mpAskPrev(String(m.prevRec[0])), 1200);
+}
+// a record of yours under the account's earlier ID is in this world (you came in after the ID change, before the world
+// knew of it, and started over): take it back if you like - you leave and come back in with it
+function mpAskPrev(name) {
+  if (!MP.on || !W.active) return;
+  if (!confirm(`이 세계에 이전 아이디 "${name}"로 남긴 기록(아이템·위치)이 있어요.\n지금 기록 대신 그 기록을 불러올까요? (지금 기록은 없어집니다)`)) return;
+  MP.pdataOk = false; pdStore({ d: null, at: 0, dirty: 0 }); // (nothing of the current self goes out any more, and this device's copy of it is dropped)
+  MP.prevBack = { url: MP.lastUrl, room: MP.roomCode, world: MP.worldId };
+  mpSend({ t: 'takeprev', name });
+}
+async function mpTookPrev() {
+  const b = MP.prevBack; MP.prevBack = null; if (!b) return;
+  chatMsg('이전 기록을 불러오는 중...', '#ffff55'); mpStop(); quitToTitle(); showMenu('mp_join');
+  await new Promise(r => setTimeout(r, 500)); await mpJoinWs(b.url, b.room || null, b.room ? null : b.world);
 }
 function mpGotAuth(dim, id) {
   if (id == null) delete MP.auth[dim]; else MP.auth[dim] = id;
