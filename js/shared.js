@@ -3778,6 +3778,7 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.BOX) {
       if (id === 1098 && !(meta & 16)) continue; // standing signs are drawn as rotated meshes on the main thread
+      if ((id === 44 || id === 1102 || id === 1094) && !opts.icon) continue; // chests: drawn on the main thread as Java's chest model (lid, latch, large chests as one), see chests.js
       if (MODEL_ELS[id]) modelFaces(id, meta, x, y, z, MODEL_ELS[id](meta), meta & 3, Cu, cFlip);
       else boxFaces(id, meta, x, y, z, shapes(id, meta), Cu, cFlip);
       if (id === 1081 && meta && POT_PLANTS[meta]) pottedPlant(x, y, z, T[POT_PLANTS[meta][1]]);

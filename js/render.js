@@ -366,7 +366,7 @@ function meshedBlockGeometry(id, meta, single) {
   const { B, M, L, bio } = iconVol, put = [[8, 1, 8, meta]];
   if (id === S.BID.red_bed && !single) { put[0][3] = (meta & 0xf0) | 0; put.push([8, 1, 7, (meta & 0xf0) | 4]); } // foot, and the head one block north (DIRS[0])
   for (const [x, y, z, m] of put) { const i = S.pidx(x, y, z); B[i] = id; M[i] = m; }
-  let r; try { r = S.meshChunk(B, M, L, bio, { fancy: true, smooth: false, h: 4 }); } catch (e) { r = null; }
+  let r; try { r = S.meshChunk(B, M, L, bio, { fancy: true, smooth: false, h: 4, icon: true }); } catch (e) { r = null; }
   for (const [x, y, z] of put) { const i = S.pidx(x, y, z); B[i] = 0; M[i] = 0; }
   if (!r) return null;
   const pos = [], uv = [], shade = [], tintA = [], def = DEFAULT_TINT[S.TINT[id]];

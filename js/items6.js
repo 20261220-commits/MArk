@@ -289,7 +289,7 @@ function saddleTick() {
     else if (!e.saddle && e.saddleMesh) { e.mesh.remove(e.saddleMesh); e.saddleMesh = null; }
   }
 }
-function items6Tick() { signTick(); rocketTick(); leashTick(); dialTick(); saddleTick(); }
+function items6Tick() { signTick(); if (typeof chestTick === 'function') chestTick(); rocketTick(); leashTick(); dialTick(); saddleTick(); }
 
 // ---------- compasses and clocks: held, a dial shows where the needle points (a compass used on a lodestone points there) ----------
 const DIAL = { el: null, g: null };

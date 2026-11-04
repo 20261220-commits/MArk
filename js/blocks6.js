@@ -81,7 +81,7 @@ function blocks6Use(t, h, dry) {
     return true;
   }
   if (id === BID.ender_chest) {
-    if (!dry) { if (!PL.ender) PL.ender = new Array(27).fill(null); UI.openScreen('chest', { cart: { items: PL.ender }, title: '엔더 상자' }); play('door', { vol: 0.4, pitch: 0.7 }); }
+    if (!dry) { if (!PL.ender) PL.ender = new Array(27).fill(null); UI.openScreen('chest', { cart: { items: PL.ender }, title: '엔더 상자', at: [x, y, z] }); play('door', { vol: 0.4, pitch: 0.7 }); }
     return true;
   }
   if (isShulker(id)) {
