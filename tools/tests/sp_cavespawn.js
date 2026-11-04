@@ -11,11 +11,11 @@ module.exports = async ({ ok, srv, b, lib }) => {
     for (const e of [...ENT]) if (e.kind === 'mob') removeEnt(e);
     // the night's monsters on the surface far above
     for (let i = 0; i < 12; i++) { const sx = X + 40 + i * 2, sz = Z + 40, sy = topY(sx, sz) + 1; const m = spawnMob('zombie', sx + .5, sy, sz + .5); if (m) m.persistent = true; }
-    let n = 0; const seen = new Set();
+    let n = 0, litAt = 0; const seen = new Set(); // (where each one first shows up: after that it walks over to the player in the light)
     for (let i = 0; i < 1200; i++) { UI.paused = false; gameTick(); PL.health = 20; PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.vx = PL.vz = 0;
-      for (const e of ENT) if (e.kind === 'mob' && e.def.hostile && !seen.has(e) && Math.abs(e.y - Y) < 6 && Math.abs(e.x - X) < 31 && Math.abs(e.z - Z) < 31) { seen.add(e); n++; }
+      for (const e of ENT) if (e.kind === 'mob' && e.def.hostile && !seen.has(e) && Math.abs(e.y - Y) < 6 && Math.abs(e.x - X) < 31 && Math.abs(e.z - Z) < 31) { seen.add(e); n++; if ((getLight(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z)) & 15) > 0) litAt++; }
       if (i % 6 === 0) await wait(2); }
-    const lit = [...seen].filter(e => (getLight(Math.floor(e.x), Math.floor(e.y), Math.floor(e.z)) & 15) > 0).length;
+    const lit = litAt;
     return { inRoom: n, lit }; });
   ok(r.inRoom >= 4, 'monsters spawn in the dark cave around the player', r);
   ok(r.lit === 0, 'none where torchlight reaches', r);
