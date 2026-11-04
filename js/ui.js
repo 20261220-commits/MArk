@@ -362,10 +362,10 @@ function showMenu(name, data) {
   } else if (name === 'packs') {
     h = `<h2>리소스 팩</h2>${UPACK.stale ? '<p style="color:#ff5">이 팩은 예전 버전으로 불러온 것입니다. 같은 파일을 다시 불러오면 HUD·하늘·파티클·그림·엔드 시티 등이 원작 그대로 적용됩니다.</p>' : ''}<p>지금 쓰는 텍스처: <b>${UPACK.name ? esc(UPACK.name) + ' (+ 없는 것은 기본 팩)' : '기본 (Pixel Perfection CE)'}</b></p><p>구조물: <b>${UPACK.structs ? 'client.jar의 원작 구조물 조각·전리품 표' : '내장 근사 구조물'}</b></p><p class="muted">내 기기에 있는 리소스 팩 .zip 이나 마인크래프트 client.jar 를 고르면 그 텍스처로 바꿉니다. client.jar 를 고르면 마을·전초기지·보루 잔해·이글루·난파선·해저 유적·폐허가 된 포탈·화석도 원작 구조물 파일로 만들어집니다(새로 생성되는 청크부터). 파일은 이 브라우저 안에서만 변환·저장되고 어디에도 올라가지 않습니다.</p><p id="packStatus" class="muted"></p><div class="btncol">${btn('파일에서 불러오기 (.zip / .jar)', 'packLoad')}${UPACK.name ? btn('기본 텍스처로 되돌리기', 'packReset') : ''}${btn('뒤로', 'options')}</div>`;
   } else if (name === 'controls') { // Java's 조작 설정: every key can be changed (js/keybinds.js); the notes for Chromebooks below
-    h = kbHtml() + `<ul class="keys"><li>크롬북 윗줄 키는 같은 자리의 PC F키로 동작합니다 (← 뒤로 = F1, → 앞으로 = F2, ↻ 새로고침 = F3, 창 보기 = F5)</li>
+    h = kbHtml(`<h3>도움말</h3><ul class="keys"><li>크롬북 윗줄 키는 같은 자리의 PC F키로 동작합니다 (← 뒤로 = F1, → 앞으로 = F2, ↻ 새로고침 = F3, 창 보기 = F5)</li>
       <li>F3 조합: F3을 누른 채로 A 청크 다시 불러오기 · B 히트박스 · C 위치 복사 · D 채팅 지우기 · G 청크 경계 · H 고급 툴팁 · N 관전 모드 전환 · P 포커스 잃으면 일시 정지 · Q 도움말</li>
       <li>크롬북에서 <kbd>Ctrl</kbd>+<kbd>W</kbd>는 탭을 닫습니다. Ctrl로 달리려면 설정에서 <b>전체 화면 + 키 잠금</b>을 켜거나 달리기 키를 바꾸세요 (R이나 W 두 번으로도 달립니다)</li>
-      <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손 · O 갑옷 숨기기</li></ul>`;
+      <li>인벤토리: Shift+클릭 빠른 이동 · 우클릭 절반 · 드래그 나누기 · 숫자키 교체 · 더블클릭 모으기 · F 보조 손 · O 갑옷 숨기기</li></ul>`);
   } else if (name === 'stats') { h = statsHtml();
   } else if (name === 'pause') {
     h = `<h2>게임 메뉴</h2><div class="btncol">${PL.sleeping ? btn('침대에서 나가기', 'leavebed') : ''}${btn('게임으로 돌아가기', 'resume')}${btn(MP.on ? '멀티플레이 (' + (MP.peers.size + 1) + '명' + (MP.roomCode ? ' · 방 ' + MP.roomCode : '') + ')' : '멀티플레이 열기', 'mp_host')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${btn('저장하고 타이틀로', 'quit')}</div>`;
