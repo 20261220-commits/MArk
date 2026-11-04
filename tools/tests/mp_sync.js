@@ -35,7 +35,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await C.evaluate(([X, Y, Z]) => { PL.x = X + 3.5; PL.z = Z - 5.5; PL.health = 20; PL.mode = 'survival'; PL.eff = {}; }, pos);
   await A.evaluate(([X, Y, Z]) => { const c = spawnMob('cow', X + 2.5, Y, Z - 5.5); c.persistent = true; window.__cow = c; }, pos); await wait(1500);
   await B.evaluate(([X, Y, Z]) => { splashPotion(POTION.poison.items.splash, X + 3, Y + 0.5, Z - 5.5, null); }, pos);
-  ok(await until(C, () => !!(PL.eff && PL.eff.poison)), 'a guest\'s splash potion poisons another player');
+  ok(await until(C, () => !!(PL.eff && PL.eff.poison)), 'a guest\'s splash potion poisons another player', await C.evaluate(([X, Y, Z]) => ({ at: [+(PL.x - X).toFixed(2), +(PL.y - Y).toFixed(2), +(PL.z - Z).toFixed(2)], eff: Object.keys(PL.eff || {}), hp: PL.health, dead: PL.dead, mode: PL.mode }), pos));
   ok(await until(A, () => !!(__cow.eff && __cow.eff.poison)), 'and the runner\'s mobs in reach');
   // a lingering cloud
   await B.evaluate(([X, Y, Z]) => { spawnCloud(X - 6, Y + 0.05, Z - 6, 'swiftness', { r: 3, dur: 400 }); }, pos);
