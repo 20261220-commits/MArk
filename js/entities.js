@@ -479,6 +479,7 @@ function arrowPackModel() {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
   arrowGeo = g; arrowMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
 }
+const HURT_KB = { extra: 0 }; // knockback added to the hit being dealt (knockback enchantment, sprinting)
 let HURTPROJ = null; // the projectile behind the hurtMob call in progress (advancements)
 function shootArrow(x, y, z, vx, vy, vz, owner, dmg) {
   const e = Ent('arrow', x, y, z); e.from = [x, z]; e.kind = 'arrow'; e.vx = vx; e.vy = vy; e.vz = vz; e.owner = owner; e.dmgMul = dmg || 2; e.w = 0.1; e.h = 0.1; e.stuck = false;
@@ -562,7 +563,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.def.armorMul) dmg *= e.def.armorMul(e);
   if (attacker === PL) stat('damage_dealt', Math.round(Math.min(dmg, Math.max(0, e.hp)) * 10));
   e.hp -= dmg; e.hurt = 10; e.inv = 10;
-  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { e.vx = kx / kl * 0.4; e.vz = kz / kl * 0.4; e.vy = e.def.fly ? 0.1 : 0.36; }
+  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { const ks = 0.4 + (HURT_KB.extra || 0) * 0.5; e.vx = kx / kl * ks; e.vz = kz / kl * ks; e.vy = e.def.fly ? 0.1 : 0.36 + (HURT_KB.extra ? 0.1 : 0); } // (Java: 0.4, plus 0.5 a level of knockback and for a sprinting hit)
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
   if (attacker === PL) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting

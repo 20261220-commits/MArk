@@ -432,12 +432,12 @@ function attackEntity(e) {
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   PL.attackT = 0;
-  const kb = (PL.sprinting && p > 0.9 ? 1.6 : 1) + enchLv(h, 'knockback') * 0.8;
+  const kb = 1, kbExtra = (PL.sprinting && p > 0.9 ? 1 : 0) + enchLv(h, 'knockback'); // (Java: a level of knockback each, the sprint counting as one)
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
   const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
-  const landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player');
+  HURT_KB.extra = kbExtra; let landed; try { landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player'); } finally { HURT_KB.extra = 0; }
   if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
   if (tool && landed) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // only a hit that lands wears the weapon (Java: not one into a mob's moment of invulnerability); a trident's stab wears it by 1, like a sword
 }
