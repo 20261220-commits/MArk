@@ -84,7 +84,7 @@ item('blaze_rod', '블레이즈 막대', { fuel: 2400 }); item('blaze_powder', '
 item('ghast_tear', '가스트의 눈물'); item('magma_cream', '마그마 크림'); item('fire_charge', '화염구');
 item('ender_pearl', '엔더 진주', { stack: 16 }); item('ender_eye', '엔더의 눈');
 item('slime_ball', '슬라임볼');
-item('oak_boat', '참나무 보트', { stack: 1, fuel: 1200 });
+item('oak_boat', '참나무 보트', { stack: 1, fuel: 1200, boat: 'oak' });
 for (const [w, n] of [['spruce', '가문비나무'], ['birch', '자작나무'], ['jungle', '정글나무'], ['acacia', '아카시아나무'], ['dark_oak', '짙은 참나무']]) item(w + '_boat', n + ' 보트', { stack: 1, fuel: 1200, boat: w });
 // dyes, crops and food
 S.COLORS.forEach((c, i) => item(c + '_dye', S.COLKO[i] + ' 염료'));

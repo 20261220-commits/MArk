@@ -220,7 +220,7 @@ function boatRender(e, x, y, z, br) {
   const P = e.mesh.userData.parts; if (P && P.lpaddle && P.rpaddle) { // Java's BoatModel.animatePaddle
     if (!(e.rider === PL)) { const mv = Math.hypot(x - (e.lastRX ?? x), z - (e.lastRZ ?? z)) > 0.02; e.row = e.row || [0, 0]; e.row[0] = mv ? e.row[0] + 0.15 : 0; e.row[1] = e.row[0]; } e.lastRX = x; e.lastRZ = z; // someone else rowing: by how it moves
     const cl = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
-    for (const [k, i] of [['lpaddle', 0], ['rpaddle', 1]]) { const f = (e.row && e.row[i]) || 0, p = P[k]; p.rotation.x = cl(-Math.PI / 3, -Math.PI / 12, (Math.sin(-f) + 1) / 2); const yr = cl(-Math.PI / 4, Math.PI / 4, (Math.sin(-f + 1) + 1) / 2); p.rotation.y = i ? Math.PI - yr : yr; }
+    for (const [k, i] of [['lpaddle', 0], ['rpaddle', 1]]) { const f = (e.row && e.row[i]) || 0, p = P[k]; p.rotation.x = -cl(-Math.PI / 3, -Math.PI / 12, (Math.sin(-f) + 1) / 2); const yr = cl(-Math.PI / 4, Math.PI / 4, (Math.sin(-f + 1) + 1) / 2); p.rotation.y = -(i ? Math.PI - yr : yr); } // (Java's angles turned into ours as buildBones does: x and y change sign, or the blades point up into the air)
   } // the model's origin is the boat's position, as Java draws it (the hull's floor 3/16 up)
   const yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
   e.mesh.rotation.set(0, yaw + Math.PI / 2, e.hurt > 0 ? Math.sin(e.hurt) * 0.1 : 0);
