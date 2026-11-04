@@ -82,7 +82,7 @@ function witchAI(e, dist) {
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
     if (e.raid) raidMarch(e);
   }
-  walkPhysics(e, e.raidMove ? e.raidMove[0] : mx, e.raidMove ? e.raidMove[1] : mz, 0.07); e.raidMove = null;
+  walkPhysics(e, e.raidMove ? e.raidMove[0] : mx, e.raidMove ? e.raidMove[1] : mz, e.def.speed); e.raidMove = null;
 }
 
 // ---------- illagers ----------
@@ -119,7 +119,7 @@ function illagerAI(e, dist) {
   let mx = 0, mz = 0, sp = d.speed;
   const t = e.target;
   if (t) {
-    const dx = t.x - e.x, dz = t.z - e.z, td = Math.hypot(dx, dz) || 1, ty = t === PL ? PL.y : t.y; faceTo(e, t.x, t.z);
+    const dx = t.x - e.x, dz = t.z - e.z, td = Math.hypot(dx, dz) || 1, ty = t === PL ? PL.y : t.y; faceTo(e, t.x, t.z); sp = d.chase || d.speed;
     if (d.crossbow) { // pillagers keep their distance and shoot
       if (td > 9) [mx, mz] = pathDir(e, t.x, ty, t.z); else if (td < 5) { mx = -dx / td; mz = -dz / td; }
       if (e.attackCd <= 0 && td < 16 && canSee(e.x, e.y + 1.6, e.z, t.x, ty + 1.2, t.z)) {
@@ -136,8 +136,8 @@ function illagerAI(e, dist) {
         else evokerFangs(e, t);
       }
     } else { // vindicators and ravagers fight hand to hand
-      [mx, mz] = pathDir(e, t.x, ty, t.z); sp = d.speed * (d.ravager ? 1.2 : 1.3);
-      if (td < e.w + (t.w || 0.3) + (d.ravager ? 1.6 : 1.1) && Math.abs(ty - e.y) < 2.5 && e.attackCd <= 0) { e.attackCd = d.ravager ? 30 : 20; e.swing = 10; hitTarget(e, t, d.dmg, dx / td, dz / td); if (d.ravager && t !== PL) { t.vx += dx / td * 1.2; t.vy = 0.5; t.vz += dz / td * 1.2; } }
+      [mx, mz] = pathDir(e, t.x, ty, t.z);
+      const tdy = ty - e.y; if (td * td + tdy * tdy <= (4 * e.w) * (4 * e.w) + 2 * (t.w || 0.3) && e.attackCd <= 0) { /* (Java's reach: (2 x width)^2 + the target's width) */ e.attackCd = d.ravager ? 30 : 20; e.swing = 10; hitTarget(e, t, d.dmg, dx / td, dz / td); if (d.ravager && t !== PL) { t.vx += dx / td * 1.2; t.vy = 0.5; t.vz += dz / td * 1.2; } }
     }
     if (!e.yell && Math.random() < 0.01) { e.yell = 200; play('hmm', { pitch: 0.6, vol: 0.6 }); }
   } else if (e.raid) raidMarch(e);

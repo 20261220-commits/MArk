@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.04 22:13';
+const NEMO_VERSION = '2026.11.05 08:42';
 
 </script>
 <script>/* js/shared.js */
@@ -9252,7 +9252,7 @@ function mobTick(e) {
   if (e.target && (!plVisible || dist > fr || e.unseen > 60 || e.repel > 0)) { e.target = null; e.unseen = 0; } // (hoglins backing off from warped fungus: nether.js)
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
-    e.yawTarget = Math.atan2(-dx, -dz);
+    e.yawTarget = Math.atan2(-dx, -dz); if (d.chase) speed = d.chase * (e.babySpeed || 1);
     if (d.ranged) {
       if (dist > 10) { mx = tx; mz = tz; } else if (dist < 5) { mx = -tx; mz = -tz; }
       else { mx = -tz * 0.5; mz = tx * 0.5; }
@@ -9268,7 +9268,7 @@ function mobTick(e) {
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
-      if (dist * dist <= (4 * e.w) * (4 * e.w) + 0.6 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
+      if (dist * dist <= (4 * e.w) * (4 * e.w) + 0.6 && e.attackCd <= 0) { e.attackCd = d.atkCd || 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
       if (d.climb && e.onGround && dist * dist >= 4 && dist * dist <= 16 && Math.random() < 0.2 && !(e.leapCd > 0)) { const l = Math.hypot(dx, dz) || 1; e.vx = dx / l * 0.4 + e.vx * 0.2; e.vz = dz / l * 0.4 + e.vz * 0.2; e.vy = 0.4; e.leapCd = 10; } // Java's LeapAtTargetGoal
       if (e.leapCd > 0) e.leapCd--;
       if (d.climb && e.hitH) { e.vy = 0.2; }
@@ -9447,6 +9447,9 @@ function arrowTick(e) {
     const speed = Math.hypot(e.vx, e.vy, e.vz); let dmg = Math.ceil(speed * e.dmgMul); if (e.crit) dmg += Math.floor(Math.random() * (dmg / 2 + 2));
     const inPL = nx > PL.x - 0.6 && nx < PL.x + 0.6 && nz > PL.z - 0.6 && nz < PL.z + 0.6 && ny > PL.y - 0.3 && ny < PL.y + (PL.h || 1.8) + 0.3;
     if (e.owner === PL && !e.leftOwner && !inPL && !e.thrown) e.leftOwner = true;
+    if (e.thrown && e.owner !== PL && e.owner && !PL.dead && !spectator() && inPL) { // a witch's potion, a snow golem's snowball: they break on the player
+      if (e.thrown === IID.snowball && PL.mode !== 'creative') { const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.2; PL.vz += e.vz / l * 0.2; }
+      onThrownHit(e, nx, ny, nz, null); removeEnt(e); return; }
     if ((e.owner !== PL || (e.leftOwner && !e.trident)) && !e.thrown && !PL.dead && inPL) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
       if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
@@ -10481,7 +10484,7 @@ function golemAI(e, dist) {
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.8) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   if (e.swing > 0) e.swing--;
-  walkPhysics(e, mx, mz, e.target ? 0.1 : 0.05);
+  walkPhysics(e, mx, mz, e.target ? 0.189 : 0.068); // (Java: movement 0.25, a stroll at 0.6 of it)
 }
 function golemAnim(e, P) { if (P.rarm) { const s = e.swing > 0 ? -1.6 * Math.sin(e.swing / 10 * Math.PI) : 0; P.rarm.rotation.x = s - Math.sin(e.walk) * 0.5 * e.walkAmt; P.larm.rotation.x = s + Math.sin(e.walk) * 0.5 * e.walkAmt; } }
 function crystalAI(e) { e.vx = e.vy = e.vz = 0; e.walk += 0.05; }
@@ -10788,7 +10791,7 @@ const BARTER = [['ender_pearl', 2, 4, 2], ['string', 3, 9, 5], ['obsidian', 1, 1
   ['nether_brick', 2, 8, 10], ['gravel', 8, 16, 10], ['blackstone', 8, 16, 10], ['iron_nugget', 10, 36, 5], ['quartz', 8, 16, 10], ['glowstone_dust', 5, 12, 10], ['magma_cream', 2, 6, 10], ['spectral', 0, 0, 0]];
 function piglinAI(e, dist) {
   // piglins leave players in gold armour alone; they barter for gold ingots
-  if (!e.target && !wearsGold() && plTargetable() && dist < 12 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.6, PL.z)) e.target = PL;
+  if (!e.target && !wearsGold() && plTargetable() && dist < 16 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.6, PL.z)) e.target = PL;
   if (e.target === PL && (wearsGold() && !e.angry || !plTargetable() || dist > 24)) e.target = null;
   if (e.barter > 0) {
     e.barter--; e.yawTarget = e.yaw;
@@ -10810,7 +10813,7 @@ function piglinAI(e, dist) {
   } else if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'piglin' ? 8 : e.def.dmg, mx, mz); } } // (a piglin's golden sword: 8 on Normal)
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
   else { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
-  walkPhysics(e, mx, mz, e.target ? 0.12 : 0.06);
+  walkPhysics(e, mx, mz, e.target ? 0.37 : 0.133); // (Java: movement 0.35, a stroll at 0.6 of it)
 }
 function striderAI(e) {
   const inLava = fluidAt(e.x, e.y + 0.3, e.z) === 2, onLava = getBlock(Math.floor(e.x), Math.floor(e.y - 0.05), Math.floor(e.z)) === BID.lava;
@@ -13220,7 +13223,7 @@ function witchAI(e, dist) {
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
     if (e.raid) raidMarch(e);
   }
-  walkPhysics(e, e.raidMove ? e.raidMove[0] : mx, e.raidMove ? e.raidMove[1] : mz, 0.07); e.raidMove = null;
+  walkPhysics(e, e.raidMove ? e.raidMove[0] : mx, e.raidMove ? e.raidMove[1] : mz, e.def.speed); e.raidMove = null;
 }
 
 // ---------- illagers ----------
@@ -13257,7 +13260,7 @@ function illagerAI(e, dist) {
   let mx = 0, mz = 0, sp = d.speed;
   const t = e.target;
   if (t) {
-    const dx = t.x - e.x, dz = t.z - e.z, td = Math.hypot(dx, dz) || 1, ty = t === PL ? PL.y : t.y; faceTo(e, t.x, t.z);
+    const dx = t.x - e.x, dz = t.z - e.z, td = Math.hypot(dx, dz) || 1, ty = t === PL ? PL.y : t.y; faceTo(e, t.x, t.z); sp = d.chase || d.speed;
     if (d.crossbow) { // pillagers keep their distance and shoot
       if (td > 9) [mx, mz] = pathDir(e, t.x, ty, t.z); else if (td < 5) { mx = -dx / td; mz = -dz / td; }
       if (e.attackCd <= 0 && td < 16 && canSee(e.x, e.y + 1.6, e.z, t.x, ty + 1.2, t.z)) {
@@ -13274,8 +13277,8 @@ function illagerAI(e, dist) {
         else evokerFangs(e, t);
       }
     } else { // vindicators and ravagers fight hand to hand
-      [mx, mz] = pathDir(e, t.x, ty, t.z); sp = d.speed * (d.ravager ? 1.2 : 1.3);
-      if (td < e.w + (t.w || 0.3) + (d.ravager ? 1.6 : 1.1) && Math.abs(ty - e.y) < 2.5 && e.attackCd <= 0) { e.attackCd = d.ravager ? 30 : 20; e.swing = 10; hitTarget(e, t, d.dmg, dx / td, dz / td); if (d.ravager && t !== PL) { t.vx += dx / td * 1.2; t.vy = 0.5; t.vz += dz / td * 1.2; } }
+      [mx, mz] = pathDir(e, t.x, ty, t.z);
+      const tdy = ty - e.y; if (td * td + tdy * tdy <= (4 * e.w) * (4 * e.w) + 2 * (t.w || 0.3) && e.attackCd <= 0) { /* (Java's reach: (2 x width)^2 + the target's width) */ e.attackCd = d.ravager ? 30 : 20; e.swing = 10; hitTarget(e, t, d.dmg, dx / td, dz / td); if (d.ravager && t !== PL) { t.vx += dx / td * 1.2; t.vy = 0.5; t.vz += dz / td * 1.2; } }
     }
     if (!e.yell && Math.random() < 0.01) { e.yell = 200; play('hmm', { pitch: 0.6, vol: 0.6 }); }
   } else if (e.raid) raidMarch(e);
@@ -15130,30 +15133,6 @@ MOBDEF.zombie_horse = { ...HORSE_DEF('horse', '좀비 말'), drops: [['rotten_fl
 function mobs9Tick() { llamaCarpetTick(); }
 
 </script>
-<script>/* js/mobai.js */
-// ---------- Java's numbers for the monsters' senses and legs ----------
-// Follow range: how far a monster notices a player it can see, and how far it keeps after one (zombies 35, most 16).
-const MOB_FOLLOW = { zombie: 35, husk: 35, drowned: 35, zombie_villager: 35, zombified_piglin: 35, piglin: 16, vindicator: 12, evoker: 12, pillager: 32, ravager: 32, witch: 16, enderman: 64 };
-function mobFollowRange(e) { return MOB_FOLLOW[e.type] || e.def.follow || 16; }
-// what the player looks like from far off: sneaking 0.8 of the range, invisible 0.07 (up to 0.7 with armour on)
-function mobSeeScale() {
-  let f = PL.sneaking ? 0.8 : 1;
-  if (effLv(PL, 'invisibility')) { const worn = INV.armor ? INV.armor.filter(Boolean).length : 0; f *= 0.7 * Math.max(0.1, worn / 4); }
-  return f;
-}
-// a spider's light rule: at a brightness of 0.5 or more (light level 12 and up where it stands) it doesn't start a
-// fight, by day in the open or by torchlight; in a dark cave it does, noon or not
-function mobBrightLight(e) {
-  if (W.dim !== 0) return false;
-  const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h * 0.85), Math.floor(e.z));
-  return Math.max(l & 15, (l >> 4) - skyDarken()) >= 12;
-}
-// walking speeds: Java's movement attribute a moves a mob 4.317 x a^2 / 0.1 blocks a second (a zombie 0.23: 2.3);
-// here a speed of s gives 14.3 x s blocks a second on the ground
-{ const J = { zombie: 0.23, husk: 0.23, drowned: 0.23, zombie_villager: 0.23, skeleton: 0.25, stray: 0.25, wither_skeleton: 0.25, spider: 0.3, cave_spider: 0.3, creeper: 0.25, silverfish: 0.25, endermite: 0.25 };
-  for (const t in J) if (MOBDEF[t]) MOBDEF[t].speed = +(4.317 * J[t] * J[t] / 0.1 / 14.3).toFixed(3); }
-
-</script>
 <script>/* js/mcmodels2.js */
 // Java Edition models for the mobs added after the first resource-pack pass, so they wear the Pixel Perfection CE
 // textures instead of flat colours. Part boxes are Java's ModelPart definitions ([u, v, x, y, z, w, h, d, grow,
@@ -15540,6 +15519,37 @@ function zoglinTick() {
   }
 }
 { const tick = mcmodels2Tick; mcmodels2Tick = function () { tick(); zoglinTick(); }; }
+
+</script>
+<script>/* js/mobai.js */
+// ---------- Java's numbers for the monsters' senses and legs ----------
+// Follow range: how far a monster notices a player it can see, and how far it keeps after one (zombies 35, most 16).
+const MOB_FOLLOW = { zombie: 35, husk: 35, drowned: 35, zombie_villager: 35, zombified_piglin: 35, piglin: 16, vindicator: 12, evoker: 12, pillager: 32, ravager: 32, witch: 16, enderman: 64 };
+function mobFollowRange(e) { return MOB_FOLLOW[e.type] || e.def.follow || 16; }
+// what the player looks like from far off: sneaking 0.8 of the range, invisible 0.07 (up to 0.7 with armour on)
+function mobSeeScale() {
+  let f = PL.sneaking ? 0.8 : 1;
+  if (effLv(PL, 'invisibility')) { const worn = INV.armor ? INV.armor.filter(Boolean).length : 0; f *= 0.7 * Math.max(0.1, worn / 4); }
+  return f;
+}
+// a spider's light rule: at a brightness of 0.5 or more (light level 12 and up where it stands) it doesn't start a
+// fight, by day in the open or by torchlight; in a dark cave it does, noon or not
+function mobBrightLight(e) {
+  if (W.dim !== 0) return false;
+  const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h * 0.85), Math.floor(e.z));
+  return Math.max(l & 15, (l >> 4) - skyDarken()) >= 12;
+}
+// walking speeds: Java's movement attribute a moves a mob 4.317 x a^2 / 0.1 blocks a second (a zombie 0.23: 2.3);
+// here a speed of s gives 14.3 x s blocks a second on the ground
+{ const J = { zombie: 0.23, husk: 0.23, drowned: 0.23, zombie_villager: 0.23, skeleton: 0.25, stray: 0.25, wither_skeleton: 0.25, spider: 0.3, cave_spider: 0.3, creeper: 0.25, silverfish: 0.25, endermite: 0.25 };
+  for (const t in J) if (MOBDEF[t]) MOBDEF[t].speed = +(4.317 * J[t] * J[t] / 0.1 / 14.3).toFixed(3); }
+// the ones with a stroll slower than their charge (Java's speed modifiers on their goals) and their own attack timing
+{ const sp = a => +(4.317 * a * a / 0.1 / 14.3).toFixed(3), set = (t, o) => { if (MOBDEF[t]) Object.assign(MOBDEF[t], o); };
+  set('hoglin', { speed: sp(0.3 * 0.4), chase: sp(0.3), atkCd: 40 }); set('zoglin', { speed: sp(0.25 * 0.4), chase: sp(0.25), atkCd: 40 });
+  set('zombified_piglin', { speed: sp(0.23), chase: sp(0.23) });
+  for (const t of ['vindicator', 'pillager']) set(t, { speed: sp(0.35 * 0.6), chase: sp(0.35) });
+  set('evoker', { speed: sp(0.5 * 0.6), chase: sp(0.5 * 0.6) }); set('ravager', { speed: sp(0.3 * 0.4), chase: sp(0.3) });
+  set('witch', { speed: sp(0.25) }); }
 
 </script>
 <script>/* js/villagers.js */

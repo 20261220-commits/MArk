@@ -19,3 +19,10 @@ function mobBrightLight(e) {
 // here a speed of s gives 14.3 x s blocks a second on the ground
 { const J = { zombie: 0.23, husk: 0.23, drowned: 0.23, zombie_villager: 0.23, skeleton: 0.25, stray: 0.25, wither_skeleton: 0.25, spider: 0.3, cave_spider: 0.3, creeper: 0.25, silverfish: 0.25, endermite: 0.25 };
   for (const t in J) if (MOBDEF[t]) MOBDEF[t].speed = +(4.317 * J[t] * J[t] / 0.1 / 14.3).toFixed(3); }
+// the ones with a stroll slower than their charge (Java's speed modifiers on their goals) and their own attack timing
+{ const sp = a => +(4.317 * a * a / 0.1 / 14.3).toFixed(3), set = (t, o) => { if (MOBDEF[t]) Object.assign(MOBDEF[t], o); };
+  set('hoglin', { speed: sp(0.3 * 0.4), chase: sp(0.3), atkCd: 40 }); set('zoglin', { speed: sp(0.25 * 0.4), chase: sp(0.25), atkCd: 40 });
+  set('zombified_piglin', { speed: sp(0.23), chase: sp(0.23) });
+  for (const t of ['vindicator', 'pillager']) set(t, { speed: sp(0.35 * 0.6), chase: sp(0.35) });
+  set('evoker', { speed: sp(0.5 * 0.6), chase: sp(0.5 * 0.6) }); set('ravager', { speed: sp(0.3 * 0.4), chase: sp(0.3) });
+  set('witch', { speed: sp(0.25) }); }

@@ -427,7 +427,7 @@ function golemAI(e, dist) {
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.8) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   if (e.swing > 0) e.swing--;
-  walkPhysics(e, mx, mz, e.target ? 0.1 : 0.05);
+  walkPhysics(e, mx, mz, e.target ? 0.189 : 0.068); // (Java: movement 0.25, a stroll at 0.6 of it)
 }
 function golemAnim(e, P) { if (P.rarm) { const s = e.swing > 0 ? -1.6 * Math.sin(e.swing / 10 * Math.PI) : 0; P.rarm.rotation.x = s - Math.sin(e.walk) * 0.5 * e.walkAmt; P.larm.rotation.x = s + Math.sin(e.walk) * 0.5 * e.walkAmt; } }
 function crystalAI(e) { e.vx = e.vy = e.vz = 0; e.walk += 0.05; }
