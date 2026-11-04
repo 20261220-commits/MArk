@@ -43,5 +43,12 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(pz.escOld === null && pz.pNew === 'pause' && pz.pKeep === 'inv' && pz.escClose === null && pz.escKeep === 'inv' && pz.cClose === null && pz.escPause === 'pause'
     && pz.backToEsc === 'default' && pz.closeBack === 'default' && pz.red === 0 && pz.safe === 'pause' && pz.safeClose === null,
     'pausing and closing windows are separate keys; Esc while choosing either goes back to Esc; with no key Esc still does both', pz);
+  // with pausing on another key, the browser letting the mouse go (Esc) doesn't pause: a hint asks for a click instead
+  const lk = await p.evaluate(() => { const o = {}; resumeGame(); showMenu(null); UI.paused = false; PL.dead = false;
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => null }); // (the browser letting the mouse go)
+    OPT.keys = { pause: 'Backspace' }; locked = true; document.dispatchEvent(new Event('pointerlockchange')); o.custom = [UI.menu || null, (document.getElementById('relock') || {}).style?.display || null];
+    delete OPT.keys; locked = true; document.dispatchEvent(new Event('pointerlockchange')); o.def = UI.menu || null; o.hintGone = document.getElementById('relock').style.display;
+    delete document.pointerLockElement; resumeGame(); return o; });
+  ok(lk.custom[0] === null && lk.custom[1] === 'block' && lk.def === 'pause' && lk.hintGone === 'none', 'Esc letting the mouse go pauses only while pausing is on Esc', lk);
   ok(!p.errs.length, 'no page errors', p.errs);
 };
