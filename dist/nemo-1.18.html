@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.04 12:57';
+const NEMO_VERSION = '2026.11.04 13:44';
 
 </script>
 <script>/* js/shared.js */
@@ -10104,7 +10104,7 @@ function pathDir(e, tx, ty, tz) {
 function spawnFireball(x, y, z, dx, dy, dz, owner, small, dragon) {
   const e = Ent('fireball', x, y, z); e.kind = 'fireball'; e.hittable = !small && !dragon; e.small = small; e.dragon = !!dragon; e.owner = owner; e.w = small ? 0.16 : 0.5; e.h = small ? 0.32 : 1;
   const l = Math.hypot(dx, dy, dz) || 1; e.ax = dx / l * 0.1; e.ay = dy / l * 0.1; e.az = dz / l * 0.1;
-  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.3 : 1); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect;
+  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.45 : 1.5); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect;
   play(small ? 'blaze' : 'fireball', { vol: 0.6 }); return addEnt(e);
 }
 function fireballDeflect(e) { const [dx, dy, dz] = lookDir(); e.ax = dx * 0.1; e.ay = dy * 0.1; e.az = dz * 0.1; e.vx = dx; e.vy = dy; e.vz = dz; e.owner = PL; play('hit'); }
@@ -10136,7 +10136,7 @@ function fireballTick(e) {
   }
   if (e.age > 400) removeEnt(e);
 }
-function spinRender(e, x, y, z, br, now) { e.mesh.position.set(x, y + e.h / 2, z); e.mesh.rotation.set(0, now / 200, now / 300); e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
+function spinRender(e, x, y, z, br, now) { e.mesh.position.set(x, y + e.h / 2, z); if (e.kind === 'fireball' && typeof camera !== 'undefined') e.mesh.quaternion.copy(camera.quaternion); else e.mesh.rotation.set(0, now / 200, now / 300); /* fireballs face you, as Java draws them */ e.mesh.traverse(o => { if (o.isMesh) R.setMeshLight(o, 1.4); }); }
 // thrown items: snowballs, eggs and ender pearls break on impact; eyes of ender fly toward a stronghold
 function onThrownHit(e, x, y, z, hitMob) {
   const td = ITEMS[e.thrown];
@@ -10310,13 +10310,13 @@ function overworldExtra(x, y, z) { // swamp slimes follow the moon: most at full
 }
 // ---------- AI routines ----------
 function ghastAI(e, dist) {
-  if (!e.goal || Math.random() < 0.01 || Math.hypot(e.goal[0] - e.x, e.goal[1] - e.y, e.goal[2] - e.z) < 1) e.goal = [e.x + (Math.random() - .5) * 32, Math.max(40, Math.min(110, e.y + (Math.random() - .5) * 16)), e.z + (Math.random() - .5) * 32];
+  if (!e.goal || Math.random() < 0.01 || Math.hypot(e.goal[0] - e.x, e.goal[1] - e.y, e.goal[2] - e.z) < 1) e.goal = [e.x + (Math.random() - .5) * 32, Math.max(MINY + 8, Math.min(MAXY - 8, e.y + (Math.random() - .5) * 16)), e.z + (Math.random() - .5) * 32]; // (Java: anywhere within 16 blocks)
   const gx = e.goal[0] - e.x, gy = e.goal[1] - e.y, gz = e.goal[2] - e.z, gl = Math.hypot(gx, gy, gz) || 1;
   e.vx += gx / gl * 0.01; e.vy += gy / gl * 0.01; e.vz += gz / gl * 0.01;
   if (e.hitH || e.hitV) e.goal = null;
   const see = plTargetable() && dist < 64 && canSee(e.x, e.y + 2, e.z, PL.x, PL.y + 1.6, PL.z);
-  if (see) { faceTo(e, PL.x, PL.z); e.charge = (e.charge || 0) + 1; if (e.charge === 10) play('ghast', { vol: 0.8 }); if (e.charge >= 20) { e.charge = -40; const sx = e.x - Math.sin(e.yaw) * 2, sz = e.z - Math.cos(e.yaw) * 2; spawnFireball(sx, e.y + 2, sz, PL.x - sx, PL.y + 1 - e.y - 2.5, PL.z - sz, e, false); } }
-  else { e.charge = Math.max(0, (e.charge || 0) - 1); e.yawTarget = Math.atan2(-e.vx, -e.vz); }
+  if (see) { faceTo(e, PL.x, PL.z); e.charge = (e.charge || 0) + 1; if (e.charge === 10) play('ghast', { vol: 0.8 }); if (e.charge >= 20) { e.charge = -40; const sx = e.x - Math.sin(e.yaw) * 4, sz = e.z - Math.cos(e.yaw) * 4, sy = e.y + 2.5; spawnFireball(sx, sy, sz, PL.x - sx, PL.y + 0.9 - sy, PL.z - sz, e, false); } } // (Java: 4 blocks out in front, from half a block over its middle, at the target's middle)
+  else { if (e.charge > 0) e.charge--; e.yawTarget = Math.atan2(-e.vx, -e.vz); } // out of sight the charge runs down, but the 2-second wait after a shot stays (it used to be wiped, so a ghast that lost sight for a moment fired again a second later)
   e.shooting = e.charge > 10;
   turn(e, 0.2); flyMove(e);
 }
@@ -10330,7 +10330,7 @@ function blazeAI(e, dist) {
     e.atk = (e.atk || 0) + 1;
     if (dist < 2.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, 6, 0, 0); }
     if (e.atk > 60 && (e.atk - 60) % 6 === 0 && see) { const sx = e.x, sy = e.y + 1.4, sz = e.z; spawnFireball(sx, sy, sz, PL.x - sx + (Math.random() - .5) * dist * 0.1, PL.y + 1 - sy, PL.z - sz + (Math.random() - .5) * dist * 0.1, e, true); }
-    if (e.atk > 78) e.atk = 0;
+    if (e.atk > 78) e.atk = -100; // (Java: after the third fireball, 5 seconds before the next charge)
   } else { e.vy -= 0.01; if (e.onGround) e.vy = 0; if (Math.random() < 0.01) { e.vx += (Math.random() - .5) * 0.2; e.vz += (Math.random() - .5) * 0.2; } }
   e.vy = Math.max(e.vy, -0.06);
   turn(e); flyMove(e, 0.85);
