@@ -3,11 +3,14 @@
 const http = require('http'), fs = require('fs'), os = require('os'), path = require('path'), crypto = require('crypto'), { spawn } = require('child_process');
 module.exports = async ({ ok, lib }) => {
   // the fake API: blobs, trees, commits and one ref, as GitHub keeps them
-  const obj = {}, refs = {}, sha = () => crypto.randomBytes(20).toString('hex'); let calls = 0;
+  const obj = {}, refs = {}, sha = () => crypto.randomBytes(20).toString('hex'); let calls = 0, empty = true; // (starts as a repository just made, with no commit)
   const api = http.createServer((req, res) => { let body = ''; req.on('data', d => body += d); req.on('end', () => { calls++;
     const b = body ? JSON.parse(body) : null, u = req.url.replace(/^\/repos\/o\/r/, ''), send = (code, o) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(o || {})); };
     if (req.headers.authorization !== 'Bearer tok') return send(401);
     let m;
+    // a repository just made has no commit: git objects are refused (409), the contents API makes its first commit
+    if (empty && req.method === 'PUT' && u.startsWith('/contents/')) { empty = false; const s = sha(); refs.main = s; obj[s] = { tree: { sha: sha() } }; return send(201, { commit: { sha: s } }); }
+    if (empty && u.startsWith('/git/')) return send(409, { message: 'Git Repository is empty.' });
     if (req.method === 'GET' && (m = u.match(/^\/git\/ref\/heads\/(.+)$/))) return refs[m[1]] ? send(200, { object: { sha: refs[m[1]] } }) : send(404);
     if (req.method === 'GET' && (m = u.match(/^\/git\/(commits|trees|blobs)\/(\w+)$/))) return obj[m[2]] ? send(200, obj[m[2]]) : send(404);
     if (req.method === 'POST' && u === '/git/blobs') { const s = sha(); obj[s] = { content: b.content, encoding: 'base64' }; return send(201, { sha: s }); }
