@@ -202,12 +202,13 @@ function anvilResult(c) {
       let d = a.d || 0; while (d > 0 && used < b.n) { d = Math.max(0, d - Math.floor(da.dur / 4)); used++; cost++; } out.d = d; changed = true;
     } else if ((b.id === a.id && da.dur) || (b.id === IID.enchanted_book && b.e)) { // combine: durability and enchantments
       if (b.id === a.id) { const keep = (da.dur - (a.d || 0)) + (da.dur - (b.d || 0)) + Math.floor(da.dur * 0.12); out.d = Math.max(0, da.dur - keep); if (out.d < (a.d || 0)) { cost += 2; changed = true; } }
-      const kinds = enchKinds(a.id);
+      const kinds = enchKinds(a.id), toBook = a.id === IID.enchanted_book;
+      if (toBook && b.id !== IID.enchanted_book) return null; // (a book takes enchantments only from another book)
       for (const [k, lv] of Object.entries(b.e || {})) {
-        if (!ENCH[k] || !(ENCH[k][2].some(t => kinds.includes(t)) || creative())) continue;
+        if (!ENCH[k] || !(toBook || ENCH[k][2].some(t => kinds.includes(t)) || creative())) continue; // (Java: in creative, or onto a book, anything goes - the knockback stick)
         if (out.e && ENCH_EXCL.some(g => g.includes(k) && g.some(o => o !== k && out.e[o]))) { cost++; continue; }
         const cur = (out.e && out.e[k]) || 0, nl = cur === lv ? Math.min(ENCH[k][1], lv + 1) : Math.max(cur, lv);
-        out.e = out.e || {}; out.e[k] = nl; cost += nl * (b.id === IID.enchanted_book ? 1 : 2); changed = true;
+        out.e = out.e || {}; out.e[k] = nl; { const m = ({ 10: 1, 5: 2, 2: 4, 1: 8 })[enchRarityW(k)] || 1; cost += nl * (b.id === IID.enchanted_book ? Math.max(1, m >> 1) : m); } changed = true; // (Java: by rarity, 1 / 2 / 4 / 8 a level, halved from a book)
       }
       used = 1;
     } else return null;

@@ -544,14 +544,14 @@ function bookshelves(c) {
 }
 function enchantOptions() {
   const c = GUI.ctx, st = c.items[0], shelves = bookshelves(c), list = [];
-  if (!st) return { shelves, list };
+  if (!st || !enchantability(st.id) || (st.e && Object.keys(st.e).length) || (st.id !== IID.book && !enchKinds(st.id).length) || (st.id === IID.book && st.n > 1)) return { shelves, list }; // (Java: only an unenchanted tool, armour piece, bow, rod or a single book; a stick gets nothing)
   PL.enchSeed = PL.enchSeed || ((Math.random() * 2 ** 31) | 0);
   const r = S.rng(PL.enchSeed), b = shelves;
   const base = 1 + r.int(8) + Math.floor(b / 2) + r.int(b + 1);
   const costs = [Math.max(Math.floor(base / 3), 1), Math.floor(base * 2 / 3) + 1, Math.max(base, b * 2)];
   const lapis = c.items[1] ? c.items[1].n : 0;
   costs.forEach((cost, i) => {
-    const e = rollEnchant(st.id, cost, PL.enchSeed + i * 7919), first = Object.keys(e)[0];
+    const e = rollEnchant(st.id, cost, PL.enchSeed + i * 7919), first = Object.keys(e)[0]; if (!first) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
     list.push({ cost, e, text: first ? ENCH[first][0] + (ENCH[first][1] > 1 ? ' ' + ROMAN[e[first]] : '') + ' . . . ?' : '?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
   });
   return { shelves, list };
@@ -564,7 +564,7 @@ $('screen').addEventListener('click', e => {
   const b = e.target.closest('[data-ench]'); if (!b || UI.screen !== 'enchant') return;
   const i = +b.dataset.ench, o = enchantOptions().list[i]; if (!o || !o.ok) return;
   const c = GUI.ctx, st = c.items[0];
-  st.e = o.e;
+  st.e = { ...o.e }; if (st.id === IID.book) st.id = IID.enchanted_book; // a book becomes an enchanted book
   if (!creative()) { PL.level = Math.max(0, PL.level - (i + 1)); c.items[1].n -= i + 1; if (c.items[1].n <= 0) c.items[1] = null; }
   PL.enchSeed = (Math.random() * 2 ** 31) | 0;
   play('levelup', { vol: 0.5 }); UI.advance('enchant'); stat('enchant_item'); UI.hudDirty = true; UI.renderScreen();
