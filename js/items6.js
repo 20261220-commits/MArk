@@ -153,12 +153,14 @@ function rocketTick() {
   for (let i = ROCKETS.length - 1; i >= 0; i--) {
     const r = ROCKETS[i];
     if (r.rider) { r.x = PL.x; r.y = PL.y + 0.5; r.z = PL.z; }
-    else if (r.shot) { r.x += r.vx; r.y += r.vy; r.z += r.vz; } // from a crossbow: straight and fast
-    else { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; }
+    let hit = false;
+    if (r.shot) { // from a crossbow: straight and fast, 1.6 blocks a tick - checked in short steps, or it would slip through a mob
+      const n = Math.max(1, Math.ceil(Math.hypot(r.vx, r.vy, r.vz) / 0.3));
+      for (let k = 0; k < n && !hit; k++) { r.x += r.vx / n; r.y += r.vy / n; r.z += r.vz / n;
+        hit = SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))] || ENT.some(e => e.kind === 'mob' && !e.dead && Math.abs(e.x - r.x) < e.w + 0.3 && Math.abs(e.z - r.z) < e.w + 0.3 && r.y > e.y - 0.2 && r.y < e.y + e.h + 0.2); }
+    } else if (!r.rider) { r.vy = Math.min(1.2, r.vy * 1.15 + 0.04); r.x += r.vx; r.y += r.vy; r.z += r.vz; hit = SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))]; }
     r.mesh.position.set(r.x, r.y, r.z);
     R.simpleParticle(r.x, r.y - 0.3, r.z, [1, 0.9, 0.6], { size: 0.06, vy: -0.5, grav: 0 });
-    let hit = !r.rider && SOLID[getBlock(Math.floor(r.x), Math.floor(r.y + 0.3), Math.floor(r.z))];
-    if (r.shot && !hit) hit = ENT.some(e => e.kind === 'mob' && !e.dead && Math.abs(e.x - r.x) < e.w + 0.3 && Math.abs(e.z - r.z) < e.w + 0.3 && r.y > e.y - 0.2 && r.y < e.y + e.h + 0.2);
     if (--r.life > 0 && !hit) continue;
     ROCKETS.splice(i, 1); rocketExplode(r);
   }

@@ -7,7 +7,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const X = Math.floor(PL.x), Z = Math.floor(PL.z), Y = 150;
     const pad = () => { for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) { setBlock(X + x, Y - 1, Z + z, BID.stone); for (let y = 0; y < 3; y++) setBlock(X + x, Y + y, Z + z, 0); } };
-    PL.x = X + 2.5; PL.y = Y; PL.z = Z + 2.5; PL.flying = false;
+    PL.x = X + 2.5; PL.y = Y; PL.z = Z + 2.5; PL.flying = false; PL.yaw = 0; PL.pitch = -0.6; // (facing north: a bed's head end goes to the free block north, not into the stone beside the spot)
     // recipes
     for (const rc of RECIPES) { if (!ITEMS[rc.out]) note('recipe out ' + rc.out, 'missing'); const ing = rc.s || rc.g || []; for (const g of ing) if (g && Array.isArray(g) && g.some(v => v == null || !ITEMS[v])) note('recipe in for ' + (ITEMS[rc.out] && ITEMS[rc.out].key), 'missing ingredient'); }
     for (const k in SMELT) if (!ITEMS[SMELT[k][0]]) note('smelt ' + k, 'missing');
@@ -22,7 +22,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
         TARGET = { type: 'block', x: X, y: Y - 1, z: Z, id: BID.stone, m: 0, nx: 0, ny: 1, nz: 0, hy: 1 };
         placeBlock(TARGET, d);
         if (UI.screen) UI.closeScreen();
-        const id = getBlock(X, Y, Z);
+        const id = getBlock(X, Y, Z); if (!id) (window.__nop = window.__nop || []).push(d.key);
         if (id) { const t = { type: 'block', x: X, y: Y, z: Z, id, m: getMeta(X, Y, Z), nx: 0, ny: 1, nz: 0, hy: 1 }; INV.slots[INV.sel] = null; interactBlock(t, true); if (UI.screen) UI.closeScreen(); INV.slots[INV.sel] = { id: IID.diamond_pickaxe, n: 1 }; breakBlock(X, Y, Z); n++; for (const e of [...ENT]) if (e.kind === 'mob') removeEnt(e); } // (an infested block lets out a silverfish: it would stand where the next block goes)
         if (UI.screen) UI.closeScreen();
       } catch (e) { note('block ' + d.key, e); if (UI.screen) UI.closeScreen(); }
@@ -45,10 +45,10 @@ module.exports = async ({ ok, srv, b, lib }) => {
       try { const m = spawnMob(t, X + 1.5, Y, Z + 1.5); m.persistent = true; for (let i = 0; i < 4; i++) { UI.paused = false; await wait(16); } INV.slots[INV.sel] = { id: IID.wheat, n: 1 }; TARGET = { type: 'ent', e: m }; try { useItem(true); } catch (e) { note('interact ' + t, e); } if (PL.riding) dismount(); if (UI.screen) UI.closeScreen(); m.inv = 0; hurtMob(m, 9999, PL, 0, 0, 'player'); for (let i = 0; i < 3; i++) { UI.paused = false; await wait(16); } } catch (e) { note('mob ' + t, e); }
     }
     await wait(300);
-    return { placed: n, blocks: blockItems.length, bad };
+    return { placed: n, blocks: blockItems.length, bad, nop: (window.__nop || []).filter(k => !/sapling|tulip|grass|fern|flower|rose|bush|seeds|dripleaf|vine|kelp|seagrass|bamboo|roots|cane|cactus|ladder|pad|lilac|peony|azalea|orchid|allium|bluet|daisy|lily|poppy|dandelion|blossom|wart|carrot|potato|berries|hook|sunflower/.test(k)) };
   });
   ok(Object.keys(r.bad).length === 0, 'blocks, items and mobs work without errors', r.bad);
-  ok(r.placed >= r.blocks - 60, 'block items place on a stone floor (about 50 plants need soil, water or a wall)', [r.placed, r.blocks]);
+  ok(r.placed >= r.blocks - 60, 'block items place on a stone floor (about 50 plants need soil, water or a wall)', [r.placed, r.blocks, r.nop]);
   const step = async (f, wait = 3000, arg) => { try { await p.evaluate(f, arg); } catch (e) { p.errs.push(String(e.message)); } await p.waitForTimeout(wait); };
   await step(() => { PL.mode = 'creative'; const X = PL.x, Z = PL.z; let i = 0; for (const k of Object.keys(MOBDEF)) { if (k === 'player' || k === 'ender_dragon' || k === 'wither') continue; const a = i++ * 0.7; spawnMob(k, X + Math.cos(a) * (6 + i % 5), PL.y + 2, Z + Math.sin(a) * (6 + i % 5)); } PL.mode = 'survival'; }, 15000);
   await step(() => { W.time = 14000; runCommand('weather thunder'); }, 8000);

@@ -216,34 +216,56 @@ const maxStack = id => ITEMS[id] ? ITEMS[id].stack : 64;
 // ---------- enchantments ----------
 // key: [name, max level, applicable kinds]
 const ENCH = {
-  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield']],
-  fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel']],
+  efficiency: ['효율', 5, ['pickaxe', 'axe', 'shovel', 'hoe', 'shears']], unbreaking: ['내구성', 3, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield', 'fishing_rod', 'shears', 'misc', 'elytra']],
+  fortune: ['행운', 3, ['pickaxe', 'axe', 'shovel', 'hoe']], silk_touch: ['섬세한 손길', 1, ['pickaxe', 'axe', 'shovel', 'hoe']],
   sharpness: ['날카로움', 5, ['sword', 'axe']], knockback: ['밀치기', 2, ['sword']], looting: ['약탈', 3, ['sword']],
   protection: ['보호', 4, ['armor']], feather_falling: ['가벼운 착지', 4, ['boots']], power: ['힘', 5, ['bow']], infinity: ['무한', 1, ['bow']],
-  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield'], 1],
+  mending: ['수선', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield', 'fishing_rod', 'shears', 'misc', 'elytra'], 1],
   quick_charge: ['빠른 장전', 3, ['crossbow']], multishot: ['다중 발사', 1, ['crossbow']], piercing: ['관통', 4, ['crossbow']],
   loyalty: ['충성', 3, ['trident']], riptide: ['급류', 3, ['trident']], channeling: ['집전', 1, ['trident']], impaling: ['찌르기', 5, ['trident']],
   smite: ['강타', 5, ['sword', 'axe']], bane_of_arthropods: ['살충', 5, ['sword', 'axe']], fire_aspect: ['발화', 2, ['sword']], sweeping: ['휩쓸기', 3, ['sword']],
   flame: ['화염', 1, ['bow']], punch: ['밀어내기', 2, ['bow']], thorns: ['가시', 3, ['armor']], respiration: ['호흡', 3, ['helmet']], aqua_affinity: ['친수성', 1, ['helmet']],
   depth_strider: ['물갈퀴', 3, ['boots']], fire_protection: ['화염으로부터 보호', 4, ['armor']], blast_protection: ['폭발로부터 보호', 4, ['armor']], projectile_protection: ['발사체로부터 보호', 4, ['armor']],
   luck_of_the_sea: ['바다의 행운', 3, ['fishing_rod']], lure: ['미끼', 3, ['fishing_rod']], soul_speed: ['영혼 가속', 3, ['boots'], 1],
-  binding_curse: ['귀속 저주', 1, ['armor'], 1], vanishing_curse: ['소실 저주', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield', 'fishing_rod'], 1] }; // 4th field: treasure (never from the enchanting table)
+  binding_curse: ['귀속 저주', 1, ['armor', 'elytra'], 1], vanishing_curse: ['소실 저주', 1, ['pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'armor', 'bow', 'crossbow', 'trident', 'shield', 'fishing_rod', 'shears', 'misc', 'elytra'], 1],
+  frost_walker: ['차가운 걸음', 2, ['boots'], 1] }; // 4th field: treasure (never from the enchanting table)
 const ENCH_EXCL = [['fortune', 'silk_touch'], ['mending', 'infinity'], ['multishot', 'piercing'], ['riptide', 'loyalty'], ['riptide', 'channeling'], ['sharpness', 'smite', 'bane_of_arthropods'],
   ['protection', 'fire_protection', 'blast_protection', 'projectile_protection'], ['depth_strider', 'frost_walker']];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 const enchLv = (st, k) => (st && st.e && st.e[k]) || 0;
-function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : d.armor.slot === 0 ? ['armor', 'helmet'] : ['armor']; if (id === IID.bow) return ['bow']; if (id === IID.fishing_rod) return ['fishing_rod']; return []; }
+function enchKinds(id) { const d = ITEMS[id]; if (!d) return []; if (id === IID.crossbow) return ['crossbow']; if (id === IID.shield) return ['shield']; if (id === IID.shears) return ['shears']; if (id === IID.elytra) return ['elytra']; if (id === IID.flint_and_steel || id === IID.carrot_on_a_stick || id === IID.warped_fungus_on_a_stick) return ['misc']; if (d.tool) return [d.tool.kind]; if (d.armor) return d.armor.slot === 3 ? ['armor', 'boots'] : d.armor.slot === 0 ? ['armor', 'helmet'] : d.armor.slot === 1 ? ['armor', 'chest'] : ['armor']; if (id === IID.bow) return ['bow']; if (id === IID.fishing_rod) return ['fishing_rod']; return []; }
 function enchText(st) { return st && st.e ? Object.entries(st.e).map(([k, l]) => ENCH[k][0] + (ENCH[k][1] > 1 ? ' ' + ROMAN[l] : '')) : []; }
-// Java-like roll: modified level -> weighted pick of applicable enchantments
+// the enchanting table (Java's EnchantmentHelper.selectEnchantment): the item's enchantability, a weighted pick (common
+// ones 10, rare ones 1) of what the table may give it, each at the highest level whose cost range holds the modified level
+const enchantability = id => { const d = ITEMS[id]; if (!d) return 0; if (id === IID.book || id === IID.enchanted_book || id === IID.bow || id === IID.crossbow || id === IID.trident || id === IID.fishing_rod) return 1;
+  if (d.tool && d.tool.mat) return ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10, netherite: 15 })[d.tool.mat] || 0;
+  if (d.armor) return d.key === 'turtle_helmet' ? 9 : ({ leather: 15, chainmail: 12, golden: 25, iron: 9, diamond: 10, netherite: 15 })[d.armor.mat] || 0; return 0; };
+// [weight, lowest modified level for level l, highest]
+const EJ = (() => { const S10 = l => 1 + l * 10 + 50; return {
+  protection: [10, l => 1 + (l - 1) * 11, l => 12 + (l - 1) * 11], fire_protection: [5, l => 10 + (l - 1) * 8, l => 18 + (l - 1) * 8], feather_falling: [5, l => 5 + (l - 1) * 6, l => 11 + (l - 1) * 6],
+  blast_protection: [2, l => 5 + (l - 1) * 8, l => 13 + (l - 1) * 8], projectile_protection: [5, l => 3 + (l - 1) * 6, l => 9 + (l - 1) * 6], respiration: [2, l => 10 * l, l => 10 * l + 30], aqua_affinity: [2, () => 1, () => 41],
+  thorns: [1, l => 10 + 20 * (l - 1), S10], depth_strider: [2, l => 10 * l, l => 10 * l + 15], sharpness: [10, l => 1 + (l - 1) * 11, l => 21 + (l - 1) * 11], smite: [5, l => 5 + (l - 1) * 8, l => 25 + (l - 1) * 8],
+  bane_of_arthropods: [5, l => 5 + (l - 1) * 8, l => 25 + (l - 1) * 8], knockback: [5, l => 5 + 20 * (l - 1), S10], fire_aspect: [2, l => 10 + 20 * (l - 1), S10], looting: [2, l => 15 + (l - 1) * 9, S10],
+  sweeping: [2, l => 5 + (l - 1) * 9, l => 20 + (l - 1) * 9], efficiency: [10, l => 1 + 10 * (l - 1), S10], silk_touch: [1, () => 15, S10], unbreaking: [5, l => 5 + (l - 1) * 8, S10], fortune: [2, l => 15 + (l - 1) * 9, S10],
+  power: [10, l => 1 + (l - 1) * 10, l => 16 + (l - 1) * 10], punch: [2, l => 12 + (l - 1) * 20, l => 37 + (l - 1) * 20], flame: [2, () => 20, () => 50], infinity: [1, () => 20, () => 50],
+  luck_of_the_sea: [2, l => 15 + (l - 1) * 9, S10], lure: [2, l => 15 + (l - 1) * 9, S10], loyalty: [5, l => 5 + l * 7, () => 50], impaling: [2, l => 1 + (l - 1) * 8, l => 21 + (l - 1) * 8],
+  riptide: [2, l => 10 + l * 7, () => 50], channeling: [1, () => 25, () => 50], multishot: [2, () => 20, () => 50], quick_charge: [5, l => 12 + (l - 1) * 20, () => 50], piercing: [10, l => 1 + (l - 1) * 10, () => 50],
+  mending: [2], frost_walker: [2], soul_speed: [1], binding_curse: [1], vanishing_curse: [1] }; })();
+// what the table gives (an anvil can add more: sharpness on an axe, thorns on any armour, efficiency on shears)
+const ENCH_TABLE = { sharpness: ['sword'], smite: ['sword'], bane_of_arthropods: ['sword'], thorns: ['chest'], efficiency: ['pickaxe', 'axe', 'shovel', 'hoe'] };
+const enchRarityW = k => (EJ[k] && EJ[k][0]) || 1; // Java's rarity weights (10 common, 5 uncommon, 2 rare, 1 very rare)
 function rollEnchant(id, level, seed) {
-  const r = S.rng(seed), kinds = enchKinds(id), d = ITEMS[id];
-  const ability = d.tool ? ({ wooden: 15, stone: 5, iron: 14, golden: 22, diamond: 10, netherite: 15 })[d.tool.mat] : d.armor ? ({ leather: 15, golden: 25, iron: 9, diamond: 10, netherite: 15 })[d.armor.mat] : 1;
-  let L = level + 1 + r.int(Math.floor(ability / 4) + 1) + r.int(Math.floor(ability / 4) + 1);
+  const r = S.rng(seed), book = id === IID.book || id === IID.enchanted_book, kinds = enchKinds(id), ab = enchantability(id);
+  if (!ab) return {};
+  let L = level + 1 + r.int(Math.floor(ab / 4) + 1) + r.int(Math.floor(ab / 4) + 1);
   L = Math.max(1, Math.round(L * (1 + (r() + r() - 1) * 0.15)));
-  const pool = Object.keys(ENCH).filter(k => !ENCH[k][3] && ENCH[k][2].some(t => kinds.includes(t)));
-  const out = {};
-  const pick = () => { const opts = pool.filter(k => !out[k] && !ENCH_EXCL.some(g => g.includes(k) && g.some(o => out[o]))); if (!opts.length) return false; const k = opts[r.int(opts.length)]; out[k] = Math.max(1, Math.min(ENCH[k][1], Math.ceil(L / 30 * ENCH[k][1] + (r() - 0.3)))); return true; };
-  pick(); while (r.int(50) <= L) { if (!pick()) break; L = Math.floor(L / 2); }
+  let pool = [];
+  for (const k in ENCH) { const J = EJ[k]; if (ENCH[k][3] || !J || !J[1]) continue; if (!book && !(ENCH_TABLE[k] || ENCH[k][2]).some(t => kinds.includes(t))) continue;
+    for (let l = ENCH[k][1]; l >= 1; l--) if (L >= J[1](l) && L <= J[2](l)) { pool.push([k, l, J[0]]); break; } }
+  const out = {}, pick = () => { const tot = pool.reduce((a, x) => a + x[2], 0); if (!tot) return null; let q = r() * tot; for (const x of pool) { q -= x[2]; if (q < 0) return x; } return pool[pool.length - 1]; };
+  let x = pick(); if (x) out[x[0]] = x[1];
+  while (x && r.int(50) <= L) { pool = pool.filter(p => !out[p[0]] && !ENCH_EXCL.some(g => g.includes(p[0]) && g.some(o => out[o]))); x = pick(); if (!x) break; out[x[0]] = x[1]; L = Math.floor(L / 2); }
+  const ks = Object.keys(out); if (book && ks.length > 1) delete out[ks[r.int(ks.length)]]; // (a book gets one fewer, as Java)
   return out;
 }
 
