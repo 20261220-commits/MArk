@@ -32,6 +32,8 @@ module.exports = async ({ ok, b, lib }) => {
   await A.evaluate(() => new Promise(r => setTimeout(r, 300)));
   const listed = await A.evaluate(async u => { MPL.addr = u; MPL.data = { world: null, rooms: [] }; return mpListHtml(); }, ws);
   ok(/되살리기/.test(listed), 'the join list offers to bring the world back', listed.slice(0, 200));
+  const order = await A.evaluate(async u => { MPL.addr = u; MPL.data = { worlds: [{ id: 'other', name: '누가 새로 만든 세계', mode: 'survival', players: 0 }], rooms: [] }; const h = mpListHtml(); let asked = null; const c0 = window.confirm; window.confirm = q => { asked = q; return false; }; const s0 = MP.status; await mpAction('mp_go:@+'); window.confirm = c0; return { lostFirst: h.indexOf('🔄') >= 0 && h.indexOf('🔄') < h.indexOf('🌍'), asked: !!asked, stayed: !MP.on }; }, ws);
+  ok(order.lostFirst && order.asked && order.stayed, 'the lost world comes first, and making a new one asks first (and cancelling stays)', order);
   await A.evaluate(async u => { showMenu('mp_join'); await mpJoinWs(u); }, ws);
   await enter();
   ok(/세계를 되살렸습니다/.test(s2.log()), 'joining the empty server restores the world from the copy', s2.log().slice(-400));
