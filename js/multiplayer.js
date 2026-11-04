@@ -713,7 +713,7 @@ function mpPuppetTick(e) {
   if (e.fire > 0 && Math.random() < 0.3) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [1, 0.6, 0.1], { kind: 'flame', size: 0.12, vy: 1, grav: -0.2, life: 0.4 });
 }
 // what the runner's mobs look like right now (anger, creeper fuse, sitting, sleeping, spells, fire, boss health...)
-const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name', 'lostHorns', 'owner'];
+const MP_MOBV = ['fuse', 'charged', 'sitting', 'sleeping', 'lying', 'roll', 'swing', 'cast', 'peek', 'charge', 'phase', 'squish', 'flying', 'nectar', 'spikes', 'playDead', 'hasTrident', 'carpet', 'noPumpkin', 'gene', 'gene2', 'bite', 'barter', 'captain', 'stung', 'inWater', 'onGround', 'trap', 'name', 'lostHorns', 'owner', 'xbow'];
 function mpMobVis(e) {
   const v = {}; for (const k of MP_MOBV) { const x = e[k]; if (x != null && x !== false && x !== 0 && (typeof x !== 'object')) v[k] = typeof x === 'number' ? +x.toFixed(2) : x; }
   if (e.target) v.tgt = 1; if (e.fire > 0) v.fire = 1; if (e.eff && e.eff.glowing) v.glow = 1; if (e.def.boss || e.hp < e.def.hp) v.hp = Math.ceil(e.hp); const ec = effSwirlColor(e.eff); if (ec) v.ec = ec;

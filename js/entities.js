@@ -422,6 +422,8 @@ function goatRamBlock(e, mx, mz) {
     if (bd && GOAT_SNAP.test(bd.key)) { e.lostHorns = (e.lostHorns || 0) + 1; dropItem(e.x, e.y + 1, e.z, IID.goat_horn, 1); play('break', { pitch: 1.4 }); return; } }
 }
 function goatHornsShow(e) { const u = e.mesh && e.mesh.userData, P = u && u.parts, n = e.lostHorns || 0; if (!P || u.hornsShown === n) return; u.hornsShown = n; for (const [k, gone] of [['horn', n >= 2], ['horn2', n >= 1]]) if (P[k]) { P[k].visible = !gone; const s = gone ? 0 : 1; P[k].scale.set(s, s, s); } }
+// a mob's arrow (AbstractArrow.setEnchantmentEffectsFromEntity): base damage 2 + 0.11 per difficulty step, a little random; hit damage = speed x base, rounded up (about 3-4 on Normal)
+function mobArrowBase() { let g = 0; for (let i = 0; i < 6; i++) g += Math.random(); return 2 + (g - 3) * 0.35 + (PL.difficulty || 0) * 0.11; }
 function removeEnt(e) { e.dead = true; dropFireOverlay(e); if (e.nameTag) { dropNameTag(e.nameTag); e.nameTag = null; } if (e.mesh) { scene.remove(e.mesh); if (e.kind === 'mob') { if (e.matOwn) for (const m of e.mesh.userData.own) m.dispose(); } else if (e.mesh.material && e.mesh.material.dispose) e.mesh.material.dispose(); } }
 function countMobs(f) { let n = 0; for (const e of ENT) if (e.kind === 'mob' && !e.dead && f(e)) n++; return n; }
 
@@ -659,7 +661,7 @@ function mobTick(e) {
         e.attackCd = 40 + Math.floor(Math.random() * 20);
         const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + PL.h / 3 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz); // MC aims at 1/3 of target height
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
-        shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, 1.2);
+        shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, mobArrowBase());
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {

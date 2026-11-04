@@ -15,7 +15,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const blockItems = ITEMS.filter(d => d && d.place != null);
     let n = 0;
     for (const d of blockItems) {
-      pad();
+      pad(); for (const e of [...ENT]) if (e.kind === 'mob') removeEnt(e); // (nothing standing where the block goes: mobs that spawned at night, or wandered in)
       try {
         setBlock(X + 1, Y, Z, BID.stone);
         INV.slots[INV.sel] = { id: d.id, n: 1 };
