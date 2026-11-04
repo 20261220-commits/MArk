@@ -737,7 +737,7 @@ async function mpEnterServerWorld(m) {
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
   for (const q of m.players) MP.peers.set(q.id, { id: q.id, name: q.name, skin: q.skin, s: null });
   const sm = m.meta; let d = m.pdata, mine = false;
-  { const loc = pdLoad(), sat = d && d.at || 0, lat = loc && loc.at || 0; // the server's record or this device's, whichever is newer
+  { const loc = pdLoad() || pdLoadPrev(), sat = d && d.at || 0, lat = loc && loc.at || 0; // the server's record or this device's, whichever is newer (this device's under an earlier ID of the account too)
     if (loc && loc.d && (!d || sat < lat || (sat === lat && loc.dirty))) { d = loc.d; mine = true; } }
   const meta = { id: 'srv-' + sm.seed + '-' + sm.name, name: sm.name, seed: sm.seed, gen: sm.gen || 1, mode: d && d.s && d.s.mode || sm.mode, diff: sm.diff, cheats: sm.cheats, exp: sm.exp, spawn: sm.spawn, remote: true, server: true, gamerules: sm.gamerules || {}, ...(sm.shared || {}),
     dim: d ? d.dim || 0 : 0, player: d ? { s: d.s, inv: d.inv, armor: d.armor, sel: d.sel, it: d.it, ender: d.ender, off: d.off, pend: d.pend || null } : null, time: m.time, rain: m.rain, thunder: m.thunder };
@@ -807,6 +807,7 @@ function mpPdata() {
 // back when you join. Kept per world and per account (logged in) or name.
 const PD_KEY = 'nemo-pdata';
 const pdKey = () => MIR.host ? MIR.host + '|' + (ACC.user ? 'a:' + ACC.user.name.toLowerCase() : 'n:' + String(MP.name || '').toLowerCase()) : null;
+function pdLoadPrev() { if (!MIR.host || !ACC.user || !(ACC.prev && ACC.prev.length)) return null; try { const all = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); for (const q of ACC.prev) { const r = all[MIR.host + '|a:' + String(q.name).toLowerCase()]; if (r && r.d) return r; } } catch (e) {} return null; } // (kept under the ID used before a change)
 function pdLoad() { const k = pdKey(); if (!k) return null; try { return (JSON.parse(localStorage.getItem(PD_KEY) || '{}'))[k] || null; } catch (e) { return null; } }
 function pdStore(patch) { const k = pdKey(); if (!k) return; try { const all = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); all[k] = { ...(all[k] || {}), ...patch }; const ks = Object.keys(all); while (ks.length > 30) delete all[ks.shift()]; localStorage.setItem(PD_KEY, JSON.stringify(all)); } catch (e) {} }
 function mpSendPdata() { if (!(MP.server && W.active && MP.pdataOk)) return; const d = mpPdata(), seq = MP.pdSeq = (MP.pdSeq || 0) + 1; pdStore({ d, dirty: seq }); mpSend({ t: 'pdata', d, seq }); } // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen) // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen)

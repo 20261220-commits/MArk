@@ -32,5 +32,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   await G.waitForFunction(() => W.active && UI.menu !== 'loading' && INV.count(IID.diamond) > 0, null, { timeout: 60000 }).catch(() => {});
   const took = await G.evaluate(() => ({ asked: !!window.__asked && /나계정/.test(window.__asked), d: INV.count(IID.diamond), on: MP.on })), keys2 = await H.evaluate(() => Object.keys(W.meta.mpPlayers || {}));
   ok(took.asked && took.d === 17 && took.on && !keys2.includes('a:나계정'), 'a record left under an earlier ID is offered, and taking it brings the things back', { took, keys2 });
+  const prevCopy = await G.evaluate(() => { const h0 = MIR.host; MIR.host = 'srv|w1'; const all = JSON.parse(localStorage.getItem('nemo-pdata') || '{}'); all['srv|w1|a:나계정'] = { d: { mark: 42 }, at: 5 }; localStorage.setItem('nemo-pdata', JSON.stringify(all)); const r = pdLoad() || pdLoadPrev(); MIR.host = h0; return r && r.d && r.d.mark; });
+  ok(prevCopy === 42, 'this device\'s own copy of a server world record, kept under an earlier ID, is found too', prevCopy);
   for (const P of [H, G]) ok(!P.errs.length, 'no page errors', P.errs);
 };
