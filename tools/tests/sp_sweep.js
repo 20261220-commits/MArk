@@ -23,7 +23,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
         placeBlock(TARGET, d);
         if (UI.screen) UI.closeScreen();
         const id = getBlock(X, Y, Z);
-        if (id) { const t = { type: 'block', x: X, y: Y, z: Z, id, m: getMeta(X, Y, Z), nx: 0, ny: 1, nz: 0, hy: 1 }; INV.slots[INV.sel] = null; interactBlock(t, true); if (UI.screen) UI.closeScreen(); INV.slots[INV.sel] = { id: IID.diamond_pickaxe, n: 1 }; breakBlock(X, Y, Z); n++; }
+        if (id) { const t = { type: 'block', x: X, y: Y, z: Z, id, m: getMeta(X, Y, Z), nx: 0, ny: 1, nz: 0, hy: 1 }; INV.slots[INV.sel] = null; interactBlock(t, true); if (UI.screen) UI.closeScreen(); INV.slots[INV.sel] = { id: IID.diamond_pickaxe, n: 1 }; breakBlock(X, Y, Z); n++; for (const e of [...ENT]) if (e.kind === 'mob') removeEnt(e); } // (an infested block lets out a silverfish: it would stand where the next block goes)
         if (UI.screen) UI.closeScreen();
       } catch (e) { note('block ' + d.key, e); if (UI.screen) UI.closeScreen(); }
     }
@@ -48,7 +48,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     return { placed: n, blocks: blockItems.length, bad };
   });
   ok(Object.keys(r.bad).length === 0, 'blocks, items and mobs work without errors', r.bad);
-  ok(r.placed > 600, 'block items place on a stone floor (the rest need a support, water or a special spot)', [r.placed, r.blocks]);
+  ok(r.placed >= r.blocks - 60, 'block items place on a stone floor (about 50 plants need soil, water or a wall)', [r.placed, r.blocks]);
   const step = async (f, wait = 3000, arg) => { try { await p.evaluate(f, arg); } catch (e) { p.errs.push(String(e.message)); } await p.waitForTimeout(wait); };
   await step(() => { PL.mode = 'creative'; const X = PL.x, Z = PL.z; let i = 0; for (const k of Object.keys(MOBDEF)) { if (k === 'player' || k === 'ender_dragon' || k === 'wither') continue; const a = i++ * 0.7; spawnMob(k, X + Math.cos(a) * (6 + i % 5), PL.y + 2, Z + Math.sin(a) * (6 + i % 5)); } PL.mode = 'survival'; }, 15000);
   await step(() => { W.time = 14000; runCommand('weather thunder'); }, 8000);
