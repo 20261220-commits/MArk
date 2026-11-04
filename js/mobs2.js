@@ -339,7 +339,7 @@ function slimeAI(e, dist) {
       e.vx = -Math.sin(e.yaw) * sp; e.vz = -Math.cos(e.yaw) * sp; e.vy = e.type === 'magma_cube' ? 0.42 + sz * 0.1 : 0.42; e.squish = 1; play('slime', { vol: 0.4 });
     }
   }
-  if (hostileNow && sz > 1 || (hostileNow && e.type === 'magma_cube')) { if (dist < 0.6 + sz * 0.5 && Math.abs(PL.y - e.y) < 1.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'magma_cube' ? sz * 2 + 1 : sz, 0, 0); } }
+  if (hostileNow && sz > 1 || (hostileNow && e.type === 'magma_cube')) { if (dist < 0.6 + sz * 0.5 && Math.abs(PL.y - e.y) < 1.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'magma_cube' ? sz + 2 : sz, 0, 0); /* (Java: a slime's size, a magma cube's size + 2: 3, 4, 6 on Normal) */ } }
   physMove(e, e.vx, e.vy, e.vz, 0);
   e.vy = (e.vy - 0.08) * 0.98;
   if (!e.onGround) { e.vx *= 0.98; e.vz *= 0.98; }

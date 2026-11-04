@@ -323,7 +323,7 @@ if (MOBDEF.axolotl) { const painted = MOBDEF.axolotl.vtex; MOBDEF.axolotl.vtex =
 // ---------- items mobs hold in their right hand, as in vanilla (bows, crossbows, swords, axes, tridents) ----------
 // The item hangs off the right-arm bone, so it hides with the arm (vindicators only show the axe while fighting).
 const MOB_HELD = { skeleton: 'bow', stray: 'bow', wither_skeleton: 'stone_sword', illusioner: 'bow', pillager: 'crossbow', vindicator: 'iron_axe', vex: 'iron_sword',
-  piglin: e => (e.id % 2 ? 'crossbow' : 'golden_sword'), piglin_brute: 'golden_axe', zombified_piglin: 'golden_sword', drowned: e => e.hasTrident && 'trident' };
+  piglin: e => ((e.xbow ? e.xbow === 1 : e.id % 2) ? 'crossbow' : 'golden_sword'), piglin_brute: 'golden_axe', zombified_piglin: 'golden_sword', drowned: e => e.hasTrident && 'trident' };
 function mobHeldTick() {
   for (const e of ENT) {
     if (e.kind !== 'mob' || !e.mesh || e.dead) continue;

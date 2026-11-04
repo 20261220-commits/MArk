@@ -125,14 +125,14 @@ function illagerAI(e, dist) {
       if (e.attackCd <= 0 && td < 16 && canSee(e.x, e.y + 1.6, e.z, t.x, ty + 1.2, t.z)) {
         e.attackCd = 40 + Math.floor(Math.random() * 20); play('bow');
         const sy = e.y + 1.5, ddy = ty + (t === PL ? PL.h : t.h) / 3 - sy, v = 1.9, l = Math.hypot(dx, ddy + td * 0.12, dz);
-        const a = shootArrow(e.x + dx / td * 0.6, sy, e.z + dz / td * 0.6, dx / l * v, (ddy + td * 0.12) / l * v, dz / l * v, e, 1.5); a.noPickup = true;
+        const a = shootArrow(e.x + dx / td * 0.6, sy, e.z + dz / td * 0.6, dx / l * v, (ddy + td * 0.12) / l * v, dz / l * v, e, mobArrowBase()); a.noPickup = true;
       }
     } else if (d.evoker) {
       if (td < 8) { mx = -dx / td; mz = -dz / td; } else if (td > 12) [mx, mz] = pathDir(e, t.x, ty, t.z);
       if (e.attackCd <= 0 && td < 16) {
         e.attackCd = 100; e.cast = 20;
         const vexes = ENT.filter(o => o.type === 'vex' && !o.dead && o.owner2 === e).length;
-        if (vexes < 3 && Math.random() < 0.4) { play('portal', { vol: 0.5 }); for (let i = 0; i < 3; i++) { const v = spawnMob('vex', e.x + (Math.random() - .5) * 2, e.y + 1.5, e.z + (Math.random() - .5) * 2); v.owner2 = e; v.life = 600 + Math.floor(Math.random() * 1800); v.target = t; } }
+        if (vexes < 3 && Math.random() < 0.4) { play('portal', { vol: 0.5 }); for (let i = 0; i < 3; i++) { const v = spawnMob('vex', e.x + (Math.random() - .5) * 2, e.y + 1.5, e.z + (Math.random() - .5) * 2); if (!v) continue; v.owner2 = e; v.life = 600 + Math.floor(Math.random() * 1800); v.target = t; } }
         else evokerFangs(e, t);
       }
     } else { // vindicators and ravagers fight hand to hand

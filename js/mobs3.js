@@ -70,7 +70,7 @@ Object.assign(MOBDEF, {
   drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
   stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]], extraDrop: [['slowness_arrow', 0.5]] },
   wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
-  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
+  piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, save: e => ({ xbow: e.xbow || 0 }), init: (e, o) => { if (o.xbow) e.xbow = o.xbow; }, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
   hoglin: { hp: 40, w: 0.7, h: 1.4, speed: 0.1, hostile: 1, dmg: 6, xp: 5, snd: 'growl', drops: [['porkchop', 2, 4], ['leather', 0, 1]], parts: BOXPARTS(16, 14, 26), tex: () => solidBox('#c08060'), food: 'crimson_fungus' },
   strider: { hp: 20, w: 0.45, h: 1.7, speed: 0.06, xp: 2, snd: 'hmm', fireproof: 1, drops: [['string', 2, 5]], parts: BOXPARTS(16, 14, 16), tex: () => solidBox('#a04040'), ai: striderAI, food: 'warped_fungus' },
   shulker: { hp: 30, w: 0.5, h: 1, speed: 0, hostile: 1, xp: 5, snd: 'click', drops: [['shulker_shell', 0, 1]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#9a6aa0'), ai: shulkerAI, anim: shulkerAnim, noPush: 1, kbRes: 1 },
@@ -98,7 +98,16 @@ function piglinAI(e, dist) {
   // pick up gold ingots lying nearby
   if (!e.target) for (const it of ENT) if (it.kind === 'item' && !it.dead && it.stack.id === IID.gold_ingot && Math.hypot(it.x - e.x, it.z - e.z) < 1.2 && Math.abs(it.y - e.y) < 1.5) { it.stack.n--; if (!it.stack.n) removeEnt(it); e.barter = 120; if (it.byPlayer) advGrant('nether/distract_piglin', 'distract_piglin'); return; }
   let mx = 0, mz = 0;
-  if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.def.dmg, mx, mz); } }
+  if (e.type === 'piglin' && !e.xbow) e.xbow = e.id % 2 ? 1 : 2; // 1: crossbow, 2: golden sword (kept, saved and sent to the others)
+  if (e.target && e.xbow === 1) { // (the half that carries a crossbow, as its model shows: keeps its distance and shoots, as Java's)
+    faceTo(e, PL.x, PL.z); const dx = PL.x - e.x, dz = PL.z - e.z, td = Math.hypot(dx, dz) || 1;
+    if (td > 9) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); else if (td < 5) { mx = -dx / td; mz = -dz / td; }
+    if (e.attackCd <= 0 && td < 16 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.2, PL.z)) {
+      e.attackCd = 40 + Math.floor(Math.random() * 20); play('bow');
+      const sy = e.y + 1.5, ddy = PL.y + PL.h / 3 - sy, v = 1.9, l = Math.hypot(dx, ddy + td * 0.12, dz);
+      const a = shootArrow(e.x + dx / td * 0.6, sy, e.z + dz / td * 0.6, dx / l * v, (ddy + td * 0.12) / l * v, dz / l * v, e, mobArrowBase()); a.noPickup = true;
+    }
+  } else if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'piglin' ? 8 : e.def.dmg, mx, mz); } } // (a piglin's golden sword: 8 on Normal)
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
   else { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
   walkPhysics(e, mx, mz, e.target ? 0.12 : 0.06);
