@@ -22,10 +22,14 @@ module.exports = async ({ ok, srv, b, lib }) => {
     clear(); arena(); W.time = 18000;
     { const z = spawnMob('zombie', X0 + .5, Y, Z0 - 14.5); z.persistent = true; await run(20, () => hold(X0 + .5, Y, Z0 + 15.5)); out.zombie30 = !!z.target; }
     clear(); { const z = spawnMob('skeleton', X0 + .5, Y, Z0 - 9.5); z.persistent = true; await run(20, () => hold(X0 + .5, Y, Z0 + 10.5)); out.skel20 = !!z.target; }
+    clear(); { const w = spawnMob('witch', X0 + .5, Y, Z0 - 5.5); w.persistent = true; PL.eff = null; let got = false; await run(200, () => { PL.x = X0 + .5; PL.y = Y; PL.z = Z0 + .5; PL.vx = PL.vz = 0; if (PL.eff && Object.keys(PL.eff).length || PL.health < 20) got = true; PL.health = 20; PL.dead = false; return got; }); out.witch = got; PL.eff = null; }
+    clear(); { const v = spawnMob('vindicator', X0 + .5, Y, Z0 - 9.5); v.persistent = true; v.target = PL; let z0; await run(30, i => { hold(X0 + .5, Y, Z0 + 9.5); v.target = PL; if (i === 10) z0 = v.z; }); out.vindSpeed = +(v.z - z0).toFixed(2); }
     clear(); return out; });
   ok(r.wall >= 0, 'a zombie walks around a wall to its gap 7 blocks off', r);
   ok(r.lava >= 0 && !r.lavaBurned, 'a zombie crosses a lava trench on its bridge, not through the lava', r);
   ok(r.shade[0] && r.shade[1], 'a skeleton in the sun finds shade and stays in it', r);
   ok(r.caveNoon >= 3 && r.roofWander >= 2, 'cave spiders fight in a dark cave at noon and wander under a roof', r);
   ok(r.zombie30 && !r.skel20, 'a zombie sees a player 30 blocks off, a skeleton not at 20', r);
+  ok(r.witch, "a witch's splash potion lands on the player", r);
+  ok(r.vindSpeed > 4, 'a vindicator charges at Java speed (about 5 blocks a second)', r);
 };

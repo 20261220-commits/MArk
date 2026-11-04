@@ -88,7 +88,7 @@ const BARTER = [['ender_pearl', 2, 4, 2], ['string', 3, 9, 5], ['obsidian', 1, 1
   ['nether_brick', 2, 8, 10], ['gravel', 8, 16, 10], ['blackstone', 8, 16, 10], ['iron_nugget', 10, 36, 5], ['quartz', 8, 16, 10], ['glowstone_dust', 5, 12, 10], ['magma_cream', 2, 6, 10], ['spectral', 0, 0, 0]];
 function piglinAI(e, dist) {
   // piglins leave players in gold armour alone; they barter for gold ingots
-  if (!e.target && !wearsGold() && plTargetable() && dist < 12 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.6, PL.z)) e.target = PL;
+  if (!e.target && !wearsGold() && plTargetable() && dist < 16 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.6, PL.z)) e.target = PL;
   if (e.target === PL && (wearsGold() && !e.angry || !plTargetable() || dist > 24)) e.target = null;
   if (e.barter > 0) {
     e.barter--; e.yawTarget = e.yaw;
@@ -110,7 +110,7 @@ function piglinAI(e, dist) {
   } else if (e.target) { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 1.6 && Math.abs(PL.y - e.y) < 2 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, e.type === 'piglin' ? 8 : e.def.dmg, mx, mz); } } // (a piglin's golden sword: 8 on Normal)
   else if (PL.held() && PL.held().id === IID.gold_ingot && dist < 8 && plTargetable()) { faceTo(e, PL.x, PL.z); if (dist > 2) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
   else { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
-  walkPhysics(e, mx, mz, e.target ? 0.12 : 0.06);
+  walkPhysics(e, mx, mz, e.target ? 0.37 : 0.133); // (Java: movement 0.35, a stroll at 0.6 of it)
 }
 function striderAI(e) {
   const inLava = fluidAt(e.x, e.y + 0.3, e.z) === 2, onLava = getBlock(Math.floor(e.x), Math.floor(e.y - 0.05), Math.floor(e.z)) === BID.lava;

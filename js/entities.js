@@ -661,7 +661,7 @@ function mobTick(e) {
   if (e.target && (!plVisible || dist > fr || e.unseen > 60 || e.repel > 0)) { e.target = null; e.unseen = 0; } // (hoglins backing off from warped fungus: nether.js)
   if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
-    e.yawTarget = Math.atan2(-dx, -dz);
+    e.yawTarget = Math.atan2(-dx, -dz); if (d.chase) speed = d.chase * (e.babySpeed || 1);
     if (d.ranged) {
       if (dist > 10) { mx = tx; mz = tz; } else if (dist < 5) { mx = -tx; mz = -tz; }
       else { mx = -tz * 0.5; mz = tx * 0.5; }
@@ -677,7 +677,7 @@ function mobTick(e) {
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
-      if (dist * dist <= (4 * e.w) * (4 * e.w) + 0.6 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
+      if (dist * dist <= (4 * e.w) * (4 * e.w) + 0.6 && e.attackCd <= 0) { e.attackCd = d.atkCd || 20; attackPlayer(e, (d.dmg || 2), tx, tz); }
       if (d.climb && e.onGround && dist * dist >= 4 && dist * dist <= 16 && Math.random() < 0.2 && !(e.leapCd > 0)) { const l = Math.hypot(dx, dz) || 1; e.vx = dx / l * 0.4 + e.vx * 0.2; e.vz = dz / l * 0.4 + e.vz * 0.2; e.vy = 0.4; e.leapCd = 10; } // Java's LeapAtTargetGoal
       if (e.leapCd > 0) e.leapCd--;
       if (d.climb && e.hitH) { e.vy = 0.2; }
@@ -856,6 +856,9 @@ function arrowTick(e) {
     const speed = Math.hypot(e.vx, e.vy, e.vz); let dmg = Math.ceil(speed * e.dmgMul); if (e.crit) dmg += Math.floor(Math.random() * (dmg / 2 + 2));
     const inPL = nx > PL.x - 0.6 && nx < PL.x + 0.6 && nz > PL.z - 0.6 && nz < PL.z + 0.6 && ny > PL.y - 0.3 && ny < PL.y + (PL.h || 1.8) + 0.3;
     if (e.owner === PL && !e.leftOwner && !inPL && !e.thrown) e.leftOwner = true;
+    if (e.thrown && e.owner !== PL && e.owner && !PL.dead && !spectator() && inPL) { // a witch's potion, a snow golem's snowball: they break on the player
+      if (e.thrown === IID.snowball && PL.mode !== 'creative') { const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.2; PL.vz += e.vz / l * 0.2; }
+      onThrownHit(e, nx, ny, nz, null); removeEnt(e); return; }
     if ((e.owner !== PL || (e.leftOwner && !e.trident)) && !e.thrown && !PL.dead && inPL) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
       if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
