@@ -389,7 +389,7 @@ function mpHandle(m, from) {
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { HURT_KB.extra = Math.max(0, Math.min(5, +m.kb || 0)); try { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); } finally { HURT_KB.extra = 0; } if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
       if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
     case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
     case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
@@ -1189,7 +1189,7 @@ function mpInstall() {
     if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
     return r; };
   const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0, th: e.thrown || 0 }); }); return e; };
-  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { const t = performance.now(); if (t - (e.myHitAt || 0) < 450) return false; /* still flashing from the last hit: the runner won't take it */ e.myHitAt = t; mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
+  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { const t = performance.now(); if (t - (e.myHitAt || 0) < 450) return false; /* still flashing from the last hit: the runner won't take it */ e.myHitAt = t; mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz, kb: HURT_KB.extra || 0 }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
   const sc = saveChunk; saveChunk = function (c) { if (MP.server) { if (MP.role === 'host' && !MP.rolePending) mpStoreChunk(c); return; } return sc.apply(this, arguments); };
@@ -1243,10 +1243,10 @@ function mpRayPeer() {
 function mpAttackPeer(p) {
   const s = p.s; if (!s || s.dead || s.mode === 'creative' || s.mode === 'spectator' || MP.pvp === false) { PL.attackT = 0; return; }
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool, sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4;
-  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + meleeBonus()) * (0.2 + q * q * 0.8);
-  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + meleeBonus()) * (0.2 + q * q * 0.8); const ench = (sharp ? 0.5 * sharp + 0.5 : 0) * q; // (as against a mob: the enchantment by the charge)
+  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness');
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
-  PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
+  dmg += ench; PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, wn: h && h.name ? h.name : undefined, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
@@ -1259,6 +1259,7 @@ function mpGotHit(m, att) {
   if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
   mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });
   if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
+  if (PL.hitPartial) return; // (a harder hit in the moment of invulnerability: no knockback)
   // LivingEntity.takeKnockback: 0.4 away from the attacker, and the knockback level along the attacker's look
   const kn = (str, x, z) => { const l = Math.hypot(x, z) || 1; PL.vx = PL.vx / 2 - x / l * str; PL.vz = PL.vz / 2 - z / l * str; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + str); };
   kn(0.4, src.x - PL.x, src.z - PL.z); if (m.kb > 0) kn(Math.min(5, m.kb) * 0.5, Math.sin(m.yaw), Math.cos(m.yaw));

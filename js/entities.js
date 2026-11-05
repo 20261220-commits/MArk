@@ -565,12 +565,17 @@ function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e
 function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
   if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
-  if (e.inv > 0) return false;
+  // Java's moment of invulnerability: 20 ticks after a hit; in the first half of it only a harder hit lands, and only by how
+  // much harder it is (no knockback, no flinch); in the second half anything hits again
+  let partial = false;
+  if (e.inv > 10) { if (dmg <= (e.lastDmg || 0)) return false; const d0 = dmg; dmg -= e.lastDmg || 0; e.lastDmg = d0; partial = true; } else e.lastDmg = dmg;
   if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
   if (e.def.armorMul) dmg *= e.def.armorMul(e);
   if (attacker === PL) stat('damage_dealt', Math.round(Math.min(dmg, Math.max(0, e.hp)) * 10));
-  e.hp -= dmg; e.hurt = 10; e.inv = 10;
-  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { const ks = 0.4 + (HURT_KB.extra || 0) * 0.5; e.vx = kx / kl * ks; e.vz = kz / kl * ks; e.vy = e.def.fly ? 0.1 : 0.36 + (HURT_KB.extra ? 0.1 : 0); } // (Java: 0.4, plus 0.5 a level of knockback and for a sprinting hit)
+  e.hp -= dmg; if (!partial) { e.hurt = 10; e.inv = 20; }
+  // Java's knockback: half of what it was moving with, plus 0.4 away from the hit (a level of knockback or a sprint: another
+  // 0.5 after it); up only from the ground, never more than 0.4
+  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes && !partial) { const res = e.def.kbResist || 0, knock = s => { s *= 1 - res; if (s <= 0) return; e.vx = e.vx / 2 + kx / kl * s; e.vz = e.vz / 2 + kz / kl * s; if (e.onGround || e.def.fly) e.vy = Math.min(0.4, (e.vy || 0) / 2 + s); }; knock(0.4); if (HURT_KB.extra) knock(HURT_KB.extra * 0.5); } // (Java: 0.4, plus 0.5 a level of knockback and for a sprinting hit)
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
   if (attacker === PL) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting
@@ -582,7 +587,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
   if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
-  play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
+  if (!partial) play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;
   if (e.hp <= 0) {
@@ -769,7 +774,7 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
+  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); if (!PL.hitPartial) plKnock(0.4 + (e.def.atkKb || 0), tx, tz); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 const diffDmg = d => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? Math.min(d / 2 + 1, d) : PL.difficulty === 3 ? d * 1.5 : d; // Java's scaling of a mob's hit: easy halves it plus one, hard adds half
