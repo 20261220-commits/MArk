@@ -629,7 +629,7 @@ function mobTick(e) {
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
   const dx = PL.x - e.x, dz = PL.z - e.z, dist = Math.hypot(dx, dz, PL.y - e.y);
   // despawn
-  if (d.hostile && !e.persistent) { if (dist > 128 || (dist > 32 && Math.random() < (dist > 64 ? 1 / 300 : 1 / 800))) { removeEnt(e); return; } } // (beyond 64 blocks a little sooner than Java: room for the ones around you)
+  if (d.hostile && !e.persistent) { if (dist <= 32) e.idleT = 0; else e.idleT = (e.idleT || 0) + 1; if (dist > 128 || (e.idleT > 600 && Math.random() < (dist > 64 ? 1 / 300 : 1 / 800))) { removeEnt(e); return; } } // (Java: only after 30 s with no player within 32 blocks) // (beyond 64 blocks a little sooner than Java: room for the ones around you)
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
@@ -886,10 +886,10 @@ function arrowTick(e) {
 }
 // ---------- spawning ----------
 function trySpawnHostile() {
-  const cap = Math.round(14 * Math.min(1, R.rd / 8)) + 4;
+  const cap = Math.round(20 * Math.min(1, R.rd / 6)) + 6; // (a short view distance on a slow computer still gets a cave's worth)
   // the cap counts the monsters around you (64 blocks): the night's monsters far up on the surface no longer keep a cave
   // empty (they fade sooner, see the despawn); all of them together stay a few over the cap (weak computers)
-  if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - PL.x, e.y - PL.y, e.z - PL.z) < 64) >= cap || countMobs(e => e.def.hostile) >= cap + 6) return;
+  if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - PL.x, e.y - PL.y, e.z - PL.z) < 64) >= cap || countMobs(e => e.def.hostile) >= cap + 8) return;
   const under = PL.y < topY(Math.floor(PL.x), Math.floor(PL.z)) - 8; // in a cave or a mine
   for (let a = 0; a < 6; a++) { // (Java tries a spot in every chunk around you each tick; six spots every half second come closer than two)
     const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, Math.min(R.rd * 16 - 30, under ? 40 : 96));
@@ -899,6 +899,7 @@ function trySpawnHostile() {
     const top = topY(x, z);
     let y = !under && Math.random() < 0.5 ? top + 1 : under && Math.random() < 0.7 ? Math.max(MINY + 1, Math.min(top, Math.floor(PL.y + (Math.random() - .5) * 40))) : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // near your depth when you're underground, else anywhere down the column
     for (let k = 0; k < 16 && y > MINY + 1 && !(!SOLID[getBlock(x, y, z)] && OPQ[getBlock(x, y - 1, z)]); k++) y--; // down to a floor (a spot inside rock or in mid-air would just fail)
+    if (under && (SOLID[getBlock(x, y, z)] || !OPQ[getBlock(x, y - 1, z)])) { const y0 = Math.floor(PL.y); y = null; for (let d = 0; d <= 24 && y == null; d++) for (const yy of [y0 + d, y0 - d]) if (yy > MINY + 1 && yy < top && !SOLID[getBlock(x, yy, z)] && !SOLID[getBlock(x, yy + 1, z)] && OPQ[getBlock(x, yy - 1, z)]) { y = yy; break; } if (y == null) continue; } // underground: the nearest cave floor in that column to your depth
     if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
@@ -908,8 +909,10 @@ function trySpawnHostile() {
     const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
     if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
-    const n = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < n; i++) jockeyChance(spawnMob(t, x + .5 + i * 0.3, y, z + .5));
+    // Java's pack: up to four of a kind, each on its own dark floor a few blocks from the first
+    const n = 1 + Math.floor(Math.random() * 4), ok = (sx, sy, sz) => !SOLID[getBlock(sx, sy, sz)] && !SOLID[getBlock(sx, sy + 1, sz)] && OPQ[getBlock(sx, sy - 1, sz)] && !FLUID[getBlock(sx, sy, sz)] && (getLight(sx, sy, sz) & 15) === 0 && Math.max(0, (getLight(sx, sy, sz) >> 4) - skyDarken()) <= 7;
+    jockeyChance(spawnMob(t, x + .5, y, z + .5));
+    for (let i = 1; i < n; i++) for (let k = 0; k < 4; k++) { const sx = x + Math.floor(Math.random() * 7) - 3, sz = z + Math.floor(Math.random() * 7) - 3; let sy = y + 1; while (sy > y - 3 && !ok(sx, sy, sz)) sy--; if (ok(sx, sy, sz) && Math.hypot(sx - PL.x, sy - PL.y, sz - PL.z) >= 24) { jockeyChance(spawnMob(t, sx + .5, sy, sz + .5)); break; } }
     break;
   }
 }
@@ -986,8 +989,9 @@ W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
-  if (c.spawns) { // villagers, golems and crystals placed by structure generation
+  if (c.spawns) { W.structSpawn = true; try { // villagers, golems and crystals placed by structure generation (a guest's copy of the terrain makes none: the runner's are mirrored)
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = (t.i >> 8) + MINY, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
+    } finally { W.structSpawn = false; }
     c.spawns = null; c.modified = true;
   }
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }

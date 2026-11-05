@@ -616,7 +616,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
-    else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
+    else if (t.t === 'mob') { if (!d.fromSave) (c.spawns || (c.spawns = [])).push(t); } // (a chunk coming back keeps the ones it saved; making them again copied every minecart, villager and frame)
     else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
   }
@@ -730,7 +730,7 @@ async function loadChunk(cx, cz) {
   if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
   if (rec) { const rm = itemRemapFor(rec.it); if (rm) { remapItems(rec.t, rm); remapItems(rec.mobs, rm); } }
-  if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
+  if (!rec || !rec.b) { W.saved.delete(dk); if (rec) W.pendingMobs.set(key, rec.mobs || []); return; } // (an empty list too: the chunk was here before, so its structure's carts, villagers and frames aren't made again)
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
   const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a; return src.subarray(0, n); };

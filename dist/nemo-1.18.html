@@ -383,7 +383,7 @@ var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.05 08:42';
+const NEMO_VERSION = '2026.11.05 10:07';
 
 </script>
 <script>/* js/shared.js */
@@ -7699,7 +7699,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
-    else if (t.t === 'mob') (c.spawns || (c.spawns = [])).push(t);
+    else if (t.t === 'mob') { if (!d.fromSave) (c.spawns || (c.spawns = [])).push(t); } // (a chunk coming back keeps the ones it saved; making them again copied every minecart, villager and frame)
     else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
   }
@@ -7813,7 +7813,7 @@ async function loadChunk(cx, cz) {
   if (W.pending.get(key) !== 'load' || wid !== W.id || dim !== W.dim) return;
   W.pending.delete(key);
   if (rec) { const rm = itemRemapFor(rec.it); if (rm) { remapItems(rec.t, rm); remapItems(rec.mobs, rm); } }
-  if (!rec || !rec.b) { W.saved.delete(dk); if (rec && rec.mobs) W.pendingMobs.set(key, rec.mobs); return; }
+  if (!rec || !rec.b) { W.saved.delete(dk); if (rec) W.pendingMobs.set(key, rec.mobs || []); return; } // (an empty list too: the chunk was here before, so its structure's carts, villagers and frames aren't made again)
   const oldH = rec.ch || 128; // saves from the 128-high version are padded with sky
   // v3 saves 16-bit block ids; older saves (v2 RLE, v1 raw) hold 8-bit ids and are widened here
   const dec = (a, fill, T = Uint8Array) => { const n = 256 * oldH, src = rec.v >= 2 ? rleDec(a, n, rec.v >= 3 ? T : Uint8Array) : a; return src.subarray(0, n); };
@@ -9220,7 +9220,7 @@ function mobTick(e) {
   if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
   const dx = PL.x - e.x, dz = PL.z - e.z, dist = Math.hypot(dx, dz, PL.y - e.y);
   // despawn
-  if (d.hostile && !e.persistent) { if (dist > 128 || (dist > 32 && Math.random() < (dist > 64 ? 1 / 300 : 1 / 800))) { removeEnt(e); return; } } // (beyond 64 blocks a little sooner than Java: room for the ones around you)
+  if (d.hostile && !e.persistent) { if (dist <= 32) e.idleT = 0; else e.idleT = (e.idleT || 0) + 1; if (dist > 128 || (e.idleT > 600 && Math.random() < (dist > 64 ? 1 / 300 : 1 / 800))) { removeEnt(e); return; } } // (Java: only after 30 s with no player within 32 blocks) // (beyond 64 blocks a little sooner than Java: room for the ones around you)
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
@@ -9477,10 +9477,10 @@ function arrowTick(e) {
 }
 // ---------- spawning ----------
 function trySpawnHostile() {
-  const cap = Math.round(14 * Math.min(1, R.rd / 8)) + 4;
+  const cap = Math.round(20 * Math.min(1, R.rd / 6)) + 6; // (a short view distance on a slow computer still gets a cave's worth)
   // the cap counts the monsters around you (64 blocks): the night's monsters far up on the surface no longer keep a cave
   // empty (they fade sooner, see the despawn); all of them together stay a few over the cap (weak computers)
-  if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - PL.x, e.y - PL.y, e.z - PL.z) < 64) >= cap || countMobs(e => e.def.hostile) >= cap + 6) return;
+  if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - PL.x, e.y - PL.y, e.z - PL.z) < 64) >= cap || countMobs(e => e.def.hostile) >= cap + 8) return;
   const under = PL.y < topY(Math.floor(PL.x), Math.floor(PL.z)) - 8; // in a cave or a mine
   for (let a = 0; a < 6; a++) { // (Java tries a spot in every chunk around you each tick; six spots every half second come closer than two)
     const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, Math.min(R.rd * 16 - 30, under ? 40 : 96));
@@ -9490,6 +9490,7 @@ function trySpawnHostile() {
     const top = topY(x, z);
     let y = !under && Math.random() < 0.5 ? top + 1 : under && Math.random() < 0.7 ? Math.max(MINY + 1, Math.min(top, Math.floor(PL.y + (Math.random() - .5) * 40))) : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // near your depth when you're underground, else anywhere down the column
     for (let k = 0; k < 16 && y > MINY + 1 && !(!SOLID[getBlock(x, y, z)] && OPQ[getBlock(x, y - 1, z)]); k++) y--; // down to a floor (a spot inside rock or in mid-air would just fail)
+    if (under && (SOLID[getBlock(x, y, z)] || !OPQ[getBlock(x, y - 1, z)])) { const y0 = Math.floor(PL.y); y = null; for (let d = 0; d <= 24 && y == null; d++) for (const yy of [y0 + d, y0 - d]) if (yy > MINY + 1 && yy < top && !SOLID[getBlock(x, yy, z)] && !SOLID[getBlock(x, yy + 1, z)] && OPQ[getBlock(x, yy - 1, z)]) { y = yy; break; } if (y == null) continue; } // underground: the nearest cave floor in that column to your depth
     if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
     if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
     const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
@@ -9499,8 +9500,10 @@ function trySpawnHostile() {
     const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
     if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
     if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
-    const n = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < n; i++) jockeyChance(spawnMob(t, x + .5 + i * 0.3, y, z + .5));
+    // Java's pack: up to four of a kind, each on its own dark floor a few blocks from the first
+    const n = 1 + Math.floor(Math.random() * 4), ok = (sx, sy, sz) => !SOLID[getBlock(sx, sy, sz)] && !SOLID[getBlock(sx, sy + 1, sz)] && OPQ[getBlock(sx, sy - 1, sz)] && !FLUID[getBlock(sx, sy, sz)] && (getLight(sx, sy, sz) & 15) === 0 && Math.max(0, (getLight(sx, sy, sz) >> 4) - skyDarken()) <= 7;
+    jockeyChance(spawnMob(t, x + .5, y, z + .5));
+    for (let i = 1; i < n; i++) for (let k = 0; k < 4; k++) { const sx = x + Math.floor(Math.random() * 7) - 3, sz = z + Math.floor(Math.random() * 7) - 3; let sy = y + 1; while (sy > y - 3 && !ok(sx, sy, sz)) sy--; if (ok(sx, sy, sz) && Math.hypot(sx - PL.x, sy - PL.y, sz - PL.z) >= 24) { jockeyChance(spawnMob(t, sx + .5, sy, sz + .5)); break; } }
     break;
   }
 }
@@ -9577,8 +9580,9 @@ W.onChunkLoaded = (c, fresh) => {
   if (W.pano) return; // title screen world stays empty and is never saved
   if (c.spawns && c.spawns.some(t => t.mob === 'villager')) c.hadVillagers = true;
   if (fresh) { spawnAnimalsForChunk(c); spawnExtraForChunk(c); spawnWarmFish(c); spawnMoreForChunk(c); }
-  if (c.spawns) { // villagers, golems and crystals placed by structure generation
+  if (c.spawns) { W.structSpawn = true; try { // villagers, golems and crystals placed by structure generation (a guest's copy of the terrain makes none: the runner's are mirrored)
     for (const t of c.spawns) { const x = c.cx * 16 + (t.i & 15) + .5, y = (t.i >> 8) + MINY, z = c.cz * 16 + ((t.i >> 4) & 15) + .5; if (t.frame) { if (typeof spawnFrame === 'function' && IID[t.item] != null) spawnFrame(Math.floor(x), y, Math.floor(z), t.f, { item: { id: IID[t.item], n: 1 } }); } else if (t.cart) spawnMinecart(x, y, z, t.cart, { loot: t.loot, yaw: S.railShape(getBlock(x, y, z), getMeta(x, y, z)) === 1 ? Math.PI / 2 : 0 }); else if (MOBDEF[t.mob]) spawnMob(t.mob, x, y, z, { vtype: t.vtype, prof: t.prof, variant: t.variant, baby: t.baby }).persistent = true; }
+    } finally { W.structSpawn = false; }
     c.spawns = null; c.modified = true;
   }
   if (c.mobs) for (const [t, x, y, z, baby, sh, ex] of c.mobs) { if (t === 'item') { if (ex && ex.st && ITEMS[ex.st.id]) dropItem(x, y, z, ex.st.id, ex.st.n, [0, 0, 0], 0, ex.st.d, ex.st); } else if (t === 'xp') { if (ex && ex.v) spawnXP(x, y, z, ex.v); } else if (t === 'boat') placeBoat(x, y, z, ex ? ex.yaw : 0, ex && ex.wood); else if (t === 'minecart') spawnMinecart(x, y, z, ex.ctype, ex); else if (t === 'frame') spawnFrame(x, y, z, ex.f, ex); else if (t === 'painting') spawnPainting(x, y, z, ex.f, ex.motif); else if (t === 'armor_stand') spawnArmorStand(x, y, z, ex.yaw, ex.armor); else if (MOBDEF[t]) { const m = spawnMob(t, x, y, z, { baby, sheared: sh, ...(ex || {}) }); if (ex && ex.persist) m.persistent = true; if (ex && ex.leash) m.leash = ex.leash; if (ex && ex.charged) m.charged = true; if (ex && typeof ex.name === 'string' && ex.name) m.name = ex.name.slice(0, 50); if (ex && ex.hp > 0) m.hp = Math.min(m.hp, ex.hp); } }
@@ -19007,7 +19011,7 @@ function mpWorldCore(store, out) {
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
         entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null, tmy: tmy() };
-          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, my: c.rec.my, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) o.mobs = c.rec.mobs || null; }
+          if (c.rec && c.rec.b) Object.assign(o, { b: c.rec.b, m: c.rec.m, l: c.rec.l, bio: c.rec.bio, tl: c.rec.t || [], ch: c.rec.ch, my: c.rec.my, it: c.rec.it, mobs: c.rec.mobs || null }); else { o.none = true; if (c.rec) { o.mobs = c.rec.mobs || null; o.stored = 1; } }
           send(p, o); }); return; }
       case 'chunkmobs': Promise.all((m.dks || []).filter(dk => store.keys.has(dk)).map(dk => entry(dk).then(c => c.rec && c.rec.mobs ? [dk, c.rec.mobs] : null))).then(l => send(p, { t: 'chunkmobs', l: l.filter(Boolean) })); return;
       case 'store': if (typeof m.dk !== 'string' || !m.rec) return; entry(m.dk).then(c => { c.rec = m.rec; c.edits = []; c.tiles = {}; c.recChanged = true; touch(m.dk, c); }); others(p, { t: 'stored', dk: m.dk }); return;
@@ -19663,7 +19667,7 @@ function mpGotChunk(m) {
   if (m.edits) mpEdits.set(key, m.edits);
   if (m.tiles) { const sh = ((m.tmy != null ? m.tmy : MINY) - MINY) << 8, tl = {}; for (const i in m.tiles) { const j = +i + sh; if (j >= 0 && j < CVOL) tl[j] = m.tiles[i]; } m.tiles = tl; mpTileWait.set(key, tl); } // the world's rows may start lower (1.18)
   const rm = m.it && typeof itemRemapFor === 'function' ? itemRemapFor(m.it) : null; if (rm) { remapItems(m.tl, rm); remapItems(m.mobs, rm); remapItems(m.tiles, rm); }
-  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs) W.pendingMobs.set(key, m.mobs); return; } // plain terrain (with its animals): generated here
+  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs || m.stored) W.pendingMobs.set(key, m.mobs || []); return; } // plain terrain (with its animals): generated here
   const n = 256 * m.ch, dec = (s, T) => rleDec(mpUnB64(s, T), n, T).subarray(0, n);
   const d = { cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] };
   fitRows(d, m.my || 0, m.ch, m.dim); // saved with another world height (before 1.18, or by a 1.18 game)
@@ -20280,7 +20284,7 @@ function mpInstall() {
   const os2 = UI.openScreen; UI.openScreen = (a, b) => { if (MP.role === 'guest' && b && b.cart && b.cart.remote) mpToAuth({ t: 'cartinv', e: b.cart.rid }); if (a === 'trade' && MP.role === 'guest' && b && b.e && b.e.remote) { b.e.trades = b.e.trades || []; mpToAuth({ t: 'trades', e: b.e.rid }); } os2(a, b); if (MP.on && b && b.x != null) { const t = getTile(b.x, b.y, b.z); if (t) b.mpBase = mpJ(t); } };
   const tt = tradeTake; tradeTake = function (c) { const r = tt.apply(this, arguments); if (MP.role === 'guest' && c.e && c.e.remote) mpToAuth({ t: 'traded', e: c.e.rid, i: c.sel }); return r; };
   const pb = placeBoat; placeBoat = function (x, y, z, yaw, wood) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'boat', x, y, z, yaw, sub: wood || 'oak' }); return null; } return pb.apply(this, arguments); };
-  const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
+  const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading && !W.structSpawn) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
   if (typeof horseTame === 'function') { const ht = horseTame; horseTame = function (e) { ht.apply(this, arguments); if (e.remote) mpToAuth({ t: 'tame', e: e.rid }); }; } // tamed by riding it, on a guest's screen
   const rc = raycast; raycast = function () { const r = rc.apply(this, arguments); if (!MP.on) return r; const h = mpRayPeer(); return h && (!r || h.t < r.t) ? h : r; };
   const ae0 = attackEntity; attackEntity = e => e.kind === 'peer' ? mpAttackPeer(e.peer) : ae0(e);
@@ -20991,7 +20995,13 @@ function saveWorldMeta() {
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
-function saveAll(sync) { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c, false, sync === true); }
+function saveAll(sync) {
+  if (!W.active) return; saveWorldMeta();
+  // a chunk still loaded is stored with what stands in it now, not the list it was loaded with: a minecart pushed into
+  // the next chunk, an animal that walked off, would otherwise be saved in both and come back twice
+  if (typeof chunkKeep === 'function' && !(W.meta && W.meta.remote)) for (const c of W.chunks.values()) { const k = chunkKeep(c, false), was = c.mobs || []; if (k.length !== was.length || JSON.stringify(k) !== JSON.stringify(was)) { c.mobs = k.length ? k : null; c.modified = true; } }
+  for (const c of W.chunks.values()) saveChunk(c, false, sync === true);
+}
 function pauseGame() { if (!W.active || UI.menu) return; relockHint(false); if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
 function resumeGame() {
   if (PL.dead) return; if (!W.active) { UI.paused = false; showMenu('title'); return; } UI.paused = false; showMenu(null);
