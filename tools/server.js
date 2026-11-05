@@ -309,7 +309,7 @@ const noteDrop = d => { DROPS.push(d); if (DROPS.length > 40) DROPS.shift(); }; 
 function serverStats() {
   const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
   return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup,
-    worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.id, name: w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
+    worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.state.meta.priv ? '(비공개)' : w.id, name: w.state.meta.priv ? '(비공개 서버)' : w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
     rooms: [...rooms.values()].filter(r => r.host).length, recentDrops: DROPS.slice().reverse() };
 }
 setInterval(() => { const m = process.memoryUsage(); console.log(`메모리 ${Math.round(m.rss / 1048576)} MB (힙 ${Math.round(m.heapUsed / 1048576)} MB), 접속 ${[...worlds.values()].reduce((a, w) => a + w.conns.size, 0)}명`); }, 5 * 60000).unref();
@@ -337,9 +337,9 @@ const CODE_CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
 function newCode() { for (;;) { let c = ''; for (let i = 0; i < 4; i++) c += CODE_CH[Math.floor(Math.random() * CODE_CH.length)]; if (!rooms.has(c)) return c; } }
 function roomList() {
   const info = w => ({ id: w.id, name: w.state.meta.name, mode: w.state.meta.mode, players: [...w.core.players.values()].filter(q => q.joined).length, last: w.state.last || 0 });
-  const list = [...worlds.values()].filter(w => w.state.meta).map(info).sort((a, b) => b.players - a.players || b.last - a.last);
+  const list = [...worlds.values()].filter(w => w.state.meta && !w.state.meta.priv).map(info) /* private worlds are never listed */.sort((a, b) => b.players - a.players || b.last - a.last);
   const def = worlds.get(worldName);
-  return { world: def && def.state.meta ? info(def) : list[0] || null, worlds: list, // world: what an older game shows
+  return { world: def && def.state.meta && !def.state.meta.priv ? info(def) : list[0] || null, worlds: list, // world: what an older game shows
     rooms: [...rooms].filter(([, r]) => r.host).map(([code, r]) => ({ code, host: r.hostName, world: r.worldName, mode: r.mode, players: r.guests.size + 1 })) };
 }
 server.on('upgrade', (req, sock) => {
@@ -374,7 +374,9 @@ server.on('upgrade', (req, sock) => {
       }
       if (m.role === 'join') { const r = code ? rooms.get(code) : null; m.role = r && r.host ? 'guest' : code ? 'none' : 'world'; }
       if (m.role === 'none') { c.send(JSON.stringify({ t: 'error', msg: `방 코드 ${code}로 열린 세계가 없습니다 (닫혔거나 코드가 틀렸어요)` })); c.close(); return; }
-      if (m.role === 'world') { role = 'world'; wp = true; w = openWorld(wid || worldName); w.conns.set(id, c); roomName = w.id;
+      if (m.role === 'world') { const ww = openWorld(wid || worldName), pk = ww.state.meta && ww.state.meta.priv && ww.state.meta.priv.key;
+        if (pk && String(m.key || '') !== pk) { c.send(JSON.stringify({ t: 'error', msg: '비공개 서버입니다. 초대 코드가 맞지 않습니다' })); c.close(); dropIfEmpty(ww); return; } // (a private world: only with its invite key)
+        role = 'world'; wp = true; w = ww; w.conns.set(id, c); roomName = w.id;
         c.send(JSON.stringify({ t: 'hello', id, world: w.state.meta ? { name: w.state.meta.name, seed: w.state.meta.seed } : null, kind: 'world', wid: w.id })); return; }
       if (m.role === 'host') { roomName = code && !(rooms.get(code) || {}).host ? code : newCode();
         room = { host: c, guests: new Map(), hostName: String(m.name || '플레이어').slice(0, 16), worldName: String(m.world || '').slice(0, 40), mode: m.mode === 'creative' ? 'creative' : 'survival' }; rooms.set(roomName, room); role = 'host'; }

@@ -628,7 +628,7 @@ function addChunk(cx, cz, d, tiles) {
   if (TRACKED.size) { const b = c.blocks; for (let i = 0; i < b.length; i++) { const s = TRACKED.get(b[i]); if (s) s.add((c.cx * 16 + (i & 15)) + ',' + ((i >> 8) + MINY) + ',' + (c.cz * 16 + ((i >> 4) & 15))); } }
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c); signTiles(c);
-  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.server)) applyMpLog(c);
+  if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.on && MP.server)) applyMpLog(c); // (MP.server can be left over from a session just ended)
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
