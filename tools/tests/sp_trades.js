@@ -22,9 +22,9 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const iBook = villagerOffers(lib).findIndex(q => q.b === IID.enchanted_book);
     if (iBook >= 0) { selectTrade(iBook); const res = tradeResult(c); o.book = res ? { id: res.id === IID.enchanted_book, e: res.e, slots: [c.items[0] && ITEMS[c.items[0].id].key, c.items[1] && ITEMS[c.items[1].id].key] } : { none: true, slots: [c.items[0] && ITEMS[c.items[0].id].key, c.items[1] && ITEMS[c.items[1].id].key], need: villagerOffers(lib)[iBook] }; }
     UI.closeScreen();
-    // restocking: a used-up offer is full again at the job site the next morning, and its price has gone up
+    // restocking: a used-up offer is full again the next morning while it works at its job site, and its price has gone up
     const q0 = villagerOffers(lib)[iPaper >= 0 ? iPaper : 0]; q0.uses = q0.max; const p0 = tradePrice(q0, lib); lib.job = [Math.floor(lib.x), Math.floor(lib.y), Math.floor(lib.z)];
-    W.time = Math.ceil(W.time / 24000) * 24000 + 2500; for (let k = 0; k < 25; k++) { W.tickN = Math.ceil(W.tickN / 20) * 20 + 20; tradeTick(lib); } o.restock = { uses: q0.uses, demand: q0.demand, before: p0, after: tradePrice(q0, lib) };
+    W.time = Math.ceil(W.time / 24000) * 24000 + 2500; for (let k = 0; k < 25; k++) { W.tickN = Math.ceil(W.tickN / 20) * 20 + 20; lib.atJob = W.tickN; tradeTick(lib); } /* (working at its job site, where Java restocks) */ o.restock = { uses: q0.uses, demand: q0.demand, before: p0, after: tradePrice(q0, lib) };
     // enchanted gear from a master armorer
     const arm = spawnMob('villager', PL.x - 2, PL.y, PL.z, { prof: 'armorer' }); arm.vlvl = 5; arm.trades = null; arm.tv = 0; o.ench = villagerOffers(arm).filter(q => q.lvl >= 4).map(q => [ITEMS[q.b].key, Object.keys(q.e || {}).length, q.an]);
     return o; });

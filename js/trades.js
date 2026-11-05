@@ -151,7 +151,7 @@ function tradeTake(c) {
 }
 // one trade done with this villager: its stock, its experience (a level-up a moment later: true), the trading gossip
 function tradeCounted(e, o) {
-  o.uses++; o.made = null; e.traded = true; e.rep = Math.min(150, (e.rep || 0) + 2); // the villager keeps its job from now on
+  o.uses++; o.made = null; e.traded = true; if (typeof vGossip === 'function') vGossip(e, 'trd', 2); else e.rep = Math.min(150, (e.rep || 0) + 2); // the villager keeps its job from now on
   if (e.prof === 'wandering' || e.remote) return false;
   e.vxp = (e.vxp || 0) + (o.xp || 0);
   if ((e.vlvl || 1) < 5 && e.vxp >= VLEVEL_XP[e.vlvl || 1] && !e.lvlUpT) { e.lvlUpT = 40; return true; }
@@ -178,7 +178,7 @@ function tradeTick(e) {
   }
   if (!e.trades || !e.job || e.prof === 'wandering' || W.tickN % 20) return;
   const t = ((W.time % 24000) + 24000) % 24000, day = Math.floor(W.time / 24000), slot = t >= 2000 && t < 6000 ? 1 : t >= 6000 && t < 9000 ? 2 : 0;
-  if (!slot || e.restocked === day * 3 + slot || !e.trades.some(o => o.uses > 0)) return;
+  if (!slot || e.restocked === day * 3 + slot || !e.trades.some(o => o.uses > 0) || !(W.tickN - (e.atJob ?? -1e9) < 100 || !ENT.includes(e))) return; // (Java: restocked while working at the job site)
   e.restocked = day * 3 + slot;
   for (const o of e.trades) { o.demand = Math.max(0, (o.demand || 0) + o.uses - (o.max - o.uses)); o.uses = 0; } // Java's updateDemandBonus, then the stock is full again
 }
