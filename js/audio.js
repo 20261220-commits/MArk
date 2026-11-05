@@ -46,6 +46,7 @@ function play(name, opt = {}) {
     case 'step': noiseHit(t, 0.07, m[0], m[1], m[2], 0.12 * v); break;
     case 'hurt': tone(t, 0.18, 260, 140, 'sawtooth', 0.25 * v); noiseHit(t, 0.1, 600, 1, 'lowpass', 0.2 * v); break;
     case 'hit': noiseHit(t, 0.1, 400, 1, 'lowpass', 0.4 * v); break;
+    case 'sweep': noiseHit(t, 0.2, 1600, 0.8, 'bandpass', 0.3 * v); noiseHit(t + 0.05, 0.15, 900, 0.8, 'bandpass', 0.2 * v); break; // a sword's sweep: a whoosh
     case 'pop': tone(t, 0.07, 900 + Math.random() * 500, 1600, 'sine', 0.18 * v); break;
     case 'xp': tone(t, 0.12, 1400 + Math.random() * 600, 2200, 'sine', 0.12 * v); break;
     case 'levelup': [0, .1, .2].forEach((d, i) => tone(t + d, 0.35, 520 * (1 + i * .25), 560 * (1 + i * .25), 'triangle', 0.18 * v)); break;
