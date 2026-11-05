@@ -278,12 +278,15 @@ function packTexture(key) {
   const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
-// villagers: base skin + biome clothes + profession clothes, alpha-composited once per combination
-function villagerTexture(type, prof) {
-  const key = 'v:' + type + ':' + prof; if (entTex[key]) return entTex[key];
+// villagers: base skin + biome clothes + profession clothes + the level badge (Java's VillagerProfessionLayer: a
+// villager with a trade wears stone, iron, gold, emerald or diamond from novice to master), alpha-composited once per combination
+const VLVL = ['stone', 'iron', 'gold', 'emerald', 'diamond'];
+function villagerTexture(type, prof, lvl) {
+  const badge = prof && prof !== 'none' && prof !== 'nitwit' ? 'vlvl_' + VLVL[Math.max(0, Math.min(4, (lvl || 1) - 1))] : null;
+  const key = 'v:' + type + ':' + prof + ':' + badge; if (entTex[key]) return entTex[key];
   const base = PACKPX.ent.villager; if (!base) return null;
   const px = new Uint8Array(base.px);
-  for (const k of ['vtype_' + type, 'vprof_' + prof]) { const o = PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
+  for (const k of ['vtype_' + type, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
   const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
@@ -351,7 +354,7 @@ function mergeGeos(gs) {
 }
 function buildModel(type, opts = {}) {
   const spec = MCMODELS[type];
-  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer') : packTexture(opts.skin || spec.tex) || packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
+  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer', opts.vlvl) : packTexture(opts.skin || spec.tex) || packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
   const def = MOBDEF[type];
   if (!mobTex[type]) mobTex[type] = def.tex();
   const mat = new THREE.MeshBasicMaterial({ map: mobTex[type], vertexColors: true, alphaTest: 0.5 });

@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.05 13:42';
+const NEMO_VERSION = '2026.11.05 14:45';
 
 </script>
 <script>/* js/shared.js */
@@ -5018,6 +5018,7 @@ Object.assign(ENT, { witch: 'entity/witch', wandering_trader: 'entity/wandering_
 Object.assign(ENT, { goat: 'entity/goat/goat', glow_squid: 'entity/squid/glow_squid' });
 for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 'entity/axolotl/axolotl_' + c;
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
+for (const l of ['stone', 'iron', 'gold', 'emerald', 'diamond']) ENT['vlvl_' + l] = 'entity/villager/profession_level/' + l; // the badge on the belt: novice to master
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
 // the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
@@ -5160,7 +5161,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 5; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends
+const UPACK = { name: null }, UPACK_VER = 6; // 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends; 6: villager level badges
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -8889,12 +8890,15 @@ function packTexture(key) {
   const t = new THREE.DataTexture(e.px, e.w, e.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
-// villagers: base skin + biome clothes + profession clothes, alpha-composited once per combination
-function villagerTexture(type, prof) {
-  const key = 'v:' + type + ':' + prof; if (entTex[key]) return entTex[key];
+// villagers: base skin + biome clothes + profession clothes + the level badge (Java's VillagerProfessionLayer: a
+// villager with a trade wears stone, iron, gold, emerald or diamond from novice to master), alpha-composited once per combination
+const VLVL = ['stone', 'iron', 'gold', 'emerald', 'diamond'];
+function villagerTexture(type, prof, lvl) {
+  const badge = prof && prof !== 'none' && prof !== 'nitwit' ? 'vlvl_' + VLVL[Math.max(0, Math.min(4, (lvl || 1) - 1))] : null;
+  const key = 'v:' + type + ':' + prof + ':' + badge; if (entTex[key]) return entTex[key];
   const base = PACKPX.ent.villager; if (!base) return null;
   const px = new Uint8Array(base.px);
-  for (const k of ['vtype_' + type, 'vprof_' + prof]) { const o = PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
+  for (const k of ['vtype_' + type, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
   const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
@@ -8962,7 +8966,7 @@ function mergeGeos(gs) {
 }
 function buildModel(type, opts = {}) {
   const spec = MCMODELS[type];
-  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer') : packTexture(opts.skin || spec.tex) || packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
+  if (spec) { const tex = type === 'villager' ? villagerTexture(opts.vtype || 'plains', opts.prof || 'farmer', opts.vlvl) : packTexture(opts.skin || spec.tex) || packTexture(spec.tex); if (tex) return buildMCModel(type, spec, tex, opts); }
   const def = MOBDEF[type];
   if (!mobTex[type]) mobTex[type] = def.tex();
   const mat = new THREE.MeshBasicMaterial({ map: mobTex[type], vertexColors: true, alphaTest: 0.5 });
@@ -15619,7 +15623,7 @@ const JOB_SITES = () => VIL.sites || (VIL.sites = new Map([[BID.composter, 'farm
   [BID.cauldron, 'leatherworker'], [BID.cartography_table, 'cartographer'], [BID.barrel, 'fisherman']]));
 const VIL = { sites: null, claimed: new Map() }; // "x,y,z" -> villager
 const VFOOD = () => VIL.food || (VIL.food = { [IID.bread]: 4, [IID.carrot]: 1, [IID.potato]: 1, [IID.beetroot]: 1 });
-function villagerRetexture(e) { const t = villagerTexture(e.vtype, e.prof); if (t && e.mesh) { e.mesh.userData.mat.map = t; if (e.matOwn) for (const m of e.mesh.userData.own) if (m.skinning) m.map = t; } }
+function villagerRetexture(e) { e.texLvl = e.vlvl || 1; e.texProf = e.prof; const t = villagerTexture(e.vtype, e.prof, e.vlvl); if (t && e.mesh) { e.mesh.userData.mat.map = t; if (e.matOwn) for (const m of e.mesh.userData.own) if (m.skinning) m.map = t; } }
 function villagerLifeTick() {
   if (W.tickN % 20) return;
   const vs = ENT.filter(e => e.type === 'villager' && !e.dead);
@@ -21000,6 +21004,9 @@ if (typeof MP_MOBV !== 'undefined' && !MP_MOBV.includes('shake')) MP_MOBV.push('
 { const d = MOBDEF.villager, save = d.save, init = d.init;
   d.save = e => ({ ...(save ? save(e) : {}), seeds: e.seeds || 0, bseeds: e.bseeds || 0, bone: e.bone || 0 });
   d.init = (e, o) => { if (init) init(e, o); if (o.seeds) e.seeds = o.seeds; if (o.bseeds) e.bseeds = o.bseeds; if (o.bone) e.bone = o.bone; }; }
+// the badge follows the level (a level-up, or what the runner tells a guest)
+{ const d = MOBDEF.villager, anim = d.anim; d.anim = function (e, P, now) { anim(e, P, now); if ((e.vlvl || 1) !== (e.texLvl || 1) || (e.texProf && e.texProf !== e.prof)) villagerRetexture(e); }; }
+if (typeof MP_MOBV !== 'undefined' && !MP_MOBV.includes('vlvl')) MP_MOBV.push('vlvl');
 
 </script>
 <script>/* js/main.js */

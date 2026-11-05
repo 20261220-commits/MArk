@@ -6,7 +6,7 @@ const JOB_SITES = () => VIL.sites || (VIL.sites = new Map([[BID.composter, 'farm
   [BID.cauldron, 'leatherworker'], [BID.cartography_table, 'cartographer'], [BID.barrel, 'fisherman']]));
 const VIL = { sites: null, claimed: new Map() }; // "x,y,z" -> villager
 const VFOOD = () => VIL.food || (VIL.food = { [IID.bread]: 4, [IID.carrot]: 1, [IID.potato]: 1, [IID.beetroot]: 1 });
-function villagerRetexture(e) { const t = villagerTexture(e.vtype, e.prof); if (t && e.mesh) { e.mesh.userData.mat.map = t; if (e.matOwn) for (const m of e.mesh.userData.own) if (m.skinning) m.map = t; } }
+function villagerRetexture(e) { e.texLvl = e.vlvl || 1; e.texProf = e.prof; const t = villagerTexture(e.vtype, e.prof, e.vlvl); if (t && e.mesh) { e.mesh.userData.mat.map = t; if (e.matOwn) for (const m of e.mesh.userData.own) if (m.skinning) m.map = t; } }
 function villagerLifeTick() {
   if (W.tickN % 20) return;
   const vs = ENT.filter(e => e.type === 'villager' && !e.dead);

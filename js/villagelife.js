@@ -245,3 +245,6 @@ if (typeof MP_MOBV !== 'undefined' && !MP_MOBV.includes('shake')) MP_MOBV.push('
 { const d = MOBDEF.villager, save = d.save, init = d.init;
   d.save = e => ({ ...(save ? save(e) : {}), seeds: e.seeds || 0, bseeds: e.bseeds || 0, bone: e.bone || 0 });
   d.init = (e, o) => { if (init) init(e, o); if (o.seeds) e.seeds = o.seeds; if (o.bseeds) e.bseeds = o.bseeds; if (o.bone) e.bone = o.bone; }; }
+// the badge follows the level (a level-up, or what the runner tells a guest)
+{ const d = MOBDEF.villager, anim = d.anim; d.anim = function (e, P, now) { anim(e, P, now); if ((e.vlvl || 1) !== (e.texLvl || 1) || (e.texProf && e.texProf !== e.prof)) villagerRetexture(e); }; }
+if (typeof MP_MOBV !== 'undefined' && !MP_MOBV.includes('vlvl')) MP_MOBV.push('vlvl');
