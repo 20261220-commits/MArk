@@ -1247,14 +1247,14 @@ function mpAttackPeer(p) {
   const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness');
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
   dmg += ench; PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
-  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, wn: h && h.name ? h.name : undefined, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
+  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, wn: h && h.name ? h.name : undefined, dmg: +dmg.toFixed(2), kb, axe: tool && tool.type === S.TOOL.AXE ? 1 : 0, sp: PL.sprinting ? 1 : 0, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
   if (performance.now() - (p.myHitAt || 0) >= 450) { p.myHitAt = performance.now(); if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); } // a hit into the other player's moment of invulnerability doesn't wear it
 }
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
-  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer' };
+  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer', axe: !!m.axe, sprint: !!m.sp };
   MP.lastHitBy = att ? att.name : null; MP.lastHitWeapon = typeof m.wn === 'string' ? m.wn.slice(0, 50) : null;
   if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
   mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });

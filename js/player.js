@@ -231,6 +231,9 @@ function playerTick() {
   advTick();
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.bobPrev = PL.bob;
   if (PL.attackT < 1000) PL.attackT++;
+  // riptide's spin attack (Java's autoSpinAttack): 20 ticks in which the first mob run into takes 8 and the player bounces back off it
+  if (PL.riptideT > 0) { PL.riptideT--; for (const o of ENT) if (o.kind === 'mob' && !o.dead && !o.deathT && Math.abs(o.x - PL.x) < o.w + PL.w + 0.2 && Math.abs(o.z - PL.z) < o.w + PL.w + 0.2 && o.y < PL.y + PL.h && o.y + o.h > PL.y) { const h2 = PL.held(); hurtMob(o, 8 + (h2 && AQUATIC.has(o.type) ? 2.5 * enchLv(h2, 'impaling') : 0), PL, PL.vx, PL.vz, 'player'); PL.vx *= -0.2; PL.vy *= -0.2; PL.vz *= -0.2; PL.riptideT = 0; break; }
+    if (PL.riptideT % 2 === 0) R.simpleParticle(PL.x, PL.y + 1, PL.z, [0.6, 0.8, 1], { kind: 'splash', size: 0.15, vy: 0.5, life: 0.4 }); }
   { const h = PL.held(), hid = h ? h.id : -1; if (hid !== PL.heldId) { if (PL.heldId !== undefined) PL.attackT = 0; PL.heldId = hid; } } // (Java: a different item in the hand starts the attack charge again)
   if (PL.dead) return;
   if (PL.inv > 0) PL.inv--; if (PL.hurtT > 0) PL.hurtT--;
@@ -434,7 +437,7 @@ function attackEntity(e) {
   PL.lastAttacked = e;
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4, ARTH = e.type === 'spider' || e.type === 'cave_spider' || e.type === 'bee' || e.type === 'silverfish' || e.type === 'endermite';
-  const base = tool ? tool.dmg : 1, ench = (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
+  const base = tool ? tool.dmg : 1, ench = (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0) + (typeof AQUATIC !== 'undefined' && AQUATIC.has(e.type) ? 2.5 * enchLv(h, 'impaling') : 0); // (impaling counts on a trident's stab too)
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
   let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8); // (Java: the weapon's damage by the square of the charge, its enchantment's by the charge, and a critical hit only on the first)
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
