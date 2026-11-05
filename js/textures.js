@@ -86,6 +86,7 @@ PAINT.powder_snow = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(h
 PAINT.ice = r => { fill((x, y) => [...pal(r, [hex(0x9cbcf4), hex(0x93b4ef), hex(0xa7c4f6)]), 190]); for (let i = 0; i < 5; i++) { let x = r.int(16), y = r.int(16); for (let k = 0; k < 5; k++) { P(x, y, hex(0xd6e4fb), 210); x++; y += r() < .5 ? 1 : 0; } } };
 PAINT.water = r => paintWater(r, 0);
 PAINT.lava = r => paintLava(r, 0);
+PAINT.water_flow = r => paintWater(r, 0); PAINT.lava_flow = r => paintLava(r, 0);
 function paintWater(r, t) {
   fill((x, y) => { const w = Math.sin((x + t * 0.7) * 0.8 + Math.sin((y + t) * 0.5) * 1.5) + Math.sin((y * 0.9 - t * 0.4) + x * 0.3); const v = 0.72 + w * 0.06 + (((x * 7 + y * 13) % 5) - 2) * 0.012; return [...gray(Math.round(v * 220)), 168]; });
 }
@@ -449,7 +450,8 @@ function animateAtlas(dt) {
   animT += dt * 6;
   curTile = S.T.water; paintWater(null, animT);
   curTile = S.T.lava; paintLava(null, animT * 0.5);
-  for (const t of [S.T.water, S.T.lava]) atlasCtx.putImageData(atlasImg, 0, 0, (t % TPR) * TS, ((t / TPR) | 0) * TS, TS, TS);
+  curTile = S.T.water_flow; paintWater(null, animT * 2); curTile = S.T.lava_flow; paintLava(null, animT);
+  for (const t of [S.T.water, S.T.lava, S.T.water_flow, S.T.lava_flow]) atlasCtx.putImageData(atlasImg, 0, 0, (t % TPR) * TS, ((t / TPR) | 0) * TS, TS, TS);
 }
 
 // ---------- resource pack (Pixel Perfection CE, CC BY-SA 4.0) ----------
@@ -474,6 +476,12 @@ function applyPackData(P, D) {
   for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
   for (const [k, [off, w, h]] of Object.entries(P.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
   if (P.sky) { const [off, w, h] = P.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }
+  // a pack without flow textures: the still ones stand in for them (and run with them)
+  for (const [fk, sk] of [['water_flow', 'water'], ['lava_flow', 'lava']]) if (!P.anim[fk] && P.tiles[fk] == null && S.T[fk] != null) {
+    if (PACKPX.anim[sk] && (!PACKPX.anim[fk] || PACKPX.anim[fk].alias)) PACKPX.anim[fk] = { ...PACKPX.anim[sk], alias: 1 };
+    const src = S.T[sk], t = S.T[fk], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+    for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4);
+  }
   for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(a.data.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
 }
 async function loadPack() {

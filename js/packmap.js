@@ -64,7 +64,7 @@ for (const t of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', '
 for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of ['', 'dead_']) for (const k of ['_coral', '_coral_fan', '_coral_block']) TILE[d + c + k] = d + c + k;
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
-const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
+const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma', water_flow: 'water_flow', lava_flow: 'lava_flow' };
 // biome-tinted plant textures are grey in vanilla and get their colour from the biome; a pack that ships them already
 // coloured (Pixel Perfection's orange birch, green spruce...) would be coloured twice, so they are turned grey first,
 // at vanilla's average brightness for that texture
@@ -215,7 +215,12 @@ function packBuild(load, extraTiles = [], extraItems = []) {
     const base = load('block/grass_block_side'), ov = load('block/grass_block_side_overlay');
     if (base && ov) { const px = new Uint8Array(crop16(base)), o = crop16(ov); for (let i = 0; i < px.length; i += 4) if (o[i + 3] >= 128) { px[i] = o[i]; px[i + 1] = o[i + 1]; px[i + 2] = o[i + 2]; px[i + 3] = 240; } out.tiles.grass_side = put(px); }
   }
-  for (const [k, f] of Object.entries(ANIM)) { const img = load('block/' + f); if (img && img.h > img.w) out.anim[k] = [put(new Uint8Array(img.px)), img.h / img.w]; }
+  for (const [k, f] of Object.entries(ANIM)) { const img = load('block/' + f); if (!img || !(img.h > img.w)) continue;
+    if (img.w === 16) { out.anim[k] = [put(new Uint8Array(img.px)), img.h / img.w]; continue; }
+    // a 32-pixel flow texture: each frame's top-left 16 x 16 (what Java draws across one block: half the sprite)
+    const n = img.h / img.w, w = img.w, px = new Uint8Array(n * 1024);
+    for (let f = 0; f < n; f++) for (let y = 0; y < 16; y++) px.set(img.px.subarray ? img.px.subarray((f * w + y) * w * 4, (f * w + y) * w * 4 + 64) : img.px.slice((f * w + y) * w * 4, (f * w + y) * w * 4 + 64), (f * 16 + y) * 64);
+    out.anim[k] = [put(px), n]; }
   { // chest and bed tiles composed from their entity textures
     // 1.15+ chest textures: the lid's top at (28,0), the front (with the latch notch) is the fourth strip and the sides
     // are upside down, because the model is drawn turned round

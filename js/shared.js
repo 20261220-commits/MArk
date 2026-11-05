@@ -32,7 +32,8 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
   .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']))
   // beds from the jar's entity textures: the foot half's long side and each half's outer end (bed_side is the head half's side)
-  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]));
+  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]))
+  .concat(['water_flow', 'lava_flow']); // (Java's flowing water and lava: down the sides of a fall and along a slope)
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -3530,6 +3531,21 @@ function meshChunk(B, M, L, bio, opts) {
     }
     flipArr.push(flip ? 1 : 0);
   }
+  // a quad with its own texture coordinate (in tile pixels, 0-16) at each corner: fluids' flow textures
+  function quadUV(buf, flipArr, cs, tile, uv, lights, sh) {
+    const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
+    if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
+    const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
+    for (let k = 0; k < 4; k++) {
+      const c = cs[k], l = lights[k], n = buf.n++, u = uv[k * 2], v = uv[k * 2 + 1];
+      P[n * 3] = Math.round((c[0] + 1) * 16); P[n * 3 + 1] = Math.round(c[1] * 16); P[n * 3 + 2] = Math.round((c[2] + 1) * 16);
+      U[n * 2] = (tu + u) * 16 + (u < 8 ? 1 : u > 8 ? -1 : 0); U[n * 2 + 1] = (tv + v) * 16 + (v < 8 ? 1 : v > 8 ? -1 : 0);
+      Lt[n * 4] = l[0]; Lt[n * 4 + 1] = l[1]; Lt[n * 4 + 2] = sh[k] >= 1 ? 255 : sh[k] * 255; Lt[n * 4 + 3] = 255;
+      Co[n * 4] = cr; Co[n * 4 + 1] = cg; Co[n * 4 + 2] = cb; Co[n * 4 + 3] = 255;
+    }
+    flipArr.push(0);
+  }
+  const UV8 = new Float32Array(8);
   const L4 = [[0, 0], [0, 0], [0, 0], [0, 0]], SH4 = [1, 1, 1, 1], CS = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
   function flatLight(x, y, z) { const l = lightAt(x, y, z); const s = (l >> 4) * 17, b = (l & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = s; L4[k][1] = b; } }
   function cubeTile(id, meta, f, x, y, z) {
@@ -3854,27 +3870,40 @@ function meshChunk(B, M, L, bio, opts) {
     }
   }
   function bw(x, y, z) { const b = blk(x, y, z); return WLOG[b] && isWet(b, M[pidx(x, y, z)]) ? 27 : b; } // waterlogged cells count as water
-  function fh(x, y, z, id) { // fluid surface height of cell (or -1 if not this fluid)
-    const b = bw(x, y, z); if (b !== id) return -1;
-    if (bw(x, y + 1, z) === id) return 1;
-    if (b !== blk(x, y, z)) return 0.89;
-    const m = M[pidx(x, y, z)]; if (m & 8) return 0.9; return m === 0 ? 0.89 : (8 - m) / 9;
+  // LiquidBlockRenderer (Java): a fluid's own height is its amount / 9 (a source 8/9), 1 under the same fluid; a corner
+  // averages the cell, its two side neighbours and (when one of those holds fluid) the diagonal, a full or nearly full
+  // cell (0.8 and up) weighing ten times; an open cell counts as 0, a solid one not at all; a cell next to fluid that
+  // reaches the block above stands full
+  function own(x, y, z, id) { const b = bw(x, y, z); if (b !== id) return -1; if (b !== blk(x, y, z)) return 8 / 9; const m = M[pidx(x, y, z)]; return (m === 0 || (m & 8) ? 8 : 8 - (m & 7)) / 9; }
+  function fh(x, y, z, id) { const b = bw(x, y, z); if (b === id) return bw(x, y + 1, z) === id ? 1 : own(x, y, z, id); return SOLID[b] && !FLUID[b] ? -1 : 0; }
+  function cornerH(center, a, c, diag) {
+    if (a >= 1 || c >= 1) return 1;
+    let s = 0, w = 0; const add = h => { if (h >= 0.8) { s += h * 10; w += 10; } else if (h >= 0) { s += h; w += 1; } };
+    if (a > 0 || c > 0) { if (diag >= 1) return 1; add(diag); }
+    add(center); add(c); add(a); return w ? s / w : 0;
   }
-  function corner(x, y, z, id, dx, dz) {
-    let s = 0, n = 0;
-    for (const [ax, az] of [[0, 0], [dx, 0], [0, dz], [dx, dz]]) {
-      const cx2 = x + ax, cz2 = z + az;
-      if (bw(cx2, y + 1, cz2) === id) return 1;
-      const h = fh(cx2, y, cz2, id);
-      if (h >= 0) { s += h; n++; } else if (!SOLID[blk(cx2, y, cz2)]) { n++; }
+  // FlowingFluid.getFlow: which way it runs (toward lower neighbours, or over an edge)
+  function flowVec(x, y, z, id) {
+    const me = own(x, y, z, id); let vx = 0, vz = 0;
+    for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nb = bw(x + dx, y, z + dz); let f1 = 0;
+      if (nb === id) { const f = own(x + dx, y, z + dz, id); if (f > 0) f1 = me - f; }
+      else if (!FLUID[nb] && !SOLID[nb]) { const f = own(x + dx, y - 1, z + dz, id); if (f > 0) f1 = me - (f - 8 / 9); }
+      vx += dx * f1; vz += dz * f1;
     }
-    return n ? s / n : 0.89;
+    const l = Math.hypot(vx, vz); return l < 1e-4 ? null : [vx / l, vz / l];
   }
   function fluid(id, meta, x, y, z) {
-    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, tile = FT[id * 4];
-    const top = bw(x, y + 1, z) === id;
-    const h00 = top ? 1 : corner(x, y, z, id, -1, -1), h10 = top ? 1 : corner(x, y, z, id, 1, -1), h11 = top ? 1 : corner(x, y, z, id, 1, 1), h01 = top ? 1 : corner(x, y, z, id, -1, 1);
+    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, still = FT[id * 4], flowT = T[water ? 'water_flow' : 'lava_flow'];
+    const top = bw(x, y + 1, z) === id, c0 = fh(x, y, z, id);
+    let h00 = 1, h10 = 1, h11 = 1, h01 = 1;
+    if (!top) {
+      const n = fh(x, y, z - 1, id), sth = fh(x, y, z + 1, id), e = fh(x + 1, y, z, id), w = fh(x - 1, y, z, id);
+      h00 = cornerH(c0, n, w, fh(x - 1, y, z - 1, id)); h10 = cornerH(c0, n, e, fh(x + 1, y, z - 1, id));
+      h11 = cornerH(c0, sth, e, fh(x + 1, y, z + 1, id)); h01 = cornerH(c0, sth, w, fh(x - 1, y, z + 1, id));
+    }
     const HH = (cx, cz) => cx ? (cz ? h11 : h10) : (cz ? h01 : h00);
+    const flow = top ? null : flowVec(x, y, z, id);
     for (let f = 0; f < 6; f++) {
       const F = FACES[f], nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2], nb = bw(nx, ny, nz);
       if (nb === id) continue;
@@ -3885,8 +3914,22 @@ function meshChunk(B, M, L, bio, opts) {
       const ownL = lightAt(x, y, z); if (f === 2 || ((ownL >> 4) > (lightAt(nx, ny, nz) >> 4))) { const s = (ownL >> 4) * 17, b = (ownL & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = Math.max(L4[k][0], s); L4[k][1] = Math.max(L4[k][1], b); } }
       SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
       for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + c[0]; CS[k][2] = z + c[2]; CS[k][1] = y + (c[1] ? HH(c[0], c[2]) : 0); }
-      quad(buf, fl, CS, tile, 0, 0, 16, 16, 0, L4, SH4, false);
-      if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
+      if (f === 2 && flow) { // a running surface: the flow texture turned to run along it (Java's atan2 - 90 degrees)
+        const a = Math.round((Math.atan2(flow[1], flow[0]) - Math.PI / 2) / (Math.PI / 2)) * (Math.PI / 2), f19 = Math.sin(a) * 0.25, f20 = Math.cos(a) * 0.25;
+        for (let k = 0; k < 4; k++) { const c = F.c[k], cx = c[0], cz = c[2];
+          const E = !cx && !cz ? [-f20 - f19, -f20 + f19] : !cx && cz ? [-f20 + f19, f20 + f19] : cx && cz ? [f20 + f19, f20 - f19] : [f20 - f19, -f20 - f19];
+          UV8[k * 2] = 8 + E[0] * 32; UV8[k * 2 + 1] = 8 + E[1] * 32; }
+        quadUV(buf, fl, CS, flowT, UV8, L4, SH4);
+        if (water) { const tmp = [CS[1], CS[0], CS[3], CS[2]], uv2 = [UV8[2], UV8[3], UV8[0], UV8[1], UV8[6], UV8[7], UV8[4], UV8[5]]; quadUV(buf, fl, tmp, flowT, uv2, L4, SH4); }
+        continue;
+      }
+      if (f !== 2 && f !== 3) { // the sides: the flow texture, its top cut at the surface (Java: (1 - height) * 8 of 16 down)
+        for (let k = 0; k < 4; k++) { const c = F.c[k]; UV8[k * 2] = k === 0 || k === 3 ? 0 : 16; UV8[k * 2 + 1] = c[1] ? (1 - HH(c[0], c[2])) * 16 : 16; }
+        quadUV(buf, fl, CS, flowT, UV8, L4, SH4);
+        continue;
+      }
+      quad(buf, fl, CS, still, 0, 0, 16, 16, 0, L4, SH4, false);
+      if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, still, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
   // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
