@@ -3,7 +3,7 @@
 const solidBox = (c) => mobCanvas(g => { g.fillStyle = c; g.fillRect(0, 0, 64, 64); });
 const BOXPARTS = (w, h, d) => [['body', [0, 0, 0], [-w / 2, 0, -d / 2, w, h, d], [0, 0]]];
 Object.assign(MOBDEF, {
-  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, neutral: 1, dmg: 8, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
+  zombified_piglin: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, sinks: 1, hostile: 1, neutral: 1, dmg: 8, xp: 5, snd: 'groan', fireproof: 1, armsOut: 1, nether: 1,
     drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], extraDrop: [['gold_ingot', 0.025]], parts: HUMAN(4), tex: () => solidBox('#d89a8a') },
   ghast: { hp: 10, w: 2, h: 4, speed: 0.03, hostile: 1, fly: 1, xp: 5, snd: 'ghast', fireproof: 1, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#f0f0f0'), ai: ghastAI },
   blaze: { hp: 20, w: 0.3, h: 1.8, speed: 0.07, hostile: 1, xp: 10, snd: 'blaze', fireproof: 1, waterHurt: 1, drops: [['blaze_rod', 0, 1]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#f0c030'), ai: blazeAI, anim: blazeAnim },
@@ -11,7 +11,7 @@ Object.assign(MOBDEF, {
   slime: { hp: 16, w: 1, h: 2, speed: 0.1, hostile: 1, xp: 4, snd: 'slime', slime: 1, drops: [['slime_ball', 0, 2]], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#70c060'), ai: slimeAI, anim: slimeAnim },
   enderman: { hp: 40, w: 0.3, h: 2.9, speed: 0.15, hostile: 1, neutral: 1, dmg: 7, xp: 5, snd: 'enderman', waterHurt: 1, drops: [['ender_pearl', 0, 1]], parts: HUMAN(2), tex: () => solidBox('#161616'), ai: endermanAI },
   villager: { hp: 20, w: 0.3, h: 1.95, speed: 0.07, xp: 0, snd: 'hmm', drops: [], parts: HUMAN(4), tex: () => solidBox('#b0805a'), villager: 1 },
-  iron_golem: { hp: 100, w: 0.7, h: 2.7, speed: 0.06, xp: 0, snd: 'golem', drops: [['iron_ingot', 3, 5], ['poppy', 0, 2]], parts: HUMAN(4), tex: () => solidBox('#d8d0c8'), ai: golemAI, anim: golemAnim, kbRes: 1 },
+  iron_golem: { hp: 100, w: 0.7, h: 2.7, speed: 0.06, sinks: 1, xp: 0, snd: 'golem', drops: [['iron_ingot', 3, 5], ['poppy', 0, 2]], parts: HUMAN(4), tex: () => solidBox('#d8d0c8'), ai: golemAI, anim: golemAnim, kbRes: 1 },
   end_crystal: { hp: 1, w: 1, h: 2, speed: 0, xp: 0, snd: 'click', drops: [], parts: BOXPARTS(8, 8, 8), tex: () => solidBox('#c080ff'), ai: crystalAI, anim: crystalAnim, onHurt: crystalHurt, noPush: 1 },
   ender_dragon: { hp: 200, w: 4, h: 4, speed: 0, hostile: 1, boss: 1, xp: 0, snd: 'growl', fireproof: 1, drops: [], parts: BOXPARTS(16, 16, 16), tex: () => solidBox('#202020'), ai: dragonAI, anim: dragonAnim, onHurt: dragonHurt, noPush: 1 },
 });
@@ -401,7 +401,7 @@ function walkPhysics(e, mx, mz, speed) {
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = 0.42; e.jumpCd = 10; }
-  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if (mx || mz) e.vy += 0.04; if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, up the bank where it meets one
+  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if ((mx || mz) && !d.sinks) e.vy += 0.04; if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, up the bank where it meets one
   turn(e);
   { const hv = Math.hypot(e.vx, e.vz); if (hv > 0.003 && hv < 0.15 && e.onGround && !inF && !d.fly && !(e.hurt > 0) && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, e.vx / hv, e.vz / hv)) { e.vx *= -0.2; e.vz *= -0.2; } }
   physMove(e, e.vx, e.vy, e.vz, 0.6);

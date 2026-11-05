@@ -128,10 +128,10 @@ const QUAD = (legH, bodyY, bodyBox, headP, headBox, legX, legZ0, legZ1) => [
   ['rleg2', [legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]], ['lleg2', [-legX, legH, legZ1], [-2, -legH, -2, 4, legH, 4], [0, 32]],
 ];
 const MOBDEF = {
-  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], extraDrop: [['iron_ingot', 0.0083], ['carrot', 0.0083], ['potato', 0.0083]], parts: HUMAN(4), armsOut: 1,
+  zombie: { hp: 20, w: 0.3, h: 1.95, speed: 0.12, hostile: 1, dmg: 3, burn: 1, sinks: 1, xp: 5, snd: 'groan', drops: [['rotten_flesh', 0, 2]], extraDrop: [['iron_ingot', 0.0083], ['carrot', 0.0083], ['potato', 0.0083]], parts: HUMAN(4), armsOut: 1,
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, (k, x, y) => k === 'top' ? hex(0x3a5a2a) : hex(0x5d8f4c), r, .15, { front: (g, x, y) => { px(g, x + 1, y + 3, '#1a2a12', 2, 1); px(g, x + 5, y + 3, '#1a2a12', 2, 1); px(g, x + 3, y + 5, '#3a5a2a', 2, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => y > 9 ? hex(0x3b3fa0) : hex(0x1fa0a8), r); paintBox(g, 40, 16, 4, 12, 4, (k, x, y) => y < 4 ? hex(0x1fa0a8) : hex(0x5d8f4c), r); paintBox(g, 0, 16, 4, 12, 4, (k, x, y) => y > 9 ? hex(0x4a4a4a) : hex(0x3b3fa0), r); }) },
-  skeleton: { hp: 20, w: 0.3, h: 1.99, speed: 0.12, hostile: 1, ranged: 1, burn: 1, xp: 5, snd: 'rattle', drops: [['bone', 0, 2], ['arrow', 0, 2]], parts: HUMAN(2),
+  skeleton: { hp: 20, w: 0.3, h: 1.99, speed: 0.12, hostile: 1, ranged: 1, burn: 1, sinks: 1, xp: 5, snd: 'rattle', drops: [['bone', 0, 2], ['arrow', 0, 2]], parts: HUMAN(2),
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 0, 8, 8, 8, () => hex(0xbcbcbc), r, .15, { front: (g, x, y) => { px(g, x + 1, y + 3, '#1a1a1a', 2, 2); px(g, x + 5, y + 3, '#1a1a1a', 2, 2); px(g, x + 3, y + 6, '#3a3a3a', 2, 1); px(g, x + 2, y + 7, '#5a5a5a', 4, 1); } });
       paintBox(g, 16, 16, 8, 12, 4, (k, x, y) => (k === 'front' || k === 'back') ? ((y % 3 === 1 && x > 0 && x < 7) || x === 3 || x === 4 ? hex(0xc8c8c8) : null) || hex(0x3a3a3a) : hex(0x9a9a9a), r); paintBox(g, 40, 16, 2, 12, 2, () => hex(0xbcbcbc), r); paintBox(g, 0, 16, 2, 12, 2, () => hex(0xb0b0b0), r); }) },
   creeper: { hp: 20, w: 0.3, h: 1.7, speed: 0.11, hostile: 1, explode: 1, xp: 5, snd: 'hiss', drops: [['gunpowder', 0, 2]],
@@ -553,7 +553,7 @@ function spawnMob(type, x, y, z, opts = {}) {
   if (d.villager) { e.vtype = opts.vtype || 'plains'; e.prof = opts.prof || 'farmer'; e.trades = opts.trades || null; e.rep = opts.rep || 0; }
   e.skin = opts.skin || (typeof pickSkin === 'function' ? pickSkin(type, e) : null);
   e.mesh = buildModel(type, { vtype: e.vtype, prof: e.prof, skin: e.skin });
-  if (e.baby) e.mesh.scale.setScalar(0.5); else if (d.scale) e.mesh.scale.setScalar(d.scale);
+  if (e.baby) { e.mesh.scale.setScalar(0.5); babyLook(e, true); } else if (d.scale) e.mesh.scale.setScalar(d.scale);
   if (type === 'drowned' && Math.random() < 0.0625) e.hasTrident = true; // 6.25% carry a trident
   if (d.rideY) e.rideY = d.rideY;
   if (d.vtex) { e.variant = opts.variant != null ? opts.variant : d.initVariant ? d.initVariant(e) : d.variant(); const k = type + ':' + e.variant; e.mesh.userData.mat.map = mobTex[k] || (mobTex[k] = d.vtex(e.variant)); } // colour variants (axolotl, tropical fish)
@@ -607,7 +607,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
       if (e.def.extraDrop && !e.baby) for (const [k, p] of e.def.extraDrop) if (Math.random() < p + loot * 0.03 && IID[k] != null) dropItem(e.x, e.y + .5, e.z, IID[k], 1);
       if (e.type === 'sheep' && !e.sheared && !e.baby) dropItem(e.x, e.y + .5, e.z, BID.white_wool, 1);
       if (e.type === 'skeleton' && Math.random() < 0.085) dropItem(e.x, e.y + .5, e.z, IID.bow, 1, null, 10, Math.floor(Math.random() * 300));
-      if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
+      if (e.baby && ZOMBIE_KIND.has(e.type)) spawnXP(e.x, e.y + .5, e.z, 12); /* (Java: a baby zombie is worth 2.5 times) */
+      else if (!e.baby) spawnXP(e.x, e.y + .5, e.z, e.def.slime ? e.size || 1 : e.def.xp != null && e.def.hostile ? e.def.xp : e.def.hostile ? 5 : 1 + Math.floor(Math.random() * 3));
       if (e.type === 'zombified_piglin' && Math.random() < 0.025 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.gold_ingot, 1);
       if (e.hasTrident && Math.random() < 0.085 + loot * 0.01) dropItem(e.x, e.y + .5, e.z, IID.trident, 1, null, 10, Math.floor(Math.random() * 200));
       stat('mob_kills'); statOf('killed', e.type);
@@ -634,20 +635,33 @@ function mobTick(e) {
   if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y - 0.1; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
   if (e.deathT) { e.deathT--; if (e.deathT <= 0) { for (let i = 0; i < 8; i++) R.simpleParticle(e.x + (Math.random() - .5) * e.w * 2, e.y + Math.random() * e.h, e.z + (Math.random() - .5) * e.w * 2, [0.9, 0.9, 0.9], { size: 0.25, vy: 0.5, grav: 0 }); removeEnt(e); } return; }
   if (e.hurt > 0) e.hurt--; if (e.inv > 0) e.inv--; if (e.attackCd > 0) e.attackCd--; if (e.panic > 0) e.panic--; if (e.love > 0) e.love--; if (e.jumpCd > 0) e.jumpCd--;
-  if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); } }
+  if (e.baby > 0) { e.baby -= 1; if (e.baby <= 0) { if (d.onGrow) d.onGrow(e); e.w = d.w; e.h = d.h; e.mesh.scale.setScalar(1); babyLook(e, false); } }
   const dx = PL.x - e.x, dz = PL.z - e.z, dist = Math.hypot(dx, dz, PL.y - e.y);
   // despawn
-  if (d.hostile && !e.persistent) { if (dist <= 32) e.idleT = 0; else e.idleT = (e.idleT || 0) + 1; if (dist > 128 || (e.idleT > 600 && Math.random() < (dist > 64 ? 1 / 300 : 1 / 800))) { removeEnt(e); return; } } // (Java: only after 30 s with no player within 32 blocks) // (beyond 64 blocks a little sooner than Java: room for the ones around you)
+  if (d.hostile && !e.persistent) { if (dist <= 32) e.idleT = 0; else e.idleT = (e.idleT || 0) + 1; if (dist > 128 || PL.difficulty === 0 || (e.idleT > 600 && Math.random() < 1 / 800)) { removeEnt(e); return; } } // (Java's Mob.checkDespawn: at once past 128 blocks, else 1 in 800 a tick once nobody has come within 32 for 30 s; peaceful clears them) // (Java: only after 30 s with no player within 32 blocks) // (beyond 64 blocks a little sooner than Java: room for the ones around you)
   // environment
   const fl = fluidAt(e.x, e.y + 0.4, e.z); e.inWater = fl === 1; e.inLava = fl === 2;
+  const eyeW = fluidAt(e.x, e.y + e.h * 0.85, e.z) === 1, wet = e.inWater || eyeW || fluidAt(e.x, e.y + 0.05, e.z) === 1; // (touching water anywhere: Java's wasTouchingWater)
   if (e.inLava && !d.fireproof) { e.fire = 300; if (e.age % 10 === 0) hurtMob(e, 4, null); }
   if (e.age % 10 === 0 && !(d.boss)) { // a cactus pricks what touches it (its sides are 1/16 in)
     const x0 = Math.floor(e.x - e.w - 0.07), x1 = Math.floor(e.x + e.w + 0.07), z0 = Math.floor(e.z - e.w - 0.07), z1 = Math.floor(e.z + e.w + 0.07), y0 = Math.floor(e.y - 0.01), y1 = Math.floor(e.y + e.h);
     let hit = false; for (let x = x0; x <= x1 && !hit; x++) for (let z = z0; z <= z1 && !hit; z++) for (let y = y0; y <= y1; y++) if (getBlock(x, y, z) === BID.cactus) { hit = true; break; }
     if (hit) hurtMob(e, 1, null);
   }
-  if (e.inWater || d.fireproof) e.fire = 0;
-  if (d.burn && dayFactor() > 0.6 && W.rain < 0.2 && !e.inWater && !e.baby) { const l = getLight(Math.floor(e.x), Math.floor(e.y + e.h), Math.floor(e.z)); if ((l >> 4) === 15) e.fire = Math.max(e.fire, 160); }
+  const ex = Math.floor(e.x), ey = Math.floor(e.y + e.h * 0.85), ez = Math.floor(e.z), skyOpen = ey > topY(ex, ez), rained = W.rain > 0.2 && skyOpen;
+  if (wet || rained || d.fireproof) e.fire = 0; // (water, or rain on it, puts the fire out)
+  // Java's isSunBurnTick: by day (the sky not darkened by 4 or more), brightness over 0.5 at the eyes, under open sky, not
+  // wet; then a chance a tick of (brightness - 0.4) * 2 in 30, and eight seconds of fire (babies too)
+  if (d.burn && !wet && !rained && skyOpen && skyDarken() < 4) { const l = getLight(ex, ey, ez), lv = Math.max(Math.max(0, (l >> 4) - skyDarken()), l & 15), br = lv / 15 / (4 - 3 * lv / 15);
+    if (br > 0.5 && Math.random() * 30 < (br - 0.4) * 2) e.fire = Math.max(e.fire, 160); }
+  // Java's Zombie.tick: a zombie with its eyes under water for 30 s shakes for 15 s and turns drowned (a husk: a zombie);
+  // a skeleton 7 s in powder snow freezes into a stray
+  const CONV = { zombie: 'drowned', zombie_villager: 'drowned', husk: 'zombie', skeleton: 'stray' }[e.type];
+  if (CONV && !e.deathT) {
+    if (e.convT > 0) { if (--e.convT <= 0) { convertMob(e, CONV); return; } }
+    else if (e.type === 'skeleton' ? getBlock(ex, Math.floor(e.y + 0.1), ez) === BID.powder_snow : eyeW) { e.convIn = (e.convIn || 0) + 1; if (e.convIn >= (e.type === 'skeleton' ? 140 : 600)) e.convT = 300; }
+    else e.convIn = 0;
+  }
   if (e.fire > 0) { e.fire--; if (e.fire % 20 === 0) { e.inv = 0; hurtMob(e, 1, null); } }
   if ((e.age % 20) === 0 && e.onGround && SENSORS.size && Math.hypot(e.vx, e.vz) > 0.02) vibrate(e.x, e.y, e.z); // footsteps reach sculk sensors
   if (--e.idleSnd <= 0) { e.idleSnd = 300 + Math.random() * 500; if (dist < 16) play(d.snd, { vol: 0.6 * (1 - dist / 16) }); }
@@ -734,7 +748,7 @@ function mobTick(e) {
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
   if ((mx || mz) && e.hitH && e.onGround && e.jumpCd <= 0) { e.vy = d.jumpy ? 0.6 : 0.42; e.jumpCd = 10; }
-  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if (mx || mz) e.vy += 0.04; if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, and up the bank where it meets one
+  if (inF) { e.vy = Math.max(e.vy - 0.02, -0.1); if (!d.sinks && !d.swim) e.vy += 0.04; else if ((mx || mz) && !d.sinks) e.vy += 0.04; /* (zombies and skeletons have no FloatGoal: they sink and walk the bottom) */ if ((mx || mz) && e.hitH) e.vy = Math.max(e.vy, 0.3); e.vy *= 0.8; } // Java's FloatGoal: head above the water, and up the bank where it meets one
   // entity cramming: push away from the player and nearby mobs
   const push = (o, ow, oh) => { const ddx = e.x - o.x, ddz = e.z - o.z, r = e.w + ow; if (Math.abs(ddx) < r && Math.abs(ddz) < r && e.y < o.y + oh && o.y < e.y + e.h) { const l = Math.hypot(ddx, ddz) || 0.01, f = 0.05; e.vx += ddx / l * f; e.vz += ddz / l * f; return [ddx / l * f, ddz / l * f]; } return null; };
   if (!PL.dead && !spectator()) { const pp = push(PL, PL.w, PL.h); if (pp) { PL.vx -= pp[0] * 0.5; PL.vz -= pp[1] * 0.5; } }
@@ -784,10 +798,27 @@ const ZOMBIE_KIND = new Set(['zombie', 'husk', 'drowned', 'zombie_villager']);
 function jockeyChance(e) {
   if (!e || e.dead) return;
   if (ZOMBIE_KIND.has(e.type) && Math.random() < 0.05) {
-    e.baby = 1e12; e.w = e.def.w * 0.5; e.h = e.def.h * 0.5; e.mesh.scale.setScalar(0.5); e.babySpeed = 1.5;
+    e.baby = 1e12; e.w = e.def.w * 0.5; e.h = e.def.h * 0.5; e.mesh.scale.setScalar(0.5); e.babySpeed = 1.5; babyLook(e, true);
     if (e.type !== 'drowned' && Math.random() < 0.05) { const c = ENT.find(o => o.type === 'chicken' && !o.dead && !o.jockey && Math.hypot(o.x - e.x, o.z - e.z) < 5) || spawnMob('chicken', e.x, e.y, e.z); if (c) mountMob(e, c); }
   }
   if (e.type === 'spider' && Math.random() < 0.01) { const s = spawnMob('skeleton', e.x, e.y + 1, e.z); if (s) mountMob(s, e); }
+}
+// Mob.convertTo: the new kind in its place, keeping its name, babyhood and persistence (fresh health)
+function convertMob(e, type) {
+  const n = spawnMob(type, e.x, e.y, e.z, { baby: false }); if (!n) return;
+  if (e.baby) { n.baby = 1e12; n.babySpeed = e.babySpeed; n.w = n.def.w * 0.5; n.h = n.def.h * 0.5; n.mesh.scale.setScalar(0.5); babyLook(n, true); }
+  n.persistent = e.persistent; if (e.name) n.name = e.name; n.yaw = e.yaw; play(type === 'stray' ? 'hit' : 'splash', { vol: 0.5 }); removeEnt(e);
+}
+// a baby's head (Java's AgeableListModel): the body at half size and the head bigger than half, set lower and back.
+// [head scale, its offset down, back] in model pixels: humanoids 0.75 (head 1.5 / 2), pigs, cows and sheep full size
+const BABY_HEAD = { zombie: [0.75, 16, 0], husk: [0.75, 16, 0], drowned: [0.75, 16, 0], zombie_villager: [0.75, 16, 0], zombified_piglin: [0.75, 16, 0], piglin: [0.75, 16, 0],
+  pig: [1, 4, 4], cow: [1, 10, 4], mooshroom: [1, 10, 4], sheep: [1, 8, 4] };
+function babyLook(e, on) {
+  const H = BABY_HEAD[e.type], P = e.mesh && e.mesh.userData.mc && e.mesh.userData.parts, h = P && P.head; if (!H || !h) return;
+  if (!h.userData.adult) h.userData.adult = h.position.clone(); const a = h.userData.adult;
+  if (!on) { h.position.copy(a); h.scale.setScalar(1); return; }
+  const [s, yo, zo] = H, py = 24 - a.y * 16; // (the bone sits in a body drawn at half size: twice what Java draws)
+  h.position.set(2 * s * a.x, 2 * (24 - s * (py + yo)) / 16, 2 * s * (a.z + zo / 16)); h.scale.setScalar(2 * s);
 }
 function mountMob(rider, mount) { rider.mount = mount; mount.jockey = rider; mount.persistent = rider.persistent = false; }
 // a mount carries its rider and goes where the rider wants (toward the rider's target)

@@ -67,7 +67,7 @@ function pickSkin(type, e) {
 const ZDEF = MOBDEF.zombie, SKDEF = MOBDEF.skeleton;
 Object.assign(MOBDEF, {
   husk: { ...ZDEF, burn: 0, drops: [['rotten_flesh', 0, 2]] },
-  drowned: { ...ZDEF, burn: 1, swim: 1, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
+  drowned: { ...ZDEF, burn: 1, swim: 1, sinks: 0, drops: [['rotten_flesh', 0, 2]], extraDrop: [['copper_ingot', 0.11]] },
   stray: { ...SKDEF, drops: [['bone', 0, 2], ['arrow', 0, 2]], extraDrop: [['slowness_arrow', 0.5]] },
   wither_skeleton: { ...SKDEF, ranged: 0, h: 2.4, w: 0.35, dmg: 8, burn: 0, fireproof: 1, armsOut: 0, drops: [['coal', 0, 1], ['bone', 0, 2]] },
   piglin: { hp: 16, w: 0.3, h: 1.95, speed: 0.11, hostile: 1, neutral: 1, dmg: 5, save: e => ({ xbow: e.xbow || 0 }), init: (e, o) => { if (o.xbow) e.xbow = o.xbow; }, xp: 5, snd: 'groan', fireproof: 1, drops: [], parts: HUMAN(4), tex: () => solidBox('#e0a080'), ai: piglinAI },
