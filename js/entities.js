@@ -651,15 +651,19 @@ function mobTick(e) {
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < voidY()) removeEnt(e); return; }
   // AI
-  let mx = 0, mz = 0, speed = d.speed * (e.babySpeed || 1);
+  const jv = d.jv, jsp = m => jv ? mobJSpeed(jv.a * m) * (e.babySpeed || 1) : d.speed * (e.babySpeed || 1); // (Java's movement attribute and each goal's speed modifier)
+  let mx = 0, mz = 0, speed = jsp(jv ? jv.stroll : 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const fr = mobFollowRange(e), bright = d.neutralDay ? mobBrightLight(e) : false;
   const hostileNow = d.hostile && !d.neutral && !(bright && e.target == null);
   if (hostileNow && !e.target && plVisible && e.age % 2 === 0 && dist < fr * mobSeeScale() && canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z)) { e.target = PL; e.unseen = 0; }
+  if (ZOMBIE_KIND.has(e.type) && e.age % 20 === 0 && (!e.target || e.target !== PL)) zombieSeekVillager(e, fr); // (Java: zombies go for villagers, traders and iron golems too; a player they see comes first)
   if (e.target === PL && e.age % 5 === 0) e.unseen = canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z) ? 0 : (e.unseen || 0) + 5;
   if (e.target && bright && Math.random() < 0.01) e.target = null; // (a spider in bright light gives up now and then)
-  if (e.target && (!plVisible || dist > fr || e.unseen > 60 || e.repel > 0)) { e.target = null; e.unseen = 0; } // (hoglins backing off from warped fungus: nether.js)
-  if (e.target) {
+  if (e.target === PL && (!plVisible || dist > fr || e.unseen > 60 || e.repel > 0)) { e.target = null; e.unseen = 0; }
+  if (e.target && e.target !== PL && (e.target.dead || e.target.deathT || Math.hypot(e.target.x - e.x, e.target.z - e.z) > fr)) e.target = null; // (hoglins backing off from warped fungus: nether.js)
+  if (e.target && e.target !== PL) { [mx, mz] = mobHuntMob(e, d); if (d.chase) speed = d.chase * (e.babySpeed || 1); }
+  else if (e.target) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
     e.yawTarget = Math.atan2(-dx, -dz); if (d.chase) speed = d.chase * (e.babySpeed || 1);
     if (d.ranged) {
@@ -683,13 +687,14 @@ function mobTick(e) {
       if (d.climb && e.hitH) { e.vy = 0.2; }
     }
   } else {
-    const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plVisible && !e.rider;
-    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = d.speed * 2.2; }
-    else if (food) { e.goal = dist > 2 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); }
+    const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && plVisible && !e.rider && !(e.panic > 0); // (Java's TemptGoal: 10 blocks, either hand)
+    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = jv ? jsp(jv.panic) : d.speed * 2.2; }
+    else if (food) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); if (jv) speed = jsp(jv.tempt); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
-    else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 7); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
+    else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
+    if (e.goal && jv && e.parGoal > W.tickN && !(e.panic > 0)) speed = jsp(jv.parent);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
-    else if (plVisible && dist < 8 && !e.rider) { if (!(e.lookT > 0) && Math.random() < 0.02) e.lookT = 40 + Math.floor(Math.random() * 40); if (e.lookT > 0) { e.lookT--; e.yawTarget = Math.atan2(-dx, -dz); } } // now and then looks at a player nearby
+    else if (plVisible && dist < 6 && !e.rider) { if (!(e.lookT > 0) && Math.random() < 0.02) e.lookT = 40 + Math.floor(Math.random() * 40); if (e.lookT > 0) { e.lookT--; e.yawTarget = Math.atan2(-dx, -dz); } } // now and then looks at a player nearby
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
@@ -710,7 +715,7 @@ function mobTick(e) {
   if (e.shadeGoal && (!e.goal || e.fire <= 0)) e.shadeGoal = 0;
   if ((e.type === 'skeleton' || e.type === 'stray') && e.age % 5 === 0) { const w = ENT.find(o => o.type === 'wolf' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 6); if (w) { const fx = e.x - w.x, fz = e.z - w.z, l = Math.hypot(fx, fz) || 1; e.goal = [e.x + fx / l * 8, e.z + fz / l * 8]; e.fleeT = 20; } }
   if (e.fleeT > 0) { e.fleeT--; if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz) || 1; mx = gx / gl; mz = gz / gl; speed = d.speed * 1.3; } }
-  if (e.baby > 0 && !e.target && !(e.panic > 0) && d.food && e.age % 20 === 0) { let par = null, pd = 16; for (const o of ENT) if (o !== e && o.type === e.type && !o.dead && !(o.baby > 0)) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < pd) { pd = dd; par = o; } } if (par && pd > 3) e.goal = [par.x, par.z]; }
+  if (e.baby > 0 && !e.target && !(e.panic > 0) && d.food && e.age % 20 === 0) { let par = null, pd = 8; for (const o of ENT) if (o !== e && o.type === e.type && !o.dead && !(o.baby > 0) && Math.abs(o.y - e.y) < 4) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < pd) { pd = dd; par = o; } } if (par && pd > 3) { e.goal = [par.x, par.z]; e.parGoal = W.tickN + 25; } } // (Java's FollowParentGoal: a grown-up within 8 blocks, kept to 3)
   if (d.climb && e.hitH && (mx || mz)) e.vy = Math.max(e.vy, 0.2);
   if (e.yawTarget != null) { let dy = e.yawTarget - e.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; e.yaw += Math.max(-0.35, Math.min(0.35, dy)); }
   if (e.inWater && !d.sinks && !d.swim && !e.target && e.age % 20 === 0 && (!e.goal || waterCol(e.goal[0], e.goal[1]))) { const g = landSeek(e); if (g) e.goal = g; } // out of the water: to the nearest bank

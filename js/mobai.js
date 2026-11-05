@@ -26,3 +26,32 @@ function mobBrightLight(e) {
   for (const t of ['vindicator', 'pillager']) set(t, { speed: sp(0.35 * 0.6), chase: sp(0.35) });
   set('evoker', { speed: sp(0.5 * 0.6), chase: sp(0.5 * 0.6) }); set('ravager', { speed: sp(0.3 * 0.4), chase: sp(0.3) });
   set('witch', { speed: sp(0.25) }); }
+// Java's movement attribute (a) and each goal's speed modifier for the animals that run on the common AI: a stroll,
+// a panic after a hit, following food in a hand, a baby keeping up with a grown-up
+function mobJSpeed(a) { return 4.317 * a * a / 0.1 / 14.3; }
+{ const J = { cow: [0.2, 1, 2, 1.25, 1.25], mooshroom: [0.2, 1, 2, 1.25, 1.25], pig: [0.25, 1, 1.25, 1.2, 1.1], sheep: [0.23, 1, 1.25, 1.1, 1.1], chicken: [0.25, 1, 1.4, 1, 1.1],
+    goat: [0.2, 1, 2, 1.25, 1.25], villager: [0.5, 0.5, 0.6, 0.5, 0.6], horse: [0.225, 0.7, 1.2, 1.25, 1], donkey: [0.175, 0.7, 1.2, 1.25, 1], mule: [0.175, 0.7, 1.2, 1.25, 1], zombie_horse: [0.2, 0.7, 1.2, 1.25, 1],
+    polar_bear: [0.25, 1, 2, 1, 1.25], panda: [0.15, 1, 2, 1, 1.25], ocelot: [0.3, 0.8, 1.33, 0.6, 1.1], llama: [0.175, 0.7, 1.2, 1.25, 1], trader_llama: [0.175, 0.7, 1.2, 1.25, 1], skeleton_horse: [0.2, 0.7, 1.2, 1.25, 1], wandering_trader: [0.5, 0.35, 0.5, 0.5, 0.5] };
+  for (const t in J) if (MOBDEF[t]) { const [a, stroll, panic, tempt, parent] = J[t]; MOBDEF[t].jv = { a, stroll, panic, tempt, parent }; } }
+// ---------- zombies and villagers (Java's ZombieAttackGoal targets, VillagerPanicTrigger) ----------
+const ZOMBIE_PREY = new Set(['villager', 'wandering_trader', 'iron_golem']);
+function zombieSeekVillager(e, fr) {
+  if (e.target && e.target !== PL) return;
+  let best = null, bd = fr; for (const o of ENT) if (o.kind === 'mob' && !o.dead && !o.deathT && ZOMBIE_PREY.has(o.type)) { const d = Math.hypot(o.x - e.x, o.y - e.y, o.z - e.z); if (d < bd && canSee(e.x, e.y + e.h * 0.85, e.z, o.x, o.y + o.h * 0.8, o.z)) { bd = d; best = o; } }
+  if (best) e.target = best;
+}
+// a monster after another mob: walks there and hits it with its own reach and damage
+function mobHuntMob(e, d) {
+  const t = e.target, dx = t.x - e.x, dz = t.z - e.z, dy = t.y - e.y, l = Math.hypot(dx, dz) || 1;
+  e.yawTarget = Math.atan2(-dx, -dz);
+  if (dx * dx + dz * dz + dy * dy <= (4 * e.w) ** 2 + 2 * (t.w || 0.3) && e.attackCd <= 0) { e.attackCd = d.atkCd || 20; hurtMob(t, d.dmg || 2, e, dx / l, dz / l); /* (difficulty only scales hits on players) */ }
+  return pathDir(e, t.x, t.y, t.z);
+}
+// villagers run from a zombie within 8 blocks (Java: panic at 0.5 of their speed, here their panic speed)
+function villagerFear(e) {
+  if (e.type !== 'villager' || e.age % 10) return;
+  let z = null, zd = 8; for (const o of ENT) if (o.kind === 'mob' && !o.dead && (ZOMBIE_KIND.has(o.type) || IS_RAIDER_SET.has(o.type))) { const d = Math.hypot(o.x - e.x, o.z - e.z); if (d < zd) { zd = d; z = o; } }
+  if (z) { e.panic = Math.max(e.panic || 0, 30); e.fleeFrom = [z.x, z.z]; if (!e.goal || Math.random() < 0.3) e.goal = null; }
+}
+const IS_RAIDER_SET = new Set(['pillager', 'vindicator', 'evoker', 'ravager', 'illusioner', 'vex']);
+{ const me = mobExtraTick; mobExtraTick = function (e, dist) { villagerFear(e); return me.apply(this, arguments); }; }

@@ -54,7 +54,7 @@ const BEAR_M = autoModel(() => [
 function polarBearAI(e, dist) {
   if (!e.baby && !e.target && plTargetable() && dist < 6 && ENT.some(o => o.type === 'polar_bear' && o.baby && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8)) e.target = PL;
   if (e.target === PL && (!plTargetable() || dist > 20)) e.target = null;
-  if (e.target === PL) { faceTo(e, PL.x, PL.z); const [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist < 2 && e.attackCd <= 0) { e.attackCd = 20; e.rear = 10; attackPlayer(e, 6, mx, mz); } walkPhysics(e, mx, mz, 0.13); return; }
+  if (e.target === PL) { faceTo(e, PL.x, PL.z); const [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); if (dist * dist <= (4 * e.w) ** 2 + 0.6 && e.attackCd <= 0) { e.attackCd = 20; e.rear = 10; attackPlayer(e, 6, mx, mz); } walkPhysics(e, mx, mz, mobJSpeed(0.25 * 1.25)); return; } // (Java: a charge at 1.25, its reach)
   return 'default';
 }
 
@@ -87,8 +87,8 @@ CAT_COL.push([0xe8c050, 0x8a5a1a, 0xf0d890]);
 const OCELOT_V = CAT_COL.length - 1;
 function ocelotAI(e, dist) {
   const held = PL.held(), fish = held && (held.id === IID.cod || held.id === IID.salmon);
-  if (!e.trusting && dist < 8 && !(PL.sneaking && fish) && !PL.dead && !spectator() && PL.mode !== 'creative') { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1, mx = (e.x - PL.x) / l, mz = (e.z - PL.z) / l; e.yawTarget = Math.atan2(-mx, -mz); walkPhysics(e, mx, mz, 0.16); return; }
-  if (fish && PL.sneaking && dist < 8 && dist > 1.5) { faceTo(e, PL.x, PL.z); const [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); walkPhysics(e, mx, mz, 0.05); return; }
+  if (!e.trusting && dist < 16 && !(PL.sneaking && fish) && !PL.dead && !spectator() && PL.mode !== 'creative') { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1, mx = (e.x - PL.x) / l, mz = (e.z - PL.z) / l; e.yawTarget = Math.atan2(-mx, -mz); walkPhysics(e, mx, mz, mobJSpeed(0.3 * (dist < 7 ? 1.33 : 0.8))); return; } // (Java: keeps 16 blocks off, running inside 7)
+  if (fish && PL.sneaking && dist < 10 && dist > 2.5) { faceTo(e, PL.x, PL.z); const [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); walkPhysics(e, mx, mz, mobJSpeed(0.3 * 0.6)); return; }
   return 'default';
 }
 function ocelotUse(e, h) {
@@ -155,12 +155,12 @@ function skeletonHorseAI(e, dist) {
 const withDefault = fn => (e, dist, dx, dz) => { if (fn(e, dist) === 'default') genericAnimal(e, dist); };
 // the generic wander/breed/panic behaviour used by most animals (a cut-down copy of mobTick's)
 function genericAnimal(e, dist) {
-  const d = e.def; let mx = 0, mz = 0, sp = d.speed;
-  const food = d.food && PL.held() && isFood(d, PL.held().id) && dist < 8 && plTargetable();
-  if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; sp *= 2.2; }
-  else if (food) e.goal = dist > 2 ? [PL.x, PL.z] : null;
+  const d = e.def, jv = d.jv, js = m => jv ? mobJSpeed(jv.a * m) * (e.babySpeed || 1) : d.speed; let mx = 0, mz = 0, sp = js(jv ? jv.stroll : 1); // (Java's movement attribute and goal speeds, mobai.js)
+  const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && plTargetable();
+  if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; sp = jv ? js(jv.panic) : sp * 2.2; }
+  else if (food) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; if (jv) sp = js(jv.tempt); }
   else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; { const kid = spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); if (e.def.onBred) e.def.onBred(kid, e, mate); } spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
-  else if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 7);
+  else if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 10);
   if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   walkPhysics(e, mx, mz, sp);
 }

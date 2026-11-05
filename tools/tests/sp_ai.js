@@ -24,6 +24,10 @@ module.exports = async ({ ok, srv, b, lib }) => {
     clear(); { const z = spawnMob('skeleton', X0 + .5, Y, Z0 - 9.5); z.persistent = true; await run(20, () => hold(X0 + .5, Y, Z0 + 10.5)); out.skel20 = !!z.target; }
     clear(); { const w = spawnMob('witch', X0 + .5, Y, Z0 - 5.5); w.persistent = true; PL.eff = null; let got = false; await run(200, () => { PL.x = X0 + .5; PL.y = Y; PL.z = Z0 + .5; PL.vx = PL.vz = 0; if (PL.eff && Object.keys(PL.eff).length || PL.health < 20) got = true; PL.health = 20; PL.dead = false; return got; }); out.witch = got; PL.eff = null; }
     clear(); { const v = spawnMob('vindicator', X0 + .5, Y, Z0 - 9.5); v.persistent = true; v.target = PL; let z0; await run(30, i => { hold(X0 + .5, Y, Z0 + 9.5); v.target = PL; if (i === 10) z0 = v.z; }); out.vindSpeed = +(v.z - z0).toFixed(2); }
+    clear(); arena(); W.time = 6000;
+    { const c = spawnMob('cow', X0 + .5, Y, Z0 + .5); c.persistent = true; hurtMob(c, 0.01, PL); let p0; await run(40, i => { hold(X0 - 3, Y, Z0 + .5); if (i === 15) p0 = [c.x, c.z]; }); out.cowPanic = +(Math.hypot(c.x - p0[0], c.z - p0[1]) / 25 * 20).toFixed(2); }
+    clear(); W.time = 18000; { const v = spawnMob('villager', X0 + .5, Y, Z0 + .5); v.persistent = true; const z = spawnMob('zombie', X0 + .5, Y, Z0 - 12.5); z.persistent = true; let fled = 0;
+      await run(200, () => { hold(X0 + 20, Y + 30, Z0 + 20); PL.mode = 'creative'; if (v.panic > 0) fled++; }); PL.mode = 'survival'; out.zv = [z.target && z.target.type, fled]; }
     clear(); return out; });
   ok(r.wall >= 0, 'a zombie walks around a wall to its gap 7 blocks off', r);
   ok(r.lava >= 0 && !r.lavaBurned, 'a zombie crosses a lava trench on its bridge, not through the lava', r);
@@ -32,4 +36,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.zombie30 && !r.skel20, 'a zombie sees a player 30 blocks off, a skeleton not at 20', r);
   ok(r.witch, "a witch's splash potion lands on the player", r);
   ok(r.vindSpeed > 4, 'a vindicator charges at Java speed (about 5 blocks a second)', r);
+  ok(r.cowPanic > 5, 'a hit cow runs at Java\'s panic speed (2 x its 0.2: about 6.9 blocks a second)', r);
+  ok(r.zv[0] === 'villager' && r.zv[1] > 10, 'a zombie goes for a villager it sees, and the villager runs', r);
 };
