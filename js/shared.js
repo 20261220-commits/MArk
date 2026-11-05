@@ -4253,6 +4253,7 @@ function stampPiece(st, G, p, tiles, proc, R, x0, z0) {
     const v = vanillaState(s, p.rot); if (!v) continue;
     st(wx, wy, wz, v[0], v[1]);
     if (nd && nd.loot && st.get(wx, wy, wz) >= 0) tiles.push({ t: 'chest', i: tl(wx, wy, wz), loot: rollVanillaLoot(R, nd.loot) });
+    if (nd && nd.items && v[0] === BID.brewing_stand && st.get(wx, wy, wz) >= 0) tiles.push({ t: 'brew', i: tl(wx, wy, wz), items: nd.items });
     if (v[0] === BID.red_bed && (v[1] & 4) === 0) { /* beds: the foot claims a villager */ }
   }
   if (later) for (const [d, x, y, z] of later) dataMarker(d, x, y, z, p, tiles, R, st);

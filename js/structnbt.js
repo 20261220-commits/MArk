@@ -49,6 +49,7 @@ function compactStructure(nbt) {
     if (t.id === 'minecraft:jigsaw' || t.pool) n[i] = { j: 1, name: (t.name || '').replace('minecraft:', ''), pool: (t.pool || '').replace('minecraft:', ''), target: (t.target || '').replace('minecraft:', ''), fin: (t.final_state || 'minecraft:air').replace('minecraft:', ''), joint: t.joint || 'rollable' };
     else if (t.LootTable) n[i] = { loot: t.LootTable.replace('minecraft:', '') };
     else if (t.mode === 'DATA' && t.metadata) n[i] = { data: t.metadata }; // data markers: "chest", "supply_chest", "drowned"...
+    else if (Array.isArray(t.Items) && t.Items.length) n[i] = { items: t.Items.map(it => [it.Slot | 0, String(it.id || '').replace('minecraft:', ''), it.Count | 0 || 1, it.tag && it.tag.Potion ? String(it.tag.Potion).replace('minecraft:', '') : null]) }; // what a container is built holding (the end ship's brewing stand: two potions of healing II)
   });
   const e = (nbt.entities || []).map(en => [en.pos[0], en.pos[1], en.pos[2], ((en.nbt && en.nbt.id) || '').replace('minecraft:', '')]);
   return { s: nbt.size, p: pal, b, n, e };

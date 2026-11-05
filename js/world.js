@@ -614,7 +614,9 @@ function addChunk(cx, cz, d, tiles) {
   if (tiles) for (const t of tiles) {
     if (t.t === 'chest') { const items = new Array(27).fill(null), wx = cx * 16 + (t.i & 15), wz = cz * 16 + ((t.i >> 4) & 15); for (const [slot, key, n, x] of t.loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); const tile = { type: 'chest', items }; if (t.loot.table) tile.lt = t.loot.table; c.tiles.set(t.i, tile); }
     else if (t.t === 'dispenser') { const items = new Array(9).fill(null); for (const [slot, key, n] of t.loot) if (IID[key] != null) items[slot] = { id: IID[key], n }; c.tiles.set(t.i, { type: 'dispenser', items }); }
-    else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 }; c.tiles.set(t.i, b); }
+    else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 };
+      if (t.items) for (const [sl, id, n, pot] of t.items) { const P = pot && POTION[pot], iid = P ? P.items[id === 'splash_potion' ? 'splash' : id === 'lingering_potion' ? 'lingering' : 'potion'] : IID[id]; if (iid != null && sl >= 0 && sl < 5) b.items[sl] = { id: iid, n: Math.max(1, n) }; } /* a structure file's brewing stand, as it was built (the end ship's healing II) */
+      c.tiles.set(t.i, b); }
     else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
     else if (t.t === 'mob') { if (!d.fromSave) (c.spawns || (c.spawns = [])).push(t); } // (a chunk coming back keeps the ones it saved; making them again copied every minecart, villager and frame)
     else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
