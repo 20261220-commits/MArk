@@ -14,7 +14,7 @@ function piglinAnger(x, y, z) {
   for (const e of ENT) if ((e.type === 'piglin' || e.type === 'piglin_brute') && !e.dead && Math.hypot(e.x - x, e.y - y, e.z - z) < 16) { e.target = PL; e.angry = true; }
 }
 Object.assign(MOBDEF, {
-  piglin_brute: { ...MOBDEF.piglin, hp: 50, dmg: 13, xp: 20, neutral: 0, drops: [], extraDrop: [['golden_axe', 0.085]], ai: bruteAI, init: e => bruteGear(e) },
+  piglin_brute: { ...MOBDEF.piglin, axe: 1, hp: 50, dmg: 13, xp: 20, neutral: 0, drops: [], extraDrop: [['golden_axe', 0.085]], ai: bruteAI, init: e => bruteGear(e) },
 });
 // outside the Nether, piglins and brutes turn into zombified piglins and hoglins into zoglins after 15 seconds; hoglins
 // keep away from warped fungus (and nether portals and respawn anchors), as in Java

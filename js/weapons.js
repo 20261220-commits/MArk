@@ -10,7 +10,9 @@ function shieldBlocks(dmg, cause, attacker, from) {
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
   if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
-  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
+  play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); PL.shieldBlockAt = W.tickN; if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
+  // another player's axe: Java's disableShield, 25% (and 75% more if they sprinted) for 5 seconds
+  if (attacker && attacker.kind === 'peer' && attacker.axe && Math.random() < 0.25 + (attacker.sprint ? 0.75 : 0)) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); }
   if (attacker && attacker.kind === 'mob' && cause === 'mob') { attacker.vx += dx / l * 0.5; attacker.vz += dz / l * 0.5; if (attacker.def.axe && Math.random() < 0.25) { PL.shieldCd = 100; USE.kind = null; play('break', { mat: 'wood' }); } } // an axe knocks the shield away for 5 s, one time in four (Java's Mob.maybeDisableShield)
   return true;
 }
@@ -50,7 +52,7 @@ function crossbowFire(h) {
 }
 
 // ---------- trident ----------
-const AQUATIC = new Set(['squid', 'glow_squid', 'cod', 'salmon', 'tropical_fish', 'axolotl', 'dolphin', 'turtle']);
+const AQUATIC = new Set(['squid', 'glow_squid', 'cod', 'salmon', 'tropical_fish', 'pufferfish', 'axolotl', 'dolphin', 'turtle', 'guardian', 'elder_guardian']); // (Java's water mobs: impaling's targets)
 function tridentRelease(h) {
   if (USE.t < 10) return;
   if (!creative() && (h.d || 0) >= ITEMS[h.id].dur - 1) return; // Java: a trident about to break can't be thrown or used for riptide
@@ -82,10 +84,12 @@ function tridentHit(e, o) {
 function tridentTick(e) {
   const st = e.trident; if (!st) return false;
   const loyal = st && e.owner === PL ? enchLv(st, 'loyalty') : 0;
-  if ((e.stuck || e.hitDone || e.y < voidY() + 54) && loyal) {
-    const dx = PL.x - e.x, dy = PL.y + 1.2 - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz) || 1, sp = 0.05 * loyal + 0.3;
-    e.stuck = false; e.x += dx / d * sp; e.y += dy / d * sp; e.z += dz / d * sp; e.vx = e.vy = e.vz = 0;
-    if (d < 1.2) { tridentPickup(e); }
+  if ((e.stuck || e.hitDone || e.returning || e.y < voidY() + 54) && loyal) {
+    // Java's ThrownTrident: back toward the owner's eyes, the motion kept at 0.95 and 0.05 a level of loyalty added each tick
+    const dx = PL.x - e.x, dy = PL.y + PL.eyeH - e.y, dz = PL.z - e.z, d = Math.hypot(dx, dy, dz) || 1, k = 0.05 * loyal;
+    if (!e.returning) { e.returning = true; e.vx = e.vy = e.vz = 0; play('bow', { pitch: 0.6, vol: 0.5 }); }
+    e.stuck = false; e.vx = e.vx * 0.95 + dx / d * k; e.vy = e.vy * 0.95 + dy / d * k; e.vz = e.vz * 0.95 + dz / d * k; e.x += e.vx; e.y += e.vy; e.z += e.vz;
+    if (d < 1.5) { tridentPickup(e); }
     return true;
   }
   if (e.stuck && e.owner === PL && !PL.dead && Math.hypot(PL.x - e.x, PL.y + 1 - e.y, PL.z - e.z) < 1.5 && e.age > 10) tridentPickup(e);

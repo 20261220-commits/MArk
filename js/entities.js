@@ -874,7 +874,9 @@ function arrowTick(e) {
       onThrownHit(e, nx, ny, nz, null); removeEnt(e); return; }
     if ((e.owner !== PL || (e.leftOwner && !e.trident)) && !e.thrown && !PL.dead && inPL) {
       if (e.trident) { tridentHit(e, PL); removeEnt(e); return; }
-      if (PL.mode !== 'creative') { if (hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e)) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
+      if (PL.mode !== 'creative') { const sb0 = PL.shieldBlockAt, hitP = hurtPlayer(diffDmg(dmg), 'arrow', e.owner, e);
+        if (!hitP && PL.shieldBlockAt !== sb0) { e.vx *= -0.1; e.vy *= -0.1; e.vz *= -0.1; e.hitDone = true; if (e.owner !== PL) e.noPickup = true; break; } /* (Java: an arrow a shield took bounces off and falls) */
+        if (hitP) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
     if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .3 && nx < o.x + o.w + .3 && nz > o.z - o.w - .3 && nz < o.z + o.w + .3 && ny > o.y - .3 && ny < o.y + o.h + .3) {
