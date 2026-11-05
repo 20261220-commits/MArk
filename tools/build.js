@@ -11,6 +11,8 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => {
   const code = fs.readFileSync(path.join(root, src), 'utf8').replace(/<\/script/gi, '<\\/script');
   return `<script>/* ${src} */\n${code}\n</script>`;
 });
+// the single file has no service worker or icons beside it: not an installable app (that is the served game, PWA)
+html = html.replace(/<link rel="(?:manifest|icon|apple-touch-icon)"[^>]*>\n?/g, '');
 html = html.replace(/url\('(fonts\/[^']+\.woff2)'\)/g, (m, f) => `url('data:font/woff2;base64,${fs.readFileSync(path.join(root, f)).toString('base64')}')`);
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 const out = path.join(root, 'dist', 'nemo-1.18.html');

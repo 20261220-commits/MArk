@@ -1,7 +1,7 @@
 // Offline play: once the game has been opened, every file it uses is kept here, so it starts again without internet
 // (worlds are already in this browser's IndexedDB). With a connection the newest files are always fetched first, and the
 // copy is refreshed; without one, or when the network is too slow, the kept copy answers.
-const CACHE = 'nemo-offline-v2';
+const CACHE = 'nemo-offline-v3';
 const NETWORK_WAIT = 4000; // ms before a slow network gives way to the kept copy
 
 // on install: the page itself and every script, style and font it names
@@ -11,8 +11,8 @@ self.addEventListener('install', e => {
     try {
       const res = await fetch('index.html', { cache: 'no-cache' }); if (!res.ok) return;
       const html = await res.clone().text(); await c.put('index.html', res); await c.put('./', new Response(html, { headers: res.headers }));
-      const files = new Set(['fonts/Galmuri11-Bold.woff2']);
-      for (const m of html.matchAll(/(?:src|href)="([^"#?:]+\.(?:js|css|woff2|png))"/g)) files.add(m[1]);
+      const files = new Set(['fonts/Galmuri11-Bold.woff2', 'manifest.webmanifest', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png']);
+      for (const m of html.matchAll(/(?:src|href)="([^"#?:]+\.(?:js|css|woff2|png|webmanifest))"/g)) files.add(m[1]);
       await Promise.all([...files].map(f => fetch(f, { cache: 'no-cache' }).then(r => r.ok && c.put(f, r)).catch(() => {})));
     } catch (er) {} // offline at install: the files are kept as they are used instead
   })());
