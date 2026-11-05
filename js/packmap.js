@@ -158,6 +158,7 @@ Object.assign(ENT, { witch: 'entity/witch', wandering_trader: 'entity/wandering_
 Object.assign(ENT, { goat: 'entity/goat/goat', glow_squid: 'entity/squid/glow_squid' });
 for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 'entity/axolotl/axolotl_' + c;
 for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
+for (const l of ['stone', 'iron', 'gold', 'emerald', 'diamond']) ENT['vlvl_' + l] = 'entity/villager/profession_level/' + l; // the badge on the belt: novice to master
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
 // the rest of a vanilla jar / full pack: HUD, sky, paintings, banners, shield, effect icons, particles, map, overlays
