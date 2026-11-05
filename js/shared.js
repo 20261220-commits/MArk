@@ -1728,7 +1728,15 @@ const LOOT = {
   ruin_big: [['coal', 4], ['gold_ingot', 3], ['emerald', 2], ['golden_apple', 1], ['wheat', 4], ['fishing_rod', 1], ['leather_chestplate', 1], ['golden_helmet', 1], ['buried_treasure_map', 1]],
   fortress: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 5], ['gold_ingot', 3], ['golden_sword', 1], ['golden_chestplate', 1], ['flint_and_steel', 1], ['nether_wart', 7], ['saddle', 1], ['obsidian', 4]],
 };
-function rollLoot(R, kind, n) { const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; } // (a third number: a rare item's chance when picked)
+// the game's own tables stand in for Java's; with the player's client.jar converted, a structure's chest rolls the real
+// loot table instead (the same one Java uses for that chest)
+const VANILLA_LOOT = { desert_pyramid: 'desert_pyramid', jungle_temple: 'jungle_temple', stronghold: 'stronghold_corridor', stronghold_library: 'stronghold_library', stronghold_crossing: 'stronghold_crossing',
+  mineshaft: 'abandoned_mineshaft', outpost: 'pillager_outpost', buried_treasure: 'buried_treasure', ship_supply: 'shipwreck_supply', ship_treasure: 'shipwreck_treasure', ship_map: 'shipwreck_map',
+  ruin_big: 'underwater_ruin_big', ruin_small: 'underwater_ruin_small', igloo: 'igloo_chest', mansion: 'woodland_mansion', ruined_portal: 'ruined_portal', bastion_treasure: 'bastion_treasure', bastion: 'bastion_other',
+  fortress: 'nether_bridge', end_city: 'end_city_treasure', dungeon: 'simple_dungeon', jungle_dispenser: 'jungle_temple_dispenser' };
+function rollLoot(R, kind, n) { const vn = VANILLA_LOOT[kind] && 'chests/' + VANILLA_LOOT[kind]; if (vn && STRUCTS && STRUCTS.loot && STRUCTS.loot[vn]) return rollVanillaLoot(R, vn);
+  if (!LOOT[kind]) kind = kind.startsWith('stronghold') ? 'stronghold' : kind; if (!LOOT[kind]) return [];
+  const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; } // (a third number: a rare item's chance when picked)
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
 function tplPos(t, tx, tz, r) { return r === 0 ? [tx, tz] : r === 1 ? [t.d - 1 - tz, tx] : r === 2 ? [t.w - 1 - tx, t.d - 1 - tz] : [tz, t.w - 1 - tx]; }
 function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
@@ -1905,7 +1913,7 @@ function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
     const ex = hx + dx * (len + 4), ez = hz + dz * (len + 4);
     box(ex - 4, sy, ez - 4, ex + 4, sy + 6, ez + 4, true);
     for (let y = sy + 1; y <= sy + 3; y++) st(hx + dx * (len + 0), y, hz + dz * (len + 0), 0);
-    if (dz) { for (let x = ex - 3; x <= ex + 3; x++) for (let y = sy + 1; y <= sy + 4; y++) st(x, y, ez + 3, 47); st(ex, sy + 1, ez + 2, 44, 0); if (st.get(ex, sy + 1, ez + 2) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | (((ez + 2) & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 6) }); }
+    if (dz) { for (let x = ex - 3; x <= ex + 3; x++) for (let y = sy + 1; y <= sy + 4; y++) st(x, y, ez + 3, 47); st(ex, sy + 1, ez + 2, 44, 0); if (st.get(ex, sy + 1, ez + 2) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | (((ez + 2) & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold_library', 6) }); }
     else if (dx > 0) { for (let z = ez - 3; z <= ez + 3; z++) for (let y = sy + 1; y <= sy + 3; y++) st(ex, y, z, 173); }
     else { st(ex, sy + 1, ez, 44, 1); if (st.get(ex, sy + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 5) }); }
   }
@@ -2079,7 +2087,7 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
   const fillW = (x, y, z) => st(x, y, z, y <= SEA ? WATER : 0);
   // buried treasure
   const tr = treasureAt(seed, G, cx, cz);
-  if (tr) { const r = rng(hash32(seed, cx, cz, 94)), loot = rollLoot(r, 'buried_treasure', 5).filter(l => l[0] !== 13); loot.push([13, 'heart_of_the_sea', 1]); chest(tr[0], tr[1], tr[2], r.int(4), loot); }
+  if (tr) { const r = rng(hash32(seed, cx, cz, 94)), l0 = rollLoot(r, 'buried_treasure', 5), loot = l0.some(l => l[1] === 'heart_of_the_sea') ? l0 : l0.filter(l => l[0] !== 13); if (loot !== l0) loot.push([13, 'heart_of_the_sea', 1]); chest(tr[0], tr[1], tr[2], r.int(4), loot); }
   // shipwrecks (about 20 x 7 blocks, partly broken; supply, map and treasure chests)
   for (let rx = Math.floor((cx - 2) / OCREG); rx <= Math.floor((cx + 2) / OCREG); rx++) for (let rz = Math.floor((cz - 2) / OCREG); rz <= Math.floor((cz + 2) / OCREG); rz++) {
     const s = oceanSite(seed, G, 's', rx, rz); if (!s || !st.inside(s.x - 12, s.z - 12, s.x + 12, s.z + 12)) continue;
@@ -2107,7 +2115,7 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
     const [mx, mz] = at(Math.floor(L / 2) - 3, 0); for (let v = 1; v <= 12; v++) if (!(v > 8 && broken(3, v))) st(mx, y0 + v, mz, LG);
     { const [x, z] = at(2, 0); chest(x, y0 + 1, z, 0, rollLoot(r, 'ship_supply', 5)); }
     { const [x, z] = at(Math.floor(L / 2) + 1, 0); chest(x, y0 + 1, z, 1, rollLoot(r, 'ship_treasure', 5)); }
-    { const [x, z] = at(L - 4, 0); const loot = rollLoot(r, 'ship_map', 3).filter(l => l[0] !== 13); loot.push([13, 'buried_treasure_map', 1]); chest(x, y0 + 5, z, 2, loot); }
+    { const [x, z] = at(L - 4, 0); const l0 = rollLoot(r, 'ship_map', 3), has = l0.some(l => l[3] && l[3].map), loot = has ? l0 : l0.filter(l => l[0] !== 13); if (!has) loot.push([13, 'buried_treasure_map', 1]); chest(x, y0 + 5, z, 2, loot); }
   }
   // ocean ruins: stone brick (cold) or sandstone (warm) walls on the sea floor, a chest and drowned
   for (let rx = Math.floor((cx - 2) / ORREG); rx <= Math.floor((cx + 2) / ORREG); rx++) for (let rz = Math.floor((cz - 2) / ORREG); rz <= Math.floor((cz + 2) / ORREG); rz++) {
@@ -2120,7 +2128,7 @@ function stampOceanStructures(seed, G, st, blocks, cx, cz, tiles) {
         const rr = rng(hash32(o.seed, ri, 5, 9)), list = Object.keys(STRUCTS.t).filter(k => k.startsWith('underwater_ruin/' + (big ? 'big_' : '') + set + '_')); if (!list.length) return;
         const name = list[rr.int(list.length)], t = STRUCTS.t[name], rot = rr.int(4);
         let mn = 999; for (const [a, b] of [[0, 0], [t.s[0] - 1, 0], [0, t.s[2] - 1], [t.s[0] - 1, t.s[2] - 1]]) { const [dx, dz] = tplXZ(a, b, rot); mn = Math.min(mn, G.column(rx2 + dx, rz2 + dz)[0]); }
-        stampSingle(st, name, rx2, mn, rz2, rot, tiles, rr, { ignoreAir: true, loot: big ? 'chests/underwater_ruin_big' : 'chests/underwater_ruin_small', proc: (s2, x, y, z) => hash32(x, y, z, 991) % 10 === 0 && !/chest|structure/.test(s2) ? null : s2 });
+        stampSingle(st, name, rx2, mn, rz2, rot, tiles, rr, { ignoreAir: true, loot: big ? 'chests/underwater_ruin_big' : 'chests/underwater_ruin_small', proc: (s2, x, y, z) => hash32(x, y, z, 991) % 10 < (big ? 1 : 2) && !/chest|structure/.test(s2) ? null : s2 });
       });
       continue;
     }
@@ -2311,7 +2319,7 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
         for (let dx = -5; dx <= 5; dx++) for (let y = y0 - 3; y <= y0 - 1; y++) for (let dz = -1; dz <= 6; dz++) if (dz >= 5 || Math.abs(dx) <= 1 || dz === -1) put(dx, y, dz, 0);
         put(-5, y0 - 3, -1, B.tripwire_hook_block, 1 | 4); put(5, y0 - 3, -1, B.tripwire_hook_block, 3 | 4);
         for (let dx = -4; dx <= 4; dx++) put(dx, y0 - 3, -1, B.tripwire, 1);
-        put(-5, y0 - 2, -1, B.dispenser, 5); if (st.get(X - 5, y0 - 2, Z - 1) >= 0) tiles.push({ t: 'dispenser', i: tl(X - 5, y0 - 2, Z - 1), loot: [[0, 'arrow', 9]] });
+        put(-5, y0 - 2, -1, B.dispenser, 5); if (st.get(X - 5, y0 - 2, Z - 1) >= 0) { const da = rollLoot(r, 'jungle_dispenser', 1); tiles.push({ t: 'dispenser', i: tl(X - 5, y0 - 2, Z - 1), loot: da.length ? da.map(l => [l[0] % 9, l[1], l[2]]) : [[0, 'arrow', 2 + r.int(6)]] }); } /* Java: chests/jungle_temple_dispenser, 2-7 arrows a roll */
         put(-6, y0 - 3, -1, B.cobblestone); put(6, y0 - 3, -1, B.cobblestone);
         chest(X + 5, y0 - 3, Z + 6, 3, rollLoot(r, 'jungle_temple', 5));
         chest(X - 5, y0 - 3, Z + 6, 1, rollLoot(r, 'jungle_temple', 5));
@@ -2352,7 +2360,7 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
           put(0, yb, -3, B.stone_bricks); put(0, yb + 1, -3, B.stone_bricks);
           mob(X - 2, yb, Z - 5, 'villager'); mob(X + 2, yb, Z - 5, 'zombie_villager');
           put(-3, yb, 2, BID.brewing_stand, 1); if (st.get(X - 3, yb, Z + 2) >= 0) tiles.push({ t: 'brew', i: tl(X - 3, yb, Z + 2), potion: 'weakness' });
-          put(3, yb, 2, BID.cauldron); chest(X + 3, yb, Z, 3, [[13, 'golden_apple', 1], ...rollLoot(r, 'igloo', 4)]);
+          put(3, yb, 2, BID.cauldron); { const l0 = rollLoot(r, 'igloo', 4); chest(X + 3, yb, Z, 3, l0.some(l => l[1] === 'golden_apple') ? l0 : [[13, 'golden_apple', 1], ...l0.filter(l => l[0] !== 13)]); }
           put(-3, yb, 0, 198, 14); put(-3, yb + 2, -1, B.redstone_torch, 1);
         }
       }
@@ -3240,7 +3248,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
         blocks[i2] = 44; meta[i2] = R.int(4);
         const loot = [], pool = [['saddle', 1], ['bread', 1], ['wheat', 4], ['gunpowder', 4], ['string', 4], ['bucket', 1], ['golden_apple', 1], ['enchanted_golden_apple', 1, 0.2], ['music_disc_13', 1], ['music_disc_cat', 1], ['music_disc_otherside', 1, 0.15], ['redstone', 4], ['iron_ingot', 4], ['coal', 4], ['bone', 6], ['rotten_flesh', 6], ['name_tag', 1], ['wheat_seeds', 4]]; // (Java's dungeon chest: saddles and name tags are common, enchanted apples and otherside rare)
         for (let k = 1 + R.int(3) + 2; k > 0; k--) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) loot.push([R.int(27), it, 1 + R.int(mx)]); }
-        tiles.push({ t: 'chest', i: i2, loot });
+        tiles.push({ t: 'chest', i: i2, loot: STRUCTS && STRUCTS.loot && STRUCTS.loot['chests/simple_dungeon'] ? rollVanillaLoot(R, 'chests/simple_dungeon') : loot });
         break;
       }
     }
@@ -4421,7 +4429,7 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
 }
 
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { rollLoot, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
