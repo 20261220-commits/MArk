@@ -936,7 +936,7 @@ function mpBlastSelf(x, y, z, power) {
   if (PL.dead || PL.mode === 'creative' || PL.mode === 'spectator') return;
   const rad = power * 2, cx = PL.x, cy = PL.y + (PL.h || 1.8) / 2, cz = PL.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
   const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1), kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-  hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2;
+  hurtPlayer(diffDmg(dmg), 'explosion', null, { x, y, z }); const bk = plBlastKb(); PL.vx += kx * imp * 1.2 * bk; PL.vy += ky * imp * 1.2 * bk; PL.vz += kz * imp * 1.2 * bk;
 }
 function mpGotBoom(m, from) {
   if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id);
@@ -1252,11 +1252,17 @@ function mpAttackPeer(p) {
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
   if (performance.now() - (p.myHitAt || 0) >= 450) { p.myHitAt = performance.now(); if (tool) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); } // a hit into the other player's moment of invulnerability doesn't wear it
 }
+// thorns on my armour, hurting the player who hit me (Java: thorns damage from me, with the usual knockback; it can't set off
+// their own thorns in turn)
+function mpThorns(src, dmg) {
+  const p = src && src.peer; if (!p || src.thorns || MP.pvp === false) return;
+  mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, dmg, kb: 0, th: 1, yaw: 0, ax: PL.x, az: PL.z }, MP.role === 'host' || MP.server ? p.id : undefined);
+}
 function mpGotHit(m, att) {
   if (PL.dead || W.dim !== (att && att.s ? att.s.dim : W.dim)) return;
-  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer', axe: !!m.axe, sprint: !!m.sp };
+  const src = { x: att && att.s ? att.s.x : +m.ax, z: att && att.s ? att.s.z : +m.az, kind: 'peer', axe: !!m.axe, sprint: !!m.sp, peer: att, thorns: !!m.th };
   MP.lastHitBy = att ? att.name : null; MP.lastHitWeapon = typeof m.wn === 'string' ? m.wn.slice(0, 50) : null;
-  if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
+  if (!hurtPlayer(Math.min(100, +m.dmg || 0), m.th ? 'thorns' : 'player', src)) return;
   mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });
   if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
   if (PL.hitPartial) return; // (a harder hit in the moment of invulnerability: no knockback)
