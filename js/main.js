@@ -358,7 +358,7 @@ function updateCamera(alpha, dt) {
   updatePlayerModel(dt, x, y, z, view > 0);
   // fov
   let fov = OPT.fov * (PL.sprinting ? 1.15 : 1) * (PL.flying && PL.sprinting ? 1.1 : 1);
-  if (USE.kind === 'bow') fov *= 1 - Math.min(1, USE.t / 20) * 0.15;
+  if (USE.kind === 'bow') { const f = Math.min(1, USE.t / 20); fov *= 1 - f * f * 0.15; } // (Java: by the square of the draw)
   if (USE.kind === 'spy') fov = 10;
   fovCur += (fov - fovCur) * Math.min(1, dt * 12);
   if (Math.abs(camera.fov - fovCur) > 0.01) { camera.fov = fovCur; camera.updateProjectionMatrix(); }

@@ -417,7 +417,7 @@ function interactTick() {
       if (USE.t >= 32) finishEat();
     } else if (USE.kind === 'bow') { USE.t++; R.hand.bow = Math.min(1, USE.t / 20); }
     else if (USE.kind === 'shield' || USE.kind === 'trident') USE.t++;
-    else if (USE.kind === 'crossbow') { USE.t++; R.hand.bow = Math.min(1, USE.t / Math.max(1, crossbowCharge(PL.held()))); if (USE.t === crossbowCharge(PL.held())) play('click', { pitch: 1.4 }); }
+    else if (USE.kind === 'crossbow') { USE.t++; R.hand.bow = Math.min(1, USE.t / Math.max(1, crossbowCharge(PL.held()))); { const cc = Math.max(1, crossbowCharge(PL.held())); if (USE.t === Math.round(cc * 0.2) || USE.t === Math.round(cc * 0.5)) play('click', { pitch: USE.t === Math.round(cc * 0.2) ? 0.9 : 1.1, vol: 0.4 }); } /* (Java: the loading start and middle sounds) */ if (USE.t === crossbowCharge(PL.held())) play('click', { pitch: 1.4 }); }
     else if (USE.kind === 'spy') { R.hand.spy = true; }
     else if (USE.kind === 'place' && USE.placeCd <= 0) { useItem(false); }
   }
@@ -531,7 +531,7 @@ function onUseRelease() {
       const [dx, dy, dz] = lookDir(); const v = f * 3;
       const bowSt = PL.held(), pw = enchLv(bowSt, 'power');
       const ai = arrowSlot(), ast = ai >= 0 ? INV.slots[ai] : null;
-      const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * v, dy * v, dz * v, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
+      const [ax, ay, az] = projVel(dx, dy, dz, v, 1, true); const arr = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, ax, ay, az, PL, 2 * (pw ? 1 + 0.25 * (pw + 1) : 1));
       if (ast && ITEMS[ast.id].tipped != null) { arr.potion = ITEMS[ast.id].tipped; arr.item = ast.id; }
       arr.flame = enchLv(bowSt, 'flame') > 0; arr.punch = enchLv(bowSt, 'punch'); arr.crit = charge >= 1; // a fully drawn bow's arrow is critical
       if (!creative()) { if (ast && (!enchLv(bowSt, 'infinity') || ast.id !== IID.arrow)) { ast.n--; if (!ast.n) INV.slots[ai] = null; } else if (enchLv(bowSt, 'infinity')) arr.noPickup = true; damageItem(INV.slots, INV.sel, 1); }
