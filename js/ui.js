@@ -325,7 +325,7 @@ function showMenu(name, data) {
   releaseLock();
   let h = '';
   if (name === 'title') {
-    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트${typeof NEMO_VERSION !== 'undefined' ? ' · 버전 ' + NEMO_VERSION : ''}</div><div id="newVer" class="newver" hidden></div>`; setTimeout(checkNewVersion, 300);
+    h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${typeof pwaCanInstall === 'function' && pwaCanInstall() ? btn('앱으로 설치', 'pwainstall') : ''}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트${typeof NEMO_VERSION !== 'undefined' ? ' · 버전 ' + NEMO_VERSION : ''}</div><div id="newVer" class="newver" hidden></div>`; setTimeout(checkNewVersion, 300);
   } else if (name === 'worlds') {
     h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
     listWorlds().then(ws => {
@@ -395,6 +395,7 @@ $('menu').addEventListener('click', async e => {
   const a = b.dataset.act;
   if (a === 'worlds' || a === 'title' || a === 'options' || a === 'create' || a === 'controls' || a === 'pause') { if (a === 'options') UI.optBack = W.active && (UI.menu === 'pause' || UI.paused) ? 'pause' : 'title'; showMenu(a); }
   else if (a.startsWith('mp')) mpAction(a, b);
+  else if (a === 'pwainstall') pwaInstall();
   else if (a === 'packs') showMenu('packs');
   else if (a === 'stats') showMenu('stats');
   else if (a.startsWith('stat_')) { STATUI.tab = a.slice(5); showMenu('stats'); }

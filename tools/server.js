@@ -38,7 +38,7 @@ const root = path.join(__dirname, '..'), args = process.argv.slice(2);
 // kept (point it at a persistent disk there, or the world is lost whenever the service restarts)
 const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a) && i !== wi + 1) || process.env.PORT || 8080), worldName = (wi >= 0 && args[wi + 1] ? args[wi + 1] : process.env.WORLD || 'world').replace(/[^\w\-가-힣]/g, '_');
 const WORLDS = path.resolve(process.env.WORLDS_DIR || path.join(root, 'worlds'));
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.md': 'text/plain; charset=utf-8', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 
 // SERVER_URL (environment) reaches the game as js/config.js; REQUIRE_LOGIN=1 lets only players logged in with a
 // nickname and password into the server world
