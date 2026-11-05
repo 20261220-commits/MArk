@@ -218,7 +218,7 @@ async function mirRestore(host) {
 // room: a player's open world by its code; world: a server world by its id ('+' makes a new one)
 async function mpJoinWs(url, room, world) {
   MP.lastUrl = url; MP.role = 'guest'; MP.on = true; MP.peers.clear(); MP.server = false; MP.auth = {};
-  try { MP.link = await mpWebSocket(url, 'join', room ? { room } : world === '+' ? { newWorld: true } : world ? { world } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
+  try { MP.link = await mpWebSocket(url, 'join', room ? { room } : world === '+' ? { newWorld: true } : world ? { world, key: typeof privKeyOf === 'function' ? privKeyOf(world) : undefined } : null); } catch (e) { MP.on = false; MP.role = null; throw e; }
   MP.roomCode = MP.link.hello.kind === 'guest' ? MP.link.hello.room || null : null;
   mpInstall();
   MP.server = true; MP.rolePending = true; // a server world, or a player's world (that runs the same world core in its browser)
@@ -833,7 +833,7 @@ async function mpUpload(url) {
   const link = await mpWebSocket(url, 'join', { newWorld: true }); if (link.hello.kind !== 'world') { link.close(); throw new Error('이 주소는 서버 세계를 받지 않습니다'); }
   if (link.hello.world) { link.close(); throw new Error('이 서버는 세계를 하나만 받습니다 (' + link.hello.world.name + ')'); } // an older server
   const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k];
-  link.send({ t: 'create', meta: { name: W.meta.name, seed: W.seed, gen: W.gen || 1, my: MINY, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
+  link.send({ t: 'create', meta: { priv: MP.uploadPriv || undefined, name: W.meta.name, seed: W.seed, gen: W.gen || 1, my: MINY, exp: W.exp, mode: W.meta.mode === 'creative' ? 'creative' : 'survival', diff: PL.difficulty, cheats: W.cheats, spawn: W.worldSpawn, gamerules: W.meta.gamerules || {}, shared: sh, time: W.time } });
   const keys = await dbReq('chunks', 'readonly', st => st.getAllKeys()); const mine = (keys || []).filter(k => typeof k === 'string' && k.startsWith(W.id + ':'));
   let n = 0;
   for (const k of mine) { const rec = await dbReq('chunks', 'readonly', st => st.get(k)); if (!rec) continue; const dk = k.slice(W.id.length + 1);

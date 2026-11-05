@@ -311,6 +311,8 @@ setInterval(() => { if (UI.screen === 'furnace' || UI.screen === 'hopper' || UI.
 
 // ---------- menus ----------
 const SPLASHES = ['동굴과 절벽!', '구리도 산화돼요!', '자수정 정동 발견!', '100% 순수 자바스크립트!', '크롬북에서도 쌩쌩!', '염소가 들이받아요!', '망원경으로 멀리!', '크리퍼 조심!', '다이아몬드!', '블록 위의 블록!', '오프라인에서도 OK!', '눈가루에 빠지지 마세요!'];
+// the chosen world: a linked private server joins the server (privserver.js), an invite not yet visited is joined by its code
+function worldPlaySel() { const w = UI.worldList && UI.worldList.find(x => x.id === UI.selWorld); if (!w) return; if (w.inv && typeof privJoinCode === 'function') privJoinCode(privCode(w.inv)); else if (w.priv && typeof privPlay === 'function') privPlay(w); else startWorld(w.id); }
 function btn(label, act, cls = '') { return `<button class="mb ${cls}" data-act="${act}">${label}</button>`; }
 // a newer game on the site than the one open (a browser that kept old files): told on the title, with a button to load it
 function checkNewVersion() {
@@ -327,11 +329,11 @@ function showMenu(name, data) {
   if (name === 'title') {
     h = `<div class="logo"><span>네모 대륙</span><em>JAVA EDITION 1.18 스타일</em><i class="splash">${SPLASHES[Math.floor(Math.random() * SPLASHES.length)]}</i></div><div class="btncol">${btn('싱글플레이', 'worlds')}${btn('멀티플레이', 'mp_join')}${btn('발전 과제', 'advs')}${btn('통계', 'stats')}${btn('설정...', 'options')}${btn('조작법', 'controls')}${typeof pwaCanInstall === 'function' && pwaCanInstall() ? btn('앱으로 설치', 'pwainstall') : ''}</div><div class="titleSide" style="position:absolute;right:max(8px,4vw);top:50%;transform:translateY(-50%)"><div class="titleDoll" title="스킨 바꾸기" data-act="skins"></div>${ACC.user ? `<div class="acc"><span>${esc(accName())}</span></div>` : ''}${btn(ACC.user ? '계정' : '로그인', 'account')}${btn('스킨 바꾸기', 'skins')}</div><div class="foot l">네모 대륙 1.18 · Caves &amp; Cliffs</div><div class="foot r">Mojang 비공식 팬 프로젝트${typeof NEMO_VERSION !== 'undefined' ? ' · 버전 ' + NEMO_VERSION : ''}</div><div id="newVer" class="newver" hidden></div>`; setTimeout(checkNewVersion, 300);
   } else if (name === 'worlds') {
-    h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}</div>`;
+    h = `<h2>세계 선택</h2><div class="wlist" id="wlist"><p class="muted">불러오는 중...</p></div><div class="btngrid">${btn('선택한 세계 플레이', 'playSel')}${btn('새로운 세계 만들기', 'create')}${btn('삭제', 'delSel')}${btn('취소', 'title')}${typeof privCreate === 'function' ? btn('🔒 비공개 서버로 만들기', 'privMake') + btn('초대 코드로 들어가기', 'privJoin') : ''}</div>`;
     listWorlds().then(ws => {
-      ws = (ws || []).sort((a, b) => b.last - a.last); UI.worldList = ws; UI.selWorld = ws[0] ? ws[0].id : null;
+      ws = (ws || []).sort((a, b) => b.last - a.last); if (typeof privListExtra === 'function') ws = [...privListExtra(ws).map(q => ({ id: 'inv:' + q.wid, name: q.name, last: q.at, inv: q, priv: q })), ...ws]; UI.worldList = ws; UI.selWorld = ws[0] ? ws[0].id : null;
       const el = $('wlist'); if (!el) return;
-      el.innerHTML = ws.length ? ws.map(w => `<div class="wi ${w.id === UI.selWorld ? 'on' : ''}" data-w="${w.id}"><b>${esc(w.name)}</b><span>${new Date(w.last).toLocaleString()} · ${MODE_NAME[w.mode] || w.mode}${w.hardcore ? ' · 하드코어' : ''}</span></div>`).join('') : '<p class="muted">아직 세계가 없어요. 새로운 세계를 만들어 보세요!</p>';
+      el.innerHTML = ws.length ? ws.map(w => `<div class="wi ${w.id === UI.selWorld ? 'on' : ''}" data-w="${w.id}"><b>${w.priv ? '🔒 ' : ''}${esc(w.name)}</b><span>${w.inv ? '비공개 서버 · 아직 받지 않음 (처음 들어가면 이 기기에도 사본이 생깁니다)' : `${new Date(w.last).toLocaleString()} · ${MODE_NAME[w.mode] || w.mode}${w.hardcore ? ' · 하드코어' : ''}${w.priv ? ' · 비공개 서버와 동기화' + (w.privDirty && w.privDirty.length ? ' (올릴 변경 있음)' : '') : ''}`}</span></div>`).join('') : '<p class="muted">아직 세계가 없어요. 새로운 세계를 만들어 보세요!</p>';
     });
   } else if (name === 'create') {
     UI.cw = UI.cw || { name: '새로운 세계', mode: 'survival', diff: 2, seed: '', cheats: true, exp: false };
@@ -389,7 +391,7 @@ const MODE_NAME = { survival: '서바이벌', creative: '크리에이티브', ha
 const MODE_DESC = { survival: '자원을 모으고, 제작하고, 레벨을 올리며 체력과 허기를 관리하세요.', creative: '무한한 자원, 자유로운 비행, 즉시 파괴. 마음껏 건축하세요.', hardcore: '서바이벌과 같지만 가장 어려운 난이도로 고정되며, 목숨은 하나뿐입니다.', spectator: '' };
 const DIFF_NAME = ['평화로움', '쉬움', '보통', '어려움'];
 $('menu').addEventListener('click', async e => {
-  const wi = e.target.closest('.wi'); if (wi) { UI.selWorld = wi.dataset.w; document.querySelectorAll('.wi').forEach(x => x.classList.toggle('on', x === wi)); if (e.detail === 2) startWorld(UI.selWorld); return; }
+  const wi = e.target.closest('.wi'); if (wi) { UI.selWorld = wi.dataset.w; document.querySelectorAll('.wi').forEach(x => x.classList.toggle('on', x === wi)); if (e.detail === 2) worldPlaySel(); return; }
   const b = e.target.closest('[data-act]'); if (!b) return;
   audioInit(); play('click');
   const a = b.dataset.act;
@@ -433,8 +435,10 @@ $('menu').addEventListener('click', async e => {
   else if (a === 'ccheat') { UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.cheats = !UI.cw.cheats; showMenu('create'); }
   else if (a === 'cexp') { UI.cw.name = $('wname').value; UI.cw.seed = $('wseed').value; UI.cw.exp = !UI.cw.exp; showMenu('create'); }
   else if (a === 'doCreate') { const c = UI.cw; c.name = $('wname').value || '새로운 세계'; c.seed = $('wseed').value; await createWorld(c); UI.cw = null; }
-  else if (a === 'playSel') { if (UI.selWorld) startWorld(UI.selWorld); }
-  else if (a === 'delSel') { if (!UI.selWorld) return; const w = UI.worldList.find(x => x.id === UI.selWorld); if (confirm(`'${w.name}' 세계를 삭제할까요? 되돌릴 수 없습니다.`)) { await deleteWorld(UI.selWorld); showMenu('worlds'); } }
+  else if (a === 'playSel') worldPlaySel();
+  else if (a === 'privMake') { const w = UI.worldList && UI.worldList.find(x => x.id === UI.selWorld); if (!w) return; if (w.inv) { prompt('친구에게 받은 비공개 서버입니다. 초대 코드', privCode(w.inv)); return; } privCreate(w.id); }
+  else if (a === 'privJoin') { const c = prompt('친구에게 받은 초대 코드를 넣어 주세요 (예: w1abc2de3f.ABCD2345)'); if (c) privJoinCode(c); }
+  else if (a === 'delSel') { if (!UI.selWorld) return; const w = UI.worldList.find(x => x.id === UI.selWorld); if (w.inv) { if (confirm(`'${w.name}'을 목록에서 뺄까요? (서버의 세계는 그대로입니다)`)) { privWrite(PRIV_INV, privRead(PRIV_INV).filter(q => q.wid !== w.inv.wid)); showMenu('worlds'); } return; } if (confirm(w.priv ? `'${w.name}'의 이 기기 사본을 삭제할까요? 비공개 서버의 세계는 그대로 남습니다.` : `'${w.name}' 세계를 삭제할까요? 되돌릴 수 없습니다.`)) { await deleteWorld(UI.selWorld); showMenu('worlds'); } }
   else if (a === 'resume') resumeGame();
   else if (a === 'quit') quitToTitle();
   else if (a === 'respawn') { respawn(); showMenu(null); resumeGame(); }
