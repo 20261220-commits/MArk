@@ -574,7 +574,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.def.neutral || e.type === 'iron_golem') e.target = PL;
     if (e.type === 'wolf' && !e.owner) { e.target = PL; e.angerT = 400 + Math.floor(Math.random() * 400); for (const o of ENT) if (o.type === 'wolf' && o !== e && !o.owner && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) { o.target = PL; o.angerT = e.angerT; } } // a wild wolf hit: it and its pack turn on the player (red eyes)
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
-    if (e.type === 'villager') { e.rep = (e.rep || 0) - 25; for (const v of ENT) if (v.type === 'villager' && v !== e && Math.hypot(v.x - e.x, v.z - e.z) < 16) v.rep = (v.rep || 0) - 5; } // gossip: minor_negative, heard by neighbours
+    if (e.type === 'villager' && typeof vGossip === 'function') vGossip(e, 'mnn', 25); // gossip: minor_negative 25 (villagelife.js)
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
