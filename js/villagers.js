@@ -15,31 +15,14 @@ function villagerLifeTick() {
   for (const e of vs) {
     // a lost job site
     if (e.job) { const [x, y, z] = e.job; if (isLoaded(x, z) && JOB_SITES().get(getBlock(x, y, z)) !== e.prof) { VIL.claimed.delete(e.job.join(',')); e.job = null; if (!e.traded) { e.prof = 'none'; e.trades = null; villagerRetexture(e); } } }
-    // looking for work
-    if (!e.baby && e.prof === 'none' && W.tickN % 100 === 0) {
-      let best = null, bd = 17;
-      for (let dx = -16; dx <= 16; dx++) for (let dy = -4; dy <= 4; dy++) for (let dz = -16; dz <= 16; dz++) {
-        const x = Math.floor(e.x) + dx, y = Math.floor(e.y) + dy, z = Math.floor(e.z) + dz, p = JOB_SITES().get(getBlock(x, y, z));
-        if (!p || VIL.claimed.has(x + ',' + y + ',' + z)) continue; const d = Math.hypot(dx, dy, dz); if (d < bd) { bd = d; best = [x, y, z, p]; }
-      }
-      if (best) { const [x, y, z, p] = best; e.job = [x, y, z]; e.prof = p; e.trades = null; VIL.claimed.set(x + ',' + y + ',' + z, e); villagerRetexture(e); for (let i = 0; i < 6; i++) R.simpleParticle(e.x, e.y + 2, e.z, [0.4, 0.9, 0.3], { kind: 'happy', size: 0.1, vy: 1, grav: 0 }); }
-    }
+    // looking for work: a free job site within 48 blocks (villagelife.js); one that traded keeps its trade and looks for the same kind
+    if (!e.baby && !e.job && (e.prof === 'none' || e.traded) && e.prof !== 'nitwit' && W.tickN % 100 === 0 && typeof vSeekJob === 'function') vSeekJob(e);
     if (e.job) VIL.claimed.set(e.job.join(','), e);
     // food lying close by is picked up
-    for (const it of ENT) if (it.kind === 'item' && !it.dead && VFOOD()[it.stack.id] && Math.hypot(it.x - e.x, it.z - e.z) < 1.5 && Math.abs(it.y - e.y) < 2) { e.vfood = (e.vfood || 0) + VFOOD()[it.stack.id] * it.stack.n; removeEnt(it); }
+    for (const it of ENT) if (it.kind === 'item' && !it.dead && typeof villagerWants === 'function' && villagerWants(e, it)) continue; else if (it.kind === 'item' && !it.dead && VFOOD()[it.stack.id] && Math.hypot(it.x - e.x, it.z - e.z) < 1.5 && Math.abs(it.y - e.y) < 2) { e.vfood = (e.vfood || 0) + VFOOD()[it.stack.id] * it.stack.n; removeEnt(it); }
   }
-  // breeding: food for both, and a bed nobody sleeps in
-  if (W.tickN % 200) return;
-  const beds = [...trackBlocks(BID.red_bed)].filter(k => { const [x, y, z] = k.split(',').map(Number); return getMeta(x, y, z) & 4; }).length;
-  const adults = vs.filter(e => !e.baby && (e.vfood || 0) >= 12 && !(e.breedCd > W.tickN));
-  if (vs.length >= beds) return;
-  for (let i = 0; i < adults.length; i++) for (let j = i + 1; j < adults.length; j++) {
-    const a = adults[i], b = adults[j]; if (Math.hypot(a.x - b.x, a.z - b.z) > 8 || a.breedCd > W.tickN || b.breedCd > W.tickN) continue;
-    a.vfood -= 12; b.vfood -= 12; a.breedCd = b.breedCd = W.tickN + 6000;
-    const kid = spawnMob('villager', (a.x + b.x) / 2, a.y, (a.z + b.z) / 2, { baby: true, vtype: a.vtype, prof: 'none' }); kid.persistent = true;
-    for (let k = 0; k < 7; k++) R.simpleParticle(kid.x, kid.y + 1, kid.z, [1, 0.3, 0.4], { kind: 'heart', size: 0.12, vy: 1, grav: 0 });
-    return;
-  }
+  // breeding (villagelife.js): two willing adults and a bed nobody has claimed
+  if (W.tickN % 200 === 0 && typeof villagerBreed === 'function') villagerBreed(vs);
 }
 { const save = MOBDEF.villager.save, init = MOBDEF.villager.init;
   MOBDEF.villager.save = e => ({ ...(save ? save(e) : {}), job: e.job || null, traded: !!e.traded, vfood: e.vfood || 0 });
