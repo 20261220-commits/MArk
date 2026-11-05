@@ -6,4 +6,4 @@
 - 게임을 바꾼 뒤에는 관련 시험을 돌립니다: `node tools/tests/run.js [이름]` (예: `sp_inventory`, `mp_basic`; 이름 없이 전부). Playwright가 필요합니다.
 - Mojang 파일(client.jar 의 텍스처·구조물 등)은 저장소에 넣지 않습니다. jar 는 사용자의 브라우저 안에서만 변환합니다.
 - 멀티플레이 서버는 Render(`mark-w65a.onrender.com`, `node tools/server.js`)에서 돌아갑니다.
-- 서버 세계는 GitHub 비공개 저장소 `20261220-commits/nemo-backup` 의 `world-backup` 브랜치에 백업됩니다(2026-11-05 작동 확인). 확인: `gh api repos/20261220-commits/nemo-backup/branches`
+- 서버 세계는 GitHub 비공개 저장소 `20261220-commits/nemo-backup` 의 `world-backup` 브랜치에 백업됩니다(2026-11-05 작동 확인). 복원 지점: `world-backup`(최신), `-prev`(직전), `-day0~6`(하루 하나, 일주일), `-suspect`(서버가 의심해 따로 둔 것). 확인: `gh api repos/20261220-commits/nemo-backup/branches`. 복원에 실패하면 서버는 세계를 잠그고(접속·백업 막음) 1분마다 다시 시도합니다 — 빈 서버가 백업을 덮어쓰면 안 됩니다.
