@@ -25,9 +25,18 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const frames = n => new Promise(r => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
     showMenu(null); UI.paused = false; INV.sel = 0; PL.sprinting = false; PL.dead = false; PL.health = 20; PL.mode = 'survival'; PL.x = X + .5; PL.y = Y; PL.z = Z + .5; PL.vx = PL.vy = PL.vz = 0; PL.yaw = Math.PI; PL.onGround = true; PL.attackT = 100; for (const q of [...ENT]) if (q.kind === 'mob') removeEnt(q);
     const t1 = spawnMob('zombie', X + .5, Y, Z + 2.2); t1.persistent = true; const t2 = spawnMob('zombie', X + 1.2, Y, Z + 2.4); t2.persistent = true; const hp2 = t2.hp;
-    await new Promise(r => setTimeout(r, 1500)); const up = HANDS[0].equip; const n0 = R.particles.length; PL.vy = 0; attackEntity(t1); const swept = hp2 - t2.hp, parts = R.particles.length - n0; removeEnt(t1); removeEnt(t2); PL.inv = 100000; // (no more hits on the player while the hand comes back up)
+    await new Promise(r => setTimeout(r, 1500)); const up = HANDS[0].equip; const n0 = R.particles.length; PL.vy = 0; PL.onGround = true; PL.sprinting = false; attackEntity(t1); const swept = hp2 - t2.hp, parts = R.particles.length - n0; removeEnt(t1); removeEnt(t2); PL.inv = 100000; // (no more hits on the player while the hand comes back up)
     let down = 1; for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 60)); down = Math.min(down, HANDS[0].equip); } await new Promise(r => setTimeout(r, 2500)); const back = HANDS[0].equip;
     out.hand = [+up.toFixed(2), +down.toFixed(2), +back.toFixed(2)]; out.sweep = [+swept.toFixed(2), parts]; PL.inv = 0;
+    // a bow: a full draw flies at 3 blocks a tick with a little wobble, carries the shooter's motion, leaves sparks; in
+    // water an arrow slows hard but a trident hardly
+    PL.inv = 0; PL.dead = false; PL.health = 20; PL.yaw = Math.PI; PL.pitch = 0; PL.vx = 0.1; PL.vz = 0; INV.slots[2] = { id: IID.bow, n: 1 }; INV.slots[3] = { id: IID.arrow, n: 16 }; INV.sel = 2;
+    USE.kind = 'bow'; USE.t = 25; const nA = ENT.length; onUseRelease(); const arr = ENT.slice(nA).find(q => q.kind === 'arrow');
+    out.bow = arr ? [+Math.hypot(arr.vx, arr.vy, arr.vz).toFixed(2), +arr.vx.toFixed(3), !!arr.crit] : null;
+    const sp0 = R.particles.length; arr && arrowTick(arr); out.spark = R.particles.length > sp0;
+    const sh = []; for (let i = 0; i < 6; i++) { USE.kind = 'bow'; USE.t = 25; INV.slots[3] = { id: IID.arrow, n: 16 }; const n1 = ENT.length; onUseRelease(); const q = ENT.slice(n1).find(o => o.kind === 'arrow'); if (q) sh.push(q.vy); } out.wobble = Math.max(...sh) - Math.min(...sh);
+    setBlock(X, Y + 3, Z, BID.water); const wa = shootArrow(X + .5, Y + 3.5, Z + .5, 1, 0, 0, null, 2), wt = shootArrow(X + .5, Y + 3.5, Z + .5, 1, 0, 0, null, 0); wt.trident = { id: IID.trident, n: 1 }; wt.tridentT = 0;
+    wa.x = wt.x = X + .5; wa.y = wt.y = Y + 3.5; wa.z = wt.z = Z + .5; wa.vx = wt.vx = 0.01; wa.vy = wt.vy = 0; arrowTick(wa); out.water = [+wa.vx.toFixed(4)];
     return out; });
   ok(r.first && r.kb[0] > 0.35 && r.kb[0] <= 0.41 && r.kb[1] > 0.3 && r.kb[1] <= 0.4, 'a hit knocks a mob 0.4 away and up from the ground (at most 0.4)', r);
   ok(!r.same && r.harder && Math.abs(r.hpAfter - 6) < 0.01 && Math.abs(r.kbAfterPartial - r.kb[0]) < 0.01, 'in its moment of invulnerability the same hit does nothing, a harder one only the difference and no knockback', r);
@@ -38,4 +47,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(r.swap[0] && r.swap[1], 'changing the item in the hand starts the attack charge again (Java)', r.swap);
   ok(r.hand[0] > 0.9 && r.hand[1] < 0.8 && r.hand[2] > 0.9, 'the held weapon drops after a swing and rises again with the charge (Java)', r.hand);
   ok(r.sweep[0] > 0 && r.sweep[1] > 0, 'a full sword swing sweeps the mob beside the target, with its sweep effect', r.sweep);
+  ok(r.bow && r.bow[0] > 2.9 && r.bow[0] < 3.3 && r.bow[1] > 0.05 && r.bow[2], 'a full draw shoots a critical arrow at 3 blocks a tick, carrying the shooter\'s motion', r.bow);
+  ok(r.spark && r.wobble > 0 && r.wobble < 0.2, 'a critical arrow leaves sparks; arrows wobble a little, as in Java', [r.spark, r.wobble]);
+  ok(r.water[0] < 0.007, 'an arrow in water slows hard (0.6 a tick)', r.water);
 };

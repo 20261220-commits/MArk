@@ -15,6 +15,14 @@ function shieldBlocks(dmg, cause, attacker, from) {
   return true;
 }
 
+// Java's Projectile.shoot: the direction, a little gaussian wobble on each axis (0.0075 times the inaccuracy, 1 for a
+// player's bow, crossbow and trident), at the given speed; shootFromRotation (bow, trident) adds what the shooter was
+// moving with (up and down only off the ground)
+const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+function projVel(dx, dy, dz, speed, inacc = 1, carry = false) {
+  const l = Math.hypot(dx, dy, dz) || 1; let x = dx / l + gauss() * 0.0075 * inacc, y = dy / l + gauss() * 0.0075 * inacc, z = dz / l + gauss() * 0.0075 * inacc;
+  x *= speed; y *= speed; z *= speed; if (carry) { x += PL.vx || 0; z += PL.vz || 0; if (!PL.onGround) y += PL.vy || 0; } return [x, y, z];
+}
 // ---------- crossbow ----------
 const crossbowCharge = st => Math.max(0, 25 - 5 * enchLv(st, 'quick_charge'));
 function crossbowRelease(h) { // let go of the button: load if fully drawn
@@ -32,7 +40,7 @@ function crossbowFire(h) {
   for (const a of angles) {
     const c = Math.cos(a), s = Math.sin(a), vx = dx * c - dz * s, vz = dx * s + dz * c;
     if (h.ch === IID.firework_rocket) { launchRocket(PL.x + vx * 0.6, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.6, { fw: h.chFw }, false, [vx * 1.6, dy * 1.6, vz * 1.6]); continue; }
-    const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, vx * 3.15, dy * 3.15, vz * 3.15, PL, 2); e.crit = true; // crossbow arrows are always critical (Java)
+    const [ax, ay, az] = projVel(vx, dy, vz, 3.15); const e = shootArrow(PL.x + vx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + vz * 0.4, ax, ay, az, PL, 2); e.crit = true; // crossbow arrows are always critical (Java)
     if (d && d.tipped != null) { e.potion = d.tipped; e.item = h.ch; }
     if (a) e.noPickup = true; // the extra multishot arrows cannot be picked up
     if (pierce) { e.pierce = pierce; e.hitSet = new Set(); }
@@ -55,7 +63,7 @@ function tridentRelease(h) {
     damageItem(INV.slots, INV.sel, 1); play('splash'); return;
   }
   const [dx, dy, dz] = lookDir();
-  const e = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, dx * 2.5, dy * 2.5, dz * 2.5, PL, 0);
+  const [tx2, ty2, tz2] = projVel(dx, dy, dz, 2.5, 1, true); const e = shootArrow(PL.x + dx * 0.4, PL.y + PL.eyeH - 0.1, PL.z + dz * 0.4, tx2, ty2, tz2, PL, 0);
   e.trident = { ...h, n: 1 }; e.slot = INV.sel; scene.remove(e.mesh); e.mesh = R.itemMesh(IID.trident); e.mesh.scale.setScalar(0.8); scene.add(e.mesh);
   if (!creative()) { INV.slots[INV.sel] = null; damageItem([e.trident], 0, 1); } play('bow');
   UI.hudDirty = true;

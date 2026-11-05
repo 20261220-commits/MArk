@@ -893,8 +893,9 @@ function arrowTick(e) {
     }
     e.x = nx; e.y = ny; e.z = nz;
   }
-  e.vy -= 0.05; e.vx *= 0.99; e.vy *= 0.99; e.vz *= 0.99;
-  if (fluidAt(e.x, e.y, e.z)) { e.vx *= 0.6; e.vy *= 0.6; e.vz *= 0.6; }
+  // Java's AbstractArrow.tick: the drag first (0.99 in air; 0.6 in water, 0.99 for a trident), then gravity 0.05; a critical arrow leaves sparks
+  const drag = fluidAt(e.x, e.y, e.z) && !e.trident ? 0.6 : 0.99; e.vx *= drag; e.vy *= drag; e.vz *= drag; e.vy -= 0.05;
+  if (e.crit && !e.stuck) for (let i = 0; i < 4; i++) R.simpleParticle(e.x + e.vx * i / 4, e.y + e.vy * i / 4, e.z + e.vz * i / 4, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.06, vx: -e.vx * 10, vy: -e.vy * 10 + 2, vz: -e.vz * 10, grav: 0.5, life: 0.4 });
   if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < voidY() && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
