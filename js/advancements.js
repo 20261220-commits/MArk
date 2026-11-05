@@ -218,11 +218,10 @@ function advScan() {
   const x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z);
   if (W.dim === 0) {
     const cb = S.caveBiomeAt(W.seed, x, y, z, topY(x, z), W.exp), key = biomeKey(cb >= 0 ? cb : biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
-    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30 && advInStruct('stronghold')) advGrant('story/follow_ender_eye');
+    if (S.inStrongholdPieces(W.seed, x, y, z) && advInStruct('stronghold')) advGrant('story/follow_ender_eye'); // (inside one of its pieces, as Java's structure check)
   } else if (W.dim === -1) {
     const b = biomeAt(x, z), key = { 13: 'nether_wastes', 14: 'crimson_forest', 15: 'warped_forest', 16: 'soul_sand_valley', 17: 'basalt_deltas' }[b]; if (key) advGrant('nether/explore_nether', key);
-    const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4 && advInStruct('fortress')) advGrant('nether/find_fortress'); }
+    if (S.inFortressPieces(W.seed, x, y, z) && advInStruct('fortress')) advGrant('nether/find_fortress');
     const bx = Math.floor((x >> 4) / S.BREG), bz = Math.floor((z >> 4) / S.BREG);
     for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40 && advInStruct('bastion')) advGrant('nether/find_bastion'); }
   } else if (W.dim === 1) {
