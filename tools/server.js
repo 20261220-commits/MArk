@@ -34,6 +34,9 @@ if (process.env.NEMO_CHILD) process.on('disconnect', () => process.exit(0)); // 
 process.on('uncaughtException', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
 process.on('unhandledRejection', e => console.log('오류 (서버는 계속 돕니다): ' + (e && e.stack || e)));
 const root = path.join(__dirname, '..'), args = process.argv.slice(2);
+// a file is written beside itself and then put in place in one step: a server stopped halfway through (out of memory, a
+// redeploy) leaves the old file whole, never half of a new one
+const writeAtomic = (f, d) => { const t = f + '.tmp' + process.pid; fs.writeFileSync(t, d); fs.renameSync(t, f); };
 // on a hosting service (Render and the like) the port comes from PORT; WORLD names the world and WORLDS_DIR is where worlds are
 // kept (point it at a persistent disk there, or the world is lost whenever the service restarts)
 const wi = args.indexOf('--world'), port = +(args.find((a, i) => /^\d+$/.test(a) && i !== wi + 1) || process.env.PORT || 8080), worldName = (wi >= 0 && args[wi + 1] ? args[wi + 1] : process.env.WORLD || 'world').replace(/[^\w\-가-힣]/g, '_');
@@ -182,8 +185,8 @@ function saveWorld(w, force) {
   const st = w.state; if (!st.meta) return; fs.mkdirSync(w.cdir, { recursive: true }); if (w.dirty.size) w.changedSinceBackup = true;
   if (!st.wid) { st.wid = crypto.randomBytes(8).toString('hex'); w.stateDirty = true; } // tells the players' copies of one world from the next
   const ver = st.cver || (st.cver = {}), out = [];
-  for (const [dk, c] of w.dirty) { const e = { rec: c.rec, edits: c.edits, tiles: c.tiles }; ver[dk] = (ver[dk] || 0) + 1; w.stateDirty = true; fs.writeFileSync(w.fileOf(dk), JSON.stringify(e)); out.push([dk, ver[dk], e]); }
-  if (w.stateDirty) { fs.writeFileSync(path.join(w.dir, 'world.json'), JSON.stringify(st)); w.stateDirty = false; }
+  for (const [dk, c] of w.dirty) { const e = { rec: c.rec, edits: c.edits, tiles: c.tiles }; ver[dk] = (ver[dk] || 0) + 1; w.stateDirty = true; writeAtomic(w.fileOf(dk), JSON.stringify(e)); out.push([dk, ver[dk], e]); }
+  if (w.stateDirty) { writeAtomic(path.join(w.dir, 'world.json'), JSON.stringify(st)); w.stateDirty = false; }
   w.dirty.clear();
   if (out.length || force || Date.now() - w.mirrorStateAt > 30000) mirrorOut(w, out);
 }
@@ -220,7 +223,7 @@ function restorePart(w, id, m) {
     fs.mkdirSync(w.cdir, { recursive: true }); w.stateDirty = true; console.log(`[${w.id}] 플레이어의 사본에서 세계 "${st.meta.name}"를 되살리는 중`); return;
   }
   if (w.restorer !== id) return;
-  if (m.part === 'chunk') { for (const [dk, v, e] of m.l || []) { if (typeof dk !== 'string' || !/^[ne]?-?\d+,-?\d+$/.test(dk) || !e) continue; fs.writeFileSync(w.fileOf(dk), JSON.stringify({ rec: e.rec || null, edits: e.edits || [], tiles: e.tiles || {} })); w.keys.add(dk); st.cver[dk] = +v || 1; } w.stateDirty = true; return; }
+  if (m.part === 'chunk') { for (const [dk, v, e] of m.l || []) { if (typeof dk !== 'string' || !/^[ne]?-?\d+,-?\d+$/.test(dk) || !e) continue; writeAtomic(w.fileOf(dk), JSON.stringify({ rec: e.rec || null, edits: e.edits || [], tiles: e.tiles || {} })); w.keys.add(dk); st.cver[dk] = +v || 1; } w.stateDirty = true; return; }
   if (m.part === 'end') { w.restorer = null; saveWorld(w); console.log(`[${w.id}] 세계를 되살렸습니다 (청크 ${w.keys.size}개)`); c.send(JSON.stringify({ t: 'restored' })); backupNow('되살림'); }
 }
 // every world that was made before: open them all at the start, so they are listed even with nobody in them
@@ -250,9 +253,14 @@ async function worldSnapshot() {
   gz.end(); await done; return any ? Buffer.concat(out) : null;
 }
 let backingUp = null;
+// a backup that would lose a world, or most of one, against the last good one is kept aside instead (…-suspect)
+function backupSuspect(counts) { const m = BK.manifest; if (!m) return null; for (const id in m) { const n0 = m[id], n = counts[id]; if (n == null) return '세계 ' + id + '이(가) 없어짐'; if (n0 >= 10 && n < n0 * 0.7) return '세계 ' + id + '의 청크가 ' + n0 + '개에서 ' + n + '개로 줄어듦'; } return null; }
 async function backupNow(why) {
   if (!BACKUP || backingUp) return backingUp;
-  backingUp = worldSnapshot().then(snap => snap && BACKUP.save(snap)).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
+  if (BK.blocked) { console.log('백업 건너뜀: 서버가 아직 백업을 불러오지 못했습니다'); return null; } // (an empty server must not be backed up over the worlds)
+  backingUp = worldSnapshot().then(async snap => { if (!snap) return null; const counts = worldCounts(), bad = backupSuspect(counts);
+      if (bad) { console.log('⚠ 이상한 백업이라 덮어쓰지 않고 따로 둡니다 (' + bad + ')'); BK.lastError = '의심 백업: ' + bad; await BACKUP.save(snap, { suspect: true }); return null; }
+      const n = await BACKUP.save(snap); BK.manifest = counts; return n; }).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
   return backingUp;
 }
 // the one-object backups ({"v":2,"worlds":{id:{"state":{..},"chunks":{dk:{..}}}}}) read a piece at a time: a small
@@ -278,37 +286,70 @@ async function scanOldBackup(input, put) {
     if (cap && from >= 0) cap.push(t.slice(from));
   }
 }
-async function restoreIfEmpty() { // a fresh disk (a restart on a free host): bring the worlds back from the backup
-  if (!BACKUP || [...worlds.values()].some(w => w.state.meta)) return;
-  try { const gz = BACKUP.loadGz ? await BACKUP.loadGz() : null; if (!gz) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
-    const head = zlib.gunzipSync(gz.subarray(0, Math.min(gz.length, 4096)), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).toString('utf8', 0, 6);
-    const ids = new Set();
-    if (head === 'NEMO3\n') { // a line at a time, straight to the files
-      const rl = require('readline').createInterface({ input: require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), crlfDelay: Infinity });
-      for await (const line of rl) {
-        const a = line.indexOf('\t'), b = line.indexOf('\t', a + 1); if (a < 0 || b < 0) continue; const kind = line.slice(0, a), id = line.slice(a + 1, b); if (!WORLD_ID.test(id)) continue;
-        const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
-        if (kind === 'W') { fs.mkdirSync(cdir, { recursive: true }); fs.writeFileSync(path.join(dir, 'world.json'), line.slice(b + 1)); ids.add(id); }
-        else if (kind === 'C' && ids.has(id)) { const c = line.indexOf('\t', b + 1); if (c < 0) continue; const dk = line.slice(b + 1, c); if (!/^[ne]?-?\d+,-?\d+$|^o:/.test(dk)) continue; fs.writeFileSync(path.join(cdir, encodeURIComponent(dk) + '.json'), line.slice(c + 1)); }
-      }
-    } else { // a backup made before (one object): read as a stream too, each world's state and each chunk on its own
-      const put = (id, dk, text) => { if (!WORLD_ID.test(id)) return; const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
-        if (dk == null) { let st; try { st = JSON.parse(text); } catch (e) { return; } if (!st || !st.meta) return; fs.mkdirSync(cdir, { recursive: true }); fs.writeFileSync(path.join(dir, 'world.json'), text); ids.add(id); }
-        else if (ids.has(id)) fs.writeFileSync(path.join(cdir, encodeURIComponent(dk) + '.json'), text); };
-      await scanOldBackup(require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), put);
-      if (!ids.size) { const snap = JSON.parse(zlib.gunzipSync(gz).toString('utf8')); if (snap && snap.state && snap.state.meta) { put(snap.name || worldName, null, JSON.stringify(snap.state)); for (const [dk, c] of Object.entries(snap.chunks || {})) put(snap.name || worldName, dk, JSON.stringify(c)); } } // the very first (one-world) backups
-    }
-    if (!ids.size) { console.log('백업된 세계 없음 — 새 세계를 기다립니다'); return; }
-    for (const id of ids) { const w = worlds.get(id); if (w) loadWorld(w); else openWorld(id); }
-    console.log('백업에서 세계를 되살렸습니다'); }
-  catch (e) { console.log('백업 불러오기 실패: ' + e.message); }
+// Restoring is careful: a restore point is read through once to check it is whole before anything is written; a broken
+// or empty one gives way to the next (the one before, then the days of the last week). If GitHub can't be reached at
+// all, the server tries again a few times, then opens with the server worlds locked (no one can join them, nothing is
+// backed up) and keeps trying every minute: an empty server must never be backed up over the worlds.
+const BK = { blocked: false, manifest: null, lastError: null, restoredFrom: null };
+async function backupCheck(gz) { // { worlds, chunks } of a NEMO3 restore point, or null if it isn't whole
+  let w = 0, c = 0; const rl = require('readline').createInterface({ input: require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), crlfDelay: Infinity }); let first = true;
+  for await (const line of rl) { if (first) { first = false; if (line !== 'NEMO3') return null; continue; } if (line.startsWith('W\t')) { const st = line.slice(line.indexOf('\t', 2) + 1); try { const o = JSON.parse(st); if (o && o.meta) w++; } catch (e) { return null; } } else if (line.startsWith('C\t')) c++; }
+  return w ? { worlds: w, chunks: c } : null;
 }
+async function restoreFrom(gz) { // the files of a checked restore point (or an older one-object backup); the worlds' chunk counts
+  const ids = new Set(), counts = {};
+  const head = zlib.gunzipSync(gz.subarray(0, Math.min(gz.length, 4096)), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).toString('utf8', 0, 6);
+  if (head === 'NEMO3\n') { // a line at a time, straight to the files
+    const rl = require('readline').createInterface({ input: require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), crlfDelay: Infinity });
+    for await (const line of rl) {
+      const a = line.indexOf('\t'), b = line.indexOf('\t', a + 1); if (a < 0 || b < 0) continue; const kind = line.slice(0, a), id = line.slice(a + 1, b); if (!WORLD_ID.test(id)) continue;
+      const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
+      if (kind === 'W') { fs.mkdirSync(cdir, { recursive: true }); writeAtomic(path.join(dir, 'world.json'), line.slice(b + 1)); ids.add(id); counts[id] = 0; }
+      else if (kind === 'C' && ids.has(id)) { const c = line.indexOf('\t', b + 1); if (c < 0) continue; const dk = line.slice(b + 1, c); if (!/^[ne]?-?\d+,-?\d+$|^o:/.test(dk)) continue; writeAtomic(path.join(cdir, encodeURIComponent(dk) + '.json'), line.slice(c + 1)); counts[id]++; }
+    }
+  } else { // a backup made before (one object): read as a stream too, each world's state and each chunk on its own
+    const put = (id, dk, text) => { if (!WORLD_ID.test(id)) return; const dir = path.join(WORLDS, id), cdir = path.join(dir, 'chunks');
+      if (dk == null) { let st; try { st = JSON.parse(text); } catch (e) { return; } if (!st || !st.meta) return; fs.mkdirSync(cdir, { recursive: true }); writeAtomic(path.join(dir, 'world.json'), text); ids.add(id); counts[id] = 0; }
+      else if (ids.has(id)) { writeAtomic(path.join(cdir, encodeURIComponent(dk) + '.json'), text); counts[id]++; } };
+    await scanOldBackup(require('stream').Readable.from([gz]).pipe(zlib.createGunzip()), put);
+    if (!ids.size) { const snap = JSON.parse(zlib.gunzipSync(gz).toString('utf8')); if (snap && snap.state && snap.state.meta) { put(snap.name || worldName, null, JSON.stringify(snap.state)); for (const [dk, c] of Object.entries(snap.chunks || {})) put(snap.name || worldName, dk, JSON.stringify(c)); } } // the very first (one-world) backups
+  }
+  return ids.size ? { ids, counts } : null;
+}
+// one try at bringing the worlds back: 'restored', 'none' (nothing was ever backed up) or throws (GitHub can't be reached)
+async function restoreOnce() {
+  const names = await BACKUP.candidates(); let sawAny = false;
+  for (const name of names) {
+    let gz; try { gz = await BACKUP.loadGz(name); } catch (e) { if (name === BACKUP.branch) throw e; continue; } // (the latest must be readable; an older one may be missing)
+    if (!gz) continue; sawAny = true;
+    let ok = null; try { const head = zlib.gunzipSync(gz.subarray(0, Math.min(gz.length, 4096)), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).toString('utf8', 0, 6); ok = head === 'NEMO3\n' ? await backupCheck(gz) : { worlds: 1, chunks: 0 }; } catch (e) { ok = null; }
+    if (!ok) { console.log(`백업 ${name}이(가) 망가져 있어 그 전 것을 봅니다`); continue; }
+    const r = await restoreFrom(gz); if (!r) continue;
+    for (const id of r.ids) { const w = worlds.get(id); if (w) loadWorld(w); else openWorld(id); }
+    BK.manifest = r.counts; BK.restoredFrom = name; console.log(`백업에서 세계를 되살렸습니다 (${name}, 세계 ${r.ids.size}개)`); return 'restored';
+  }
+  if (sawAny) { const e = new Error('읽을 수 있는 백업이 없습니다'); e.broken = true; throw e; }
+  return 'none';
+}
+async function restoreIfEmpty() { // a fresh disk (a restart on a free host): bring the worlds back from the backup
+  if (!BACKUP || [...worlds.values()].some(w => w.state.meta)) { if (BACKUP) BK.manifest = worldCounts(); return; }
+  const RS = +process.env.BACKUP_RETRY_SCALE || 1; // (tests make the waits short)
+  for (const wait of [0, 5000, 15000, 30000]) {
+    if (wait) await new Promise(r => setTimeout(r, wait * RS));
+    try { const r = await restoreOnce(); if (r === 'none') console.log('백업된 세계 없음 — 새 세계를 기다립니다'); BK.blocked = false; BK.lastError = null; return; }
+    catch (e) { BK.lastError = e.message; console.log('백업 불러오기 실패: ' + e.message); }
+  }
+  // still nothing: the server opens, its worlds locked until a restore goes through
+  BK.blocked = true; console.log('백업을 불러오지 못해 서버 세계를 잠가 둡니다 (1분마다 다시 시도)');
+  const retry = setInterval(async () => { try { await restoreOnce(); BK.blocked = false; BK.lastError = null; clearInterval(retry); console.log('백업을 불러와 서버 세계를 다시 엽니다'); } catch (e) { BK.lastError = e.message; } }, 60000 * RS);
+}
+const worldCounts = () => { const o = {}; for (const w of worlds.values()) if (w.state.meta) o[w.id] = w.keys.size; return o; };
 // /stats: how the server is doing (memory, worlds, players), and why it last stopped if it did
 const STARTED = Date.now(); let lastBackup = null; const DROPS = [];
 const noteDrop = d => { DROPS.push(d); if (DROPS.length > 40) DROPS.shift(); }; // the last connections that ended, and why (as the server saw it, and as players' games reported it)
 function serverStats() {
   const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
-  return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup,
+  return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup, backup: { on: !!BACKUP, locked: BK.blocked, lastError: BK.lastError, restoredFrom: BK.restoredFrom },
     worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.state.meta.priv ? '(비공개)' : w.id, name: w.state.meta.priv ? '(비공개 서버)' : w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
     rooms: [...rooms.values()].filter(r => r.host).length, recentDrops: DROPS.slice().reverse() };
 }
@@ -324,7 +365,7 @@ setInterval(() => {
   if (global.gc) global.gc();
   console.log(`메모리 ${Math.round(rss / 1048576)} MB: 쓰지 않는 청크를 비웠습니다 → ${Math.round(process.memoryUsage().rss / 1048576)} MB`);
 }, 10000).unref();
-if (BACKUP) { setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow('10분마다'); }, 10 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
+if (BACKUP) { setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow('5분마다'); }, 5 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
 // Render gives the service's own address; asking it for /ping every 10 minutes counts as a visit, so the free plan's
 // 15-minute sleep never comes (KEEP_AWAKE=0 turns this off; KEEP_AWAKE_URL sets the address on other hosts)
 const SELF_URL = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL || '';
@@ -374,6 +415,7 @@ server.on('upgrade', (req, sock) => {
       }
       if (m.role === 'join') { const r = code ? rooms.get(code) : null; m.role = r && r.host ? 'guest' : code ? 'none' : 'world'; }
       if (m.role === 'none') { c.send(JSON.stringify({ t: 'error', msg: `방 코드 ${code}로 열린 세계가 없습니다 (닫혔거나 코드가 틀렸어요)` })); c.close(); return; }
+      if (m.role === 'world' && BK.blocked) { c.send(JSON.stringify({ t: 'error', msg: '서버가 세계 백업을 아직 불러오지 못해 잠시 잠가 두었습니다. 1~2분 뒤 다시 접속해 주세요' })); c.close(); return; } // (nothing may be made or changed before the worlds are back)
       if (m.role === 'world') { const ww = openWorld(wid || worldName), pk = ww.state.meta && ww.state.meta.priv && ww.state.meta.priv.key;
         if (pk && String(m.key || '') !== pk) { c.send(JSON.stringify({ t: 'error', msg: '비공개 서버입니다. 초대 코드가 맞지 않습니다' })); c.close(); dropIfEmpty(ww); return; } // (a private world: only with its invite key)
         role = 'world'; wp = true; w = ww; w.conns.set(id, c); roomName = w.id;
