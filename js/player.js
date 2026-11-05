@@ -78,7 +78,22 @@ function raycast(reach, fluids) {
 
 // ---------- damage & stats ----------
 function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { const a = ITEMS[s.id].armor; p += a.pts; t += a.tough; } return [p, t]; }
-const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
+const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1, stalactite: 1, firework: 1, thorns: 1 };
+// the highest level of an enchantment on any piece worn (Java's getEnchantmentLevel for an entity: fire and blast protection)
+function armorMaxLv(k) { return INV.armor.reduce((a, s) => Math.max(a, enchLv(s, k)), 0); }
+// fire protection shortens burning by 15% a level, blast protection pushes back 15% less a level
+function plFireDamp(t) { const l = armorMaxLv('fire_protection'); return l ? t - Math.floor(t * l * 0.15) : t; }
+function plBlastKb() { return Math.max(0, 1 - armorMaxLv('blast_protection') * 0.15); }
+// thorns (Java's ThornsEnchantment.doPostHurt): every piece with it rolls 15% a level; a hit does 1-4 (level - 10 above 10)
+// to whoever was behind it (the shooter of an arrow too), and costs a random thorns piece 2 more durability
+function plThorns(attacker) {
+  if (!attacker || attacker.dead || !(attacker.kind === 'mob' || attacker.kind === 'peer')) return;
+  const th = []; for (let i = 0; i < 4; i++) if (enchLv(INV.armor[i], 'thorns')) th.push(i);
+  for (const i of th.slice()) { const lv = enchLv(INV.armor[i], 'thorns'); if (!(Math.random() < 0.15 * lv)) continue;
+    const dmg = lv > 10 ? lv - 10 : 1 + Math.floor(Math.random() * 4);
+    if (attacker.kind === 'mob') hurtMob(attacker, dmg, PL, attacker.x - PL.x, attacker.z - PL.z, 'thorns'); else if (typeof mpThorns === 'function') mpThorns(attacker, dmg);
+    const live = th.filter(j => INV.armor[j]); if (live.length) damageItem(INV.armor, live[Math.floor(Math.random() * live.length)], 2); }
+}
 // caves & cliffs: from the build limit to the bottom of the world, landing alive (in water too)
 function fallLanded() { if (PL.fallDist > 0 && PL.fallFrom >= 319 && PL.y < -58.5 && typeof advGrant === 'function') setTimeout(() => { if (PL.health > 0) advGrant('adventure/fall_from_world_height'); }, 0); }
 // Java's knockback on the player: half its motion plus the push; up only from the ground; netherite armour resists 10% a piece
@@ -104,12 +119,14 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
     for (let i = 0; i < 4; i++) if (INV.armor[i] && ITEMS[INV.armor[i].id].armor && !ITEMS[INV.armor[i].id].elytra) damageItem(INV.armor, i, Math.max(1, Math.floor(dmg / 4))); // armour only: an elytra wears by flying
     const [pts, tough] = armorPoints();
     dmg = dmg * (1 - Math.min(20, Math.max(pts / 5, pts - dmg / (2 + tough / 4))) / 25);
-    if (attacker && attacker.kind === 'mob' && !attacker.dead) { const th = INV.armor.reduce((a, s) => a + enchLv(s, 'thorns'), 0); if (th && Math.random() < 0.15 * th) hurtMob(attacker, 1 + Math.floor(Math.random() * 4), PL); } // thorns
   }
-  if (cause !== 'void' && cause !== 'kill' && cause !== 'starve' && cause !== 'drown') { // protection, and the kinds that guard against one cause
-    const sp = cause === 'fire' || cause === 'lava' || cause === 'burn' ? 'fire_protection' : cause === 'explosion' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : null;
-    const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * 2 : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
+  // protection, and the kinds that guard against one cause (Java: everything but the void, /kill and starving; drowning,
+  // magic and falling too; feather falling counts three a level, the others two)
+  if (cause !== 'void' && cause !== 'kill' && cause !== 'starve') {
+    const sp = cause === 'fire' || cause === 'lava' || cause === 'burn' ? 'fire_protection' : cause === 'explosion' || cause === 'firework' ? 'blast_protection' : cause === 'arrow' ? 'projectile_protection' : cause === 'fall' || cause === 'stalagmite' ? 'feather_falling' : null;
+    const epf = INV.armor.reduce((a, s) => a + enchLv(s, 'protection') + (sp ? enchLv(s, sp) * (sp === 'feather_falling' ? 3 : 2) : 0), 0); dmg *= 1 - Math.min(20, epf) * 0.04;
   }
+  if (ARMORED[cause]) plThorns(attacker);
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
   stat('damage_taken', Math.round(Math.min(dmg, PL.health) * 10));
   PL.health = Math.max(0, PL.health - dmg); if (!PL.hitPartial) { PL.hurtT = 10; PL.inv = 20; } PL.exh += 0.1; PL.lastHurtBy = cause;
@@ -137,11 +154,12 @@ function entKo(e) {
 }
 function deathMessage(cause, attacker, proj) {
   const me = (typeof accName === 'function' && accName()) || '플레이어', S = josa(me, '이', '가');
-  const cr = !attacker && PL.credit && W.tickN - PL.credit.at < 100 ? PL.credit : null, who = attacker ? (cause === 'player' ? (MP.lastHitBy || '플레이어') : entKo(attacker)) : cr ? (cr.name || entKo(cr.e)) : null;
+  const cr = !attacker && PL.credit && W.tickN - PL.credit.at < 100 ? PL.credit : null, who = attacker ? (cause === 'player' || cause === 'thorns' ? (MP.lastHitBy || '플레이어') : entKo(attacker)) : cr ? (cr.name || entKo(cr.e)) : null;
   const held = attacker && attacker.held && attacker.held.name ? attacker.held.name : cause === 'player' && MP.lastHitWeapon ? MP.lastHitWeapon : null; // only a named weapon is told (as Java)
   const by = (direct, alone, fight) => who ? (fight ? fight(who) : direct(who)) : alone;
   switch (cause) {
     case 'mob': case 'player': return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 살해당했습니다` : by(w => `${S} ${w}에게 살해당했습니다`, `${S} 살해당했습니다`);
+    case 'thorns': return by(w => `${S} ${josa(w, '을', '를')} 해치려다 살해당했습니다`, `${S} 살해당했습니다`);
     case 'arrow': if (proj && proj.trident) return by(w => `${S} ${w}에게 꿰뚫렸습니다`, `${S} 꿰뚫렸습니다`); return held ? `${S} ${josa(held, '을', '를')} 사용한 ${who}에게 저격당했습니다` : by(w => `${S} ${w}에게 저격당했습니다`, `${S} 저격당했습니다`);
     case 'explosion': if (who && attacker && attacker.type === 'ghast') return `${S} ${who}의 화염구에 맞았습니다`; return by(w => `${S} ${w}에 의해 폭파당했습니다`, `${S} 폭파당했습니다`);
     case 'firework': return `${S} 펑 하고 터졌습니다`;
@@ -206,7 +224,7 @@ function addXP(v) {
 function damageItem(arr, i, n = 1) {
   if (creative()) return;
   const s = arr[i]; if (!s) return; const d = ITEMS[s.id]; if (!d.dur) return;
-  const ub = enchLv(s, 'unbreaking'); if (ub && Math.random() > (d.armor ? 0.6 + 0.4 / (ub + 1) : 1 / (ub + 1))) return; // unbreaking
+  const ub = enchLv(s, 'unbreaking'); if (ub) { let k = 0; for (let j = 0; j < n; j++) if (Math.random() < (d.armor ? 0.6 + 0.4 / (ub + 1) : 1 / (ub + 1))) k++; n = k; if (!n) return; } // unbreaking: each point of wear has its own chance (Java)
   s.d = (s.d || 0) + n; statOf('used', s.id);
   if (s.d >= d.dur) { statOf('broken', s.id); arr[i] = null; play('break', { mat: 'metal' }); UI.flash(d.name + ' 부서짐'); }
   UI.hudDirty = true;
@@ -325,7 +343,7 @@ function playerTick() {
       if (sgy != null && PL.fallDist > 1 && !creative()) { hurtPlayer(Math.ceil((PL.fallDist - 1) * 2), 'stalagmite'); play('hit'); PL.fallDist = 0; } // a stalagmite doubles fall damage and adds two blocks
       { const fx = Math.floor(PL.x), fy = Math.floor(PL.y - 0.01), fz = Math.floor(PL.z); // landing on farmland can trample it back to dirt (Java: the chance is the fall height less half a block)
         if (PL.fallDist > 0.5 && getBlock(fx, fy, fz) === BID.farmland && Math.random() < PL.fallDist - 0.5) { const cb = getBlock(fx, fy + 1, fz); if (cb && BLOCKS[cb].plant) { for (const [iid, n] of blockDrops(cb, getMeta(fx, fy + 1, fz), null).items) dropItem(fx + .5, fy + 1.3, fz + .5, iid, n); setBlock(fx, fy + 1, fz, 0); } setBlock(fx, fy, fz, 3); } }
-      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (1 - Math.min(0.8, enchLv(INV.armor[3], 'feather_falling') * 0.12 + INV.armor.reduce((a, s) => a + enchLv(s, 'protection'), 0) * 0.04))); const lb = blockUnder(); if (lb !== BID.hay_block && lb !== BID.honey_block) hurtPlayer(dmg, 'fall'); else hurtPlayer(Math.ceil(dmg * 0.2), 'fall'); if (dmg > 0) play('hit'); }
+      if (PL.fallDist > 3 + effLv(PL, 'jump_boost') && !creative()) { const lb = blockUnder(), dmg = Math.ceil((PL.fallDist - 3 - effLv(PL, 'jump_boost')) * (lb === BID.hay_block || lb === BID.honey_block ? 0.2 : 1)); hurtPlayer(dmg, 'fall'); /* (feather falling and protection: in hurtPlayer) */ if (dmg > 0) play('hit'); }
       fallLanded();
       PL.fallDist = 0;
     } else if (PL.y < oy) { if (!PL.fallDist) PL.fallFrom = oy; PL.fallDist += oy - PL.y; }
@@ -359,10 +377,12 @@ function survivalTick(inWater, inLava, eyeF) {
   const cx = Math.floor(PL.x), cy = Math.floor(PL.y + 0.3), cz = Math.floor(PL.z);
   if (getBlock(cx, cy, cz) === BID.cauldron && (getMeta(cx, cy, cz) & 3)) { const k = (getMeta(cx, cy, cz) >> 2) & 3; if (k === 1) inLava = true; else if (k === 0) inWater = true; }
   if (inLava) { PL.fire = 300; if (W.tickN % 10 === 0) hurtPlayer(4, 'lava'); }
+  if (PL.fire > (PL.fireSeen || 0)) PL.fire = Math.max(PL.fireSeen || 0, plFireDamp(PL.fire)); /* fire protection: set on fire for less (Java's getFireAfterDampener) */
   if (inWater || (W.rain > 0.5 && (getLight(Math.floor(PL.x), Math.floor(PL.y + 1.8), Math.floor(PL.z)) >> 4) === 15)) PL.fire = 0;
   if (PL.fire > 0) { PL.fire--; if (PL.fire % 20 === 0 && !inLava) hurtPlayer(1, 'burn'); } // on fire: through armour, as Java's onFire
   // contact damage
-  inBlock(b => { if (b === BID.cactus) { hurtPlayer(1, 'cactus'); return true; } if (b === BID.fire) { PL.fire = Math.max(PL.fire, 160); if (W.tickN % 10 === 0) hurtPlayer(1, 'fire'); return true; } });
+  inBlock(b => { if (b === BID.cactus) { hurtPlayer(1, 'cactus'); return true; } if (b === BID.fire) { PL.fire = Math.max(PL.fire, plFireDamp(160)); if (W.tickN % 10 === 0) hurtPlayer(1, 'fire'); return true; } });
+  PL.fireSeen = PL.fire;
   if (PL.onGround && blockUnder() === BID.magma_block && !PL.sneaking && W.tickN % 20 === 0 && !enchLv(INV.armor[3], 'frost_walker')) hurtPlayer(1, 'fire');
   const around = (dx, dz) => getBlock(Math.floor(PL.x + dx), Math.floor(PL.y + 0.5), Math.floor(PL.z + dz)) === BID.cactus;
   if (around(PL.w + 0.08, 0) || around(-PL.w - 0.08, 0) || around(0, PL.w + 0.08) || around(0, -PL.w - 0.08) || (PL.onGround && blockUnder() === BID.cactus)) hurtPlayer(1, 'cactus'); // its sides are 1/16 in: touching them (or standing on it) hurts
@@ -678,6 +698,10 @@ function useItem(first) {
   const t = TARGET, h = PL.held(), d = h && ITEMS[h.id];
   if (d && h.id === IID.map && !(t && t.type === 'block' && interactBlock(t, true))) { useEmptyMap(); return; }
   if (first && items6Use(t, h, d)) return;
+  // armour (and the elytra) in hand, right-clicked: worn, if that slot is empty (Java 1.18's ArmorItem.use; a block that
+  // does something on a click, or a creature, comes first)
+  if (first && d && d.armor && !INV.armor[d.armor.slot] && !(t && t.type === 'ent') && !(t && t.type === 'block' && interactBlock(t, true))) {
+    INV.armor[d.armor.slot] = { ...h, n: 1 }; if (h.n > 1) h.n--; else INV.slots[INV.sel] = null; play('place', { mat: d.armor.mat === 'leather' || d.elytra ? 'wool' : 'metal', vol: 0.7 }); swing(); UI.hudDirty = true; return; }
   if (d && h.id === IID.goat_horn && !(t && t.type === 'block' && interactBlock(t, true)) && !(t && t.type === 'ent')) { if (first && !(PL.hornT > performance.now())) { PL.hornT = performance.now() + 7000; play('goat_horn'); swing(); UI.flash('염소 뿔을 불었습니다'); } else if (first) UI.flash('염소 뿔을 다시 불려면 잠시 기다리세요'); return; } // 7 seconds between calls (Java)
   if (d && d.egg && MOBDEF[d.egg] && t) {
     if (t.type === 'ent' && t.e.kind === 'mob' && t.e.type === d.egg) { const b = spawnMob(d.egg, t.e.x, t.e.y, t.e.z, { baby: true }); if (b) b.baby = true; }

@@ -528,7 +528,7 @@ function explode(x, y, z, power, fire) {
     const cx = e.x, cy = e.y + e.h / 2, cz = e.z, d = Math.hypot(cx - x, cy - y, cz - z) / rad; if (d > 1) return;
     const imp = 1 - d, dmg = Math.floor((imp * imp + imp) / 2 * 7 * rad + 1);
     const kx = (cx - x) / (d * rad + .01), ky = (cy - y) / (d * rad + .01), kz = (cz - z) / (d * rad + .01);
-    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', MOB_BLAST && MOB_BLAST.kind ? MOB_BLAST : null, { x, y, z }); PL.vx += kx * imp * 1.2; PL.vy += ky * imp * 1.2; PL.vz += kz * imp * 1.2; } }
+    if (isPl) { if (PL.mode !== 'creative') { hurtPlayer(diffDmg(dmg), 'explosion', MOB_BLAST && MOB_BLAST.kind ? MOB_BLAST : null, { x, y, z }); { const bk = plBlastKb(); PL.vx += kx * imp * 1.2 * bk; PL.vy += ky * imp * 1.2 * bk; PL.vz += kz * imp * 1.2 * bk; } } }
     else { if (e.kind === 'mob') hurtMob(e, dmg, null, kx * imp, kz * imp, 'explosion'); else if (e.kind === 'minecart') cartBlast(e, dmg); else if ((e.kind === 'item' && !e.noBlast) || e.kind === 'xp') removeEnt(e); }
   };
   for (const e of ENT) if (!e.dead && e.kind !== 'tnt') hit(e, false);
