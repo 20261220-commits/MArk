@@ -163,14 +163,14 @@ const CAT_M = autoModel(v => {
 });
 function catAI(e, dist) {
   const tame = e.owner === 'player';
-  let mx = 0, mz = 0, sp = 0.07;
+  let mx = 0, mz = 0, sp = mobJSpeed(0.3 * 0.8); // (Java: movement 0.3, a stroll at 0.8)
   if (tame && e.sitting) { walkPhysics(e, 0, 0, 0); return; }
   const held = PL.held(), tempt = held && (held.id === IID.cod || held.id === IID.salmon) && dist < 10 && !PL.dead;
-  if (tame && dist > 3) {
-    if (dist > 14 && PL.onGround) { e.x = e.px = PL.x + (Math.random() - .5); e.y = e.py = PL.y; e.z = e.pz = PL.z + (Math.random() - .5); e.path = null; }
-    else { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = 0.12; }
-  } else if (!tame && tempt && PL.sneaking) { faceTo(e, PL.x, PL.z); if (dist > 1.5) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = 0.06; }
-  else if (!tame && dist < 6 && !PL.sneaking && !PL.dead && !spectator()) { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1; mx = (e.x - PL.x) / l; mz = (e.z - PL.z) / l; e.yawTarget = Math.atan2(-mx, -mz); sp = 0.13; } // strays keep their distance
+  if (tame && (dist > 10 || (e.follow && dist > 5))) { e.follow = 1; // (Java's FollowOwnerGoal for cats: from 10 blocks to 5, a jump past 12)
+    if (dist > 12 && PL.onGround) { e.x = e.px = PL.x + (Math.random() - .5); e.y = e.py = PL.y; e.z = e.pz = PL.z + (Math.random() - .5); e.path = null; }
+    else { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = mobJSpeed(0.3); }
+  } else if (!tame && tempt && PL.sneaking) { e.follow = 0; faceTo(e, PL.x, PL.z); if (dist > 2.5) [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = mobJSpeed(0.3 * 0.6); }
+  else if (!tame && dist < 16 && !PL.sneaking && !PL.dead && !spectator()) { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1; mx = (e.x - PL.x) / l; mz = (e.z - PL.z) / l; e.yawTarget = Math.atan2(-mx, -mz); sp = mobJSpeed(0.3 * (dist < 7 ? 1.33 : 0.8)); } /* (Java's avoid goal: 16 blocks, running inside 7) */ // strays keep their distance
   else {
     if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 5);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
@@ -254,17 +254,17 @@ const FOX_M = autoModel(v => {
 });
 const FOX_PREY = new Set(['chicken', 'rabbit', 'cod', 'salmon', 'tropical_fish']);
 function foxAI(e, dist) {
-  let mx = 0, mz = 0, sp = 0.08;
+  let mx = 0, mz = 0, sp = mobJSpeed(0.3);
   const day = dayFactor() > 0.6, trusted = e.owner === 'player';
   // sleeping by day in the shade, unless something is close by
   if (day && !e.target && e.panic <= 0 && (dist > 6 || PL.sneaking || trusted) && e.onGround && (getLight(Math.floor(e.x), Math.floor(e.y + 1), Math.floor(e.z)) >> 4) < 15 - 0 || (day && e.sleeping && dist > 3)) {
     if (e.age % 100 === 0 || e.sleeping) e.sleeping = true;
   } else e.sleeping = false;
   if (e.sleeping) { walkPhysics(e, 0, 0, 0); return; }
-  if (!trusted && dist < 8 && !PL.sneaking && !PL.dead && !spectator() && PL.mode !== 'creative') { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1; mx = (e.x - PL.x) / l; mz = (e.z - PL.z) / l; sp = 0.15; e.target = null; }
+  if (!trusted && dist < 16 && !PL.sneaking && !PL.dead && !spectator() && PL.mode !== 'creative') { const l = Math.hypot(e.x - PL.x, e.z - PL.z) || 1; mx = (e.x - PL.x) / l; mz = (e.z - PL.z) / l; sp = mobJSpeed(0.3 * (dist < 7 ? 1.4 : 1.6)); e.target = null; } // (Java: foxes keep 16 blocks from a player who isn't sneaking)
   else if (e.target) {
     const t = e.target; if (t.dead || t.deathT) { e.target = null; } else {
-      faceTo(e, t.x, t.z); [mx, mz] = pathDir(e, t.x, t.y, t.z); sp = 0.14;
+      faceTo(e, t.x, t.z); [mx, mz] = pathDir(e, t.x, t.y, t.z); sp = mobJSpeed(0.3 * 1.2);
       const td = Math.hypot(t.x - e.x, t.z - e.z);
       if (td < 3 && td > 1.2 && e.onGround && e.jumpCd <= 0 && Math.random() < 0.1) { e.vy = 0.45; e.jumpCd = 30; } // pounce
       if (td < e.w + t.w + 0.4 && e.attackCd <= 0) { e.attackCd = 20; hurtMob(t, 2, e, mx, mz); }

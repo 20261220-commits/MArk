@@ -162,15 +162,15 @@ function wolfAI(e, dist) {
     let best = null, bd = 12; for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e && ((o.type === 'skeleton' || o.type === 'stray' || o.type === 'wither_skeleton') || (!tame && (o.type === 'sheep' || o.type === 'rabbit' || o.type === 'fox') && Math.random() < 0.1))) { const dd = Math.hypot(o.x - e.x, o.z - e.z); if (dd < bd) { bd = dd; best = o; } }
     if (best) e.target = best; }
   if (e.target && e.target !== PL && Math.hypot(e.target.x - e.x, e.target.z - e.z) > 20) e.target = null;
-  let mx = 0, mz = 0, sp = 0.1;
+  let mx = 0, mz = 0, sp = mobJSpeed(0.3); // (Java: movement 0.3; every goal at 1.0)
   if (e.sitting) { walkPhysics(e, 0, 0, 0); return; }
   if (e.target) {
-    const t = e.target, tx = t.x, tz = t.z; faceTo(e, tx, tz); [mx, mz] = pathDir(e, tx, t.y, tz); sp = 0.15;
-    if (Math.hypot(tx - e.x, tz - e.z) < 1.2 + (t.w || 0.3) && Math.abs(t.y - e.y) < 1.5 && e.attackCd <= 0) { e.attackCd = 20; if (t === PL) attackPlayer(e, 3, mx, mz); else hurtMob(t, tame ? 4 : 2, e, mx, mz); }
-  } else if (tame && dist > 4) {
-    if (dist > 14 && PL.onGround) { e.x = e.px = PL.x + (Math.random() - .5); e.y = e.py = PL.y; e.z = e.pz = PL.z + (Math.random() - .5); e.path = null; }
-    else { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); sp = 0.13; }
-  } else if (!tame) { if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 6); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
+    const t = e.target, tx = t.x, tz = t.z; faceTo(e, tx, tz); [mx, mz] = pathDir(e, tx, t.y, tz);
+    if ((tx - e.x) ** 2 + (tz - e.z) ** 2 + (t.y - e.y) ** 2 <= (4 * e.w) ** 2 + 2 * (t.w || 0.3) && e.attackCd <= 0) { e.attackCd = 20; if (t === PL) attackPlayer(e, 3, mx, mz); else hurtMob(t, tame ? 4 : 2, e, mx, mz); }
+  } else if (tame && (dist > 10 || (e.follow && dist > 2))) { e.follow = 1; // (Java's FollowOwnerGoal: starts at 10 blocks, stops at 2, a jump to the owner past 12)
+    if (dist > 12 && PL.onGround) { e.x = e.px = PL.x + (Math.random() - .5); e.y = e.py = PL.y; e.z = e.pz = PL.z + (Math.random() - .5); e.path = null; }
+    else { faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
+  } else if (!tame) { e.follow = 0; if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 10); if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } } }
   walkPhysics(e, mx, mz, sp);
 }
 function wolfAnim(e, P) {
