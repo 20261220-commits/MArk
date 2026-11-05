@@ -534,7 +534,10 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
       H.id = id; H.gl = gl;
       if (id > 0) { H.mesh = itemMesh(id); if (gl) addGlint(H.mesh); H.mesh.matrixAutoUpdate = false; H.g.add(H.mesh); }
     }
-    H.equip = Math.min(1, H.equip + dt * 6);
+    // Java's ItemInHandRenderer: the main hand's height follows the cube of the attack charge (down after a swing, back up
+    // as it charges), at most 0.4 a tick either way
+    if (k === 0 && typeof plAttackScale === 'function' && !h.spy) { const f3 = Math.pow(plAttackScale(), 3), st = 0.4 * dt * 20; H.equip += Math.max(-st, Math.min(st, f3 - H.equip)); }
+    else H.equip = Math.min(1, H.equip + dt * 6);
     const f = (k === 0) === right ? 1 : -1, act = k === active;
     const p = act && h.swing > 0 ? 1 - h.swing : 0, eq = 1 - H.equip, sp = Math.sqrt(p);
     // the main hand shows the arm when empty; the off hand shows nothing when empty (vanilla)
