@@ -262,14 +262,12 @@ const NETHER_SPAWNS = {
 };
 const pickSpawn = list => { let t = list.reduce((a, e) => a + e[1], 0), r = Math.random() * t; for (const e of list) if ((r -= e[1]) < 0) return e; return list[0]; };
 function inFortress(x, y, z) {
-  const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 24 && Math.abs(x - f.x) < 112 && Math.abs(z - f.z) < 112) return true; }
-  return false;
+  return S.inFortressPieces(W.seed, x, y, z); // (inside one of the fortress's pieces: Java's spawn override)
 }
 function mobsForDimension(x, y, z, b, below) {
   if (W.dim === -1) {
     const bio = biomeAt(x, z), N = S.NETHER_BIO;
-    const list = below === BID.nether_bricks || (Math.random() < 0.5 && inFortress(x, y, z) && [BID.nether_bricks, BID.netherrack, BID.soul_sand].includes(below)) ? NETHER_SPAWNS.fortress
+    const list = inFortress(x, y, z) ? NETHER_SPAWNS.fortress /* Java: inside the fortress's pieces only its own mobs */
       : bio === N.SOUL ? NETHER_SPAWNS.soul : bio === N.BASALT ? NETHER_SPAWNS.basalt : bio === N.WARPED ? NETHER_SPAWNS.warped : bio === N.CRIMSON ? NETHER_SPAWNS.crimson : NETHER_SPAWNS.wastes;
     const [t, , lo, hi] = pickSpawn(list); return [t, lo + Math.floor(Math.random() * (hi - lo + 1))];
   }

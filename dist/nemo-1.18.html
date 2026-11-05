@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.05 21:02';
+const NEMO_VERSION = '2026.11.05 22:01';
 
 </script>
 <script>/* js/shared.js */
@@ -2290,88 +2290,6 @@ function strongholdsOf(seed) {
   }
   SH_CACHE.set(seed, out); return out;
 }
-function stampStronghold(seed, st, sx, sy, sz, R, tiles) {
-  const r = rng(hash32(seed, sx, sz, 41));
-  const brick = () => { const v = r(); return v < 0.2 ? 171 : v < 0.35 ? 172 : 90; };
-  const box = (ax, ay, az, bx, by, bz, hollow) => { if (!st.inside(ax, az, bx, bz)) return; for (let x = ax; x <= bx; x++) for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) { const edge = x === ax || x === bx || y === ay || y === by || z === az || z === bz; st(x, y, z, edge || !hollow ? brick() : 0); } };
-  // portal room: 11 x 8 x 16, portal on a raised platform over lava
-  const ax = sx - 5, az = sz - 8;
-  box(ax, sy, az, ax + 10, sy + 7, az + 15, true);
-  for (let x = ax + 3; x <= ax + 7; x++) for (let z = az + 9; z <= az + 13; z++) st(x, sy + 1, z, 28);
-  for (let x = ax + 3; x <= ax + 7; x++) for (let z = az + 5; z <= az + 8; z++) st(x, sy + 1, z, 90);
-  for (let x = ax + 4; x <= ax + 6; x++) st(x, sy + 2, az + 6, 115, 0);
-  const pcx = ax + 5, pcz = az + 11, py = sy + 3;
-  for (let x = pcx - 2; x <= pcx + 2; x++) for (let z = pcz - 2; z <= pcz + 2; z++) { st(x, py - 1, z, 90); const ex = Math.abs(x - pcx) === 2, ez = Math.abs(z - pcz) === 2; if (ex !== ez) st(x, py, z, 167, (ez ? (z < pcz ? 2 : 0) : (x < pcx ? 1 : 3)) | (r() < 0.1 ? 4 : 0)); }
-  for (let x = pcx - 1; x <= pcx + 1; x++) for (let z = pcz - 1; z <= pcz + 1; z++) st(x, py - 1, z, 28);
-  st(ax + 5, sy + 1, az + 3, 108); if (st.get(ax + 5, sy + 1, az + 3) >= 0) tiles.push({ t: 'spawner', i: ((sy + 1) << 8) | (((az + 3) & 15) << 4) | ((ax + 5) & 15), mob: 'silverfish' });
-  st(ax + 1, sy + 3, az + 1, 45, 0); st(ax + 9, sy + 3, az + 1, 45, 0); st(ax + 1, sy + 3, az + 14, 45, 0); st(ax + 9, sy + 3, az + 14, 45, 0);
-  for (let y = sy + 1; y <= sy + 3; y++) st(sx, y, az, y === sy + 3 ? 90 : 0);
-  // corridors leading away, with a library alcove, a prison cell and a chest room
-  const halls = [[0, -1, 26], [1, 0, 20], [-1, 0, 22]];
-  for (const [dx, dz, len] of halls) {
-    const hx = dx ? (dx > 0 ? ax + 10 : ax) : sx, hz = dz ? az : sz;
-    for (let s = 0; s <= len; s++) {
-      const x = hx + dx * s, z = hz + dz * s;
-      for (let o = -2; o <= 2; o++) for (let y = sy; y <= sy + 4; y++) {
-        const px = dz ? x + o : x, pz = dx ? z + o : z, edge = Math.abs(o) === 2 || y === sy || y === sy + 4;
-        if (s === 0 && !edge) { st(px, y, pz, 0); continue; }
-        st(px, y, pz, edge ? brick() : 0);
-      }
-      if (s % 6 === 3) st(dz ? x - 1 : x, sy + 3, dx ? z - 1 : z, 45, 0);
-    }
-    const ex = hx + dx * (len + 4), ez = hz + dz * (len + 4);
-    box(ex - 4, sy, ez - 4, ex + 4, sy + 6, ez + 4, true);
-    for (let y = sy + 1; y <= sy + 3; y++) st(hx + dx * (len + 0), y, hz + dz * (len + 0), 0);
-    if (dz) { for (let x = ex - 3; x <= ex + 3; x++) for (let y = sy + 1; y <= sy + 4; y++) st(x, y, ez + 3, 47); st(ex, sy + 1, ez + 2, 44, 0); if (st.get(ex, sy + 1, ez + 2) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | (((ez + 2) & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold_library', 6) }); }
-    else if (dx > 0) { for (let z = ez - 3; z <= ez + 3; z++) for (let y = sy + 1; y <= sy + 3; y++) st(ex, y, z, 173); }
-    else { st(ex, sy + 1, ez, 44, 1); if (st.get(ex, sy + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((sy + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'stronghold', 5) }); }
-  }
-}
-// ---- abandoned mineshafts: about one in three 160-block regions has a tree of 3x3 corridors deep underground,
-// with wooden supports, broken rail lines, cobwebs and chest minecarts (spawned from tiles of type 'mob' with `cart`) ----
-const MS_REG = 160, MS_CACHE = new Map();
-function mineshaftOf(seed, rx, rz) {
-  const key = seed + ':' + rx + ',' + rz; if (MS_CACHE.has(key)) return MS_CACHE.get(key);
-  const r = rng(hash32(seed, rx, rz, 91)), segs = [];
-  if (r() < 0.35) {
-    const ox = rx * MS_REG + 40 + r.int(80), oz = rz * MS_REG + 40 + r.int(80), y = 14 + r.int(26);
-    const q = [[ox, oz, 0, 0], [ox, oz, 1, 0], [ox, oz, 2, 0], [ox, oz, 3, 0]];
-    while (q.length && segs.length < 36) {
-      const [x, z, d, depth] = q.shift(), [dx, , dz] = DIRS[d], len = 8 + r.int(22);
-      const ex = x + dx * len, ez = z + dz * len;
-      if (Math.abs(ex - ox) > 72 || Math.abs(ez - oz) > 72) continue;
-      segs.push({ x0: Math.min(x, ex), z0: Math.min(z, ez), x1: Math.max(x, ex), z1: Math.max(z, ez), y, ax: dx ? 1 : 0, seed: r.int(1 << 30) });
-      if (depth < 4) for (const nd of [d, (d + 1) & 3, (d + 3) & 3]) if (r() < (nd === d ? 0.5 : 0.4)) q.push([ex, ez, nd, depth + 1]);
-    }
-  }
-  MS_CACHE.set(key, segs); return segs;
-}
-function stampMineshafts(seed, st, cx, cz, tiles) {
-  const x0 = cx * 16, z0 = cz * 16, rx0 = Math.floor((x0 - 80) / MS_REG), rx1 = Math.floor((x0 + 95) / MS_REG), rz0 = Math.floor((z0 - 80) / MS_REG), rz1 = Math.floor((z0 + 95) / MS_REG);
-  const carve = (x, y, z) => { const b = st.get(x, y, z); if (b > 0 && b !== 7 && !FLUID[b] && !FLUID[st.get(x, y + 1, z)]) st(x, y, z, 0); };
-  for (let rx = rx0; rx <= rx1; rx++) for (let rz = rz0; rz <= rz1; rz++) for (const g of mineshaftOf(seed, rx, rz)) {
-    if (!st.inside(g.x0 - 1, g.z0 - 1, g.x1 + 1, g.z1 + 1)) continue;
-    const r = rng(g.seed), y = g.y, len = g.ax ? g.x1 - g.x0 : g.z1 - g.z0, cart = r() < 0.4 ? 2 + r.int(Math.max(1, len - 3)) : -1, spawner = r() < 0.25 ? 1 + r.int(Math.max(1, len - 2)) : -1;
-    for (let s = 0; s <= len; s++) {
-      const cx2 = g.ax ? g.x0 + s : g.x0, cz2 = g.ax ? g.z0 : g.z0 + s, w = (o) => g.ax ? [cx2, cz2 + o] : [cx2 + o, cz2];
-      const rr = rng(hash32(g.seed, s, 0, 5)); // per-cell decisions stay the same whichever chunk is being built
-      for (let o = -1; o <= 1; o++) {
-        const [px, pz] = w(o);
-        for (let dy = 0; dy < 3; dy++) carve(px, y + dy, pz);
-        const fl = st.get(px, y - 1, pz); if (fl === 0 || FLUID[fl] === 2) st(px, y - 1, pz, 5); // planks bridge gaps and lava
-      }
-      if (s % 5 === 2 && s < len - 1) { const [ax, az] = w(-1), [bx, bz] = w(1); st(ax, y, az, 116); st(ax, y + 1, az, 116); st(bx, y, bz, 116); st(bx, y + 1, bz, 116); for (let o = -1; o <= 1; o++) { const [px, pz] = w(o); st(px, y + 2, pz, 5); } }
-      else { for (let o = -1; o <= 1; o++) { const [px, pz] = w(o); if (rr() < 0.04) st(px, y + 2 - (rr() < 0.3 ? 1 : 0), pz, 100); } }
-      const [mx, mz] = w(0);
-      if (st.get(mx, y, mz) === 0 && rr() < 0.7) st(mx, y, mz, 1060, g.ax ? 1 : 0);
-      if (s === spawner && s !== cart && st.get(mx, y, mz) >= 0) { // a cave spider spawner wrapped in cobwebs
-        st(mx, y, mz, BID.spawner); tiles.push({ t: 'spawner', i: (y << 8) | ((mz & 15) << 4) | (mx & 15), mob: 'cave_spider' });
-        for (let o = -1; o <= 1; o++) for (let dy = 0; dy < 3; dy++) { const [px, pz] = w(o); if ((o || dy) && st.get(px, y + dy, pz) === 0 && rr() < 0.6) st(px, y + dy, pz, 100); }
-      }
-      if (s === cart && st.get(mx, y, mz) >= 0) tiles.push({ t: 'mob', i: (y << 8) | ((mz & 15) << 4) | (mx & 15), cart: 'chest', loot: rollLoot(r, 'mineshaft', 4 + r.int(4)) });
-    }
-  }
-}
 // ---- pillager outposts: a dark oak watchtower in open biomes, tried in 60% of the 24-chunk regions, kept away
 // from villages; pillagers are spawned around it (tiles of type 'mob', and outpostSpawn on the main thread) ----
 const OREG = 24, OP_CACHE = new Map();
@@ -2711,28 +2629,8 @@ function stampTemples(seed, G, st, cx, cz, tiles) {
         for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) put(dx, y0 - 15, dz, [B.tnt, 0]);
         put(0, y0 - 13, 0, [B.stone_pressure_plate, 0]);
         [[0, -3, 0], [3, 0, 1], [0, 3, 2], [-3, 0, 3]].forEach(([dx, dz, f]) => chest(X + dx, y0 - 13, Z + dz, f, rollLoot(r, 'desert_pyramid', 5)));
-      } else if (kind === 'jungle') {
-        const put = (dx, y, dz, id, m = 0) => st(X + dx, y, Z + dz, id, m), cob = (dx, y, dz) => put(dx, y, dz, hash32(o.seed, dx, y, dz) % 100 < 45 ? B.mossy_cobblestone : B.cobblestone);
-        for (let dx = -6; dx <= 6; dx++) for (let dz = -8; dz <= 8; dz++) {
-          for (let y = y0 - 4; y <= y0 + 14; y++) put(dx, y, dz, 0);
-          for (let y = y0 - 5; y <= y0 - 4; y++) cob(dx, y, dz);
-          const edge = Math.abs(dx) === 6 || Math.abs(dz) === 8;
-          for (let y = y0 - 3; y <= y0 + 8; y++) if (edge || y === y0 || y === y0 + 5) cob(dx, y, dz);
-          if (Math.abs(dx) <= 4 && Math.abs(dz) <= 6) { cob(dx, y0 + 9, dz); if ((Math.abs(dx) === 4 || Math.abs(dz) === 6)) cob(dx, y0 + 10, dz); }
-          if (Math.abs(dx) <= 2 && Math.abs(dz) <= 3) cob(dx, y0 + 11, dz);
-        }
-        for (let y = y0 + 1; y <= y0 + 3; y++) for (let dx = -1; dx <= 1; dx++) put(dx, y, -8, 0); // doorway
-        for (const [dx, dz] of [[-4, -8], [4, -8], [-6, 0], [6, 0]]) for (let y = y0 + 2; y <= y0 + 3; y++) put(dx, y, dz, 0); // windows
-        for (let k = 0; k < 4; k++) put(0, y0 - k, 2 + k, 0), put(0, y0 - k + 1, 2 + k, 0); // stairs down into the basement
-        // basement corridor with a tripwire across it and an arrow dispenser at the far end
-        for (let dx = -5; dx <= 5; dx++) for (let y = y0 - 3; y <= y0 - 1; y++) for (let dz = -1; dz <= 6; dz++) if (dz >= 5 || Math.abs(dx) <= 1 || dz === -1) put(dx, y, dz, 0);
-        put(-5, y0 - 3, -1, B.tripwire_hook_block, 1 | 4); put(5, y0 - 3, -1, B.tripwire_hook_block, 3 | 4);
-        for (let dx = -4; dx <= 4; dx++) put(dx, y0 - 3, -1, B.tripwire, 1);
-        put(-5, y0 - 2, -1, B.dispenser, 5); if (st.get(X - 5, y0 - 2, Z - 1) >= 0) { const da = rollLoot(r, 'jungle_dispenser', 1); tiles.push({ t: 'dispenser', i: tl(X - 5, y0 - 2, Z - 1), loot: da.length ? da.map(l => [l[0] % 9, l[1], l[2]]) : [[0, 'arrow', 2 + r.int(6)]] }); } /* Java: chests/jungle_temple_dispenser, 2-7 arrows a roll */
-        put(-6, y0 - 3, -1, B.cobblestone); put(6, y0 - 3, -1, B.cobblestone);
-        chest(X + 5, y0 - 3, Z + 6, 3, rollLoot(r, 'jungle_temple', 5));
-        chest(X - 5, y0 - 3, Z + 6, 1, rollLoot(r, 'jungle_temple', 5));
-        for (let k = 0; k < 14; k++) { const dx = r.int(13) - 6, dz = r.int(17) - 8, y = y0 + r.int(10); if (Math.abs(dx) === 6 || Math.abs(dz) === 8) { const v = dx === 6 ? [1, 0, 4] : dx === -6 ? [-1, 0, 5] : dz === 8 ? [0, 1, 2] : [0, -1, 3]; if (st.get(X + dx + v[0], y, Z + dz + v[1]) === 0) put(dx + v[0], y, dz + v[1], 222, v[2]); } }
+      } else if (kind === 'jungle') { // JungleTemplePiece: the temple, its two arrow traps and the lever puzzle over the hidden chest
+        jStamp(st, tiles, o.seed, cx, cz, [jungleTemplePiece(o, G)], jtPost);
       } else if (kind === 'hut') {
         const yH = Math.max(SEA, o.h) + 3, put = (dx, y, dz, id, m = 0) => st(X + dx, y, Z + dz, id, m);
         for (const [dx, dz] of [[-3, -2], [3, -2], [-3, 4], [3, 4]]) for (let y = o.h - 1; y < yH; y++) put(dx, y, dz, B.oak_log);
@@ -3080,37 +2978,6 @@ function fortressAt(seed, rx, rz) {
   const r = rng(hash32(seed, rx, rz, 53)); if (r() > 0.6) return null;
   return { x: (rx * FREG + 2 + r.int(FREG - 4)) * 16 + 8, z: (rz * FREG + 2 + r.int(FREG - 4)) * 16 + 8, y: 64, arms: [18 + r.int(30), 18 + r.int(30), 18 + r.int(30), 18 + r.int(30)] };
 }
-function stampFortress(f, st, R, tiles) {
-  const NB = 144, FENCE = 165;
-  // bridges: 5 wide deck at y, railings, pillars down to the lava sea
-  f.arms.forEach((len, a) => {
-    const [dx, , dz] = DIRS[a];
-    for (let s = 4; s <= len; s++) {
-      const x = f.x + dx * s, z = f.z + dz * s;
-      for (let o = -2; o <= 2; o++) {
-        const px = dz ? x + o : x, pz = dx ? z + o : z;
-        st(px, f.y, pz, NB); st(px, f.y - 1, pz, Math.abs(o) === 2 || s % 2 ? NB : 0);
-        for (let y = f.y + 1; y <= f.y + 4; y++) st(px, y, pz, Math.abs(o) === 2 && y === f.y + 1 ? FENCE : 0);
-        if (s % 7 === 0 && Math.abs(o) <= 1) for (let y = f.y - 2; y > 20; y--) { const b = st.get(px, y, pz); if (b < 0) break; if (b && b !== 28) break; st(px, y, pz, NB); }
-      }
-    }
-    // a small room at the end of each arm, two of them with nether wart, one with a chest
-    const ex = f.x + dx * (len + 4), ez = f.z + dz * (len + 4);
-    for (let x = ex - 4; x <= ex + 4; x++) for (let z = ez - 4; z <= ez + 4; z++) for (let y = f.y; y <= f.y + 6; y++) {
-      const edge = Math.abs(x - ex) === 4 || Math.abs(z - ez) === 4 || y === f.y || y === f.y + 6;
-      st(x, y, z, edge ? NB : 0);
-    }
-    for (let y = f.y + 1; y <= f.y + 3; y++) for (let o = -1; o <= 1; o++) st(dz ? ex + o : ex - dx * 4, y, dx ? ez + o : ez - dz * 4, 0);
-    if (a % 2 === 0) for (let x = ex - 2; x <= ex + 2; x++) { st(x, f.y, ez + 2, 138); st(x, f.y + 1, ez + 2, 161, R.int(4)); }
-    if (a === 1) { st(ex, f.y + 1, ez, 44, 0); if (st.get(ex, f.y + 1, ez) >= 0) tiles.push({ t: 'chest', i: ((f.y + 1) << 8) | ((ez & 15) << 4) | (ex & 15), loot: rollLoot(R, 'fortress', 5) }); }
-  });
-  // central crossing with the blaze spawner
-  for (let x = f.x - 4; x <= f.x + 4; x++) for (let z = f.z - 4; z <= f.z + 4; z++) for (let y = f.y; y <= f.y + 7; y++) {
-    const edge = Math.abs(x - f.x) === 4 || Math.abs(z - f.z) === 4, door = (Math.abs(x - f.x) <= 1 || Math.abs(z - f.z) <= 1) && y > f.y && y < f.y + 4;
-    st(x, y, z, y === f.y || y === f.y + 7 ? NB : edge && !door ? NB : 0);
-  }
-  st(f.x, f.y + 1, f.z, 108); if (st.get(f.x, f.y + 1, f.z) >= 0) tiles.push({ t: 'spawner', i: ((f.y + 1) << 8) | ((f.z & 15) << 4) | (f.x & 15), mob: 'blaze' });
-}
 // the Nether's terrain density at one spot, the way genNether interpolates it (exact on its 4-block columns)
 const ND_CACHE = new Map();
 function netherDensityAt(seed, x, y, z) {
@@ -3237,9 +3104,7 @@ function genNether(seed, cx, cz) {
   const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
   for (let a = frx - 1; a <= frx + 1; a++) for (let b = frz - 1; b <= frz + 1; b++) {
     const f = fortressAt(seed, a, b); if (!f) continue;
-    const reach = Math.max(...f.arms) + 9;
-    if (!st.inside(f.x - reach, f.z - reach, f.x + reach, f.z + reach)) continue;
-    stampFortress(f, st, rng(hash32(seed, a, b, 54)), tiles);
+    jStamp(st, tiles, seed, cx, cz, assembleFortress(seed, f.x - 6, f.z - 6), nfPost); // NetherFortressPieces, grown from the start chunk
   }
   stampNetherRuins(seed, st, cx, cz, tiles);
   fixConnections(blocks, meta);
@@ -3418,7 +3283,7 @@ function oreVeins(blocks, seed, cx, cz) {
 }
 // 1.18's aquifers: the caves below a region's own water level are flooded, the level picked per region (warped, so the
 // edges wander); where a region's water meets a drier one a wall of stone holds it (as Java's aquifer barriers)
-function aquifers(blocks, seed, cx, cz) {
+function aquifers(blocks, seed, cx, cz, keep) {
   const N = deepNoise(seed), x0 = cx * 16, z0 = cz * 16, lv = new Int16Array(18 * 18), top = new Int16Array(256);
   const level = (wx, wz) => { const rx = Math.floor((wx + N[1].n2(wx / 40, wz / 40) * 12) / 48), rz = Math.floor((wz + N[2].n2(wx / 40 + 9.1, wz / 40) * 12) / 48), h = hash32(seed, rx, rz, 4242);
     return (h & 1023) < 450 ? -48 + (h >>> 10) % 88 : -999; }; // about 44% of regions hold water, between y -48 and 39
@@ -3427,7 +3292,7 @@ function aquifers(blocks, seed, cx, cz) {
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const L = lv[(z + 1) * 18 + x + 1]; if (L < -54) continue;
     const roof = Math.min(L, top[z * 16 + x] - 10);
-    for (let y = -54; y <= roof; y++) { const i = TI(x, y, z); if (blocks[i] !== 0) continue;
+    for (let y = -54; y <= roof; y++) { const i = TI(x, y, z); if (blocks[i] !== 0) continue; if (keep && y >= 0 && keep.has((y << 8) | (z << 4) | x)) continue; // (a structure's rooms and halls)
       let wall = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (lv[(z + 1 + dz) * 18 + x + 1 + dx] < y) { wall = true; break; }
       blocks[i] = wall ? (y < 0 ? 76 : 1) : 27; }
   }
@@ -3436,13 +3301,14 @@ function genTall(r, dim, seed, cx, cz) {
   const off = (0 - MINY) << 8, blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
   blocks.set(r.blocks, off); meta.set(r.meta, off);
   if (dim === 0) deepFill(blocks, meta, seed, cx, cz);
-  if (dim === 0 && GENV >= 3) { oreVeins(blocks, seed, cx, cz); aquifers(blocks, seed, cx, cz); }
+  if (dim === 0 && GENV >= 3) { oreVeins(blocks, seed, cx, cz); aquifers(blocks, seed, cx, cz, r.keep); }
   for (const t of r.tiles) if (t.i != null) t.i += off;
   const light = new Uint8Array(CVOL); lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome: r.biome, tiles: r.tiles };
 }
-function genChunk(seed, cx, cz, dim, exp) { return genTall(genChunk0(seed, cx, cz, dim, exp), dim, seed, cx, cz); }
+function genChunk(seed, cx, cz, dim, exp) { const r = genChunk0(seed, cx, cz, dim, exp); r.keep = J_KEEP; return genTall(r, dim, seed, cx, cz); }
 function genChunk0(seed, cx, cz, dim, exp) {
+  J_FIX = false; J_KEEP = null;
   if (dim === -1) return genNether(seed, cx, cz);
   if (dim === 1) return genEnd(seed, cx, cz);
   if (GENV >= 3) exp = true; // 1.18: lush caves are a normal part of the world
@@ -3855,10 +3721,10 @@ function genChunk0(seed, cx, cz, dim, exp) {
   // structures: villages on the surface, strongholds underground
   const stamp = makeStamp(blocks, meta, x0, z0);
   for (const v of vills) { if (v.jig) { const vr = rng(hash32(seed, cx, cz, 33)), pr = villageProc(v.vt, v.jig[0] && v.jig[0].zombie); for (const p of v.jig) stampPiece(stamp, G, p, tiles, pr, vr, x0, z0); } else stampVillage(v, stamp, blocks, meta, hgt, x0, z0, rng(hash32(seed, cx, cz, 33)), tiles); }
-  stampMineshafts(seed, stamp, cx, cz, tiles);
+  stampMineshaftsJ(seed, G, stamp, cx, cz, tiles);
   stampOutposts(seed, G, stamp, cx, cz, tiles);
-  for (const [sx, sy, sz] of strongholdsOf(seed)) if (stamp.inside(sx - 44, sz - 44, sx + 44, sz + 44)) stampStronghold(seed, stamp, sx, sy, sz, R, tiles);
-  if (vills.length) fixConnections(blocks, meta);
+  stampStrongholds(seed, stamp, cx, cz, tiles);
+  if (vills.length || J_FIX) fixConnections(blocks, meta);
   // snow cover for cold biomes
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
     const b = biome[z * 16 + x], cold = BIOMES[vbio[z * 16 + x]][4] <= 0.15 || (b === BIO.MOUNTAINS && hgt[(z + 1) * 18 + x + 1] > 95);
@@ -4837,10 +4703,644 @@ function dataMarker(d, x, y, z, p, tiles, R, st) {
   st(x, y, z, 0, 0);
 }
 
+// ---------- Java's structure pieces (StructurePiece and its kin), for the structures Java builds in code rather than from
+// files: strongholds (StrongholdPieces), nether fortresses (NetherFortressPieces), mineshafts (MineshaftPieces) and jungle
+// temples (JungleTemplePiece). Each structure is grown once (the same pieces, weights, limits and joins as Java) and kept;
+// every chunk then builds the parts of the pieces inside it, as Java's postProcess does with the chunk's box. ----------
+// Box: [minX, minY, minZ, maxX, maxY, maxZ]. Inside a piece, local +z is "north" and +x "east" in block facings; the
+// piece's orientation turns and mirrors both, as setOrientation does.
+const JDIRS = ['north', 'east', 'south', 'west'];
+const jBoxHit = (a, b) => a[3] >= b[0] && a[0] <= b[3] && a[5] >= b[2] && a[2] <= b[5] && a[4] >= b[1] && a[1] <= b[4];
+const jHit = (pieces, b) => { for (const p of pieces) if (jBoxHit(p.box, b)) return p; return null; };
+function jOrientBox(x, y, z, ox, oy, oz, sx, sy, sz, d) {
+  switch (d) {
+    case 'south': return [x + ox, y + oy, z + oz, x + sx - 1 + ox, y + sy - 1 + oy, z + sz - 1 + oz];
+    case 'west': return [x - sz + 1 + oz, y + oy, z + ox, x + oz, y + sy - 1 + oy, z + sx - 1 + ox];
+    case 'east': return [x + oz, y + oy, z + ox, x + sz - 1 + oz, y + sy - 1 + oy, z + sx - 1 + ox];
+    default: return [x + ox, y + oy, z - sz + 1 + oz, x + sx - 1 + ox, y + sy - 1 + oy, z + oz];
+  }
+}
+const jMakeBox = (x, y, z, d, w, h, dp) => d === 'north' || d === 'south' ? [x, y, z, x + w - 1, y + h - 1, z + dp - 1] : [x, y, z, x + dp - 1, y + h - 1, z + w - 1];
+const jSpanX = b => b[3] - b[0] + 1, jSpanY = b => b[4] - b[1] + 1, jSpanZ = b => b[5] - b[2] + 1;
+const jRandDir = R => JDIRS[R.int(4)];
+const jMove = (pieces, dy) => { for (const p of pieces) { p.box[1] += dy; p.box[4] += dy; } };
+const jBounds = pieces => pieces.reduce((a, p) => [Math.min(a[0], p.box[0]), Math.min(a[1], p.box[1]), Math.min(a[2], p.box[2]), Math.max(a[3], p.box[3]), Math.max(a[4], p.box[4]), Math.max(a[5], p.box[5])], [1e9, 1e9, 1e9, -1e9, -1e9, -1e9]);
+// StructurePiece.getWorldX / Y / Z
+function jWX(p, x, z) { const b = p.box; switch (p.ori) { case 'north': case 'south': return b[0] + x; case 'west': return b[3] - z; case 'east': return b[0] + z; default: return x; } }
+function jWY(p, y) { return p.ori ? y + p.box[1] : y; }
+function jWZ(p, x, z) { const b = p.box; switch (p.ori) { case 'north': return b[5] - z; case 'south': return b[2] + z; case 'west': case 'east': return b[2] + x; default: return z; } }
+// mirror, then rotation (south: mirrored north-south; west: mirrored and turned; east: turned)
+const JTURN = { north: { north: 'north', east: 'east', south: 'south', west: 'west' }, south: { north: 'south', south: 'north', east: 'east', west: 'west' },
+  west: { north: 'west', south: 'east', east: 'south', west: 'north' }, east: { north: 'east', east: 'south', south: 'west', west: 'north' } };
+const JSTATE = new Map();
+function jState(s, ori) { // 'name[k=v,...]' in the piece's frame -> [id, meta] in the world (or null)
+  const key = s + '|' + (ori || ''); let r = JSTATE.get(key); if (r !== undefined) return r;
+  const i = s.indexOf('['), name = i < 0 ? s : s.slice(0, i), props = {};
+  if (i >= 0) for (const kv of s.slice(i + 1, -1).split(',')) { const [k, v] = kv.split('='); props[k] = v; }
+  const T = JTURN[ori || 'north'], o = {};
+  for (const k in props) { const v = props[k]; if (k in T) o[T[k]] = v; else if (k === 'facing' && v in T) o.facing = T[v]; else if (k === 'axis' && (ori === 'east' || ori === 'west') && v !== 'y') o.axis = v === 'x' ? 'z' : 'x';
+    else if (k === 'shape' && (ori === 'east' || ori === 'west')) o.shape = v === 'north_south' ? 'east_west' : v === 'east_west' ? 'north_south' : v; else if (k === 'hinge' && (ori === 'south' || ori === 'west')) o.hinge = v === 'left' ? 'right' : 'left'; else o[k] = v; }
+  if (name === 'air' || name === 'cave_air') r = [0, 0];
+  else if (name === 'end_portal_frame') r = [BID.end_portal_frame, FACE4[o.facing || 'north'] | (o.eye === 'true' ? 4 : 0)];
+  else if (name === 'tripwire_hook') r = [BID.tripwire_hook_block, FACE4[o.facing || 'north'] | (o.attached === 'true' ? 4 : 0)];
+  else { const ks = Object.keys(o); r = vanillaState(ks.length ? name + '[' + ks.map(k => k + '=' + o[k]).join(',') + ']' : name, 0); }
+  JSTATE.set(key, r || null); return r || null;
+}
+// a chunk being built: the stamp, its box, tiles, a random source, the ground height (OCEAN_FLOOR_WG)
+function jCtx(st, tiles, R, cx, cz, H) {
+  const x0 = cx * 16, z0 = cz * 16;
+  return { st, tiles, R, cb: [x0, -1e9, z0, x0 + 15, 1e9, z0 + 15], cx, cz,
+    surf(x, z) { const k = x * 4096 + z; let h = H.get(k); if (h != null) return h; h = 0; for (let y = CH0 - 1; y > 0; y--) { const b = st.get(x, y, z); if (b > 0 && !FLUID[b] && !REPL[b] && !(BLOCKS[b] && BLOCKS[b].leaves)) { h = y + 1; break; } } H.set(k, h); return h; } };
+}
+const jIn = (c, x, y, z) => x >= c.cb[0] && x <= c.cb[3] && z >= c.cb[2] && z <= c.cb[5] && y > 0 && y < CH0;
+const jTl = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+function jGet(c, p, x, y, z) { const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); return jIn(c, wx, wy, wz) ? c.st.get(wx, wy, wz) : 0; }
+const jAir = b => b === 0;
+const jLiquid = b => b > 0 && !!FLUID[b];
+const jSolid = b => b > 0 && !!SOLID[b] && !FLUID[b];
+function jPlace(c, p, s, x, y, z) {
+  const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz)) return;
+  const v = typeof s === 'string' ? jState(s, p.ori) : s; if (!v) return; c.st(wx, wy, wz, v[0], v[1]); c.touched = true;
+  if (v[0] === 0) (J_KEEP || (J_KEEP = new Set())).add((wy << 8) | ((wz & 15) << 4) | (wx & 15)); // (the pieces' air stays air: no aquifer fills it later)
+}
+function jBox(c, p, x0, y0, z0, x1, y1, z1, edge, inner, skipAir) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    if (skipAir && jAir(jGet(c, p, x, y, z))) continue;
+    jPlace(c, p, y === y0 || y === y1 || x === x0 || x === x1 || z === z0 || z === z1 ? edge : inner, x, y, z);
+  }
+}
+function jBoxSel(c, p, x0, y0, z0, x1, y1, z1, skipAir, sel) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    if (skipAir && jAir(jGet(c, p, x, y, z))) continue;
+    jPlace(c, p, sel(c.R, y === y0 || y === y1 || x === x0 || x === x1 || z === z0 || z === z1), x, y, z);
+  }
+}
+function jMaybeBox(c, p, ch, x0, y0, z0, x1, y1, z1, edge, inner, skipAir, interior) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++)
+    if (c.R() <= ch && (!skipAir || !jAir(jGet(c, p, x, y, z))) && (!interior || jInterior(c, p, x, y, z)))
+      jPlace(c, p, y === y0 || y === y1 || x === x0 || x === x1 || z === z0 || z === z1 ? edge : inner, x, y, z);
+}
+function jMaybe(c, p, ch, x, y, z, s) { if (c.R() < ch) jPlace(c, p, s, x, y, z); }
+function jAirBox(c, p, x0, y0, z0, x1, y1, z1) { jBox(c, p, x0, y0, z0, x1, y1, z1, 'air', 'air', false); }
+function jInterior(c, p, x, y, z) { const wx = jWX(p, x, z), wy = jWY(p, y + 1), wz = jWZ(p, x, z); return jIn(c, wx, wy, wz) && wy < c.surf(wx, wz); }
+function jColumnDown(c, p, s, x, y, z) {
+  const wx = jWX(p, x, z), wz = jWZ(p, x, z); let wy = jWY(p, y); if (!jIn(c, wx, wy, wz)) return; const v = jState(s, p.ori); if (!v) return;
+  for (let b = c.st.get(wx, wy, wz); (b === 0 || jLiquid(b)) && wy > 1; b = c.st.get(wx, --wy, wz)) c.st(wx, wy, wz, v[0], v[1]);
+}
+function jUpperHalfSphere(c, p, x0, y0, z0, x1, y1, z1, s, skipAir) {
+  const f = x1 - x0 + 1, f1 = y1 - y0 + 1, f2 = z1 - z0 + 1, f3 = x0 + f / 2, f4 = z0 + f2 / 2;
+  for (let y = y0; y <= y1; y++) { const f5 = (y - y0) / f1;
+    for (let x = x0; x <= x1; x++) { const f6 = (x - f3) / (f * 0.5);
+      for (let z = z0; z <= z1; z++) { const f7 = (z - f4) / (f2 * 0.5); if (!skipAir || !jAir(jGet(c, p, x, y, z))) { if (f6 * f6 + f5 * f5 + f7 * f7 <= 1.05) jPlace(c, p, s, x, y, z); } } } }
+}
+function jEdgesLiquid(c, p) { // StructurePiece.edgesLiquid, over the part of the piece in this chunk
+  const b = p.box, cb = c.cb, i = Math.max(b[0] - 1, cb[0]), j = Math.max(b[1] - 1, 1), k = Math.max(b[2] - 1, cb[2]), l = Math.min(b[3] + 1, cb[3]), i1 = Math.min(b[4] + 1, CH0 - 1), j1 = Math.min(b[5] + 1, cb[5]);
+  const L = (x, y, z) => jLiquid(c.st.get(x, y, z));
+  for (let x = i; x <= l; x++) for (let z = k; z <= j1; z++) if (L(x, j, z) || L(x, i1, z)) return true;
+  for (let x = i; x <= l; x++) for (let y = j; y <= i1; y++) if (L(x, y, k) || L(x, y, j1)) return true;
+  for (let z = k; z <= j1; z++) for (let y = j; y <= i1; y++) if (L(i, y, z) || L(l, y, z)) return true;
+  return false;
+}
+// a chest facing away from the one solid block beside it (StructurePiece.reorient); its loot rolled now
+function jChest(c, p, x, y, z, loot, n) {
+  const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz) || c.st.get(wx, wy, wz) === BID.chest) return false;
+  let dir = null; for (const [d, dx, dz] of [['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]]) { const b = c.st.get(wx + dx, wy, wz + dz); if (b === BID.chest) { dir = null; break; } if (jSolid(b)) { if (dir) { dir = null; break; } dir = d; } }
+  const face = dir ? { north: 'south', south: 'north', east: 'west', west: 'east' }[dir] : 'north', v = vanillaState('chest[facing=' + face + ']', 0) || [BID.chest, 0];
+  c.st(wx, wy, wz, v[0], v[1]); c.tiles.push({ t: 'chest', i: jTl(wx, wy, wz), loot: rollLoot(c.R, loot, n || 6) }); return true;
+}
+function jSpawner(c, p, x, y, z, mob) { const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz)) return false; c.st(wx, wy, wz, BID.spawner, 0); c.tiles.push({ t: 'spawner', i: jTl(wx, wy, wz), mob }); return true; }
+const jInside = (c, p, x, y, z) => jIn(c, jWX(p, x, z), jWY(p, y), jWZ(p, x, z));
+// stamp one structure's pieces into a chunk
+let J_FIX = false, J_KEEP = null; // (a chunk with fences, bars or tripwire from these pieces: its connections are worked out after)
+function jStamp(st, tiles, seed, cx, cz, pieces, post) {
+  const x0 = cx * 16, z0 = cz * 16, H = st.jH || (st.jH = new Map()); let touched = false; // (the ground heights: one cache for the chunk)
+  pieces.forEach((p, k) => { if (p.box[3] < x0 || p.box[0] > x0 + 15 || p.box[5] < z0 || p.box[2] > z0 + 15) return;
+    const c = jCtx(st, tiles, rng(hash32(seed + k, cx, cz, 4271)), cx, cz, H); post(c, p); if (c.touched) touched = J_FIX = true; });
+  return touched;
+}
+
+// ===================== strongholds (StrongholdPieces) =====================
+const SH_W = [['Straight', 40, 0], ['PrisonHall', 5, 5], ['LeftTurn', 20, 0], ['RightTurn', 20, 0], ['RoomCrossing', 10, 6], ['StraightStairsDown', 5, 5], ['StairsDown', 5, 5], ['FiveCrossing', 5, 4], ['ChestCorridor', 5, 4], ['Library', 10, 2], ['PortalRoom', 20, 1]];
+const shOk = b => b && b[1] > 10;
+const shDoor = R => { const i = R.int(5); return i <= 1 ? 'open' : i === 2 ? 'wood' : i === 3 ? 'grates' : 'iron'; };
+// the stone selector: cracked 20%, mossy 30%, infested 5%, else stone bricks (edges); air inside
+const SH_SEL = (R, edge) => { if (!edge) return 'cave_air'; const f = R(); return f < 0.2 ? 'cracked_stone_bricks' : f < 0.5 ? 'mossy_stone_bricks' : f < 0.55 ? 'infested_stone_bricks' : 'stone_bricks'; };
+const SH_MAKE = {
+  Straight: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, 7, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), left: R.int(2) === 0, right: R.int(2) === 0, box: b } : null; },
+  PrisonHall: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -1, 0, 9, 5, 11, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  LeftTurn: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, 5, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  RightTurn: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, 5, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  RoomCrossing: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -4, -1, 0, 11, 7, 11, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), kind: R.int(5), box: b } : null; },
+  StraightStairsDown: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -7, 0, 5, 11, 8, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  StairsDown: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -7, 0, 5, 11, 5, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  FiveCrossing: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -4, -3, 0, 10, 9, 11, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), ll: R() < 0.5, lh: R() < 0.5, rl: R() < 0.5, rh: R.int(3) > 0, box: b } : null; },
+  ChestCorridor: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, 7, d); return shOk(b) && !jHit(L, b) ? { door: shDoor(R), box: b } : null; },
+  Library: (L, R, x, y, z, d) => { let b = jOrientBox(x, y, z, -4, -1, 0, 14, 11, 15, d); if (!shOk(b) || jHit(L, b)) { b = jOrientBox(x, y, z, -4, -1, 0, 14, 6, 15, d); if (!shOk(b) || jHit(L, b)) return null; } return { door: shDoor(R), tall: jSpanY(b) > 6, box: b }; },
+  PortalRoom: (L, R, x, y, z, d) => { const b = jOrientBox(x, y, z, -4, -1, 0, 11, 8, 16, d); return shOk(b) && !jHit(L, b) ? { box: b } : null; },
+};
+function assembleStronghold(seed, sx, sz) {
+  const key = 'sh:' + seed + ':' + sx + ',' + sz; let res = JIG_CACHE.get(key); if (res) return res;
+  const R = rng(hash32(seed, sx, sz, 4301));
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const L = [], S = { prev: null, imposed: null, portal: null, pending: [], minX: sx, minZ: sz };
+    let W = SH_W.map(([t, w, m]) => ({ t, w, m, n: 0 })), total = 0;
+    const update = () => { let f = false; total = 0; for (const e of W) { if (e.m > 0 && e.n < e.m) f = true; total += e.w; } return f; };
+    const doPlace = (e, depth) => (e.m === 0 || e.n < e.m) && (e.t === 'Library' ? depth > 4 : e.t === 'PortalRoom' ? depth > 5 : true);
+    const make = (t, x, y, z, d, depth) => { const o = SH_MAKE[t](L, R, x, y, z, d); if (!o) return null; o.type = t; o.ori = d; o.depth = depth; return o; };
+    const fromDoor = (x, y, z, d, depth) => {
+      if (!update()) return null;
+      if (S.imposed) { const p = make(S.imposed, x, y, z, d, depth); S.imposed = null; if (p) return p; }
+      for (let i = 0; i < 5; i++) {
+        let j = R.int(total);
+        for (const e of W) { j -= e.w; if (j < 0) { if (!doPlace(e, depth) || e === S.prev) break; const p = make(e.t, x, y, z, d, depth); if (p) { e.n++; S.prev = e; if (!(e.m === 0 || e.n < e.m)) W = W.filter(q => q !== e); return p; } } }
+      }
+      // FillerCorridor.findPieceBox: a short corridor up to the piece in the way
+      let b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, 4, d); const o = jHit(L, b); if (!o) return null;
+      if (o.box[1] === b[1]) for (let i = 3; i >= 1; i--) { b = jOrientBox(x, y, z, -1, -1, 0, 5, 5, i - 1, d); if (!jBoxHit(o.box, b)) { const fb = jOrientBox(x, y, z, -1, -1, 0, 5, 5, i, d); return fb[1] > 1 ? { type: 'Filler', ori: d, depth, box: fb, steps: d === 'north' || d === 'south' ? jSpanZ(fb) : jSpanX(fb) } : null; } }
+      return null;
+    };
+    const add = (x, y, z, d, depth) => { if (depth > 50) return null; if (Math.abs(x - S.minX) > 112 || Math.abs(z - S.minZ) > 112) return null; const p = fromDoor(x, y, z, d, depth + 1); if (p) { L.push(p); S.pending.push(p); } return p; };
+    const fwd = (p, xo, yo) => { const b = p.box; switch (p.ori) { case 'north': return add(b[0] + xo, b[1] + yo, b[2] - 1, p.ori, p.depth); case 'south': return add(b[0] + xo, b[1] + yo, b[5] + 1, p.ori, p.depth); case 'west': return add(b[0] - 1, b[1] + yo, b[2] + xo, p.ori, p.depth); default: return add(b[3] + 1, b[1] + yo, b[2] + xo, p.ori, p.depth); } };
+    const left = (p, yo, zo) => { const b = p.box; return p.ori === 'north' || p.ori === 'south' ? add(b[0] - 1, b[1] + yo, b[2] + zo, 'west', p.depth) : add(b[0] + zo, b[1] + yo, b[2] - 1, 'north', p.depth); };
+    const right = (p, yo, zo) => { const b = p.box; return p.ori === 'north' || p.ori === 'south' ? add(b[3] + 1, b[1] + yo, b[2] + zo, 'east', p.depth) : add(b[0] + zo, b[1] + yo, b[5] + 1, 'south', p.depth); };
+    const children = p => {
+      switch (p.type) {
+        case 'Start': S.imposed = 'FiveCrossing'; fwd(p, 1, 1); break;
+        case 'StairsDown': case 'StraightStairsDown': case 'PrisonHall': case 'ChestCorridor': fwd(p, 1, 1); break;
+        case 'Straight': fwd(p, 1, 1); if (p.left) left(p, 1, 2); if (p.right) right(p, 1, 2); break;
+        case 'LeftTurn': if (p.ori !== 'north' && p.ori !== 'east') right(p, 1, 1); else left(p, 1, 1); break;
+        case 'RightTurn': if (p.ori !== 'north' && p.ori !== 'east') left(p, 1, 1); else right(p, 1, 1); break;
+        case 'RoomCrossing': fwd(p, 4, 1); left(p, 1, 4); right(p, 1, 4); break;
+        case 'FiveCrossing': { let i = 3, j = 5; if (p.ori === 'west' || p.ori === 'north') { i = 8 - i; j = 8 - j; } fwd(p, 5, 1); if (p.ll) left(p, i, 1); if (p.lh) left(p, j, 7); if (p.rl) right(p, i, 1); if (p.rh) right(p, j, 7); break; }
+        case 'PortalRoom': S.portal = p; break;
+      }
+    };
+    const d0 = jRandDir(R), start = { type: 'Start', ori: d0, depth: 0, door: 'open', box: jMakeBox(sx, 64, sz, d0, 5, 11, 5) };
+    L.push(start); children(start);
+    while (S.pending.length) { const p = S.pending.splice(R.int(S.pending.length), 1)[0]; children(p); }
+    if (!S.portal) continue;
+    // StructurePiecesBuilder.moveBelowSeaLevel(63, 0, random, 10)
+    const B = jBounds(L), top = 63 - 10; let j = jSpanY(B) + 0 + 1; if (j < top) j += R.int(top - j); jMove(L, j - B[4]);
+    res = L; break;
+  }
+  res = res || []; JIG_CACHE.set(key, res); return res;
+}
+function shSmallDoor(c, p, type, x, y, z) {
+  const SB = 'stone_bricks';
+  if (type === 'open') jBox(c, p, x, y, z, x + 2, y + 2, z, 'cave_air', 'cave_air', false);
+  else if (type === 'wood' || type === 'iron') {
+    for (const [a, b] of [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0]]) jPlace(c, p, SB, x + a, y + b, z);
+    const dn = type === 'wood' ? 'oak_door' : 'iron_door'; jPlace(c, p, dn + '[facing=north,half=lower,hinge=left]', x + 1, y, z); jPlace(c, p, dn + '[facing=north,half=upper,hinge=left]', x + 1, y + 1, z);
+    if (type === 'iron') { jPlace(c, p, 'stone_button[face=wall,facing=north]', x + 2, y + 1, z + 1); jPlace(c, p, 'stone_button[face=wall,facing=south]', x + 2, y + 1, z - 1); }
+  } else if (type === 'grates') {
+    jPlace(c, p, 'cave_air', x + 1, y, z); jPlace(c, p, 'cave_air', x + 1, y + 1, z);
+    for (const [a, b] of [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0]]) jPlace(c, p, 'iron_bars', x + a, y + b, z);
+  }
+}
+function shPost(c, p) {
+  const sel = SH_SEL, SB = 'stone_bricks', SL = 'smooth_stone_slab', B = (...a) => jBox(c, p, ...a), S = (...a) => jBoxSel(c, p, ...a), P = (s, x, y, z) => jPlace(c, p, s, x, y, z);
+  switch (p.type) {
+    case 'Start': case 'StairsDown':
+      S(0, 0, 0, 4, 10, 4, true, sel); shSmallDoor(c, p, p.door, 1, 7, 0); shSmallDoor(c, p, 'open', 1, 1, 4);
+      for (const [s, x, y, z] of [[SB, 2, 6, 1], [SB, 1, 5, 1], [SL, 1, 6, 1], [SB, 1, 5, 2], [SB, 1, 4, 3], [SL, 1, 5, 3], [SB, 2, 4, 3], [SB, 3, 3, 3], [SL, 3, 4, 3], [SB, 3, 3, 2], [SB, 3, 2, 1], [SL, 3, 3, 1], [SB, 2, 2, 1], [SB, 1, 1, 1], [SL, 1, 2, 1], [SB, 1, 1, 2], [SL, 1, 1, 3]]) P(s, x, y, z);
+      break;
+    case 'Straight':
+      S(0, 0, 0, 4, 4, 6, true, sel); shSmallDoor(c, p, p.door, 1, 1, 0); shSmallDoor(c, p, 'open', 1, 1, 6);
+      jMaybe(c, p, 0.1, 1, 2, 1, 'wall_torch[facing=east]'); jMaybe(c, p, 0.1, 3, 2, 1, 'wall_torch[facing=west]'); jMaybe(c, p, 0.1, 1, 2, 5, 'wall_torch[facing=east]'); jMaybe(c, p, 0.1, 3, 2, 5, 'wall_torch[facing=west]');
+      if (p.left) B(0, 1, 2, 0, 3, 4, 'cave_air', 'cave_air', false); if (p.right) B(4, 1, 2, 4, 3, 4, 'cave_air', 'cave_air', false);
+      break;
+    case 'Filler':
+      for (let i = 0; i < p.steps; i++) { for (let x = 0; x <= 4; x++) { P(SB, x, 0, i); P(SB, x, 4, i); } for (let j = 1; j <= 3; j++) { P(SB, 0, j, i); P('cave_air', 1, j, i); P('cave_air', 2, j, i); P('cave_air', 3, j, i); P(SB, 4, j, i); } }
+      break;
+    case 'ChestCorridor':
+      S(0, 0, 0, 4, 4, 6, true, sel); shSmallDoor(c, p, p.door, 1, 1, 0); shSmallDoor(c, p, 'open', 1, 1, 6);
+      B(3, 1, 2, 3, 1, 4, SB, SB, false); P('stone_brick_slab', 3, 1, 1); P('stone_brick_slab', 3, 1, 5); P('stone_brick_slab', 3, 2, 2); P('stone_brick_slab', 3, 2, 4);
+      for (let i = 2; i <= 4; i++) P('stone_brick_slab', 2, 1, i);
+      if (jInside(c, p, 3, 2, 3)) jChest(c, p, 3, 2, 3, 'stronghold', 6);
+      break;
+    case 'LeftTurn': case 'RightTurn': {
+      S(0, 0, 0, 4, 4, 4, true, sel); shSmallDoor(c, p, p.door, 1, 1, 0);
+      const flip = p.ori !== 'north' && p.ori !== 'east'; if ((p.type === 'LeftTurn') === flip) B(4, 1, 1, 4, 3, 3, 'cave_air', 'cave_air', false); else B(0, 1, 1, 0, 3, 3, 'cave_air', 'cave_air', false);
+      break; }
+    case 'StraightStairsDown':
+      S(0, 0, 0, 4, 10, 7, true, sel); shSmallDoor(c, p, p.door, 1, 7, 0); shSmallDoor(c, p, 'open', 1, 1, 7);
+      for (let i = 0; i < 6; i++) { for (let x = 1; x <= 3; x++) { P('cobblestone_stairs[facing=south]', x, 6 - i, 1 + i); if (i < 5) P(SB, x, 5 - i, 1 + i); } }
+      break;
+    case 'PrisonHall':
+      S(0, 0, 0, 8, 4, 10, true, sel); shSmallDoor(c, p, p.door, 1, 1, 0); B(1, 1, 10, 3, 3, 10, 'cave_air', 'cave_air', false);
+      S(4, 1, 1, 4, 3, 1, false, sel); S(4, 1, 3, 4, 3, 3, false, sel); S(4, 1, 7, 4, 3, 7, false, sel); S(4, 1, 9, 4, 3, 9, false, sel);
+      for (let i = 1; i <= 3; i++) { P('iron_bars', 4, i, 4); P('iron_bars', 4, i, 5); P('iron_bars', 4, i, 6); P('iron_bars', 5, i, 5); P('iron_bars', 6, i, 5); P('iron_bars', 7, i, 5); }
+      P('iron_bars', 4, 3, 2); P('iron_bars', 4, 3, 8);
+      for (const z of [2, 8]) { P('iron_door[facing=west,half=lower,hinge=left]', 4, 1, z); P('iron_door[facing=west,half=upper,hinge=left]', 4, 2, z); }
+      break;
+    case 'RoomCrossing':
+      S(0, 0, 0, 10, 6, 10, true, sel); shSmallDoor(c, p, p.door, 4, 1, 0);
+      B(4, 1, 10, 6, 3, 10, 'cave_air', 'cave_air', false); B(0, 1, 4, 0, 3, 6, 'cave_air', 'cave_air', false); B(10, 1, 4, 10, 3, 6, 'cave_air', 'cave_air', false);
+      if (p.kind === 0) {
+        P(SB, 5, 1, 5); P(SB, 5, 2, 5); P(SB, 5, 3, 5);
+        P('wall_torch[facing=west]', 4, 3, 5); P('wall_torch[facing=east]', 6, 3, 5); P('wall_torch[facing=south]', 5, 3, 4); P('wall_torch[facing=north]', 5, 3, 6);
+        for (const [x, z] of [[4, 4], [4, 5], [4, 6], [6, 4], [6, 5], [6, 6], [5, 4], [5, 6]]) P(SL, x, 1, z);
+      } else if (p.kind === 1) {
+        for (let i = 0; i < 5; i++) { P(SB, 3, 1, 3 + i); P(SB, 7, 1, 3 + i); P(SB, 3 + i, 1, 3); P(SB, 3 + i, 1, 7); }
+        P(SB, 5, 1, 5); P(SB, 5, 2, 5); P(SB, 5, 3, 5); P('water', 5, 4, 5);
+      } else if (p.kind === 2) {
+        for (let j = 1; j <= 9; j++) { P('cobblestone', 1, 3, j); P('cobblestone', 9, 3, j); P('cobblestone', j, 3, 1); P('cobblestone', j, 3, 9); }
+        for (const [x, y, z] of [[5, 1, 4], [5, 1, 6], [5, 3, 4], [5, 3, 6], [4, 1, 5], [6, 1, 5], [4, 3, 5], [6, 3, 5]]) P('cobblestone', x, y, z);
+        for (let k = 1; k <= 3; k++) { P('cobblestone', 4, k, 4); P('cobblestone', 6, k, 4); P('cobblestone', 4, k, 6); P('cobblestone', 6, k, 6); }
+        P('torch', 5, 3, 5);
+        for (let l = 2; l <= 8; l++) { P('oak_planks', 2, 3, l); P('oak_planks', 3, 3, l); if (l <= 3 || l >= 7) { P('oak_planks', 4, 3, l); P('oak_planks', 5, 3, l); P('oak_planks', 6, 3, l); } P('oak_planks', 7, 3, l); P('oak_planks', 8, 3, l); }
+        for (let y = 1; y <= 3; y++) P('ladder[facing=west]', 9, y, 3);
+        jChest(c, p, 3, 4, 8, 'stronghold_crossing', 5);
+      }
+      break;
+    case 'FiveCrossing':
+      S(0, 0, 0, 9, 8, 10, true, sel); shSmallDoor(c, p, p.door, 4, 3, 0);
+      if (p.ll) B(0, 3, 1, 0, 5, 3, 'cave_air', 'cave_air', false); if (p.rl) B(9, 3, 1, 9, 5, 3, 'cave_air', 'cave_air', false);
+      if (p.lh) B(0, 5, 7, 0, 7, 9, 'cave_air', 'cave_air', false); if (p.rh) B(9, 5, 7, 9, 7, 9, 'cave_air', 'cave_air', false);
+      B(5, 1, 10, 7, 3, 10, 'cave_air', 'cave_air', false);
+      S(1, 2, 1, 8, 2, 6, false, sel); S(4, 1, 5, 4, 4, 9, false, sel); S(8, 1, 5, 8, 4, 9, false, sel); S(1, 4, 7, 3, 4, 9, false, sel); S(1, 3, 5, 3, 3, 6, false, sel);
+      B(1, 3, 4, 3, 3, 4, SL, SL, false); B(1, 4, 6, 3, 4, 6, SL, SL, false); S(5, 1, 7, 7, 1, 8, false, sel); B(5, 1, 9, 7, 1, 9, SL, SL, false); B(5, 2, 7, 7, 2, 7, SL, SL, false);
+      B(4, 5, 7, 4, 5, 9, SL, SL, false); B(8, 5, 7, 8, 5, 9, SL, SL, false); B(5, 5, 7, 7, 5, 9, 'smooth_stone_slab[type=double]', 'smooth_stone_slab[type=double]', false);
+      P('wall_torch[facing=south]', 6, 5, 6);
+      break;
+    case 'Library': {
+      const h = p.tall ? 11 : 6, PL = 'oak_planks', BS = 'bookshelf';
+      S(0, 0, 0, 13, h - 1, 14, true, sel); shSmallDoor(c, p, p.door, 4, 1, 0);
+      jMaybeBox(c, p, 0.07, 2, 1, 1, 11, 4, 13, 'cobweb', 'cobweb', false, false);
+      for (let l = 1; l <= 13; l++) {
+        const s = (l - 1) % 4 === 0 ? PL : BS;
+        B(1, 1, l, 1, 4, l, s, s, false); B(12, 1, l, 12, 4, l, s, s, false);
+        if (s === PL) { P('wall_torch[facing=east]', 2, 3, l); P('wall_torch[facing=west]', 11, 3, l); }
+        if (p.tall) { B(1, 6, l, 1, 9, l, s, s, false); B(12, 6, l, 12, 9, l, s, s, false); }
+      }
+      for (let l = 3; l < 12; l += 2) { B(3, 1, l, 4, 3, l, BS, BS, false); B(6, 1, l, 7, 3, l, BS, BS, false); B(9, 1, l, 10, 3, l, BS, BS, false); }
+      if (p.tall) {
+        B(1, 5, 1, 3, 5, 13, PL, PL, false); B(10, 5, 1, 12, 5, 13, PL, PL, false); B(4, 5, 1, 9, 5, 2, PL, PL, false); B(4, 5, 12, 9, 5, 13, PL, PL, false);
+        P(PL, 9, 5, 11); P(PL, 8, 5, 11); P(PL, 9, 5, 10);
+        const F = 'oak_fence'; B(3, 6, 3, 3, 6, 11, F, F, false); B(10, 6, 3, 10, 6, 9, F, F, false); B(4, 6, 2, 9, 6, 2, F, F, false); B(4, 6, 12, 7, 6, 12, F, F, false);
+        P(F, 3, 6, 2); P(F, 3, 6, 12); P(F, 10, 6, 2);
+        for (let i = 0; i <= 2; i++) { P(F, 8 + i, 6, 12 - i); if (i !== 2) P(F, 8 + i, 6, 11 - i); }
+        for (let y = 1; y <= 7; y++) P('ladder[facing=south]', 10, y, 13);
+        for (const y of [7, 8, 9]) { P(F, 6, y, 7); P(F, 7, y, 7); }
+        for (const [x, z] of [[5, 7], [8, 7], [6, 6], [6, 8], [7, 6], [7, 8]]) { P(F, x, 7, z); P('torch', x, 8, z); }
+      }
+      jChest(c, p, 3, 3, 5, 'stronghold_library', 6);
+      if (p.tall) { P('cave_air', 12, 9, 1); jChest(c, p, 12, 8, 1, 'stronghold_library', 6); }
+      break; }
+    case 'PortalRoom': {
+      S(0, 0, 0, 10, 7, 15, false, sel); shSmallDoor(c, p, 'grates', 4, 1, 0);
+      S(1, 6, 1, 1, 6, 14, false, sel); S(9, 6, 1, 9, 6, 14, false, sel); S(2, 6, 1, 8, 6, 2, false, sel); S(2, 6, 14, 8, 6, 14, false, sel);
+      S(1, 1, 1, 2, 1, 4, false, sel); S(8, 1, 1, 9, 1, 4, false, sel); B(1, 1, 1, 1, 1, 3, 'lava', 'lava', false); B(9, 1, 1, 9, 1, 3, 'lava', 'lava', false);
+      S(3, 1, 8, 7, 1, 12, false, sel); B(4, 1, 9, 6, 1, 11, 'lava', 'lava', false);
+      for (let j = 3; j < 14; j += 2) { B(0, 3, j, 0, 4, j, 'iron_bars', 'iron_bars', false); B(10, 3, j, 10, 4, j, 'iron_bars', 'iron_bars', false); }
+      for (let i = 2; i < 9; i += 2) B(i, 3, 15, i, 4, 15, 'iron_bars', 'iron_bars', false);
+      S(4, 1, 5, 6, 1, 7, false, sel); S(4, 2, 6, 6, 2, 7, false, sel); S(4, 3, 7, 6, 3, 7, false, sel);
+      for (let k = 4; k <= 6; k++) { P('stone_brick_stairs[facing=north]', k, 1, 4); P('stone_brick_stairs[facing=north]', k, 2, 5); P('stone_brick_stairs[facing=north]', k, 3, 6); }
+      if (!p.eyes) { const r = rng(hash32(p.box[0], p.box[1], p.box[2], 4313)); p.eyes = []; for (let l = 0; l < 12; l++) p.eyes.push(r() > 0.9); } // (the same eyes whichever chunk builds it)
+      const E = p.eyes, fr = (f, k, x, z) => P('end_portal_frame[facing=' + f + ',eye=' + E[k] + ']', x, 3, z);
+      fr('north', 0, 4, 8); fr('north', 1, 5, 8); fr('north', 2, 6, 8); fr('south', 3, 4, 12); fr('south', 4, 5, 12); fr('south', 5, 6, 12);
+      fr('east', 6, 3, 9); fr('east', 7, 3, 10); fr('east', 8, 3, 11); fr('west', 9, 7, 9); fr('west', 10, 7, 10); fr('west', 11, 7, 11);
+      if (E.every(Boolean)) for (let x = 4; x <= 6; x++) for (let z = 9; z <= 11; z++) P('end_portal', x, 3, z);
+      jSpawner(c, p, 5, 3, 6, 'silverfish');
+      break; }
+  }
+}
+function stampStrongholds(seed, st, cx, cz, tiles) {
+  let any = false;
+  for (const [x, , z] of strongholdsOf(seed)) { if (Math.abs(x - cx * 16) > 180 || Math.abs(z - cz * 16) > 180) continue; // (a stronghold reaches 112 out from its start, and its pieces a little more)
+    if (jStamp(st, tiles, seed, cx, cz, assembleStronghold(seed, x - 6, z - 6), shPost)) any = true; }
+  return any;
+}
+
+// ===================== mineshafts (MineshaftPieces) =====================
+function assembleMineshaft(seed, ccx, ccz, mesa) {
+  const key = 'ms:' + seed + ':' + ccx + ',' + ccz; let res = JIG_CACHE.get(key); if (res) return res;
+  const R = rng(hash32(seed, ccx, ccz, 4401)), L = [], x = ccx * 16 + 2, z = ccz * 16 + 2;
+  const room = { type: 'Room', ori: null, depth: 0, box: [x, 50, z, x + 7 + R.int(6), 54 + R.int(6), z + 7 + R.int(6)], doors: [] };
+  L.push(room);
+  const shaft = (x, y, z, d, depth) => {
+    const i = R.int(100);
+    if (i >= 80) { const h = R.int(4) === 0 ? 6 : 2, b0 = d === 'south' ? [-1, 0, 0, 3, h, 4] : d === 'west' ? [-4, 0, -1, 0, h, 3] : d === 'east' ? [0, 0, -1, 4, h, 3] : [-1, 0, -4, 3, h, 0], b = [b0[0] + x, b0[1] + y, b0[2] + z, b0[3] + x, b0[4] + y, b0[5] + z];
+      return jHit(L, b) ? null : { type: 'Crossing', ori: null, dir: d, depth, box: b, two: jSpanY(b) > 3 }; }
+    if (i >= 70) { const b0 = d === 'south' ? [0, -5, 0, 2, 2, 8] : d === 'west' ? [-8, -5, 0, 0, 2, 2] : d === 'east' ? [0, -5, 0, 8, 2, 2] : [0, -5, -8, 2, 2, 0], b = [b0[0] + x, b0[1] + y, b0[2] + z, b0[3] + x, b0[4] + y, b0[5] + z];
+      return jHit(L, b) ? null : { type: 'Stairs', ori: d, depth, box: b }; }
+    for (let k = R.int(3) + 2; k > 0; k--) { const j = k * 5, b0 = d === 'south' ? [0, 0, 0, 2, 2, j - 1] : d === 'west' ? [-(j - 1), 0, 0, 0, 2, 2] : d === 'east' ? [0, 0, 0, j - 1, 2, 2] : [0, 0, -(j - 1), 2, 2, 0], b = [b0[0] + x, b0[1] + y, b0[2] + z, b0[3] + x, b0[4] + y, b0[5] + z];
+      if (!jHit(L, b)) { const rails = R.int(3) === 0, spider = !rails && R.int(23) === 0; return { type: 'Corridor', ori: d, depth, box: b, rails, spider, n: d === 'north' || d === 'south' ? Math.floor(jSpanZ(b) / 5) : Math.floor(jSpanX(b) / 5) }; } }
+    return null;
+  };
+  const gen = (x, y, z, d, depth) => { if (depth > 8) return null; if (Math.abs(x - room.box[0]) > 80 || Math.abs(z - room.box[2]) > 80) return null; const p = shaft(x, y, z, d, depth + 1); if (p) { L.push(p); children(p); } return p; };
+  const children = p => {
+    const b = p.box, i = p.depth;
+    if (p.type === 'Room') {
+      let j = jSpanY(b) - 3 - 1; if (j <= 0) j = 1;
+      for (let k = 0; k < jSpanX(b); k += 4) { k += R.int(jSpanX(b)); if (k + 3 > jSpanX(b)) break; const c = gen(b[0] + k, b[1] + R.int(j) + 1, b[2] - 1, 'north', i); if (c) p.doors.push([c.box[0], c.box[1], b[2], c.box[3], c.box[4], b[2] + 1]); }
+      for (let k = 0; k < jSpanX(b); k += 4) { k += R.int(jSpanX(b)); if (k + 3 > jSpanX(b)) break; const c = gen(b[0] + k, b[1] + R.int(j) + 1, b[5] + 1, 'south', i); if (c) p.doors.push([c.box[0], c.box[1], b[5] - 1, c.box[3], c.box[4], b[5]]); }
+      for (let k = 0; k < jSpanZ(b); k += 4) { k += R.int(jSpanZ(b)); if (k + 3 > jSpanZ(b)) break; const c = gen(b[0] - 1, b[1] + R.int(j) + 1, b[2] + k, 'west', i); if (c) p.doors.push([b[0], c.box[1], c.box[2], b[0] + 1, c.box[4], c.box[5]]); }
+      for (let k = 0; k < jSpanZ(b); k += 4) { k += R.int(jSpanZ(b)); if (k + 3 > jSpanZ(b)) break; const c = gen(b[3] + 1, b[1] + R.int(j) + 1, b[2] + k, 'east', i); if (c) p.doors.push([b[3] - 1, c.box[1], c.box[2], b[3], c.box[4], c.box[5]]); }
+    } else if (p.type === 'Corridor') {
+      const j = R.int(4), d = p.ori, y = () => b[1] - 1 + R.int(3);
+      if (d === 'north') { if (j <= 1) gen(b[0], y(), b[2] - 1, d, i); else if (j === 2) gen(b[0] - 1, y(), b[2], 'west', i); else gen(b[3] + 1, y(), b[2], 'east', i); }
+      else if (d === 'south') { if (j <= 1) gen(b[0], y(), b[5] + 1, d, i); else if (j === 2) gen(b[0] - 1, y(), b[5] - 3, 'west', i); else gen(b[3] + 1, y(), b[5] - 3, 'east', i); }
+      else if (d === 'west') { if (j <= 1) gen(b[0] - 1, y(), b[2], d, i); else if (j === 2) gen(b[0], y(), b[2] - 1, 'north', i); else gen(b[0], y(), b[5] + 1, 'south', i); }
+      else { if (j <= 1) gen(b[3] + 1, y(), b[2], d, i); else if (j === 2) gen(b[3] - 3, y(), b[2] - 1, 'north', i); else gen(b[3] - 3, y(), b[5] + 1, 'south', i); }
+      if (i < 8) {
+        if (d !== 'north' && d !== 'south') { for (let k = b[0] + 3; k + 3 <= b[3]; k += 5) { const l = R.int(5); if (l === 0) gen(k, b[1], b[2] - 1, 'north', i + 1); else if (l === 1) gen(k, b[1], b[5] + 1, 'south', i + 1); } }
+        else { for (let k = b[2] + 3; k + 3 <= b[5]; k += 5) { const l = R.int(5); if (l === 0) gen(b[0] - 1, b[1], k, 'west', i + 1); else if (l === 1) gen(b[3] + 1, b[1], k, 'east', i + 1); } }
+      }
+    } else if (p.type === 'Crossing') {
+      const d = p.dir;
+      if (d === 'south') { gen(b[0] + 1, b[1], b[5] + 1, 'south', i); gen(b[0] - 1, b[1], b[2] + 1, 'west', i); gen(b[3] + 1, b[1], b[2] + 1, 'east', i); }
+      else if (d === 'west') { gen(b[0] + 1, b[1], b[2] - 1, 'north', i); gen(b[0] + 1, b[1], b[5] + 1, 'south', i); gen(b[0] - 1, b[1], b[2] + 1, 'west', i); }
+      else if (d === 'east') { gen(b[0] + 1, b[1], b[2] - 1, 'north', i); gen(b[0] + 1, b[1], b[5] + 1, 'south', i); gen(b[3] + 1, b[1], b[2] + 1, 'east', i); }
+      else { gen(b[0] + 1, b[1], b[2] - 1, 'north', i); gen(b[0] - 1, b[1], b[2] + 1, 'west', i); gen(b[3] + 1, b[1], b[2] + 1, 'east', i); }
+      if (p.two) { if (R() < 0.5) gen(b[0] + 1, b[1] + 4, b[2] - 1, 'north', i); if (R() < 0.5) gen(b[0] - 1, b[1] + 4, b[2] + 1, 'west', i); if (R() < 0.5) gen(b[3] + 1, b[1] + 4, b[2] + 1, 'east', i); if (R() < 0.5) gen(b[0] + 1, b[1] + 4, b[5] + 1, 'south', i); }
+    } else if (p.type === 'Stairs') {
+      const d = p.ori; if (d === 'south') gen(b[0], b[1], b[5] + 1, d, i); else if (d === 'west') gen(b[0] - 1, b[1], b[2], d, i); else if (d === 'east') gen(b[3] + 1, b[1], b[2], d, i); else gen(b[0], b[1], b[2] - 1, d, i);
+    }
+  };
+  children(room);
+  // StructurePiecesBuilder.moveBelowSeaLevel(63, 0, random, 10) (a badlands mineshaft instead stays near the surface)
+  const B = jBounds(L);
+  if (mesa) { const top = 63 + 30 - 1, j = 63 + R.int(top - 63 + 1); jMove(L, j - B[4]); }
+  else { const top = 63 - 10; let j = jSpanY(B) + 0 + 1; if (j < top) j += R.int(top - j); jMove(L, j - B[4]); }
+  for (const p of L) p.mesa = mesa;
+  res = L; JIG_CACHE.set(key, res); return res;
+}
+function msPost(c, p) {
+  if (jEdgesLiquid(c, p)) return;
+  const PL = p.mesa ? 'dark_oak_planks' : 'oak_planks', FE = p.mesa ? 'dark_oak_fence' : 'oak_fence', B = (...a) => jBox(c, p, ...a), A = 'cave_air';
+  const planksAt = (x, y, z) => { if (!jInterior(c, p, x, y, z)) return; const b = jGet(c, p, x, y, z); if (!jSolid(b)) jPlace(c, p, PL, x, y, z); };
+  if (p.type === 'Room') {
+    const b = p.box;
+    B(b[0], b[1], b[2], b[3], b[1], b[5], 'dirt', A, true);
+    B(b[0], b[1] + 1, b[2], b[3], Math.min(b[1] + 3, b[4]), b[5], A, A, false);
+    for (const d of p.doors) B(d[0], d[4] - 2, d[2], d[3], d[4], d[5], A, A, false);
+    jUpperHalfSphere(c, p, b[0], b[1] + 4, b[2], b[3], b[4], b[5], A, false);
+  } else if (p.type === 'Stairs') {
+    B(0, 5, 0, 2, 7, 1, A, A, false); B(0, 0, 7, 2, 2, 8, A, A, false);
+    for (let i = 0; i < 5; i++) B(0, 5 - i - (i < 4 ? 1 : 0), 2 + i, 2, 7 - i, 2 + i, A, A, false);
+  } else if (p.type === 'Crossing') {
+    const b = p.box;
+    if (p.two) { B(b[0] + 1, b[1], b[2], b[3] - 1, b[1] + 2, b[5], A, A, false); B(b[0], b[1], b[2] + 1, b[3], b[1] + 2, b[5] - 1, A, A, false); B(b[0] + 1, b[4] - 2, b[2], b[3] - 1, b[4], b[5], A, A, false); B(b[0], b[4] - 2, b[2] + 1, b[3], b[4], b[5] - 1, A, A, false); B(b[0] + 1, b[1] + 3, b[2] + 1, b[3] - 1, b[1] + 3, b[5] - 1, A, A, false); }
+    else { B(b[0] + 1, b[1], b[2], b[3] - 1, b[4], b[5], A, A, false); B(b[0], b[1], b[2] + 1, b[3], b[4], b[5] - 1, A, A, false); }
+    for (const [x, z] of [[b[0] + 1, b[2] + 1], [b[0] + 1, b[5] - 1], [b[3] - 1, b[2] + 1], [b[3] - 1, b[5] - 1]]) if (!jAir(jGet(c, p, x, b[4] + 1, z))) B(x, b[1], z, x, b[4], z, PL, A, false);
+    for (let x = b[0]; x <= b[3]; x++) for (let z = b[2]; z <= b[5]; z++) planksAt(x, b[1] - 1, z);
+  } else if (p.type === 'Corridor') {
+    const i1 = p.n * 5 - 1, R = c.R, pr = rng(hash32(p.box[0], p.box[1], p.box[2], 4413)), spSec = pr.int(Math.max(1, p.n)), spOff = pr.int(3);
+    B(0, 0, 0, 2, 1, i1, A, A, false);
+    jMaybeBox(c, p, 0.8, 0, 2, 0, 2, 2, i1, A, A, false, false);
+    if (p.spider) jMaybeBox(c, p, 0.6, 0, 0, 0, 2, 1, i1, 'cobweb', A, false, true);
+    const web = (ch, x, y, z) => { if (!jInterior(c, p, x, y, z) || !(R() < ch)) return; let n = 0; for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) if (jSolid(jGet(c, p, x + dx, y + dy, z + dz))) n++; if (n >= 2) jPlace(c, p, 'cobweb', x, y, z); };
+    const cart = (x, y, z) => { // MineShaftCorridor.createChest: a chest minecart on a rail, on a floor
+      const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz) || c.st.get(wx, wy, wz) !== 0 || c.st.get(wx, wy - 1, wz) === 0) return;
+      jPlace(c, p, 'rail[shape=' + (R() < 0.5 ? 'north_south' : 'east_west') + ']', x, y, z); c.tiles.push({ t: 'mob', i: jTl(wx, wy, wz), cart: 'chest', loot: rollLoot(R, 'mineshaft', 5) });
+    };
+    for (let j1 = 0; j1 < p.n; j1++) {
+      const k1 = 2 + j1 * 5;
+      // placeSupport: posts and a beam where the ceiling holds
+      let held = true; for (let x = 0; x <= 2; x++) if (jAir(jGet(c, p, x, 3, k1))) held = false;
+      if (held) { B(0, 0, k1, 0, 1, k1, FE, A, false); B(2, 0, k1, 2, 1, k1, FE, A, false);
+        if (R.int(4) === 0) { B(0, 2, k1, 0, 2, k1, PL, A, false); B(2, 2, k1, 2, 2, k1, PL, A, false); }
+        else { B(0, 2, k1, 2, 2, k1, PL, A, false); jMaybe(c, p, 0.05, 1, 2, k1 - 1, 'wall_torch[facing=south]'); jMaybe(c, p, 0.05, 1, 2, k1 + 1, 'wall_torch[facing=north]'); } }
+      web(0.1, 0, 2, k1 - 1); web(0.1, 2, 2, k1 - 1); web(0.1, 0, 2, k1 + 1); web(0.1, 2, 2, k1 + 1); web(0.05, 0, 2, k1 - 2); web(0.05, 2, 2, k1 - 2); web(0.05, 0, 2, k1 + 2); web(0.05, 2, 2, k1 + 2);
+      if (R.int(100) === 0) cart(2, 0, k1 - 1);
+      if (R.int(100) === 0) cart(0, 0, k1 + 1);
+      if (p.spider && j1 === spSec) { const i2 = k1 - 1 + spOff; if (jInside(c, p, 1, 0, i2) && jInterior(c, p, 1, 0, i2)) jSpawner(c, p, 1, 0, i2, 'cave_spider'); } // (one spawner: the section and spot fixed by the piece, whichever chunk builds it)
+    }
+    for (let x = 0; x <= 2; x++) for (let z = 0; z <= i1; z++) planksAt(x, -1, z);
+    // 1.18: over a gap, a post down to the ground (or a chain up to the ceiling) under the floor's ends
+    const prop = z => { for (const x of [0, 2]) { const wx = jWX(p, x, z), wz = jWZ(p, x, z); let wy = jWY(p, -2); if (!jIn(c, wx, wy, wz) || !jAir(c.st.get(wx, wy, wz))) continue;
+      let y = wy, ok = false; for (let k = 0; k < 24 && y > 1; k++, y--) { const b = c.st.get(wx, y, wz); if (jSolid(b)) { ok = true; break; } if (jLiquid(b)) break; }
+      if (ok) { const v = jState(FE, p.ori); for (let yy = wy; yy > y; yy--) c.st(wx, yy, wz, v[0], v[1]); } } };
+    prop(2); if (p.n > 1) prop(i1 - 2);
+    if (p.rails) for (let k3 = 0; k3 <= i1; k3++) { const below = jGet(c, p, 1, -1, k3); if (jSolid(below)) jMaybe(c, p, jInterior(c, p, 1, 0, k3) ? 0.7 : 0.9, 1, 0, k3, 'rail[shape=north_south]'); }
+  }
+}
+function stampMineshaftsJ(seed, G, st, cx, cz, tiles) {
+  for (let a = cx - 6; a <= cx + 6; a++) for (let b = cz - 6; b <= cz + 6; b++) {
+    if (rng(hash32(seed, a, b, 4407))() >= 0.004) continue; // Java: a mineshaft starts in 0.4% of chunks
+    const mesa = G ? BB[G.column(a * 16 + 8, b * 16 + 8)[1]] === BIO.BADLANDS : false;
+    jStamp(st, tiles, seed, cx, cz, assembleMineshaft(seed, a, b, mesa), msPost);
+  }
+}
+
+// ===================== nether fortresses (NetherFortressPieces) =====================
+const NF_BRIDGE = [['BridgeStraight', 30, 0, true], ['BridgeCrossing', 10, 4], ['RoomCrossing', 10, 4], ['StairsRoom', 10, 3], ['MonsterThrone', 5, 2], ['CastleEntrance', 5, 1]];
+const NF_CASTLE = [['CastleSmallCorridor', 25, 0, true], ['CastleSmallCorridorCrossing', 15, 5], ['CastleSmallCorridorRightTurn', 5, 10], ['CastleSmallCorridorLeftTurn', 5, 10], ['CastleCorridorStairs', 10, 3, true], ['CastleCorridorTBalcony', 7, 2], ['CastleStalkRoom', 5, 2]];
+const NF_SIZE = { BridgeStraight: [-1, -3, 0, 5, 10, 19], BridgeCrossing: [-8, -3, 0, 19, 10, 19], RoomCrossing: [-2, 0, 0, 7, 9, 7], StairsRoom: [-2, 0, 0, 7, 11, 7], MonsterThrone: [-2, 0, 0, 7, 8, 9], CastleEntrance: [-5, -3, 0, 13, 14, 13],
+  CastleSmallCorridor: [-1, 0, 0, 5, 7, 5], CastleSmallCorridorCrossing: [-1, 0, 0, 5, 7, 5], CastleSmallCorridorRightTurn: [-1, 0, 0, 5, 7, 5], CastleSmallCorridorLeftTurn: [-1, 0, 0, 5, 7, 5], CastleCorridorStairs: [-1, -7, 0, 5, 14, 10], CastleCorridorTBalcony: [-3, 0, 0, 9, 7, 9], CastleStalkRoom: [-5, -3, 0, 13, 14, 13], BridgeEndFiller: [-1, -3, 0, 5, 10, 8] };
+function assembleFortress(seed, fx, fz) {
+  const key = 'nf:' + seed + ':' + fx + ',' + fz; let res = JIG_CACHE.get(key); if (res) return res;
+  const R = rng(hash32(seed, fx, fz, 4501)), L = [], S = { prev: null, pending: [], bridge: NF_BRIDGE.map(([t, w, m, row]) => ({ t, w, m, row: !!row, n: 0 })), castle: NF_CASTLE.map(([t, w, m, row]) => ({ t, w, m, row: !!row, n: 0 })) };
+  const make = (t, x, y, z, d, depth) => { const [ox, oy, oz, sx, sy, sz] = NF_SIZE[t], b = jOrientBox(x, y, z, ox, oy, oz, sx, sy, sz, d); if (!(b[1] > 10) || jHit(L, b)) return null;
+    const p = { type: t, ori: d, depth, box: b }; if (t === 'BridgeEndFiller') p.seed = R.int(1 << 30); if (t === 'CastleSmallCorridorLeftTurn' || t === 'CastleSmallCorridorRightTurn') p.chest = R.int(3) === 0; return p; };
+  const piece = (list, x, y, z, d, depth) => {
+    let tot = 0, f = false; for (const e of list) { if (e.m > 0 && e.n < e.m) f = true; tot += e.w; } const i = f ? tot : -1;
+    let ok = i > 0 && depth <= 30;
+    for (let j = 0; j < 5 && ok; j++) { let k = R.int(i);
+      for (const e of list) { k -= e.w; if (k < 0) { if (!(e.m === 0 || e.n < e.m) || (e === S.prev && !e.row)) break; const p = make(e.t, x, y, z, d, depth); if (p) { e.n++; S.prev = e; if (!(e.m === 0 || e.n < e.m)) list.splice(list.indexOf(e), 1); return p; } } } }
+    return make('BridgeEndFiller', x, y, z, d, depth);
+  };
+  const add = (x, y, z, d, depth, castle) => {
+    if (Math.abs(x - start.box[0]) <= 112 && Math.abs(z - start.box[2]) <= 112) { const p = piece(castle ? S.castle : S.bridge, x, y, z, d, depth + 1); if (p) { L.push(p); S.pending.push(p); } return p; }
+    return null; // (Java makes an end filler here but never adds it)
+  };
+  const fwd = (p, xo, yo, c) => { const b = p.box; switch (p.ori) { case 'north': return add(b[0] + xo, b[1] + yo, b[2] - 1, p.ori, p.depth, c); case 'south': return add(b[0] + xo, b[1] + yo, b[5] + 1, p.ori, p.depth, c); case 'west': return add(b[0] - 1, b[1] + yo, b[2] + xo, p.ori, p.depth, c); default: return add(b[3] + 1, b[1] + yo, b[2] + xo, p.ori, p.depth, c); } };
+  const left = (p, yo, zo, c) => { const b = p.box; return p.ori === 'north' || p.ori === 'south' ? add(b[0] - 1, b[1] + yo, b[2] + zo, 'west', p.depth, c) : add(b[0] + zo, b[1] + yo, b[2] - 1, 'north', p.depth, c); };
+  const right = (p, yo, zo, c) => { const b = p.box; return p.ori === 'north' || p.ori === 'south' ? add(b[3] + 1, b[1] + yo, b[2] + zo, 'east', p.depth, c) : add(b[0] + zo, b[1] + yo, b[5] + 1, 'south', p.depth, c); };
+  const children = p => {
+    switch (p.type) {
+      case 'BridgeStraight': fwd(p, 1, 3, false); break;
+      case 'BridgeCrossing': fwd(p, 8, 3, false); left(p, 3, 8, false); right(p, 3, 8, false); break;
+      case 'RoomCrossing': fwd(p, 2, 0, false); left(p, 0, 2, false); right(p, 0, 2, false); break;
+      case 'StairsRoom': right(p, 6, 2, false); break;
+      case 'CastleEntrance': fwd(p, 5, 3, true); break;
+      case 'CastleSmallCorridor': fwd(p, 1, 0, true); break;
+      case 'CastleSmallCorridorCrossing': fwd(p, 1, 0, true); left(p, 0, 1, true); right(p, 0, 1, true); break;
+      case 'CastleSmallCorridorLeftTurn': left(p, 0, 1, true); break;
+      case 'CastleSmallCorridorRightTurn': right(p, 0, 1, true); break;
+      case 'CastleCorridorStairs': fwd(p, 1, 0, true); break;
+      case 'CastleCorridorTBalcony': { const i = p.ori === 'west' || p.ori === 'north' ? 5 : 1; left(p, 0, i, R.int(8) > 0); right(p, 0, i, R.int(8) > 0); break; }
+      case 'CastleStalkRoom': fwd(p, 5, 3, true); fwd(p, 5, 11, true); break;
+    }
+  };
+  const d0 = jRandDir(R), start = { type: 'BridgeCrossing', ori: d0, depth: 0, box: jMakeBox(fx, 64, fz, d0, 19, 10, 19) };
+  L.push(start); children(start);
+  while (S.pending.length) { const p = S.pending.splice(R.int(S.pending.length), 1)[0]; children(p); }
+  // moveInsideHeights(random, 48, 70)
+  const B = jBounds(L), i = 70 - 48 + 1 - jSpanY(B), j = i > 1 ? 48 + R.int(i) : 48; jMove(L, j - B[1]);
+  res = L; JIG_CACHE.set(key, res); return res;
+}
+function nfPost(c, p) {
+  const NB = 'nether_bricks', F = 'nether_brick_fence', A = 'air', B = (x0, y0, z0, x1, y1, z1, s) => jBox(c, p, x0, y0, z0, x1, y1, z1, s, s, false), P = (s, x, y, z) => jPlace(c, p, s, x, y, z), D = (x, y, z) => jColumnDown(c, p, NB, x, y, z);
+  const castleTop = () => { // the walls and roof railings shared by the entrance and the stalk room
+    B(0, 3, 0, 12, 4, 12, NB); B(0, 5, 0, 12, 13, 12, A); B(0, 5, 0, 1, 12, 12, NB); B(11, 5, 0, 12, 12, 12, NB); B(2, 5, 11, 4, 12, 12, NB); B(8, 5, 11, 10, 12, 12, NB); B(5, 9, 11, 7, 12, 12, NB);
+    B(2, 5, 0, 4, 12, 1, NB); B(8, 5, 0, 10, 12, 1, NB); B(5, 9, 0, 7, 12, 1, NB); B(2, 11, 2, 10, 12, 10, NB);
+    for (let i = 1; i <= 11; i += 2) { B(i, 10, 0, i, 11, 0, F); B(i, 10, 12, i, 11, 12, F); B(0, 10, i, 0, 11, i, F); B(12, 10, i, 12, 11, i, F); P(NB, i, 13, 0); P(NB, i, 13, 12); P(NB, 0, 13, i); P(NB, 12, 13, i); if (i !== 11) { P(F, i + 1, 13, 0); P(F, i + 1, 13, 12); P(F, 0, 13, i + 1); P(F, 12, 13, i + 1); } }
+    P(F, 0, 13, 0); P(F, 0, 13, 12); P(F, 12, 13, 12); P(F, 12, 13, 0);
+    for (let j = 3; j <= 9; j += 2) { B(1, 7, j, 1, 8, j, F); B(11, 7, j, 11, 8, j, F); }
+  };
+  const castleBase = () => { B(4, 2, 0, 8, 2, 12, NB); B(0, 2, 4, 12, 2, 8, NB); B(4, 0, 0, 8, 1, 3, NB); B(4, 0, 9, 8, 1, 12, NB); B(0, 0, 4, 3, 1, 8, NB); B(9, 0, 4, 12, 1, 8, NB);
+    for (let k = 4; k <= 8; k++) for (let l = 0; l <= 2; l++) { D(k, -1, l); D(k, -1, 12 - l); } for (let k = 0; k <= 2; k++) for (let l = 4; l <= 8; l++) { D(k, -1, l); D(12 - k, -1, l); } };
+  const small = () => { B(0, 0, 0, 4, 1, 4, NB); B(0, 2, 0, 4, 5, 4, A); };
+  const smallEnd = () => { B(0, 6, 0, 4, 6, 4, NB); for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) D(i, -1, j); };
+  switch (p.type) {
+    case 'BridgeStraight':
+      B(0, 3, 0, 4, 4, 18, NB); B(1, 5, 0, 3, 7, 18, A); B(0, 5, 0, 0, 5, 18, NB); B(4, 5, 0, 4, 5, 18, NB); B(0, 2, 0, 4, 2, 5, NB); B(0, 2, 13, 4, 2, 18, NB); B(0, 0, 0, 4, 1, 3, NB); B(0, 0, 15, 4, 1, 18, NB);
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 2; j++) { D(i, -1, j); D(i, -1, 18 - j); }
+      B(0, 1, 1, 0, 4, 1, F); B(0, 3, 4, 0, 4, 4, F); B(0, 3, 14, 0, 4, 14, F); B(0, 1, 17, 0, 4, 17, F); B(4, 1, 1, 4, 4, 1, F); B(4, 3, 4, 4, 4, 4, F); B(4, 3, 14, 4, 4, 14, F); B(4, 1, 17, 4, 4, 17, F);
+      break;
+    case 'BridgeCrossing':
+      B(7, 3, 0, 11, 4, 18, NB); B(0, 3, 7, 18, 4, 11, NB); B(8, 5, 0, 10, 7, 18, A); B(0, 5, 8, 18, 7, 10, A);
+      B(7, 5, 0, 7, 5, 7, NB); B(7, 5, 11, 7, 5, 18, NB); B(11, 5, 0, 11, 5, 7, NB); B(11, 5, 11, 11, 5, 18, NB); B(0, 5, 7, 7, 5, 7, NB); B(11, 5, 7, 18, 5, 7, NB); B(0, 5, 11, 7, 5, 11, NB); B(11, 5, 11, 18, 5, 11, NB);
+      B(7, 2, 0, 11, 2, 5, NB); B(7, 2, 13, 11, 2, 18, NB); B(7, 0, 0, 11, 1, 3, NB); B(7, 0, 15, 11, 1, 18, NB);
+      for (let i = 7; i <= 11; i++) for (let j = 0; j <= 2; j++) { D(i, -1, j); D(i, -1, 18 - j); }
+      B(0, 2, 7, 5, 2, 11, NB); B(13, 2, 7, 18, 2, 11, NB); B(0, 0, 7, 3, 1, 11, NB); B(15, 0, 7, 18, 1, 11, NB);
+      for (let i = 0; i <= 2; i++) for (let j = 7; j <= 11; j++) { D(i, -1, j); D(18 - i, -1, j); }
+      break;
+    case 'BridgeEndFiller': {
+      const r = rng(p.seed);
+      for (let i = 0; i <= 4; i++) for (let j = 3; j <= 4; j++) B(i, j, 0, i, j, r.int(8), NB);
+      B(0, 5, 0, 0, 5, r.int(8), NB); B(4, 5, 0, 4, 5, r.int(8), NB);
+      for (let l = 0; l <= 4; l++) B(l, 2, 0, l, 2, r.int(5), NB);
+      for (let l = 0; l <= 4; l++) for (let j = 0; j <= 1; j++) B(l, j, 0, l, j, r.int(3), NB);
+      break; }
+    case 'RoomCrossing':
+      B(0, 0, 0, 6, 1, 6, NB); B(0, 2, 0, 6, 7, 6, A); B(0, 2, 0, 1, 6, 0, NB); B(0, 2, 6, 1, 6, 6, NB); B(5, 2, 0, 6, 6, 0, NB); B(5, 2, 6, 6, 6, 6, NB); B(0, 2, 0, 0, 6, 1, NB); B(0, 2, 5, 0, 6, 6, NB); B(6, 2, 0, 6, 6, 1, NB); B(6, 2, 5, 6, 6, 6, NB);
+      B(2, 6, 0, 4, 6, 0, NB); B(2, 5, 0, 4, 5, 0, F); B(2, 6, 6, 4, 6, 6, NB); B(2, 5, 6, 4, 5, 6, F); B(0, 6, 2, 0, 6, 4, NB); B(0, 5, 2, 0, 5, 4, F); B(6, 6, 2, 6, 6, 4, NB); B(6, 5, 2, 6, 5, 4, F);
+      for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) D(i, -1, j);
+      break;
+    case 'StairsRoom':
+      B(0, 0, 0, 6, 1, 6, NB); B(0, 2, 0, 6, 10, 6, A); B(0, 2, 0, 1, 8, 0, NB); B(5, 2, 0, 6, 8, 0, NB); B(0, 2, 1, 0, 8, 6, NB); B(6, 2, 1, 6, 8, 6, NB); B(1, 2, 6, 5, 8, 6, NB);
+      B(0, 3, 2, 0, 5, 4, F); B(6, 3, 2, 6, 5, 2, F); B(6, 3, 4, 6, 5, 4, F); P(NB, 5, 2, 5); B(4, 2, 5, 4, 3, 5, NB); B(3, 2, 5, 3, 4, 5, NB); B(2, 2, 5, 2, 5, 5, NB); B(1, 2, 5, 1, 6, 5, NB);
+      B(1, 7, 1, 5, 7, 4, NB); B(6, 8, 2, 6, 8, 4, A); B(2, 6, 0, 4, 8, 0, NB); B(2, 5, 0, 4, 5, 0, F);
+      for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) D(i, -1, j);
+      break;
+    case 'MonsterThrone':
+      B(0, 2, 0, 6, 7, 7, A); B(1, 0, 0, 5, 1, 7, NB); B(1, 2, 1, 5, 2, 7, NB); B(1, 3, 2, 5, 3, 7, NB); B(1, 4, 3, 5, 4, 7, NB); B(1, 2, 0, 1, 4, 2, NB); B(5, 2, 0, 5, 4, 2, NB); B(1, 5, 2, 1, 5, 3, NB); B(5, 5, 2, 5, 5, 3, NB); B(0, 5, 3, 0, 5, 8, NB); B(6, 5, 3, 6, 5, 8, NB); B(1, 5, 8, 5, 5, 8, NB);
+      P(F, 1, 6, 3); P(F, 5, 6, 3); B(0, 6, 3, 0, 6, 8, F); B(6, 6, 3, 6, 6, 8, F); B(1, 6, 8, 5, 6, 8, F); P(F, 1, 7, 8); B(2, 7, 8, 4, 7, 8, F); P(F, 5, 7, 8); P(F, 2, 8, 8); P(F, 3, 8, 8); P(F, 4, 8, 8);
+      jSpawner(c, p, 3, 5, 5, 'blaze');
+      for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) D(i, -1, j);
+      break;
+    case 'CastleEntrance':
+      castleTop(); B(5, 8, 0, 7, 8, 0, F); castleBase();
+      B(5, 5, 5, 7, 5, 7, NB); B(6, 1, 6, 6, 4, 6, A); P(NB, 6, 0, 6); P('lava', 6, 5, 6);
+      break;
+    case 'CastleStalkRoom':
+      castleTop();
+      for (let k = 0; k <= 6; k++) { const l = k + 4; for (let i = 5; i <= 7; i++) P('nether_brick_stairs[facing=north]', i, 5 + k, l); if (l >= 5 && l <= 8) B(5, 5, l, 7, k + 4, l, NB); else if (l >= 9 && l <= 10) B(5, 8, l, 7, k + 4, l, NB); if (k >= 1) B(5, 6 + k, l, 7, 9 + k, l, A); }
+      for (let i = 5; i <= 7; i++) P('nether_brick_stairs[facing=north]', i, 12, 11);
+      B(5, 6, 7, 5, 7, 7, F); B(7, 6, 7, 7, 7, 7, F); B(5, 13, 12, 7, 13, 12, A);
+      B(2, 5, 2, 3, 5, 3, NB); B(2, 5, 9, 3, 5, 10, NB); B(9, 5, 2, 10, 5, 3, NB); B(9, 5, 9, 10, 5, 10, NB); B(10, 5, 4, 10, 5, 8, NB);
+      for (const z of [2, 3, 9, 10]) { P('nether_brick_stairs[facing=west]', 4, 5, z); P('nether_brick_stairs[facing=east]', 8, 5, z); }
+      B(3, 4, 4, 4, 4, 8, 'soul_sand'); B(8, 4, 4, 9, 4, 8, 'soul_sand'); B(3, 5, 4, 4, 5, 8, 'nether_wart'); B(8, 5, 4, 9, 5, 8, 'nether_wart');
+      castleBase();
+      break;
+    case 'CastleSmallCorridor':
+      small(); B(0, 2, 0, 0, 5, 4, NB); B(4, 2, 0, 4, 5, 4, NB); B(0, 3, 1, 0, 4, 1, F); B(0, 3, 3, 0, 4, 3, F); B(4, 3, 1, 4, 4, 1, F); B(4, 3, 3, 4, 4, 3, F); smallEnd();
+      break;
+    case 'CastleSmallCorridorCrossing':
+      small(); B(0, 2, 0, 0, 5, 0, NB); B(4, 2, 0, 4, 5, 0, NB); B(0, 2, 4, 0, 5, 4, NB); B(4, 2, 4, 4, 5, 4, NB); smallEnd();
+      break;
+    case 'CastleSmallCorridorLeftTurn':
+      small(); B(4, 2, 0, 4, 5, 4, NB); B(4, 3, 1, 4, 4, 1, F); B(4, 3, 3, 4, 4, 3, F); B(0, 2, 0, 0, 5, 0, NB); B(0, 2, 4, 3, 5, 4, NB); B(1, 3, 4, 1, 4, 4, F); B(3, 3, 4, 3, 4, 4, F);
+      if (p.chest) jChest(c, p, 3, 2, 3, 'fortress', 5);
+      smallEnd(); break;
+    case 'CastleSmallCorridorRightTurn':
+      small(); B(0, 2, 0, 0, 5, 4, NB); B(0, 3, 1, 0, 4, 1, F); B(0, 3, 3, 0, 4, 3, F); B(4, 2, 0, 4, 5, 0, NB); B(1, 2, 4, 4, 5, 4, NB); B(1, 3, 4, 1, 4, 4, F); B(3, 3, 4, 3, 4, 4, F);
+      if (p.chest) jChest(c, p, 1, 2, 3, 'fortress', 5);
+      smallEnd(); break;
+    case 'CastleCorridorStairs':
+      for (let i = 0; i <= 9; i++) { const j = Math.max(1, 7 - i), k = Math.min(Math.max(j + 5, 14 - i), 13);
+        B(0, 0, i, 4, j, i, NB); B(1, j + 1, i, 3, k - 1, i, A); if (i <= 6) for (let x = 1; x <= 3; x++) P('nether_brick_stairs[facing=north]', x, j + 1, i);
+        B(0, k, i, 4, k, i, NB); B(0, j + 1, i, 0, k - 1, i, NB); B(4, j + 1, i, 4, k - 1, i, NB); if ((i & 1) === 0) { B(0, j + 2, i, 0, j + 3, i, F); B(4, j + 2, i, 4, j + 3, i, F); }
+        for (let x = 0; x <= 4; x++) D(x, -1, i); }
+      break;
+    case 'CastleCorridorTBalcony':
+      B(0, 0, 0, 8, 1, 8, NB); B(0, 2, 0, 8, 5, 8, A); B(0, 6, 0, 8, 6, 5, NB); B(0, 2, 0, 2, 5, 0, NB); B(6, 2, 0, 8, 5, 0, NB); B(1, 3, 0, 1, 4, 0, F); B(7, 3, 0, 7, 4, 0, F);
+      B(0, 2, 4, 8, 2, 8, NB); B(1, 1, 4, 2, 2, 4, A); B(6, 1, 4, 7, 2, 4, A); B(1, 3, 8, 7, 3, 8, F); P(F, 0, 3, 8); P(F, 8, 3, 8); B(0, 3, 6, 0, 3, 7, F); B(8, 3, 6, 8, 3, 7, F);
+      B(0, 3, 4, 0, 5, 5, NB); B(8, 3, 4, 8, 5, 5, NB); B(1, 3, 5, 2, 5, 5, NB); B(6, 3, 5, 7, 5, 5, NB); B(1, 4, 5, 1, 5, 5, F); B(7, 4, 5, 7, 5, 5, F);
+      for (let i = 0; i <= 5; i++) for (let j = 0; j <= 8; j++) D(j, -1, i);
+      break;
+  }
+}
+function fortressPieces(seed, a, b) { const f = fortressAt(seed, a, b); return f ? assembleFortress(seed, f.x - 6, f.z - 6) : null; }
+// is (x, y, z) inside one of a fortress's pieces? (where its blazes and wither skeletons spawn, as Java's spawn overrides)
+function inFortressPieces(seed, x, y, z) {
+  const rx = Math.floor((x >> 4) / FREG), rz = Math.floor((z >> 4) / FREG);
+  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const L = fortressPieces(seed, i, j); if (L) for (const p of L) { const b = p.box; if (x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5]) return true; } }
+  return false;
+}
+function inStrongholdPieces(seed, x, y, z) {
+  for (const [sx, , sz] of strongholdsOf(seed)) { if (Math.abs(sx - x) > 200 || Math.abs(sz - z) > 200) continue;
+    for (const p of assembleStronghold(seed, sx - 6, sz - 6)) { const b = p.box; if (x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5]) return true; } }
+  return false;
+}
+
+// ===================== jungle temples (JungleTemplePiece) =====================
+const JT_SEL = R => R() < 0.4 ? 'cobblestone' : 'mossy_cobblestone';
+function jungleTemplePiece(o, G) {
+  if (o.jt) return o.jt;
+  const r = rng(hash32(o.seed, 5, 5, 4601)), d = jRandDir(r), x = o.x - 8, z = o.z - 8, box = jMakeBox(x, 64, z, d, 12, 10, 15);
+  let sum = 0, n = 0; for (let a = box[0]; a <= box[3]; a++) for (let b = box[2]; b <= box[5]; b++) { sum += Math.max(G.column(a, b)[0] + 1, SEA + 1); n++; } // updateAverageGroundHeight
+  const avg = Math.round(sum / n); box[1] = avg; box[4] = avg + 9;
+  o.jt = { type: 'Jungle', ori: d, box }; return o.jt;
+}
+function jtPost(c, p) {
+  const S = (x0, y0, z0, x1, y1, z1) => jBoxSel(c, p, x0, y0, z0, x1, y1, z1, false, JT_SEL), A = (...a) => jAirBox(c, p, ...a), P = (s, x, y, z) => jPlace(c, p, s, x, y, z);
+  S(0, -4, 0, 11, 0, 14); S(2, 1, 2, 9, 2, 2); S(2, 1, 12, 9, 2, 12); S(2, 1, 3, 2, 2, 11); S(9, 1, 3, 9, 2, 11);
+  S(1, 3, 1, 10, 6, 1); S(1, 3, 13, 10, 6, 13); S(1, 3, 2, 1, 6, 12); S(10, 3, 2, 10, 6, 12); S(2, 3, 2, 9, 3, 12); S(2, 6, 2, 9, 6, 12); S(3, 7, 3, 8, 7, 11); S(4, 8, 4, 7, 8, 10);
+  A(3, 1, 3, 8, 2, 11); A(4, 3, 6, 7, 3, 9); A(2, 4, 2, 9, 5, 12); A(4, 6, 5, 7, 6, 9); A(5, 7, 6, 6, 7, 8); A(5, 1, 2, 6, 2, 2); A(5, 2, 12, 6, 2, 12); A(5, 5, 1, 6, 5, 1); A(5, 5, 13, 6, 5, 13);
+  P('air', 1, 5, 5); P('air', 10, 5, 5); P('air', 1, 5, 9); P('air', 10, 5, 9);
+  for (let i = 0; i <= 14; i += 14) { S(2, 4, i, 2, 5, i); S(4, 4, i, 4, 5, i); S(7, 4, i, 7, 5, i); S(9, 4, i, 9, 5, i); }
+  S(5, 6, 0, 6, 6, 0);
+  for (let l = 0; l <= 11; l += 11) { for (let j = 2; j <= 12; j += 2) S(l, 4, j, l, 5, j); S(l, 6, 5, l, 6, 5); S(l, 6, 9, l, 6, 9); }
+  S(2, 7, 2, 2, 9, 2); S(9, 7, 2, 9, 9, 2); S(2, 7, 12, 2, 9, 12); S(9, 7, 12, 9, 9, 12); S(4, 9, 4, 4, 9, 4); S(7, 9, 4, 7, 9, 4); S(4, 9, 10, 4, 9, 10); S(7, 9, 10, 7, 9, 10); S(5, 9, 7, 6, 9, 7);
+  const st = f => 'cobblestone_stairs[facing=' + f + ']';
+  P(st('north'), 5, 9, 6); P(st('north'), 6, 9, 6); P(st('south'), 5, 9, 8); P(st('south'), 6, 9, 8);
+  for (let x = 4; x <= 7; x++) P(st('north'), x, 0, 0);
+  P(st('north'), 4, 1, 8); P(st('north'), 4, 2, 9); P(st('north'), 4, 3, 10); P(st('north'), 7, 1, 8); P(st('north'), 7, 2, 9); P(st('north'), 7, 3, 10);
+  S(4, 1, 9, 4, 1, 9); S(7, 1, 9, 7, 1, 9); S(4, 1, 10, 7, 2, 10); S(5, 4, 5, 6, 4, 5); P(st('east'), 4, 4, 5); P(st('west'), 7, 4, 5);
+  for (let k = 0; k < 4; k++) { P(st('south'), 5, -k, 6 + k); P(st('south'), 6, -k, 6 + k); A(5, -k, 7 + k, 6, -k, 9 + k); }
+  A(1, -3, 12, 10, -1, 13); A(1, -3, 1, 3, -1, 13); A(1, -3, 1, 9, -1, 5);
+  for (let i = 1; i <= 13; i += 2) S(1, -3, i, 1, -2, i);
+  for (let j = 2; j <= 12; j += 2) S(1, -1, j, 3, -1, j);
+  S(2, -2, 1, 5, -2, 1); S(7, -2, 1, 9, -2, 1); S(6, -3, 1, 6, -3, 1); S(6, -1, 1, 6, -1, 1);
+  // the first trap: a tripwire across the stairs' foot, wired to a dispenser in the wall
+  P('tripwire_hook[attached=true,facing=east]', 1, -3, 8); P('tripwire_hook[attached=true,facing=west]', 4, -3, 8); P('tripwire[attached=true,east=true,west=true]', 2, -3, 8); P('tripwire[attached=true,east=true,west=true]', 3, -3, 8);
+  for (const z of [7, 6, 5, 4, 3, 2, 1]) P('redstone_wire[north=side,south=side]', 5, -3, z);
+  P('redstone_wire[east=side,west=side]', 4, -3, 1); P('mossy_cobblestone', 3, -3, 1);
+  jDispenser(c, p, 3, -2, 1, 'north');
+  P('vine[south=true]', 3, -2, 2);
+  // the second: along the corridor to the main chest
+  P('tripwire_hook[attached=true,facing=north]', 7, -3, 1); P('tripwire_hook[attached=true,facing=south]', 7, -3, 5);
+  for (const z of [2, 3, 4]) P('tripwire[attached=true,north=true,south=true]', 7, -3, z);
+  P('redstone_wire[east=side,west=side]', 8, -3, 6); P('redstone_wire[west=side,south=side]', 9, -3, 6); P('redstone_wire[north=side,south=up]', 9, -3, 5); P('mossy_cobblestone', 9, -3, 4); P('redstone_wire[north=side,south=side]', 9, -2, 4);
+  jDispenser(c, p, 9, -2, 3, 'west');
+  P('vine[east=true]', 8, -1, 3); P('vine[east=true]', 8, -2, 3);
+  jChest(c, p, 8, -3, 3, 'jungle_temple', 5);
+  for (const [x, y, z] of [[9, -3, 2], [8, -3, 1], [4, -3, 5], [5, -2, 5], [5, -1, 5], [6, -3, 5], [7, -2, 5], [7, -1, 5], [8, -3, 5]]) P('mossy_cobblestone', x, y, z);
+  S(9, -1, 1, 9, -1, 5);
+  // the lever puzzle: three levers, sticky pistons that pull back the wall in front of the hidden chest
+  A(8, -3, 8, 10, -1, 10);
+  P('chiseled_stone_bricks', 8, -2, 11); P('chiseled_stone_bricks', 9, -2, 11); P('chiseled_stone_bricks', 10, -2, 11);
+  for (const x of [8, 9, 10]) P('lever[face=wall,facing=north]', x, -2, 12);
+  S(8, -3, 8, 8, -3, 10); S(10, -3, 8, 10, -3, 10);
+  P('mossy_cobblestone', 10, -2, 9); P('redstone_wire[north=side,south=side]', 8, -2, 9); P('redstone_wire[north=side,south=side]', 8, -2, 10); P('redstone_wire[north=side,south=side,east=side,west=side]', 10, -1, 9);
+  P('sticky_piston[facing=up]', 9, -2, 8); P('sticky_piston[facing=west]', 10, -2, 8); P('sticky_piston[facing=west]', 10, -1, 8); P('repeater[facing=north]', 10, -2, 10);
+  jChest(c, p, 9, -3, 10, 'jungle_temple', 5);
+}
+function jDispenser(c, p, x, y, z, face) {
+  const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz) || c.st.get(wx, wy, wz) === BID.dispenser) return false;
+  jPlace(c, p, 'dispenser[facing=' + face + ']', x, y, z);
+  const da = rollLoot(c.R, 'jungle_dispenser', 1); c.tiles.push({ t: 'dispenser', i: jTl(wx, wy, wz), loot: da.length ? da.map(l => [l[0] % 9, l[1], l[2]]) : [[0, 'arrow', 2 + c.R.int(6)]] });
+  return true;
+}
+
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { rollLoot, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
@@ -10379,14 +10879,12 @@ const NETHER_SPAWNS = {
 };
 const pickSpawn = list => { let t = list.reduce((a, e) => a + e[1], 0), r = Math.random() * t; for (const e of list) if ((r -= e[1]) < 0) return e; return list[0]; };
 function inFortress(x, y, z) {
-  const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-  for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 24 && Math.abs(x - f.x) < 112 && Math.abs(z - f.z) < 112) return true; }
-  return false;
+  return S.inFortressPieces(W.seed, x, y, z); // (inside one of the fortress's pieces: Java's spawn override)
 }
 function mobsForDimension(x, y, z, b, below) {
   if (W.dim === -1) {
     const bio = biomeAt(x, z), N = S.NETHER_BIO;
-    const list = below === BID.nether_bricks || (Math.random() < 0.5 && inFortress(x, y, z) && [BID.nether_bricks, BID.netherrack, BID.soul_sand].includes(below)) ? NETHER_SPAWNS.fortress
+    const list = inFortress(x, y, z) ? NETHER_SPAWNS.fortress /* Java: inside the fortress's pieces only its own mobs */
       : bio === N.SOUL ? NETHER_SPAWNS.soul : bio === N.BASALT ? NETHER_SPAWNS.basalt : bio === N.WARPED ? NETHER_SPAWNS.warped : bio === N.CRIMSON ? NETHER_SPAWNS.crimson : NETHER_SPAWNS.wastes;
     const [t, , lo, hi] = pickSpawn(list); return [t, lo + Math.floor(Math.random() * (hi - lo + 1))];
   }
@@ -18448,11 +18946,10 @@ function advScan() {
   const x = Math.floor(PL.x), y = Math.floor(PL.y), z = Math.floor(PL.z);
   if (W.dim === 0) {
     const cb = S.caveBiomeAt(W.seed, x, y, z, topY(x, z), W.exp), key = biomeKey(cb >= 0 ? cb : biomeAt(x, z), x, z); if (key) advGrant('adventure/adventuring_time', key);
-    for (const [sx, sy, sz] of S.strongholdsOf(W.seed)) if (Math.abs(x - sx) < 44 && Math.abs(z - sz) < 44 && y < sy + 12 && y > sy - 30 && advInStruct('stronghold')) advGrant('story/follow_ender_eye');
+    if (S.inStrongholdPieces(W.seed, x, y, z) && advInStruct('stronghold')) advGrant('story/follow_ender_eye'); // (inside one of its pieces, as Java's structure check)
   } else if (W.dim === -1) {
     const b = biomeAt(x, z), key = { 13: 'nether_wastes', 14: 'crimson_forest', 15: 'warped_forest', 16: 'soul_sand_valley', 17: 'basalt_deltas' }[b]; if (key) advGrant('nether/explore_nether', key);
-    const rx = Math.floor((x >> 4) / S.FREG), rz = Math.floor((z >> 4) / S.FREG);
-    for (let i = rx - 1; i <= rx + 1; i++) for (let j = rz - 1; j <= rz + 1; j++) { const f = S.fortressAt(W.seed, i, j); if (f && Math.abs(y - f.y) < 16 && Math.abs(x - f.x) < Math.max(...f.arms) + 4 && Math.abs(z - f.z) < Math.max(...f.arms) + 4 && advInStruct('fortress')) advGrant('nether/find_fortress'); }
+    if (S.inFortressPieces(W.seed, x, y, z) && advInStruct('fortress')) advGrant('nether/find_fortress');
     const bx = Math.floor((x >> 4) / S.BREG), bz = Math.floor((z >> 4) / S.BREG);
     for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) { const o = S.bastionAt(W.seed, i, j); if (o && Math.abs(x - o.x) < 36 && Math.abs(z - o.z) < 36 && y > o.y - 4 && y < o.y + 40 && advInStruct('bastion')) advGrant('nether/find_bastion'); }
   } else if (W.dim === 1) {
