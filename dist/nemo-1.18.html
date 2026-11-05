@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.05 17:00';
+const NEMO_VERSION = '2026.11.05 19:39';
 
 </script>
 <script>/* js/shared.js */
@@ -9177,12 +9177,17 @@ function setSheared(e) { e.sheared = true; for (const [n, p] of Object.entries(e
 function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
   if (e.dead || e.deathT) return false;
   if (e.def.onHurt) return e.def.onHurt(e, dmg, attacker, src);
-  if (e.inv > 0) return false;
+  // Java's moment of invulnerability: 20 ticks after a hit; in the first half of it only a harder hit lands, and only by how
+  // much harder it is (no knockback, no flinch); in the second half anything hits again
+  let partial = false;
+  if (e.inv > 10) { if (dmg <= (e.lastDmg || 0)) return false; const d0 = dmg; dmg -= e.lastDmg || 0; e.lastDmg = d0; partial = true; } else e.lastDmg = dmg;
   if (e.type === 'shulker') dmg *= shulkerHurtMul(e);
   if (e.def.armorMul) dmg *= e.def.armorMul(e);
   if (attacker === PL) stat('damage_dealt', Math.round(Math.min(dmg, Math.max(0, e.hp)) * 10));
-  e.hp -= dmg; e.hurt = 10; e.inv = 10;
-  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes) { const ks = 0.4 + (HURT_KB.extra || 0) * 0.5; e.vx = kx / kl * ks; e.vz = kz / kl * ks; e.vy = e.def.fly ? 0.1 : 0.36 + (HURT_KB.extra ? 0.1 : 0); } // (Java: 0.4, plus 0.5 a level of knockback and for a sprinting hit)
+  e.hp -= dmg; if (!partial) { e.hurt = 10; e.inv = 20; }
+  // Java's knockback: half of what it was moving with, plus 0.4 away from the hit (a level of knockback or a sprint: another
+  // 0.5 after it); up only from the ground, never more than 0.4
+  const kl = Math.hypot(kx, kz) || 1; if ((kx || kz) && !e.def.kbRes && !partial) { const res = e.def.kbResist || 0, knock = s => { s *= 1 - res; if (s <= 0) return; e.vx = e.vx / 2 + kx / kl * s; e.vz = e.vz / 2 + kz / kl * s; if (e.onGround || e.def.fly) e.vy = Math.min(0.4, (e.vy || 0) / 2 + s); }; knock(0.4); if (HURT_KB.extra) knock(HURT_KB.extra * 0.5); } // (Java: 0.4, plus 0.5 a level of knockback and for a sprinting hit)
   // neutral mobs remember who hit them; zombified piglins call their friends; golems defend villagers
   if (attacker === PL) {
     e.plHitT = W.tickN; // axolotls go after what the player is fighting
@@ -9194,7 +9199,7 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
   if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
-  play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
+  if (!partial) play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;
   if (e.hp <= 0) {
@@ -9381,7 +9386,7 @@ function squidTick(e) {
 }
 function attackPlayer(e, dmg, tx, tz) {
   if (PL.mode === 'creative' || PL.dead) return;
-  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); PL.vx += tx * 0.4; PL.vz += tz * 0.4; PL.vy = Math.max(PL.vy, 0.3); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
+  if (hurtPlayer(diffDmg(dmg), 'mob', e)) { if (e.type === 'wither_skeleton') addEffect(PL, 'wither', 200, 0); else if (e.type === 'husk') addEffect(PL, 'hunger', 140, 0); if (!PL.hitPartial) plKnock(0.4 + (e.def.atkKb || 0), tx, tz); if (e.def.onHitPlayer) e.def.onHitPlayer(e); }
 }
 const DIFF_MUL = () => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? 0.5 : PL.difficulty === 3 ? 1.5 : 1;
 const diffDmg = d => PL.difficulty === 0 ? 0 : PL.difficulty === 1 ? Math.min(d / 2 + 1, d) : PL.difficulty === 3 ? d * 1.5 : d; // Java's scaling of a mob's hit: easy halves it plus one, hard adds half
@@ -16096,7 +16101,7 @@ function raycast(reach, fluids) {
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
     const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
-    const lim = creative() ? 5 : 3;
+    const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
   return best;
@@ -16107,10 +16112,15 @@ function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { c
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
 // caves & cliffs: from the build limit to the bottom of the world, landing alive (in water too)
 function fallLanded() { if (PL.fallDist > 0 && PL.fallFrom >= 319 && PL.y < -58.5 && typeof advGrant === 'function') setTimeout(() => { if (PL.health > 0) advGrant('adventure/fall_from_world_height'); }, 0); }
+// Java's knockback on the player: half its motion plus the push; up only from the ground; netherite armour resists 10% a piece
+function plKnock(s, dx, dz) { const l = Math.hypot(dx, dz) || 1, res = INV.armor.reduce((a, q) => a + (q && ITEMS[q.id] && /^netherite_/.test(ITEMS[q.id].key) ? 0.1 : 0), 0); s *= 1 - Math.min(1, res); if (s <= 0) return; PL.vx = PL.vx / 2 + dx / l * s; PL.vz = PL.vz / 2 + dz / l * s; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + s); }
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
-  if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
+  // Java: 60 ticks of safety after respawning; after a hit 20 ticks, in the first half of which only a harder hit lands,
+  // by the difference (and without knockback)
+  PL.hitPartial = false;
+  if (cause !== 'void' && cause !== 'kill') { if (PL.inv > 20) return false; if (PL.inv > 10) { if (dmg <= (PL.lastDmg || 0)) return false; const d0 = dmg; dmg -= PL.lastDmg || 0; PL.lastDmg = d0; PL.hitPartial = true; } else PL.lastDmg = dmg; }
   if (dmg <= 0) return false;
   if (PL.sleeping) wakeUp(); // being hurt wakes you
   if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
@@ -16131,7 +16141,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
   stat('damage_taken', Math.round(Math.min(dmg, PL.health) * 10));
-  PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
+  PL.health = Math.max(0, PL.health - dmg); if (!PL.hitPartial) { PL.hurtT = 10; PL.inv = 20; } PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
   if (attacker && (attacker.kind === 'mob' || cause === 'player')) PL.credit = { e: attacker, at: W.tickN, name: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitBy) || null : null, item: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitWeapon) || null : null }; // who gets the credit for a death soon after (Java's combat tracker)
@@ -16452,19 +16462,20 @@ function attackEntity(e) {
   PL.lastAttacked = e;
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4, ARTH = e.type === 'spider' || e.type === 'cave_spider' || e.type === 'bee' || e.type === 'silverfish' || e.type === 'endermite';
-  const base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
+  const base = tool ? tool.dmg : 1, ench = (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
-  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
+  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8); // (Java: the weapon's damage by the square of the charge, its enchantment's by the charge, and a critical hit only on the first)
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
+  const enchDmg = ench * p;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
-  PL.attackT = 0;
+  dmg += enchDmg; PL.attackT = 0;
   const kb = 1, kbExtra = (PL.sprinting && p > 0.9 ? 1 : 0) + enchLv(h, 'knockback'); // (Java: a level of knockback each, the sprint counting as one)
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
   const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
   HURT_KB.extra = kbExtra; let landed; try { landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player'); } finally { HURT_KB.extra = 0; }
-  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
+  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (kbExtra > 0) { PL.vx *= 0.6; PL.vz *= 0.6; } /* (Java: a knockback hit slows you) */ if (PL.sprinting) PL.sprinting = false; play('hit', { pitch: crit ? 0.8 : p > 0.9 ? 1 : 1.3, vol: p > 0.9 ? 1 : 0.6 }); }
   if (tool && landed) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // only a hit that lands wears the weapon (Java: not one into a mob's moment of invulnerability); a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
@@ -19500,7 +19511,7 @@ function mpHandle(m, from) {
     case 'drop': if (host && m.st && ITEMS[m.st.id]) { const e = dropItem(m.x, m.y, m.z, m.st.id, m.st.n, m.vel, Math.min(60, +m.delay || 10), m.st.d, m.st); if (e) e.from = from; } return;
     case 'pick': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead && q.kind === 'item'); if (e) { removeEnt(e); mpSend({ t: 'give', st: e.stack }, from); } } return;
     case 'give': if (!host && m.st && ITEMS[m.st.id]) { INV.giveOrDrop({ ...m.st }); play('pop', { vol: 0.4 }); UI.hudDirty = true; } return;
-    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
+    case 'hit': if (host) { const e = ENT.find(q => q.mpid === m.e && !q.dead), p = MP.peers.get(from), hit = () => { HURT_KB.extra = Math.max(0, Math.min(5, +m.kb || 0)); try { hurtMob(e, Math.min(30, +m.dmg || 0), PL, +m.kx || 0, +m.kz || 0, 'player'); } finally { HURT_KB.extra = 0; } if (e.panic > 0 && p && p.pos) e.fleeFrom = [p.pos[0], p.pos[2]]; }; /* it runs from the one who hit it */
       if (e) { if (p && p.s) mpProxy(p, hit); else hit(); } } return; // a kill by a guest counts as a player's kill (experience, player-only drops), and the mob turns on that guest
     case 'pvp': if (mpRelay() && m.tgt !== 0) { mpSend({ ...m, from }, m.tgt); return; } mpGotHit(m, MP.peers.get(MP.server ? m.from : host ? from : m.from)); return;
     case 'hitfx': { const p = MP.peers.get(MP.server ? m.from : host ? from : m.id); if (p) p.hurtFx = 10; if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend({ ...m, id: from }, id); return; }
@@ -20300,7 +20311,7 @@ function mpInstall() {
     if (MP.on && MP.role === 'host') { mpSend({ t: 'boom', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), p: power, px: pr ? pr.id : null }); if (pr) queueMicrotask(() => mpBlastSelf(x, y, z, power)); } // a blast worked out for a guest hit that guest; you get yours after
     return r; };
   const sa = shootArrow; shootArrow = function (x, y, z, vx, vy, vz, owner) { const e = sa.apply(this, arguments); if (MP.on && owner === PL && e && !MP.allowSpawn) queueMicrotask(() => { if (!e.dead) mpSend({ t: 'proj', dim: W.dim, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), vx: +vx.toFixed(3), vy: +vy.toFixed(3), vz: +vz.toFixed(3), k: e.trident ? 1 : 0, th: e.thrown || 0 }); }); return e; };
-  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { const t = performance.now(); if (t - (e.myHitAt || 0) < 450) return false; /* still flashing from the last hit: the runner won't take it */ e.myHitAt = t; mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
+  const hm = hurtMob; hurtMob = function (e, dmg, attacker, kx = 0, kz = 0) { if (e.remote) { if (attacker === PL) { const t = performance.now(); if (t - (e.myHitAt || 0) < 450) return false; /* still flashing from the last hit: the runner won't take it */ e.myHitAt = t; mpToAuth({ t: 'hit', e: e.rid, dmg, kx, kz, kb: HURT_KB.extra || 0 }); e.hurt = 10; return true; } return false; } return hm.apply(this, arguments); };
   if (typeof ensureDragon === 'function') { const ed = ensureDragon; ensureDragon = function () { if (MP.role !== 'guest') ed(); }; }
   const lc = loadChunk; loadChunk = (cx, cz) => MP.role === 'guest' || MP.server ? mpRequestChunk(cx, cz) : lc(cx, cz);
   const sc = saveChunk; saveChunk = function (c) { if (MP.server) { if (MP.role === 'host' && !MP.rolePending) mpStoreChunk(c); return; } return sc.apply(this, arguments); };
@@ -20354,10 +20365,10 @@ function mpRayPeer() {
 function mpAttackPeer(p) {
   const s = p.s; if (!s || s.dead || s.mode === 'creative' || s.mode === 'spectator' || MP.pvp === false) { PL.attackT = 0; return; }
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool, sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4;
-  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + meleeBonus()) * (0.2 + q * q * 0.8);
-  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater;
+  const q = Math.min(1, (PL.attackT + 0.5) / (20 / as)); let dmg = Math.max(0, (tool ? tool.dmg : 1) + meleeBonus()) * (0.2 + q * q * 0.8); const ench = (sharp ? 0.5 * sharp + 0.5 : 0) * q; // (as against a mob: the enchantment by the charge)
+  const crit = q > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness');
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(p.pos[0] + (Math.random() - .5) * .6, p.pos[1] + 1.1, p.pos[2] + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
-  PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
+  dmg += ench; PL.attackT = 0; const kb = enchLv(h, 'knockback') + (PL.sprinting && q > 0.9 ? 1 : 0);
   mpSend({ t: 'pvp', tgt: p.id, from: MP.server ? MP.id : MP.role === 'host' ? 0 : MP.id, wn: h && h.name ? h.name : undefined, dmg: +dmg.toFixed(2), kb, yaw: +PL.yaw.toFixed(3), ax: PL.x, az: PL.z, fire: enchLv(h, 'fire_aspect') * 80 }, MP.role === 'host' || MP.server ? p.id : undefined);
   if (kb > 0) { PL.vx *= 0.6; PL.vz *= 0.6; PL.sprinting = false; }
   PL.exh += 0.1; p.hurtFx = 10; play('hit');
@@ -20370,6 +20381,7 @@ function mpGotHit(m, att) {
   if (!hurtPlayer(Math.min(100, +m.dmg || 0), 'player', src)) return;
   mpSend({ t: 'hitfx', id: MP.role === 'host' && !MP.server ? 0 : MP.id });
   if (m.fire > 0 && !effLv(PL, 'fire_resistance')) PL.fire = Math.max(PL.fire || 0, Math.min(160, +m.fire));
+  if (PL.hitPartial) return; // (a harder hit in the moment of invulnerability: no knockback)
   // LivingEntity.takeKnockback: 0.4 away from the attacker, and the knockback level along the attacker's look
   const kn = (str, x, z) => { const l = Math.hypot(x, z) || 1; PL.vx = PL.vx / 2 - x / l * str; PL.vz = PL.vz / 2 - z / l * str; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + str); };
   kn(0.4, src.x - PL.x, src.z - PL.z); if (m.kb > 0) kn(Math.min(5, m.kb) * 0.5, Math.sin(m.yaw), Math.cos(m.yaw));

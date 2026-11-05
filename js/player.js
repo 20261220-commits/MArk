@@ -70,7 +70,7 @@ function raycast(reach, fluids) {
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
     const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
-    const lim = creative() ? 5 : 3;
+    const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
   return best;
@@ -81,10 +81,15 @@ function armorPoints() { let p = 0, t = 0; for (const s of INV.armor) if (s) { c
 const ARMORED = { mob: 1, arrow: 1, explosion: 1, player: 1, fire: 1, lava: 1, cactus: 1, berry: 1, lightning: 1 };
 // caves & cliffs: from the build limit to the bottom of the world, landing alive (in water too)
 function fallLanded() { if (PL.fallDist > 0 && PL.fallFrom >= 319 && PL.y < -58.5 && typeof advGrant === 'function') setTimeout(() => { if (PL.health > 0) advGrant('adventure/fall_from_world_height'); }, 0); }
+// Java's knockback on the player: half its motion plus the push; up only from the ground; netherite armour resists 10% a piece
+function plKnock(s, dx, dz) { const l = Math.hypot(dx, dz) || 1, res = INV.armor.reduce((a, q) => a + (q && ITEMS[q.id] && /^netherite_/.test(ITEMS[q.id].key) ? 0.1 : 0), 0); s *= 1 - Math.min(1, res); if (s <= 0) return; PL.vx = PL.vx / 2 + dx / l * s; PL.vz = PL.vz / 2 + dz / l * s; if (PL.onGround) PL.vy = Math.min(0.4, PL.vy / 2 + s); }
 function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or explosion position, for shields
   if (PL.dead || spectator()) return false;
   if (creative() && cause !== 'void' && cause !== 'kill') return false;
-  if (PL.inv > 0 && cause !== 'void' && cause !== 'kill') return false;
+  // Java: 60 ticks of safety after respawning; after a hit 20 ticks, in the first half of which only a harder hit lands,
+  // by the difference (and without knockback)
+  PL.hitPartial = false;
+  if (cause !== 'void' && cause !== 'kill') { if (PL.inv > 20) return false; if (PL.inv > 10) { if (dmg <= (PL.lastDmg || 0)) return false; const d0 = dmg; dmg -= PL.lastDmg || 0; PL.lastDmg = d0; PL.hitPartial = true; } else PL.lastDmg = dmg; }
   if (dmg <= 0) return false;
   if (PL.sleeping) wakeUp(); // being hurt wakes you
   if ((cause === 'fall' && !gr('fallDamage')) || (cause === 'drown' && !gr('drowningDamage')) || ((cause === 'fire' || cause === 'lava' || cause === 'burn') && !gr('fireDamage')) || (cause === 'freeze' && !gr('freezeDamage'))) return false;
@@ -105,7 +110,7 @@ function hurtPlayer(dmg, cause, attacker, from) { // from: the projectile or exp
   }
   if (PL.absorb > 0) { const a = Math.min(PL.absorb, dmg); PL.absorb -= a; dmg -= a; }
   stat('damage_taken', Math.round(Math.min(dmg, PL.health) * 10));
-  PL.health = Math.max(0, PL.health - dmg); PL.hurtT = 10; PL.inv = 10; PL.exh += 0.1; PL.lastHurtBy = cause;
+  PL.health = Math.max(0, PL.health - dmg); if (!PL.hitPartial) { PL.hurtT = 10; PL.inv = 20; } PL.exh += 0.1; PL.lastHurtBy = cause;
   if (attacker) PL.hurtDir = Math.atan2(attacker.z - PL.z, attacker.x - PL.x) - PL.yaw; else PL.hurtDir = 0;
   if (attacker && attacker.kind === 'mob') PL.lastAttacked = attacker;
   if (attacker && (attacker.kind === 'mob' || cause === 'player')) PL.credit = { e: attacker, at: W.tickN, name: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitBy) || null : null, item: cause === 'player' ? (typeof MP !== 'undefined' && MP.lastHitWeapon) || null : null }; // who gets the credit for a death soon after (Java's combat tracker)
@@ -426,19 +431,20 @@ function attackEntity(e) {
   PL.lastAttacked = e;
   const h = PL.held(), tool = h && ITEMS[h.id] && ITEMS[h.id].tool;
   const sharp = enchLv(h, 'sharpness'), as = tool ? tool.as : 4, ARTH = e.type === 'spider' || e.type === 'cave_spider' || e.type === 'bee' || e.type === 'silverfish' || e.type === 'endermite';
-  const base = (tool ? tool.dmg : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
+  const base = tool ? tool.dmg : 1, ench = (sharp ? 0.5 * sharp + 0.5 : 0) + (UNDEAD.has(e.type) ? 2.5 * enchLv(h, 'smite') : 0) + (ARTH ? 2.5 * enchLv(h, 'bane_of_arthropods') : 0);
   const p = Math.min(1, (PL.attackT + 0.5) / (20 / as));
-  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8);
+  let dmg = Math.max(0, base + meleeBonus()) * (0.2 + p * p * 0.8); // (Java: the weapon's damage by the square of the charge, its enchantment's by the charge, and a critical hit only on the first)
   const crit = p > 0.9 && PL.vy < 0 && !PL.onGround && !PL.inWater && !PL.sprinting && !PL.riding && !effLv(PL, 'blindness') && !(() => { const b = getBlock(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); return BLOCKS[b] && (BLOCKS[b].climb || b === BID.vine); })(); // (Java: not while sprinting, blind, riding or on a ladder or vines)
+  const enchDmg = ench * p;
   if (crit) { dmg *= 1.5; for (let i = 0; i < 10; i++) R.simpleParticle(e.x + (Math.random() - .5) * .6, e.y + e.h * .6, e.z + (Math.random() - .5) * .6, [0.9, 0.9, 0.8], { kind: 'crit', size: 0.08, vy: 1 }); }
-  PL.attackT = 0;
+  dmg += enchDmg; PL.attackT = 0;
   const kb = 1, kbExtra = (PL.sprinting && p > 0.9 ? 1 : 0) + enchLv(h, 'knockback'); // (Java: a level of knockback each, the sprint counting as one)
   const s = Math.sin(PL.yaw), c = Math.cos(PL.yaw);
   const fa = enchLv(h, 'fire_aspect'); if (fa && !e.def.fireproof) e.fire = Math.max(e.fire || 0, 80 * fa);
   if (ARTH && enchLv(h, 'bane_of_arthropods')) addEffect(e, 'slowness', 20 + Math.floor(Math.random() * 10 * enchLv(h, 'bane_of_arthropods')), 3);
   if (tool && tool.type === S.TOOL.SWORD && p > 0.9 && PL.onGround && !PL.sprinting) for (const o of ENT) if (o !== e && o.kind === 'mob' && !o.dead && !(o.owner === 'player') && Math.hypot(o.x - e.x, o.z - e.z) < 1.2 && Math.abs(o.y - e.y) < 0.5) { const sw = enchLv(h, 'sweeping'); hurtMob(o, 1 + dmg * (sw / (sw + 1)), PL, -s * 0.4, -c * 0.4, 'player'); } // sweep attack
   HURT_KB.extra = kbExtra; let landed; try { landed = hurtMob(e, dmg, PL, -s * kb, -c * kb, 'player'); } finally { HURT_KB.extra = 0; }
-  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (PL.sprinting) PL.sprinting = false; play('hit'); }
+  if (landed) { if (e.def.thorns && e.def.thorns(e)) hurtPlayer(2, 'magic', e); /* guardian spikes */ PL.exh += 0.1; if (kbExtra > 0) { PL.vx *= 0.6; PL.vz *= 0.6; } /* (Java: a knockback hit slows you) */ if (PL.sprinting) PL.sprinting = false; play('hit', { pitch: crit ? 0.8 : p > 0.9 ? 1 : 1.3, vol: p > 0.9 ? 1 : 0.6 }); }
   if (tool && landed) damageItem(INV.slots, INV.sel, tool.type === S.TOOL.SWORD || h.id === IID.trident ? 1 : 2); // only a hit that lands wears the weapon (Java: not one into a mob's moment of invulnerability); a trident's stab wears it by 1, like a sword
 }
 function breakBlock(x, y, z) {
