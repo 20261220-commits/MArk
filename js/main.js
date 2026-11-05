@@ -278,7 +278,13 @@ function saveWorldMeta() {
   W.meta.time = W.time; W.meta.rain = W.rain; W.meta.thunder = W.thunderOn; W.meta.dim = W.dim; W.meta.adv = W.meta.adv || {}; W.meta.keepInv = W.keepInv; W.meta.last = Date.now(); W.meta.mode = PL.mode; W.meta.diff = PL.difficulty;
   putWorld(W.meta);
 }
-function saveAll(sync) { if (!W.active) return; saveWorldMeta(); for (const c of W.chunks.values()) saveChunk(c, false, sync === true); }
+function saveAll(sync) {
+  if (!W.active) return; saveWorldMeta();
+  // a chunk still loaded is stored with what stands in it now, not the list it was loaded with: a minecart pushed into
+  // the next chunk, an animal that walked off, would otherwise be saved in both and come back twice
+  if (typeof chunkKeep === 'function' && !(W.meta && W.meta.remote)) for (const c of W.chunks.values()) { const k = chunkKeep(c, false), was = c.mobs || []; if (k.length !== was.length || JSON.stringify(k) !== JSON.stringify(was)) { c.mobs = k.length ? k : null; c.modified = true; } }
+  for (const c of W.chunks.values()) saveChunk(c, false, sync === true);
+}
 function pauseGame() { if (!W.active || UI.menu) return; relockHint(false); if (UI.screen) UI.closeScreen(); UI.paused = true; clearInput(); showMenu('pause'); saveAll(); }
 function resumeGame() {
   if (PL.dead) return; if (!W.active) { UI.paused = false; showMenu('title'); return; } UI.paused = false; showMenu(null);

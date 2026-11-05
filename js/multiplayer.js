@@ -605,7 +605,7 @@ function mpGotChunk(m) {
   if (m.edits) mpEdits.set(key, m.edits);
   if (m.tiles) { const sh = ((m.tmy != null ? m.tmy : MINY) - MINY) << 8, tl = {}; for (const i in m.tiles) { const j = +i + sh; if (j >= 0 && j < CVOL) tl[j] = m.tiles[i]; } m.tiles = tl; mpTileWait.set(key, tl); } // the world's rows may start lower (1.18)
   const rm = m.it && typeof itemRemapFor === 'function' ? itemRemapFor(m.it) : null; if (rm) { remapItems(m.tl, rm); remapItems(m.mobs, rm); remapItems(m.tiles, rm); }
-  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs) W.pendingMobs.set(key, m.mobs); return; } // plain terrain (with its animals): generated here
+  if (m.none) { W.saved.delete(DIM_PREFIX[m.dim] + m.cx + ',' + m.cz); if (m.mobs || m.stored) W.pendingMobs.set(key, m.mobs || []); return; } // plain terrain (with its animals): generated here
   const n = 256 * m.ch, dec = (s, T) => rleDec(mpUnB64(s, T), n, T).subarray(0, n);
   const d = { cx: m.cx, cz: m.cz, blocks: dec(m.b, Uint16Array), meta: dec(m.m, Uint8Array), light: dec(m.l, Uint8Array), biome: Uint8Array.from(m.bio), mobs: m.mobs || null, fromSave: true, tileList: m.tl || [] };
   fitRows(d, m.my || 0, m.ch, m.dim); // saved with another world height (before 1.18, or by a 1.18 game)
@@ -1222,7 +1222,7 @@ function mpInstall() {
   const os2 = UI.openScreen; UI.openScreen = (a, b) => { if (MP.role === 'guest' && b && b.cart && b.cart.remote) mpToAuth({ t: 'cartinv', e: b.cart.rid }); if (a === 'trade' && MP.role === 'guest' && b && b.e && b.e.remote) { b.e.trades = b.e.trades || []; mpToAuth({ t: 'trades', e: b.e.rid }); } os2(a, b); if (MP.on && b && b.x != null) { const t = getTile(b.x, b.y, b.z); if (t) b.mpBase = mpJ(t); } };
   const tt = tradeTake; tradeTake = function (c) { const r = tt.apply(this, arguments); if (MP.role === 'guest' && c.e && c.e.remote) mpToAuth({ t: 'traded', e: c.e.rid, i: c.sel }); return r; };
   const pb = placeBoat; placeBoat = function (x, y, z, yaw, wood) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'boat', x, y, z, yaw, sub: wood || 'oak' }); return null; } return pb.apply(this, arguments); };
-  const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
+  const pm = spawnMinecart; spawnMinecart = function (x, y, z, ctype, o) { if (MP.on && MP.role === 'guest' && !MP.allowSpawn) { if (W.active && !MP.loading && !W.structSpawn) mpToAuth({ t: 'veh', kind: 'minecart', x, y, z, yaw: o && o.yaw || 0, sub: ctype || 'minecart' }); return null; } return pm.apply(this, arguments); };
   if (typeof horseTame === 'function') { const ht = horseTame; horseTame = function (e) { ht.apply(this, arguments); if (e.remote) mpToAuth({ t: 'tame', e: e.rid }); }; } // tamed by riding it, on a guest's screen
   const rc = raycast; raycast = function () { const r = rc.apply(this, arguments); if (!MP.on) return r; const h = mpRayPeer(); return h && (!r || h.t < r.t) ? h : r; };
   const ae0 = attackEntity; attackEntity = e => e.kind === 'peer' ? mpAttackPeer(e.peer) : ae0(e);
