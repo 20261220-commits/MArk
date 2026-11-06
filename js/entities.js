@@ -382,20 +382,29 @@ function addEnt(e) { ENT.push(e); if (e.mesh) scene.add(e.mesh); return e; }
 const FIRE_OVL = { geo: new Map(), mat: null };
 function fireOverlay(o, on, x, y, z, w, h) {
   if (!on) { if (o.fireOvl) o.fireOvl.visible = false; return; }
-  const key = Math.round(w * 100) + ':' + Math.round(h * 100);
+  // with the texture pack: fire_0 and fire_1 in turn (R.fireTex); without it, the atlas's fire tile, taken in half a
+  // pixel at its edges (the atlas's smaller mip levels mix in the tiles beside it: thin lines above the flames)
+  const own = !!(typeof R !== 'undefined' && R.fireTex), key = Math.round(w * 100) + ':' + Math.round(h * 100) + (own ? ':o' : '');
   let g = FIRE_OVL.geo.get(key);
   if (!g) {
-    const t = S.T.fire, u0 = (t % S.TPR) / S.TPR, v0 = Math.floor(t / S.TPR) / S.TPR, du = 1 / S.TPR, f = w * 2 * 1.4, pos = [], uv = [], idx = [];
+    const t = S.T.fire, du = 1 / S.TPR, ins = du / 32, f = w * 2 * 1.4, pos = [], uv = [], idx = [];
     let hl = h / f, half = 0.5, yo = 0, zo = 0, i = 0;
-    while (hl > 0) { const m = (i >> 1) % 2 === 0, ua = m ? u0 + du : u0, ub = m ? u0 : u0 + du, b = pos.length / 3;
+    while (hl > 0) { const m = (i >> 1) % 2 === 0, b = pos.length / 3;
+      let u0, u1, vt, vb;
+      if (own) { u0 = 0; u1 = 1; vt = (i % 2) * 0.5; vb = vt + 0.5; }
+      else { u0 = (t % S.TPR) / S.TPR + ins; u1 = u0 + du - 2 * ins; vt = Math.floor(t / S.TPR) / S.TPR + ins; vb = vt + du - 2 * ins; }
+      const ua = m ? u1 : u0, ub = m ? u0 : u1;
       pos.push(-half * f, yo * f, zo * f, half * f, yo * f, zo * f, half * f, (yo + 1.4) * f, zo * f, -half * f, (yo + 1.4) * f, zo * f);
-      uv.push(ua, v0 + du, ub, v0 + du, ub, v0, ua, v0); idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      uv.push(ua, vb, ub, vb, ub, vt, ua, vt); idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
       hl -= 0.45; yo += 0.45; half *= 0.9; zo += 0.03; i++; }
     g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); FIRE_OVL.geo.set(key, g);
   }
-  if (!FIRE_OVL.mat) FIRE_OVL.mat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true, alphaTest: 0.1, depthWrite: false, side: THREE.DoubleSide });
-  if (!o.fireOvl) { o.fireOvl = new THREE.Mesh(g, FIRE_OVL.mat); o.fireOvl.renderOrder = 3; scene.add(o.fireOvl); }
-  o.fireOvl.geometry = g; o.fireOvl.visible = true;
+  const mk = map => new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  if (own && !FIRE_OVL.matOwn) FIRE_OVL.matOwn = mk(R.fireTex);
+  if (!own && !FIRE_OVL.mat) FIRE_OVL.mat = mk(atlasTex);
+  const mat = own ? FIRE_OVL.matOwn : FIRE_OVL.mat;
+  if (!o.fireOvl) { o.fireOvl = new THREE.Mesh(g, mat); o.fireOvl.renderOrder = 3; scene.add(o.fireOvl); }
+  o.fireOvl.geometry = g; o.fireOvl.material = mat; o.fireOvl.visible = true;
   o.fireOvl.position.set(x, y, z); o.fireOvl.rotation.set(0, Math.atan2(camera.position.x - x, camera.position.z - z), 0);
   o.fireOvl.translateZ(w * 0.9); // in front of the body, toward the camera
 }

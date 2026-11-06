@@ -6,6 +6,21 @@ W.active = false; UI.paused = true;
 // ---------- pointer lock ----------
 function grabLock() { if (isTouch || !W.active || UI.screen || UI.chatOpen || UI.menu) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
 const LOCK_AT = { t: 0, first: false }; // when the pointer was last locked: the first moves after it can carry the whole jump from where the cursor was
+// burning, seen from inside: Java's ScreenEffectRenderer.renderFire, two quads of the fire_1 texture (animated, 90%
+// opaque) one unit square at half a unit in front of the eye under the hand's 70-degree view, 0.24 left and right and
+// 0.3 down, each mirrored: a square 1.43 screen-heights tall over each lower corner. Without the texture pack: a glow
+const FIRESCR = { el: null, cv: [], frame: -1, w: 0, h: 0 };
+function fireScreen() {
+  const ov = $('ovFire'), pack = typeof PACKPX !== 'undefined' && PACKPX.anim && (PACKPX.anim.fire1 || PACKPX.anim.fire);
+  ov.classList.toggle('grad', !pack); if (!pack) return;
+  if (!FIRESCR.cv.length) for (let i = 0; i < 2; i++) { const c = document.createElement('canvas'); c.width = c.height = 16; ov.appendChild(c); FIRESCR.cv.push(c); }
+  const W0 = innerWidth, H0 = innerHeight;
+  if (W0 !== FIRESCR.w || H0 !== FIRESCR.h) { FIRESCR.w = W0; FIRESCR.h = H0; const u = H0 / (2 * Math.tan(35 * Math.PI / 180) * 0.5), side = u;
+    FIRESCR.cv.forEach((c, i) => { const cx = W0 / 2 + (i ? -1 : 1) * 0.24 * u, cy = H0 / 2 + 0.3 * u; Object.assign(c.style, { width: side + 'px', height: side + 'px', left: (cx - side / 2) + 'px', top: (cy - side / 2) + 'px', transform: `scaleX(-1) perspective(${u}px) rotateY(${i ? 10 : -10}deg)` }); }); }
+  const f = Math.floor(performance.now() / 100); if (f === FIRESCR.frame) return; FIRESCR.frame = f;
+  const px = PACKPX.anim.fire1 ? animFrame('fire1', f) : animFrame('fire', f); if (!px) return;
+  for (const c of FIRESCR.cv) c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px), 16, 16), 0, 0);
+}
 function releaseLock() { if (document.pointerLockElement) document.exitPointerLock(); }
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === canvas;
@@ -431,7 +446,7 @@ function frame(now) {
   $('ovHurt').style.opacity = PL.hurtT > 0 ? PL.hurtT / 10 * 0.5 : (PL.health <= 4 && PL.mode !== 'creative' ? 0.25 + 0.1 * Math.sin(now / 200) : 0);
   $('ovSleep').style.opacity = PL.sleeping ? Math.min(1, PL.sleeping / 60) : 0; $('sleepTip').hidden = !PL.sleeping || UI.hideHud;
   $('ovSpy').hidden = USE.kind !== 'spy';
-  $('ovFire').hidden = !(PL.fire > 0 && PL.mode !== 'creative' && !PL.dead);
+  { const on = PL.fire > 0 && PL.mode !== 'creative' && !PL.dead && view === 0; $('ovFire').hidden = !on; if (on) fireScreen(); }
   $('cross').hidden = view !== 0 || USE.kind === 'spy';
   const tool = h && ITEMS[h.id] && ITEMS[h.id].tool, as = tool ? tool.as : 4, cd = Math.min(1, (PL.attackT + alpha) / (20 / as));
   $('attackInd').hidden = cd >= 1 || creative(); $('attackInd').firstElementChild.style.width = (cd * 100) + '%';
