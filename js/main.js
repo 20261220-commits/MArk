@@ -321,7 +321,7 @@ function gameTick() {
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
   const spawnOK = gr('doMobSpawning');
-  if (spawnOK && W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
+  if (spawnOK) { if (W.dim === 0) trySpawnHostile(); else if (W.tickN % 10 === 0) trySpawnDimension(); } // (Java: monsters every tick)
   if (W.tickN % 40 === 0) ensureDragon();
   if (spawnOK && W.tickN % 100 === 0) trySpawnStrider();
   if (spawnOK && W.tickN % 200 === 50) trySpawnAmbient();

@@ -597,6 +597,7 @@ function onWorker(w, m) {
   if (W.pump) W.pump(); // keep workers saturated between frames
 }
 function handleWorker(m) {
+  if (m.type === 'fix') { const f = FIXP.get(m.id); if (f) { FIXP.delete(m.id); f(m); } return; }
   if (m.type === 'gen') {
     const k = ckey(m.cx, m.cz);
     if (W.pending.get(k) !== m.id) return;
@@ -662,6 +663,8 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
+  c.fx = d.fromSave ? d.fx || 0 : FIX_VER; // (the generator fixes this chunk has had: see fixSavedChunk)
+  if (d.fixed) { c.modified = c.edited = true; for (const i of d.fixSrcs || []) schedule(cx * 16 + (i & 15), (i >> 8) + MINY, cz * 16 + ((i >> 4) & 15), 5 + (i % 40)); }
   if (d.fromSave && W.dim === 0 && fixVillageIron(c)) c.modified = c.edited = true; // saved with the old desert-village bug: iron ore where sand should be
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
@@ -670,6 +673,29 @@ function addChunk(cx, cz, d, tiles) {
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c); signTiles(c);
   if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.on && MP.server)) applyMpLog(c); // (MP.server can be left over from a session just ended)
+}
+// ---------- bringing saved chunks up to today's generator ----------
+// 1: sugar cane in Java's patches, Java's Nether spring counts, loot tables read as Java reads them. A worker generates
+// the chunk with the old rules and the new: what the save still holds exactly as the old rules made it (cane, springs and
+// their running lava, a chest no one has opened) is replaced by what the new rules make; anything the player built,
+// planted, poured or opened stays
+const FIX_VER = 1, FIXP = new Map();
+function chestItemsFrom(cx, cz, i, loot) { const items = new Array(27).fill(null), wx = cx * 16 + (i & 15), wz = cz * 16 + ((i >> 4) & 15); for (const [slot, key, n, x] of loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); return items; }
+function fixSavedChunk(d, dim) {
+  const w = idleWorker(3) || workers[0]; if (!w) return Promise.resolve();
+  const id = jobId++; w.busy++;
+  return new Promise(res => { FIXP.set(id, r => {
+    d.blocks = r.blocks; d.meta = r.meta;
+    if (r.changed) { d.light = new Uint8Array(d.blocks.length); S.lightChunk(d.blocks, d.light, d.meta); d.fixSrcs = r.srcs; }
+    const oldC = new Map(r.oldChests.map(([i, loot]) => [i, loot])), newC = new Map(r.newChests.map(([i, loot, tb]) => [i, [loot, tb]]));
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    d.tileList = d.tileList.map(([i, t]) => { // a chest still holding exactly what it was made with: the new roll instead
+      if (!t || t.type !== 'chest' || !oldC.has(i) || !newC.has(i)) return [i, t];
+      if (!same(t.items, chestItemsFrom(d.cx, d.cz, i, oldC.get(i)))) return [i, t];
+      const [loot, tb] = newC.get(i), nt = { ...t, items: chestItemsFrom(d.cx, d.cz, i, loot) }; if (tb) nt.lt = tb; r.changed++; return [i, nt]; });
+    d.fx = FIX_VER; d.fixed = true; res(); });
+    w.postMessage({ type: 'fix', id, seed: W.seed, gen: W.gen || 1, cx: d.cx, cz: d.cz, dim, exp: W.exp, blocks: d.blocks, meta: d.meta }, [d.blocks.buffer, d.meta.buffer]);
+  });
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
@@ -740,7 +766,7 @@ function rleEnc(a) { // keeps the element type: block ids are 16 bit, meta and l
 }
 function rleDec(b, len, T = Uint8Array) { const a = new T(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 // RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
-const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,my:m.my,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,my:m.my,fx:m.fx,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
 const savePending = new Map(), saveWaiters = new Map();
 saveWorker.onmessage = e => {
   const { k, rec } = e.data;
@@ -757,10 +783,11 @@ function saveChunk(c, unloading, sync) {
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }
-  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, my: MINY, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  const fx = c.fx || 0;
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, my: MINY, fx, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
   const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
   savePending.set(dk, (savePending.get(dk) || 0) + 1);
-  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, my: MINY, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
+  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, my: MINY, fx, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
@@ -780,6 +807,8 @@ async function loadChunk(cx, cz) {
   let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data');
     fitRows(d, rec.my || 0, oldH, dim); unshiftRows(d, dim); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
+  d.fx = rec.fx || 0;
+  if (d.fx < FIX_VER && (dim === 0 || dim === -1)) { W.pending.set(key, 'fix'); try { await fixSavedChunk(d, dim); } catch (e) { console.warn('chunk fix failed', e); } if (W.pending.get(key) !== 'fix' || wid !== W.id || dim !== W.dim) return; W.pending.delete(key); }
   W.inbox.push(d);
 }
 // a chunk saved with another world height (before 1.18: y 0..255, or 128 high) put into this world's rows (-64..319):

@@ -653,7 +653,7 @@ function mpTick() {
   for (const p of here) {
     if (Math.abs(p.s.x - PL.x) < 48 && Math.abs(p.s.z - PL.z) < 48) continue; // already covered by the host's own area
     randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
-    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
+    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(10); else trySpawnDimension(); }); // (ten ticks' worth at once)
   }
   // experience orbs fly to the nearest player, guests included, and a guest gets the points on touching one
   if (here.length) for (const e of ENT) {

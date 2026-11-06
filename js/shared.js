@@ -1709,6 +1709,7 @@ const VSTYLE = {
 const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman'];
 const LOOT = {
   smith: [['iron_horse_armor', 1], ['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
+  house_old: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
   house: [['bread', 4], ['apple', 5], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 4], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 7], ['gold_nugget', 3], ['dandelion', 1], ['poppy', 1], ['book', 1], ['feather', 1]], // (Java's village house chests: 3-8 of these)
   stronghold: [['music_disc_otherside', 1, 0.15], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
@@ -1735,7 +1736,7 @@ const VANILLA_LOOT = { desert_pyramid: 'desert_pyramid', jungle_temple: 'jungle_
   mineshaft: 'abandoned_mineshaft', outpost: 'pillager_outpost', buried_treasure: 'buried_treasure', ship_supply: 'shipwreck_supply', ship_treasure: 'shipwreck_treasure', ship_map: 'shipwreck_map',
   ruin_big: 'underwater_ruin_big', ruin_small: 'underwater_ruin_small', igloo: 'igloo_chest', mansion: 'woodland_mansion', ruined_portal: 'ruined_portal', bastion_treasure: 'bastion_treasure', bastion: 'bastion_other',
   fortress: 'nether_bridge', end_city: 'end_city_treasure', dungeon: 'simple_dungeon', jungle_dispenser: 'jungle_temple_dispenser' };
-function rollLoot(R, kind, n) { const vn = VANILLA_LOOT[kind] && 'chests/' + VANILLA_LOOT[kind]; if (vn && STRUCTS && STRUCTS.loot && STRUCTS.loot[vn]) return rollVanillaLoot(R, vn);
+function rollLoot(R, kind, n) { if (LEGACY.loot && kind === 'house') kind = 'house_old'; const vn = VANILLA_LOOT[kind] && 'chests/' + VANILLA_LOOT[kind]; if (vn && STRUCTS && STRUCTS.loot && STRUCTS.loot[vn]) return rollVanillaLoot(R, vn);
   if (!LOOT[kind]) kind = kind.startsWith('stronghold') ? 'stronghold' : kind; if (!LOOT[kind]) return [];
   const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; } // (a third number: a rare item's chance when picked)
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
@@ -1774,7 +1775,7 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
         case 't': id = 45; break;
         case 'c': id = 41; break;
         case 'f': id = 42; m = rf(1); break;
-        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', 3 + R.int(6)) }); break;
+        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', LEGACY.loot ? 3 + R.int(4) : 3 + R.int(6)) }); break;
         case 'X': id = 133; break;
         case 'a': id = 132; m = rf(1); break;
         case 'k': id = 47; break;
@@ -2689,10 +2690,10 @@ function genNether(seed, cx, cz) {
   // (Java's NetherPlacements: spring_open 8 tries a chunk at y 4-123, spring_closed 16 and spring_closed_double 32 at
   // y 10-117; 40 open tries here once flooded the Nether with lavafalls)
   for (let k = 0; k < 56; k++) {
-    const x = 1 + R.int(14), z = 1 + R.int(14), y = k < 8 ? 4 + R.int(120) : 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
+    const OPEN = LEGACY.springs ? 40 : 8, x = 1 + R.int(14), z = 1 + R.int(14), y = k < OPEN && !LEGACY.springs ? 4 + R.int(120) : 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
     let rock = 0, air = 0; for (const j of [I(x + 1, y, z), I(x - 1, y, z), I(x, y, z + 1), I(x, y, z - 1), I(x, y - 1, z)]) { if (blocks[j] === 135) rock++; else if (blocks[j] === 0) air++; }
     if (blocks[I(x, y + 1, z)] !== 135) continue;
-    if (k < 8 ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < 8) tiles.push({ t: 'flow', i }); }
+    if (k < OPEN ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < OPEN) tiles.push({ t: 'flow', i }); }
   }
   // fortresses
   const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
@@ -3301,11 +3302,15 @@ function genChunk0(seed, cx, cz, dim, exp) {
       if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0 && cactusRoom(blocks, x, h + k, z); k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
     }
+    if (LEGACY.cane && (top === 2 || top === 9 || top === 3) && h === SEA && R() < 0.25) { // (the old rule: a quarter of every shore block)
+      let wet = false; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (hgt[(z + 1 + az) * 18 + x + 1 + ax] < SEA) wet = true;
+      if (wet) { const n = 1 + R.int(3); for (let k = 1; k <= n; k++) blocks[I(x, h + k, z)] = 36; }
+    }
   }
   // sugar cane as Java's patch_sugar_cane: a patch in 1 chunk of 6 (1 of 3 in swamps, every chunk in deserts, 1 of 5 in
   // badlands), 20 tries within 4 blocks of its centre, each a column of 2-4 (biased low) on grass, dirt or sand beside water
   { const cb = biome[8 * 16 + 8], every = cb === BIO.DESERT ? 1 : cb === BIO.SWAMP ? 3 : cb === BIO.BADLANDS ? 5 : 6;
-    if (!isOceanBio(cb) && R.int(every) === 0) {
+    if (!LEGACY.cane && !isOceanBio(cb) && R.int(every) === 0) {
       const px = R.int(16), pz = R.int(16);
       for (let t = 0; t < 20; t++) {
         const x = px + R.int(5) - R.int(5), z = pz + R.int(5) - R.int(5); if (x < 0 || z < 0 || x > 15 || z > 15) continue;
@@ -4239,7 +4244,7 @@ function rollVanillaLoot(R, name) {
     if (v.min != null) { const lo = Math.floor(num(v.min)), hi = Math.floor(num(v.max)); return lo + R.int(Math.max(0, hi - lo) + 1); }
     return v.value != null ? numI(v.value) : 1; };
   for (const pool of tbl.pools || []) {
-    const rolls = numI(pool.rolls) + Math.floor(num(pool.bonus_rolls || 0) * 0); // (bonus rolls go with luck: none here)
+    const rolls = LEGACY.loot ? Math.floor(num(pool.rolls) + 0.0001) : numI(pool.rolls); // (bonus rolls go with luck: none here)
     const ents = (pool.entries || []).filter(e => e.type === 'minecraft:item' || e.type === 'minecraft:empty' || e.type === 'item' || e.type === 'empty'), tot = ents.reduce((a, e) => a + (e.weight || 1), 0);
     for (let r = 0; r < rolls; r++) {
       let w = R() * tot, e = null; for (const x of ents) { w -= x.weight || 1; if (w < 0) { e = x; break; } }
@@ -4247,7 +4252,7 @@ function rollVanillaLoot(R, name) {
       let n = 1; const extra = {};
       for (const f of e.functions || []) {
         const fn = (f.function || '').replace('minecraft:', '');
-        if (fn === 'set_count') n = Math.max(0, numI(f.count));
+        if (fn === 'set_count') n = Math.max(0, LEGACY.loot ? Math.floor(num(f.count) + 0.0001) : numI(f.count));
         else if (fn === 'set_damage') extra.dmg = num(f.damage);
         else if (fn === 'enchant_randomly' || fn === 'enchant_with_levels') extra.ench = fn === 'enchant_with_levels' ? Math.floor(num(f.levels)) : 1;
         else if (fn === 'exploration_map') extra.map = f.destination || 'buried_treasure';
@@ -4463,7 +4468,10 @@ function jChest(c, p, x, y, z, loot, n) {
 function jSpawner(c, p, x, y, z, mob) { const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz)) return false; c.st(wx, wy, wz, BID.spawner, 0); c.tiles.push({ t: 'spawner', i: jTl(wx, wy, wz), mob }); return true; }
 const jInside = (c, p, x, y, z) => jIn(c, jWX(p, x, z), jWY(p, y), jWZ(p, x, z));
 // stamp one structure's pieces into a chunk
-let J_FIX = false, J_KEEP = null; // (a chunk with fences, bars or tripwire from these pieces: its connections are worked out after)
+let J_FIX = false, J_KEEP = null;
+// the generator as it was before a fix (sugar cane, Nether springs, loot numbers): to tell what a saved chunk still holds
+// from its first generation, so old worlds get the fix without losing what the player made
+let LEGACY = {}; // (a chunk with fences, bars or tripwire from these pieces: its connections are worked out after)
 function jStamp(st, tiles, seed, cx, cz, pieces, post) {
   const x0 = cx * 16, z0 = cz * 16, H = st.jH || (st.jH = new Map()); let touched = false; // (the ground heights: one cache for the chunk)
   pieces.forEach((p, k) => { if (p.box[3] < x0 || p.box[0] > x0 + 15 || p.box[5] < z0 || p.box[2] > z0 + 15) return;
@@ -4989,15 +4997,32 @@ function jDispenser(c, p, x, y, z, face) {
   return true;
 }
 
+// a saved chunk brought up to today's generator: what is still exactly as the old generator made it (its sugar cane, its
+// Nether springs and their running lava) becomes what the generator makes now; the chests are compared on the main thread
+function fixSaved(m) {
+  const B = m.blocks, M = m.meta; let old;
+  LEGACY = { cane: 1, springs: 1, loot: 1 }; try { old = genChunk(m.seed, m.cx, m.cz, m.dim, m.exp); } finally { LEGACY = {}; }
+  const neu = genChunk(m.seed, m.cx, m.cz, m.dim, m.exp); let changed = 0; const srcs = [];
+  if (m.dim === 0) for (let i = 0; i < B.length; i++) { if (B[i] === 36 && old.blocks[i] === 36 && neu.blocks[i] !== 36) { B[i] = neu.blocks[i]; M[i] = neu.meta[i]; changed++; } }
+  if (m.dim === -1) {
+    for (let i = 0; i < B.length; i++) { if (B[i] !== 28) continue;
+      if (M[i] !== 0 && neu.blocks[i] !== 28) { B[i] = 0; M[i] = 0; changed++; } // (running lava: it runs again from the sources that stay)
+      else if (M[i] === 0 && old.blocks[i] === 28 && neu.blocks[i] !== 28) { B[i] = neu.blocks[i]; M[i] = neu.meta[i]; changed++; } } // (a spring the old count added)
+    for (let i = 0; i < B.length; i++) if (B[i] === 28 && M[i] === 0) { const x = i & 15, z = (i >> 4) & 15; if ((x > 0 && B[i - 1] === 0) || (x < 15 && B[i + 1] === 0) || (z > 0 && B[i - 16] === 0) || (z < 15 && B[i + 16] === 0) || (i >= 256 && B[i - 256] === 0)) srcs.push(i); }
+  }
+  const chests = r => r.tiles.filter(t => t.t === 'chest').map(t => [t.i, t.loot, t.loot.table || null]);
+  return { blocks: B, meta: M, changed, srcs, oldChests: chests(old), newChests: chests(neu) };
+}
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { rollLoot, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, fixSaved, setLegacy: o => { LEGACY = o || {}; }, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
   self.onmessage = e => {
     const m = e.data;
+    if (m.type === 'fix') { S.setGenVersion(m.gen); const r = S.fixSaved(m); self.postMessage({ type: 'fix', id: m.id, ...r }, [r.blocks.buffer, r.meta.buffer]); return; }
     if (m.type === 'gen') {
       S.setGenVersion(m.gen); const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
