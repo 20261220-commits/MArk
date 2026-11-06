@@ -25,7 +25,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     clear(); { const w = spawnMob('witch', X0 + .5, Y, Z0 - 5.5); w.persistent = true; PL.eff = null; let got = false; await run(200, () => { PL.x = X0 + .5; PL.y = Y; PL.z = Z0 + .5; PL.vx = PL.vz = 0; if (PL.eff && Object.keys(PL.eff).length || PL.health < 20) got = true; PL.health = 20; PL.dead = false; return got; }); out.witch = got; PL.eff = null; }
     clear(); { const v = spawnMob('vindicator', X0 + .5, Y, Z0 - 9.5); v.persistent = true; v.target = PL; let z0; await run(30, i => { hold(X0 + .5, Y, Z0 + 9.5); v.target = PL; if (i === 10) z0 = v.z; }); out.vindSpeed = +(v.z - z0).toFixed(2); }
     clear(); arena(); W.time = 6000;
-    { const c = spawnMob('cow', X0 + .5, Y, Z0 + .5); c.persistent = true; hurtMob(c, 0.01, PL); let p0; await run(40, i => { hold(X0 - 3, Y, Z0 + .5); if (i === 15) p0 = [c.x, c.z]; }); out.cowPanic = +(Math.hypot(c.x - p0[0], c.z - p0[1]) / 25 * 20).toFixed(2); }
+    { const c = spawnMob('cow', X0 + .5, Y, Z0 + .5); c.persistent = true; hurtMob(c, 0.01, PL); let px = c.x, pz = c.z, top = 0; await run(40, i => { hold(X0 - 3, Y, Z0 + .5); top = Math.max(top, Math.hypot(c.x - px, c.z - pz) * 20); px = c.x; pz = c.z; }); out.cowPanic = +top.toFixed(2); } // (its top speed: Java's panic is dashes to spots within 5 blocks, not a straight run)
     clear(); W.time = 18000; { const v = spawnMob('villager', X0 + .5, Y, Z0 + .5); v.persistent = true; const z = spawnMob('zombie', X0 + .5, Y, Z0 - 12.5); z.persistent = true; let fled = 0;
       await run(200, () => { hold(X0 + 20, Y + 30, Z0 + 20); PL.mode = 'creative'; if (v.panic > 0) fled++; }); PL.mode = 'survival'; out.zv = [z.target && z.target.type, fled]; }
     clear(); return out; });
