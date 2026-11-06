@@ -2686,11 +2686,13 @@ function genNether(seed, cx, cz) {
   }
   // lava springs (Java's spring_open and spring_closed): a source in a netherrack wall with one side open runs down as a
   // lavafall once the chunk is loaded; closed ones wait inside the rock for someone to dig into them
+  // (Java's NetherPlacements: spring_open 8 tries a chunk at y 4-123, spring_closed 16 and spring_closed_double 32 at
+  // y 10-117; 40 open tries here once flooded the Nether with lavafalls)
   for (let k = 0; k < 56; k++) {
-    const x = 1 + R.int(14), z = 1 + R.int(14), y = 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
+    const x = 1 + R.int(14), z = 1 + R.int(14), y = k < 8 ? 4 + R.int(120) : 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
     let rock = 0, air = 0; for (const j of [I(x + 1, y, z), I(x - 1, y, z), I(x, y, z + 1), I(x, y, z - 1), I(x, y - 1, z)]) { if (blocks[j] === 135) rock++; else if (blocks[j] === 0) air++; }
     if (blocks[I(x, y + 1, z)] !== 135) continue;
-    if (k < 40 ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < 40) tiles.push({ t: 'flow', i }); }
+    if (k < 8 ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < 8) tiles.push({ t: 'flow', i }); }
   }
   // fortresses
   const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
