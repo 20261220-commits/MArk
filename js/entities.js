@@ -409,6 +409,34 @@ function fireOverlay(o, on, x, y, z, w, h) {
   o.fireOvl.translateZ(w * 0.9); // in front of the body, toward the camera
 }
 function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOvl = null; } }
+// ---------- heads and legs as Java moves them ----------
+// Java's walk animation (LivingEntity.calculateEntityAnimation): the swing's speed eases 40% a tick toward 4 x the
+// blocks moved that tick (at most 1) and its position runs on by that speed; a leg is at cos(position x 0.6662) x 1.4 x
+// speed, an arm at the opposite, 1.0 x speed
+function mobLimb(e, hs) { e.limbAmtO = e.limbAmt || 0; e.limbAmt = e.limbAmtO + (Math.min(1, hs * 4) - e.limbAmtO) * 0.4; e.limbPos = (e.limbPos || 0) + e.limbAmt; }
+// Java's LookControl with LookAtPlayerGoal and RandomLookAroundGoal: the head turns 10 degrees a tick (up and down at
+// once, up to 40) toward what it looks at - its target, a player within 8 blocks (6 for animals) it glances at now and
+// then for 2 to 4 s, or somewhere at random for 1 to 2 s while standing - never more than 75 degrees off the body, and back
+// to the body's way with nothing to look at. A body standing still turns after a head that has stayed put for half a
+// second (BodyRotationControl), over the next half second
+const wrapA2 = a => ((a + Math.PI * 3) % (Math.PI * 2)) - Math.PI, rotTo = (a, b, m) => a + Math.max(-m, Math.min(m, wrapA2(b - a)));
+function mobLookTick(e, dist) {
+  const P = e.mesh && e.mesh.userData.parts; if (!P || !P.head) return;
+  if (e.hYaw == null) { e.hYaw = e.phYaw = e.yaw; e.hPitch = e.phPitch = 0; }
+  e.phYaw = e.hYaw; e.phPitch = e.hPitch;
+  const d = e.def, eye = e.y + e.h * 0.85, moving = (e.limbAmt || 0) > 0.05, seePl = !PL.dead && PL.mode !== 'spectator';
+  let tx = null, ty = 0, tz = 0;
+  const t = e.target; if (t && !t.dead) { tx = t.x; ty = t === PL ? PL.y + 1.62 : t.y + (t.h || 1) * 0.85; tz = t.z; e.lookPT = e.lookRT = 0; }
+  else if (e.lookPT > 0) { e.lookPT--; if (!seePl || dist > (d.hostile ? 8 : 6) + 2) e.lookPT = 0; else { tx = PL.x; ty = PL.y + 1.62; tz = PL.z; } }
+  else if (e.lookRT > 0) { e.lookRT--; if (moving) e.lookRT = 0; else { tx = e.x - Math.sin(e.lookRA) * 4; ty = eye; tz = e.z - Math.cos(e.lookRA) * 4; } }
+  else if (!e.rider && Math.random() < 0.02) { if (seePl && dist < (d.hostile ? 8 : 6)) e.lookPT = 40 + Math.floor(Math.random() * 40); else if (!moving) { e.lookRT = 20 + Math.floor(Math.random() * 20); e.lookRA = Math.random() * Math.PI * 2; } }
+  if (tx != null) { const dx = tx - e.x, dz = tz - e.z; e.hYaw = rotTo(e.hYaw, Math.atan2(-dx, -dz), 10 * DEG); e.hPitch = Math.max(-40 * DEG, Math.min(40 * DEG, Math.atan2(ty - eye, Math.hypot(dx, dz) || 0.01))); }
+  else { e.hYaw = rotTo(e.hYaw, e.yaw, 10 * DEG); e.hPitch = 0; }
+  const rel = wrapA2(e.hYaw - e.yaw); if (Math.abs(rel) > 75 * DEG) e.hYaw = e.yaw + Math.sign(rel) * 75 * DEG;
+  if (moving || t) { e.headStable = 0; e.headStill = e.hYaw; return; }
+  if (Math.abs(wrapA2(e.hYaw - (e.headStill != null ? e.headStill : e.hYaw))) > 15 * DEG) { e.headStable = 0; e.headStill = e.hYaw; } else e.headStable = (e.headStable || 0) + 1;
+  if (e.headStable > 10) { const f = Math.min(1, (e.headStable - 10) / 10), mx = 75 * DEG * (1 - f), b = wrapA2(e.yaw - e.hYaw); if (Math.abs(b) > mx) { e.yaw = e.hYaw + Math.sign(b) * mx; e.yawTarget = e.yaw; } }
+}
 // ---------- the good sense of animals (Java's stroll, float and panic goals) ----------
 // Java's PanicGoal: for 5 s after a hit, one dash after another to a spot picked at random within 5 blocks (out of ten
 // tries, grass first) - round about where it was hit, not away from the player. Villagers running from a zombie (Java:
@@ -705,6 +733,7 @@ function mobTick(e) {
   if (e.eff) effectTick(e);
   if (e.jockey && jockeyTick(e)) return; // a chicken or spider carrying a jockey
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
+  mobLookTick(e, dist);
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < voidY()) removeEnt(e); return; }
   // AI
   const jv = d.jv, jsp = m => jv ? mobJSpeed(jv.a * m) * (e.babySpeed || 1) : d.speed * (e.babySpeed || 1); // (Java's movement attribute and each goal's speed modifier)
@@ -761,7 +790,7 @@ function mobTick(e) {
     else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
     if (e.goal && jv && e.parGoal > W.tickN && !(e.panic > 0)) speed = jsp(jv.parent);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
-    else if (plVisible && dist < 6 && !e.rider) { if (!(e.lookT > 0) && Math.random() < 0.02) e.lookT = 40 + Math.floor(Math.random() * 40); if (e.lookT > 0) { e.lookT--; e.yawTarget = Math.atan2(-dx, -dz); } } // now and then looks at a player nearby
+    // (looking at a player nearby: the head does it, mobLookTick, as Java's LookAtPlayerGoal)
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
     // goats (1.17) occasionally ram a nearby player
     if (e.type === 'goat' && !e.baby && plVisible) {
@@ -808,7 +837,7 @@ function mobTick(e) {
   else if (e.vy < 0 && e.fallY == null) e.fallY = e.y; else if (inF) e.fallY = null;
   if (e.y < voidY()) removeEnt(e);
   const hs = Math.hypot(e.vx, e.vz);
-  e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
+  e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6; mobLimb(e, hs);
   // spawner/despawn fuse visual
 }
 function squidTick(e) {
@@ -1165,6 +1194,7 @@ function mobNameTag(e, x, y, z) {
   placeNameTag(e.nameTag, x, y + e.h, z, !e.deathT && typeof TARGET !== 'undefined' && !!TARGET && TARGET.type === 'ent' && TARGET.e === e, false, typeof lightBright === 'function' ? lightBright(x, y + e.h, z) : 1);
 }
 // ---------- render update (interpolated) ----------
+const HEAD_PITCH_SIGN = 1; // (looking up: the head's x rotation in these models)
 function entityRender(alpha, now) {
   for (const e of ENT) {
     if (e.dead || !e.mesh) continue;
@@ -1177,11 +1207,12 @@ function entityRender(alpha, now) {
       e.mesh.position.set(x, y, z); fireOverlay(e, e.fire > 0 && !e.deathT && !e.def.fireproof, x, y, z, e.w, e.h);
       let yaw = e.pyaw + (((e.yaw - e.pyaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * alpha;
       e.mesh.rotation.set(0, yaw, e.deathT ? (1 - e.deathT / 20) * Math.PI / 2 : 0);
-      const P = e.mesh.userData.parts, sw = Math.sin(e.walk) * 0.9 * e.walkAmt;
+      const P = e.mesh.userData.parts, la = (e.limbAmtO || 0) + ((e.limbAmt || 0) - (e.limbAmtO || 0)) * alpha, sw = e.limbPos != null ? Math.cos(((e.limbPos || 0) - (e.limbAmt || 0) * (1 - alpha)) * 0.6662) * 1.4 * la : Math.sin(e.walk) * 0.9 * e.walkAmt; // (Java's limb swing)
       const legs = [['rleg', 1], ['lleg', -1], ['rleg2', -1], ['lleg2', 1]];
       for (const [n, s] of legs) if (P[n]) P[n].rotation.x = sw * s;
-      if (P.rarm) { if (e.def.armsOut || ((e.type === 'skeleton' || e.type === 'stray') && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
-      if (P.head && e.target) { const hy = Math.atan2(-(PL.x - x), -(PL.z - z)) - yaw; P.head.rotation.y = ((hy + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.head.rotation.y = Math.max(-1, Math.min(1, P.head.rotation.y)); }
+      if (P.rarm) { if (e.def.armsOut || ((e.type === 'skeleton' || e.type === 'stray') && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw / 1.4; P.larm.rotation.x = sw / 1.4; } } // (arms: 1.0 x the swing speed, legs 1.4)
+      if (P.head && e.hYaw != null) { const hy = e.phYaw + wrapA2(e.hYaw - e.phYaw) * alpha, b = P.head.userData.base; // (mobLookTick)
+        P.head.rotation.y = (b ? b.y : 0) + Math.max(-75 * DEG, Math.min(75 * DEG, wrapA2(hy - yaw))); P.head.rotation.x = (b ? b.x : 0) + HEAD_PITCH_SIGN * (e.phPitch + (e.hPitch - e.phPitch) * alpha); }
       if (e.def.fish && P.tail) P.tail.rotation.y = Math.sin(now / 90 + e.id) * 0.6;
       if (e.def.water && P.t0) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }
       if (e.type === 'chicken') { const f = e.onGround ? 0 : Math.sin(now / 40); P.rwing.rotation.z = f * 0.8; P.lwing.rotation.z = -f * 0.8; }

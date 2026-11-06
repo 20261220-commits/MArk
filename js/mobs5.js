@@ -7,7 +7,7 @@ function swimToward(e, gx, gy, gz, sp) {
   e.vx += (dx / l * sp - e.vx) * 0.1; e.vy += (dy / l * sp - e.vy) * 0.1; e.vz += (dz / l * sp - e.vz) * 0.1;
   e.yawTarget = Math.atan2(-dx, -dz); turn(e, 0.2);
   physMove(e, e.vx, e.vy, e.vz, 0);
-  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
+  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6; if (typeof mobLimb === 'function') mobLimb(e, hs);
 }
 function waterGoal(e, r, yMin, yMax) {
   for (let k = 0; k < 8; k++) {

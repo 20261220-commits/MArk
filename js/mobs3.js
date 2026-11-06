@@ -122,7 +122,7 @@ function striderAI(e) {
   if (inLava) e.vy = Math.min(e.vy + 0.05, 0.1); else if (onLava) e.vy = Math.max(e.vy, 0); else e.vy = (e.vy - 0.08) * 0.98;
   turn(e); physMove(e, e.vx, e.vy, e.vz, 0.6);
   if (onLava && e.vy < 0) { e.vy = 0; e.y = Math.ceil(e.y - 0.05); }
-  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
+  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6; if (typeof mobLimb === 'function') mobLimb(e, hs);
 }
 function shulkerAI(e, dist) {
   e.vx = e.vy = e.vz = 0;
