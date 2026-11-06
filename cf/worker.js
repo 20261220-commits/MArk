@@ -16,7 +16,6 @@ export default {
     if (u === '/profile') return profileLookup(url);
     if (u === '/ping') return new Response('ok', { headers: { 'cache-control': 'no-store' } });
     if (u.startsWith('/mp') || u === '/rooms' || u === '/stats' || u === '/report') return env.NEMO.get(env.NEMO.idFromName('main')).fetch(req);
-    if (u === '/js/config.js') return new Response('var NEMO_CONFIG = ' + JSON.stringify({ server: url.host }) + ';\n', { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } });
     if (env.ASSETS && (u === '/' || u === '/index.html')) { const r = await env.ASSETS.fetch(new Request(new URL('/nemo-1.18.html', url))); return new Response(r.body, { status: r.status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' } }); }
     if (env.ASSETS) return env.ASSETS.fetch(req);
     return new Response('not found', { status: 404 });
@@ -262,8 +261,14 @@ export class NemoServer {
     }
     this.kv('restoring', null); return ids.size ? { ids, counts } : null;
   }
+  // its own restore points first; with none at all (a server just set up), those of GITHUB_RESTORE_FROM (the Render server's)
   async restoreOnce() {
-    const B = this.backup; let sawAny = false, days = null;
+    const r = await this.restoreFromBackup(this.backup); if (r !== 'none' || !this.env.GITHUB_RESTORE_FROM) return r;
+    this.log('이 서버의 백업이 없어 ' + this.env.GITHUB_RESTORE_FROM + ' 에서 세계를 가져옵니다');
+    return this.restoreFromBackup(githubBackup({ repo: this.env.GITHUB_BACKUP_REPO, token: this.env.GITHUB_TOKEN, branch: this.env.GITHUB_RESTORE_FROM, api: this.env.GITHUB_API_URL || undefined }));
+  }
+  async restoreFromBackup(B) {
+    let sawAny = false, days = null;
     for (let i = 0; ; i++) {
       let name = i === 0 ? B.branch : i === 1 ? B.branch + '-prev' : null;
       if (i >= 2) { if (!days) days = await B.days(); name = days[i - 2]; if (!name) break; }

@@ -53,15 +53,16 @@
 - 계산(몹, 물·용암, 작물, 레드스톤)은 접속한 사람들이 나눠 맡습니다: 차원마다 그곳에 먼저 있는 사람이 맡고, 그 사람이 나가거나 다른 차원으로 가면 다음 사람이 자동으로 이어받습니다. 그래서 각자 오버월드·네더·엔드에 따로 있어도 됩니다. 아무도 없으면 세계는 저장된 채 기다립니다.
 - 시간·날씨는 서버가 돌리고, 오버월드의 모두가 침대에 누우면 밤이 지나갑니다.
 
-### 인터넷 서버 (Cloudflare, 지금 쓰는 곳)
+### 인터넷 서버 (Cloudflare와 Render, 둘 다)
+- 멀티플레이 화면의 **서버 고르기**에서 Cloudflare / Render 를 바꿀 수 있습니다(목록은 `js/config.js` 의 `servers`). 두 서버의 세계는 따로입니다. Cloudflare 는 처음 켜질 때 Render 의 백업(`world-backup`)에서 세계를 가져오고, 그다음부터는 자기 백업(`world-backup-cf`)에 저장합니다.
 - 게임 서버는 Cloudflare Workers + Durable Object 에서 돌아갑니다(`cf/worker.js`, 설정 `wrangler.jsonc`). 주소: `mark.yubinl3756.workers.dev` (게임도 이 주소에서 열림). 무료 플랜, 카드 필요 없음, 보내는 데이터 양 제한 없음.
 - Cloudflare 대시보드에서 Worker 를 이 GitHub 저장소에 연결해 두면 main 에 머지할 때마다 `npm run build` → `npx wrangler deploy` 로 자동 배포됩니다.
-- 세계는 Durable Object 의 저장소(SQLite)에 보관되고, GitHub 백업(`20261220-commits/nemo-backup` 의 `world-backup` 브랜치, 바뀌었을 때 최대 30분마다 + 모두 나갈 때)도 그대로 합니다. 저장소가 비어 있으면 백업에서 세계를 되살립니다.
+- 세계는 Durable Object 의 저장소(SQLite)에 보관되고, GitHub 백업(`20261220-commits/nemo-backup` 의 `world-backup-cf` 브랜치, 바뀌었을 때 최대 30분마다 + 모두 나갈 때)도 그대로 합니다. 저장소가 비어 있으면 백업에서 세계를 되살립니다.
 - 필요한 비밀 값: Worker → Settings → Variables and Secrets 에 **Secret** `GITHUB_TOKEN`(백업 저장소 Contents 읽기·쓰기 권한). 없으면 서버 세계는 잠겨 있습니다(빈 서버가 백업을 덮어쓰지 않도록).
 - 게임은 0.1초 동안 보낼 메시지를 한 묶음(`{"t":"multi"}`)으로 보냅니다: 무료 플랜이 받는 메시지 수를 세기 때문입니다.
 - 상태: `https://mark.yubinl3756.workers.dev/stats`
 
-### 인터넷 서버 (Render, 예전 방식)
+### 인터넷 서버 (Render)
 - Render 대시보드에서 **New → Web Service** 로 이 저장소를 고르고 **Start Command** 를 `node tools/server.js` 로 둡니다(Build Command 는 비워 두거나 `echo ok`). 또는 **New → Blueprint** 로 고르면 `render.yaml` 설정으로 만들어집니다. 포트는 Render 가 주는 `PORT` 를 그대로 씁니다.
 - 다 되면 나오는 주소(`https://이름.onrender.com`)를 브라우저로 열면 게임이 뜨고, 멀티플레이 목록은 처음부터 그 서버를 보여 줍니다. 다른 곳(GitHub Pages 등)에서 연 게임에서는 **다른 서버** 칸에 `이름.onrender.com` 만 적어도 됩니다.
 - **항상 열려 있는 서버 (무료 플랜)**: 서버는 Render 가 주는 자기 주소(`RENDER_EXTERNAL_URL`)에 10분마다 `/ping` 을 보내 스스로 깨어 있으므로, 아무도 접속하지 않아도 15분 뒤에 잠들지 않습니다(끄려면 `KEEP_AWAKE=0`, 다른 호스팅에서는 `KEEP_AWAKE_URL` 에 주소). 서버 세계는 아무도 없을 때도 그대로 열려 있어 누구나 언제든 참가할 수 있습니다(몹·작물 계산은 접속한 사람이 맡으므로 아무도 없을 때는 멈춰 있음).
