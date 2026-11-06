@@ -343,7 +343,7 @@ function gameTick() {
   if (spawnOK && W.tickN % 200 === 50) trySpawnAmbient();
   if (spawnOK && W.tickN % 200 === 150) trySpawnAxolotl();
   if (spawnOK && W.tickN % 200 === 100) trySpawnGlowSquid();
-  displayTick();
+  displayTick(); if (typeof enchTableTick === 'function') { enchTableTick(); enchGlyphTick(); }
   spawnerTick();
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); beaconTick(); jukeboxVolume(); }
   if (W.tickN % 40 === 0) campfireCleanup();
@@ -433,7 +433,7 @@ function frame(now) {
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   dynLights(px, py, pz); effSwirls(dt, px, pz);
-  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0);
+  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); // (the enchanting table's book and glyphs)
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
   updateSkyBox();
