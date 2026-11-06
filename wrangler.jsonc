@@ -1,0 +1,14 @@
+// Cloudflare: the multiplayer server (cf/worker.js) and the game (dist/). Cloudflare builds this repository with
+// `npm run build` and deploys it with `npx wrangler deploy`. Secret (dashboard → the Worker → Settings → Variables and
+// Secrets): GITHUB_TOKEN, a token with "Contents: read and write" on GITHUB_BACKUP_REPO.
+{
+  "name": "mark",
+  "main": "cf/worker.js",
+  "compatibility_date": "2025-09-01",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "html_handling": "none" },
+  "durable_objects": { "bindings": [{ "name": "NEMO", "class_name": "NemoServer" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NemoServer"] }],
+  "vars": { "GITHUB_BACKUP_REPO": "20261220-commits/nemo-backup", "GITHUB_BACKUP_BRANCH": "world-backup" },
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}

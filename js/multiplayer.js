@@ -17,7 +17,8 @@ if (!MP.name) { MP.name = '플레이어' + (10000 + Math.floor(Math.random() * 9
 // pages hosts that serve files only: they can't be a multiplayer server
 const MP_STATIC = /(^|\.)(github\.io|claude\.ai|claudeusercontent\.com|netlify\.app|vercel\.app|pages\.dev)$/i;
 const mpStaticHost = a => { try { return MP_STATIC.test(new URL(mpWsUrl(a)).hostname); } catch (e) { return false; } };
-const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a && !mpStaticHost(a)) return a; } catch (e) {}
+const MP_OLD_SERVER = /mark-w65a\.onrender\.com/i; // (the server moved to Cloudflare: an address saved from before gives way to the new one)
+const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a && !mpStaticHost(a) && !MP_OLD_SERVER.test(a)) return a; } catch (e) {}
   if (typeof NEMO_CONFIG !== 'undefined' && NEMO_CONFIG.server) return mpWsUrl(NEMO_CONFIG.server);
   if (/^https?:$/.test(location.protocol) && !MP_STATIC.test(location.hostname)) return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp';
   return location.protocol === 'https:' ? '' : 'ws://192.168.0.2:8080/mp'; }; // on GitHub Pages: empty, the field shows what to write
@@ -32,14 +33,14 @@ async function mpUnpack(code) { const u8 = mpUnB64(code.replace(/\s+/g, ''), Uin
 // relay server: the server forwards guests' messages to the host and the host's to one guest or all of them
 // "my-server.onrender.com", "https://my-server.onrender.com" or "192.168.0.2:8080" -> a WebSocket address ending in /mp
 function mpWsUrl(a) {
-  a = String(a || '').trim(); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
+  a = String(a || '').trim().replace(MP_OLD_SERVER, 'mark.yubinl3756.workers.dev'); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
   a = a.replace(/^http(s?):\/\//i, 'ws$1://'); try { const u = new URL(a); if (u.pathname === '/' || u.pathname === '') u.pathname = '/mp'; return u.href; } catch (e) { return a; }
 }
 // a hosted server (Render's free plan and the like) sleeps when nobody uses it and takes up to a minute to wake:
 // knock on its web page, then keep trying for a while instead of failing at once
 async function mpWebSocket(url, role, extra) {
-  if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.onrender.com)');
-  if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. Render 서버 주소(이름.onrender.com)를 넣어 주세요');
+  if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.workers.dev)');
+  if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. 멀티플레이 서버 주소(이름.workers.dev)를 넣어 주세요');
   url = mpWsUrl(url); const local = /^wss?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url), t0 = Date.now();
   const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
   for (let k = 0; ; k++) {
@@ -58,9 +59,15 @@ function mpWsOnce(url, role, extra) {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
     const late = new Map(), link = { kind: 'ws', send(o, to) { // a slow upload keeps only the newest position (and the like) until it catches up
       if (ws.readyState !== 1) return; const s = JSON.stringify(to != null ? { ...o, to } : o);
+      // a server that takes them (Cloudflare counts every incoming message): what this game says in a tenth of a second
+      // goes as one message, only the newest position (and the like) of each kind in it
+      if (link.hello && link.hello.multi) { const k = MP_DROP.has(o.t) ? o.t + ':' + (to != null ? to : '') : null; if (k && link.qk.has(k)) link.q[link.qk.get(k)] = s; else { if (k) link.qk.set(k, link.q.length); link.q.push(s); }
+        if (!link.qt) link.qt = setTimeout(link.flushQ, 100); return; }
       if (MP_DROP.has(o.t) && ws.bufferedAmount > 128 * 1024) { late.set(o.t + ':' + (to != null ? to : ''), s); return; }
       if (late.size && ws.bufferedAmount < 64 * 1024) { for (const v of late.values()) ws.send(v); late.clear(); }
-      ws.send(s); }, close() { try { ws.close(); } catch (e) {} } };
+      ws.send(s); }, close() { try { ws.close(); } catch (e) {} }, q: [], qk: new Map(), qt: 0,
+      flushQ() { link.qt = 0; if (ws.readyState !== 1 || !link.q.length) { link.q = []; link.qk.clear(); return; } if (ws.bufferedAmount > 256 * 1024) { link.qt = setTimeout(link.flushQ, 100); return; } /* a slow upload: the queue waits (positions in it are still replaced) */
+        const l = link.q; link.q = []; link.qk.clear(); ws.send(l.length === 1 ? l[0] : '{"t":"multi","l":[' + l.join(',') + ']}'); } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { link.rx = Date.now(); if (ok && MP.link !== link && !(MP.core && role === 'host')) return; /* an old connection still talking after the game moved on */ let m; try { m = JSON.parse(e.data); } catch (er) { return; }
@@ -653,7 +660,7 @@ function mpTick() {
   for (const p of here) {
     if (Math.abs(p.s.x - PL.x) < 48 && Math.abs(p.s.z - PL.z) < 48) continue; // already covered by the host's own area
     randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
-    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
+    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(10); else trySpawnDimension(); }); // (ten ticks' worth at once)
   }
   // experience orbs fly to the nearest player, guests included, and a guest gets the points on touching one
   if (here.length) for (const e of ENT) {
@@ -1307,7 +1314,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
+  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Cloudflare 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.workers.dev"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}

@@ -113,29 +113,38 @@ async function profileLookup(req, res) {
 }
 
 // ---------- a minimal WebSocket (RFC 6455): text frames, fragments, ping, close ----------
-function frame(op, payload) {
-  const n = payload.length, head = n < 126 ? Buffer.from([0x80 | op, n]) : n < 65536 ? Buffer.from([0x80 | op, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([0x80 | op, 127]), (() => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(n)); return b; })()]);
+function frame(op, payload, rsv1) {
+  const b0 = 0x80 | op | (rsv1 ? 0x40 : 0), n = payload.length, head = n < 126 ? Buffer.from([b0, n]) : n < 65536 ? Buffer.from([b0, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([b0, 127]), (() => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(n)); return b; })()]);
   return Buffer.concat([head, payload]);
 }
+// what goes out, by message kind (bytes as sent): the free plan's traffic allowance is the limit, so /stats shows it
+const TRAFFIC = { since: Date.now(), total: 0, kinds: {} };
+function countOut(s, n) { TRAFFIC.total += n; const m = /"t":"([a-z_]+)"/.exec(s.slice(0, 60)), k = m ? m[1] : '?'; TRAFFIC.kinds[k] = (TRAFFIC.kinds[k] || 0) + n; }
 function wsAccept(req, sock, onText, onClose) {
   const key = req.headers['sec-websocket-key']; if (!key) { sock.destroy(); return null; }
   try { sock.setNoDelay(true); } catch (e) {} // small game messages go out at once, not batched
   const acc = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
-  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + '\r\n\r\n');
-  let buf = Buffer.alloc(0), parts = [], closed = false;
+  // permessage-deflate (RFC 7692), when the browser offers it (they all do): every message bigger than a few hundred
+  // bytes goes out compressed on its own (no shared window either way, so each one stands alone). The game's JSON
+  // shrinks to a fraction, and the free plan counts the bytes that go out
+  const deflate = /permessage-deflate/i.test(req.headers['sec-websocket-extensions'] || '') && !/^(0|false|no)$/i.test(process.env.WS_DEFLATE || '');
+  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + (deflate ? '\r\nSec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover' : '') + '\r\n\r\n');
+  const TAIL = Buffer.from([0, 0, 255, 255]);
+  const out = s => { const raw = Buffer.from(s); if (deflate && raw.length > 200) { const z = zlib.deflateRawSync(raw, { level: 6, finishFlush: zlib.constants.Z_SYNC_FLUSH }), /* (a sync flush ending in 00 00 ff ff, taken off: what RFC 7692 asks for) */ body = z.length >= 4 && z.subarray(z.length - 4).equals(TAIL) ? z.subarray(0, z.length - 4) : z; return frame(1, body, true); } return frame(1, raw); };
+  let buf = Buffer.alloc(0), parts = [], closed = false, zin = false;
   // drop: a message the next one replaces (positions, mob lists, the clock). When a player's connection can't keep up,
   // these are skipped instead of piling up: a queue that only grows makes everything arrive later and later
   // (the newest of each kind - each player's position, the mob list - is kept and goes out the moment the connection
   // drains, so the latest state always arrives, only the stale ones in between are skipped)
   const latest = new Map();
-  const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) sock.write(frame(1, Buffer.from(s))); };
+  const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) { const f = out(s); countOut(s, f.length); sock.write(f); } };
   sock.on('drain', flush);
-  const c = { backlog: () => sock.writableLength, send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose('서버가 닫음'); } } };
+  const c = { backlog: () => sock.writableLength, send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); const f = out(s); countOut(s, f.length); sock.write(f); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose('서버가 닫음'); } } };
   sock.on('data', d => {
     seen = Date.now(); buf = buf.length ? Buffer.concat([buf, d]) : d;
     for (;;) {
       if (buf.length < 2) return;
-      const fin = buf[0] & 0x80, op = buf[0] & 15, masked = buf[1] & 0x80; let len = buf[1] & 127, p = 2;
+      const fin = buf[0] & 0x80, op = buf[0] & 15, rsv1 = buf[0] & 0x40, masked = buf[1] & 0x80; let len = buf[1] & 127, p = 2;
       if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); p = 4; } else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); p = 10; }
       if (buf.length < p + (masked ? 4 : 0) + len) return;
       const mask = masked ? buf.subarray(p, p + 4) : null; p += masked ? 4 : 0;
@@ -143,7 +152,7 @@ function wsAccept(req, sock, onText, onClose) {
       buf = buf.subarray(p + len);
       if (op === 8) { why = '플레이어가 나감'; closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(why); return; }
       if (op === 9) { sock.write(frame(10, data)); continue; }
-      if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
+      if (op === 1 || op === 2 || op === 0) { if (op !== 0) zin = !!rsv1; parts.push(data); if (fin) { let mb = Buffer.concat(parts); parts = []; if (zin) { try { mb = zlib.inflateRawSync(Buffer.concat([mb, TAIL]), { finishFlush: zlib.constants.Z_SYNC_FLUSH }); } catch (e) { console.log('압축 메시지를 풀지 못했습니다'); continue; } } const msg = mb.toString(); try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
   // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself). A connection
@@ -188,8 +197,12 @@ function saveWorld(w, force) {
   for (const [dk, c] of w.dirty) { const e = { rec: c.rec, edits: c.edits, tiles: c.tiles }; ver[dk] = (ver[dk] || 0) + 1; w.stateDirty = true; writeAtomic(w.fileOf(dk), JSON.stringify(e)); out.push([dk, ver[dk], e]); }
   if (w.stateDirty) { writeAtomic(path.join(w.dir, 'world.json'), JSON.stringify(st)); w.stateDirty = false; }
   w.dirty.clear();
-  if (out.length || force || Date.now() - w.mirrorStateAt > 30000) mirrorOut(w, out);
+  // the players' copies (a safety net under the GitHub backup): changed chunks gathered and sent at most every 5 minutes,
+  // the newest version of each only (sent every 5 seconds they were most of the server's traffic)
+  const pend = w.mirPend || (w.mirPend = new Map()); for (const o of out) pend.set(o[0], o);
+  if (force || (pend.size && Date.now() - (w.mirrorStateAt || 0) > MIRROR_EVERY) || Date.now() - (w.mirrorStateAt || 0) > MIRROR_EVERY * 2) { mirrorOut(w, [...pend.values()]); pend.clear(); }
 }
+const MIRROR_EVERY = Math.max(10, +process.env.MIRROR_SECONDS || 300) * 1000;
 const saveAllWorlds = () => { for (const w of worlds.values()) { w.stateDirty = true; saveWorld(w); } };
 // a world slot opened for a new world that was never made (the player left the create screen) goes away again
 function dropIfEmpty(w) { if (w.state.meta || w.conns.size) return; worlds.delete(w.id); try { fs.rmdirSync(w.cdir); fs.rmdirSync(w.dir); } catch (e) {} }
@@ -201,7 +214,7 @@ function dropIfEmpty(w) { if (w.state.meta || w.conns.size) return; worlds.delet
 const mirrorState = w => { const o = { ...w.state }; delete o.logins; return o; };
 const joinedConns = w => [...w.conns].filter(([id]) => { const p = w.core.players.get(id); return p && p.joined; }).map(([, c]) => c);
 function mirrorOut(w, l) {
-  const to = joinedConns(w); if (!to.length || !w.state.meta) return; w.mirrorStateAt = Date.now();
+  const to = joinedConns(w); w.mirrorStateAt = Date.now(); if (!to.length || !w.state.meta) return;
   const s = JSON.stringify({ t: 'mirror', wid: w.state.wid, state: mirrorState(w), l }); for (const c of to) c.send(s);
 }
 // a player who just came in says which versions it has; it gets the rest a few chunks at a time
@@ -255,12 +268,15 @@ async function worldSnapshot() {
 let backingUp = null;
 // a backup that would lose a world, or most of one, against the last good one is kept aside instead (…-suspect)
 function backupSuspect(counts) { const m = BK.manifest; if (!m) return null; for (const id in m) { const n0 = m[id], n = counts[id]; if (n == null) return '세계 ' + id + '이(가) 없어짐'; if (n0 >= 10 && n < n0 * 0.7) return '세계 ' + id + '의 청크가 ' + n0 + '개에서 ' + n + '개로 줄어듦'; } return null; }
+let lastBackupHash = null;
 async function backupNow(why) {
   if (!BACKUP || backingUp) return backingUp;
   if (BK.blocked) { console.log('백업 건너뜀: 서버가 아직 백업을 불러오지 못했습니다'); return null; } // (an empty server must not be backed up over the worlds)
   backingUp = worldSnapshot().then(async snap => { if (!snap) return null; const counts = worldCounts(), bad = backupSuspect(counts);
       if (bad) { console.log('⚠ 이상한 백업이라 덮어쓰지 않고 따로 둡니다 (' + bad + ')'); BK.lastError = '의심 백업: ' + bad; await BACKUP.save(snap, { suspect: true }); return null; }
-      const n = await BACKUP.save(snap); BK.manifest = counts; return n; }).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
+      const hash = require('crypto').createHash('sha1').update(Buffer.isBuffer(snap) ? snap : JSON.stringify(snap)).digest('hex');
+      if (hash === lastBackupHash) { console.log('백업 건너뜀: 지난 백업과 같습니다'); for (const w of worlds.values()) w.changedSinceBackup = false; return null; }
+      const n = await BACKUP.save(snap); lastBackupHash = hash; BK.manifest = counts; return n; }).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
   return backingUp;
 }
 // the one-object backups ({"v":2,"worlds":{id:{"state":{..},"chunks":{dk:{..}}}}}) read a piece at a time: a small
@@ -349,7 +365,7 @@ const STARTED = Date.now(); let lastBackup = null; const DROPS = [];
 const noteDrop = d => { DROPS.push(d); if (DROPS.length > 40) DROPS.shift(); }; // the last connections that ended, and why (as the server saw it, and as players' games reported it)
 function serverStats() {
   const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
-  return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup, backup: { on: !!BACKUP, locked: BK.blocked, lastError: BK.lastError, restoredFrom: BK.restoredFrom },
+  return { traffic: { sinceMin: Math.round((Date.now() - TRAFFIC.since) / 60000), MB: +(TRAFFIC.total / 1048576).toFixed(2), byKindKB: Object.fromEntries(Object.entries(TRAFFIC.kinds).sort((x, y) => y[1] - x[1]).slice(0, 15).map(([k, v]) => [k, Math.round(v / 1024)])) }, pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup, backup: { on: !!BACKUP, locked: BK.blocked, lastError: BK.lastError, restoredFrom: BK.restoredFrom },
     worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.state.meta.priv ? '(비공개)' : w.id, name: w.state.meta.priv ? '(비공개 서버)' : w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
     rooms: [...rooms.values()].filter(r => r.host).length, recentDrops: DROPS.slice().reverse() };
 }
@@ -365,7 +381,11 @@ setInterval(() => {
   if (global.gc) global.gc();
   console.log(`메모리 ${Math.round(rss / 1048576)} MB: 쓰지 않는 청크를 비웠습니다 → ${Math.round(process.memoryUsage().rss / 1048576)} MB`);
 }, 10000).unref();
-if (BACKUP) { setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow('5분마다'); }, 5 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
+// every backup goes out as upload traffic (a 2 MB world, a third more in transit), and the free plan allows 5 GB a month:
+// the worlds go up when they changed, at most every 30 minutes (and when everyone leaves, and before the server stops);
+// a backup the same as the last one isn't sent at all
+const BACKUP_EVERY = Math.max(5, +process.env.BACKUP_MINUTES || 30) * 60 * 1000;
+if (BACKUP) setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow(Math.round(BACKUP_EVERY / 60000) + '분마다'); }, BACKUP_EVERY);
 // Render gives the service's own address; asking it for /ping every 10 minutes counts as a visit, so the free plan's
 // 15-minute sleep never comes (KEEP_AWAKE=0 turns this off; KEEP_AWAKE_URL sets the address on other hosts)
 const SELF_URL = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL || '';
@@ -387,8 +407,20 @@ server.on('upgrade', (req, sock) => {
   const url = new URL(req.url, 'http://x'); if (!url.pathname.startsWith('/mp')) { sock.destroy(); return; }
   let roomName = null, room = null, w = null; // w: the server world this player is in
   const id = nextId++; let role = null, wp = false;
+  // a game sends what it says in a tenth of a second as one message ({"t":"multi","l":[...]}) to a server that takes it
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (m && m.t === 'multi' && Array.isArray(m.l)) { for (const x of m.l) { try { handle(x); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } return; }
+    handle(m);
+  }, why => {
+    { const p = wp && w.core.players.get(id); if (p && p.joined || role) noteDrop({ at: new Date().toISOString(), side: 'server', world: wp ? w.id : roomName, name: p ? p.name : role, why }); }
+    if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
+    if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
+    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
+    if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
+  });
+  function handle(m) {
+    if (!m || typeof m !== 'object') return;
     if (m.t === 'hb' && !wp && role !== 'guest') return; // a player's game saying it is still there (in a background tab too): the world (or the host's) marks it seen
     if (wp) {
       if (m.t === 'restore') { restorePart(w, id, m); return; }
@@ -419,23 +451,17 @@ server.on('upgrade', (req, sock) => {
       if (m.role === 'world') { const ww = openWorld(wid || worldName), pk = ww.state.meta && ww.state.meta.priv && ww.state.meta.priv.key;
         if (pk && String(m.key || '') !== pk) { c.send(JSON.stringify({ t: 'error', msg: '비공개 서버입니다. 초대 코드가 맞지 않습니다' })); c.close(); dropIfEmpty(ww); return; } // (a private world: only with its invite key)
         role = 'world'; wp = true; w = ww; w.conns.set(id, c); roomName = w.id;
-        c.send(JSON.stringify({ t: 'hello', id, world: w.state.meta ? { name: w.state.meta.name, seed: w.state.meta.seed } : null, kind: 'world', wid: w.id })); return; }
+        c.send(JSON.stringify({ t: 'hello', id, world: w.state.meta ? { name: w.state.meta.name, seed: w.state.meta.seed } : null, kind: 'world', wid: w.id, multi: 1 })); return; }
       if (m.role === 'host') { roomName = code && !(rooms.get(code) || {}).host ? code : newCode();
         room = { host: c, guests: new Map(), hostName: String(m.name || '플레이어').slice(0, 16), worldName: String(m.world || '').slice(0, 40), mode: m.mode === 'creative' ? 'creative' : 'survival' }; rooms.set(roomName, room); role = 'host'; }
       else { roomName = code || 'main'; room = rooms.get(roomName); if (!room || !room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
-      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
+      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName, multi: 1 })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
     const dr = DROPPABLE.has(m.t) && m.t + ':' + (m.id != null ? m.id : role === 'guest' ? id : '');
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id }), dr); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s, dr); } else for (const g of room.guests.values()) g.send(s, dr);
-  }, why => {
-    { const p = wp && w.core.players.get(id); if (p && p.joined || role) noteDrop({ at: new Date().toISOString(), side: 'server', world: wp ? w.id : roomName, name: p ? p.name : role, why }); }
-    if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
-    if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
-    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
-    if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
-  });
+  }
 });
 restoreIfEmpty().then(() => server.listen(port, () => {
   const addrs = Object.values(os.networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal).map(a => a.address);

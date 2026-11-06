@@ -381,8 +381,8 @@ body.vfurn .flame::after{content:"";position:absolute;left:0;right:0;bottom:0;he
 <script>/* js/config.js */
 // Settings for where the game is published. On a server started with tools/server.js the server fills these in from its
 // environment (SERVER_URL); on a static host such as GitHub Pages, write them here.
-//   server: the multiplayer server the game offers first, e.g. 'my-server.onrender.com' (empty: the page's own host)
-var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark-w65a.onrender.com' };
+//   server: the multiplayer server the game offers first, e.g. 'my-server.workers.dev' (empty: the page's own host)
+var NEMO_CONFIG = window.NEMO_CONFIG || { server: 'mark.yubinl3756.workers.dev' };
 
 </script>
 <script>/* js/pwa.js */
@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.06 10:19';
+const NEMO_VERSION = '2026.11.06 13:31';
 
 </script>
 <script>/* js/shared.js */
@@ -2118,6 +2118,7 @@ const VSTYLE = {
 const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman'];
 const LOOT = {
   smith: [['iron_horse_armor', 1], ['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
+  house_old: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
   house: [['bread', 4], ['apple', 5], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 4], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 7], ['gold_nugget', 3], ['dandelion', 1], ['poppy', 1], ['book', 1], ['feather', 1]], // (Java's village house chests: 3-8 of these)
   stronghold: [['music_disc_otherside', 1, 0.15], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
@@ -2144,7 +2145,7 @@ const VANILLA_LOOT = { desert_pyramid: 'desert_pyramid', jungle_temple: 'jungle_
   mineshaft: 'abandoned_mineshaft', outpost: 'pillager_outpost', buried_treasure: 'buried_treasure', ship_supply: 'shipwreck_supply', ship_treasure: 'shipwreck_treasure', ship_map: 'shipwreck_map',
   ruin_big: 'underwater_ruin_big', ruin_small: 'underwater_ruin_small', igloo: 'igloo_chest', mansion: 'woodland_mansion', ruined_portal: 'ruined_portal', bastion_treasure: 'bastion_treasure', bastion: 'bastion_other',
   fortress: 'nether_bridge', end_city: 'end_city_treasure', dungeon: 'simple_dungeon', jungle_dispenser: 'jungle_temple_dispenser' };
-function rollLoot(R, kind, n) { const vn = VANILLA_LOOT[kind] && 'chests/' + VANILLA_LOOT[kind]; if (vn && STRUCTS && STRUCTS.loot && STRUCTS.loot[vn]) return rollVanillaLoot(R, vn);
+function rollLoot(R, kind, n) { if (LEGACY.loot && kind === 'house') kind = 'house_old'; const vn = VANILLA_LOOT[kind] && 'chests/' + VANILLA_LOOT[kind]; if (vn && STRUCTS && STRUCTS.loot && STRUCTS.loot[vn]) return rollVanillaLoot(R, vn);
   if (!LOOT[kind]) kind = kind.startsWith('stronghold') ? 'stronghold' : kind; if (!LOOT[kind]) return [];
   const pool = LOOT[kind], out = []; out.table = kind; /* which table it came from: the bastion advancement reads it */ for (let k = 0; k < n; k++) { const [it, mx, p] = pool[R.int(pool.length)]; if (mx && !(p && R() > p)) out.push([R.int(27), it, 1 + R.int(mx)]); } return out; } // (a third number: a rare item's chance when picked)
 // template cell -> world offset and facing for rotation r (quarter turns clockwise: front north -> east -> south -> west)
@@ -2183,7 +2184,7 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
         case 't': id = 45; break;
         case 'c': id = 41; break;
         case 'f': id = 42; m = rf(1); break;
-        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', 3 + R.int(6)) }); break;
+        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', LEGACY.loot ? 3 + R.int(4) : 3 + R.int(6)) }); break;
         case 'X': id = 133; break;
         case 'a': id = 132; m = rf(1); break;
         case 'k': id = 47; break;
@@ -3098,10 +3099,10 @@ function genNether(seed, cx, cz) {
   // (Java's NetherPlacements: spring_open 8 tries a chunk at y 4-123, spring_closed 16 and spring_closed_double 32 at
   // y 10-117; 40 open tries here once flooded the Nether with lavafalls)
   for (let k = 0; k < 56; k++) {
-    const x = 1 + R.int(14), z = 1 + R.int(14), y = k < 8 ? 4 + R.int(120) : 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
+    const OPEN = LEGACY.springs ? 40 : 8, x = 1 + R.int(14), z = 1 + R.int(14), y = k < OPEN && !LEGACY.springs ? 4 + R.int(120) : 10 + R.int(108), i = I(x, y, z); if (blocks[i] !== 135) continue;
     let rock = 0, air = 0; for (const j of [I(x + 1, y, z), I(x - 1, y, z), I(x, y, z + 1), I(x, y, z - 1), I(x, y - 1, z)]) { if (blocks[j] === 135) rock++; else if (blocks[j] === 0) air++; }
     if (blocks[I(x, y + 1, z)] !== 135) continue;
-    if (k < 8 ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < 8) tiles.push({ t: 'flow', i }); }
+    if (k < OPEN ? rock === 4 && air === 1 : rock === 5) { blocks[i] = 28; meta[i] = 0; if (k < OPEN) tiles.push({ t: 'flow', i }); }
   }
   // fortresses
   const st = makeStamp(blocks, meta, x0, z0), frx = Math.floor(cx / FREG), frz = Math.floor(cz / FREG);
@@ -3710,11 +3711,15 @@ function genChunk0(seed, cx, cz, dim, exp) {
       if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0 && cactusRoom(blocks, x, h + k, z); k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
     }
+    if (LEGACY.cane && (top === 2 || top === 9 || top === 3) && h === SEA && R() < 0.25) { // (the old rule: a quarter of every shore block)
+      let wet = false; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (hgt[(z + 1 + az) * 18 + x + 1 + ax] < SEA) wet = true;
+      if (wet) { const n = 1 + R.int(3); for (let k = 1; k <= n; k++) blocks[I(x, h + k, z)] = 36; }
+    }
   }
   // sugar cane as Java's patch_sugar_cane: a patch in 1 chunk of 6 (1 of 3 in swamps, every chunk in deserts, 1 of 5 in
   // badlands), 20 tries within 4 blocks of its centre, each a column of 2-4 (biased low) on grass, dirt or sand beside water
   { const cb = biome[8 * 16 + 8], every = cb === BIO.DESERT ? 1 : cb === BIO.SWAMP ? 3 : cb === BIO.BADLANDS ? 5 : 6;
-    if (!isOceanBio(cb) && R.int(every) === 0) {
+    if (!LEGACY.cane && !isOceanBio(cb) && R.int(every) === 0) {
       const px = R.int(16), pz = R.int(16);
       for (let t = 0; t < 20; t++) {
         const x = px + R.int(5) - R.int(5), z = pz + R.int(5) - R.int(5); if (x < 0 || z < 0 || x > 15 || z > 15) continue;
@@ -4648,7 +4653,7 @@ function rollVanillaLoot(R, name) {
     if (v.min != null) { const lo = Math.floor(num(v.min)), hi = Math.floor(num(v.max)); return lo + R.int(Math.max(0, hi - lo) + 1); }
     return v.value != null ? numI(v.value) : 1; };
   for (const pool of tbl.pools || []) {
-    const rolls = numI(pool.rolls) + Math.floor(num(pool.bonus_rolls || 0) * 0); // (bonus rolls go with luck: none here)
+    const rolls = LEGACY.loot ? Math.floor(num(pool.rolls) + 0.0001) : numI(pool.rolls); // (bonus rolls go with luck: none here)
     const ents = (pool.entries || []).filter(e => e.type === 'minecraft:item' || e.type === 'minecraft:empty' || e.type === 'item' || e.type === 'empty'), tot = ents.reduce((a, e) => a + (e.weight || 1), 0);
     for (let r = 0; r < rolls; r++) {
       let w = R() * tot, e = null; for (const x of ents) { w -= x.weight || 1; if (w < 0) { e = x; break; } }
@@ -4656,7 +4661,7 @@ function rollVanillaLoot(R, name) {
       let n = 1; const extra = {};
       for (const f of e.functions || []) {
         const fn = (f.function || '').replace('minecraft:', '');
-        if (fn === 'set_count') n = Math.max(0, numI(f.count));
+        if (fn === 'set_count') n = Math.max(0, LEGACY.loot ? Math.floor(num(f.count) + 0.0001) : numI(f.count));
         else if (fn === 'set_damage') extra.dmg = num(f.damage);
         else if (fn === 'enchant_randomly' || fn === 'enchant_with_levels') extra.ench = fn === 'enchant_with_levels' ? Math.floor(num(f.levels)) : 1;
         else if (fn === 'exploration_map') extra.map = f.destination || 'buried_treasure';
@@ -4872,7 +4877,10 @@ function jChest(c, p, x, y, z, loot, n) {
 function jSpawner(c, p, x, y, z, mob) { const wx = jWX(p, x, z), wy = jWY(p, y), wz = jWZ(p, x, z); if (!jIn(c, wx, wy, wz)) return false; c.st(wx, wy, wz, BID.spawner, 0); c.tiles.push({ t: 'spawner', i: jTl(wx, wy, wz), mob }); return true; }
 const jInside = (c, p, x, y, z) => jIn(c, jWX(p, x, z), jWY(p, y), jWZ(p, x, z));
 // stamp one structure's pieces into a chunk
-let J_FIX = false, J_KEEP = null; // (a chunk with fences, bars or tripwire from these pieces: its connections are worked out after)
+let J_FIX = false, J_KEEP = null;
+// the generator as it was before a fix (sugar cane, Nether springs, loot numbers): to tell what a saved chunk still holds
+// from its first generation, so old worlds get the fix without losing what the player made
+let LEGACY = {}; // (a chunk with fences, bars or tripwire from these pieces: its connections are worked out after)
 function jStamp(st, tiles, seed, cx, cz, pieces, post) {
   const x0 = cx * 16, z0 = cz * 16, H = st.jH || (st.jH = new Map()); let touched = false; // (the ground heights: one cache for the chunk)
   pieces.forEach((p, k) => { if (p.box[3] < x0 || p.box[0] > x0 + 15 || p.box[5] < z0 || p.box[2] > z0 + 15) return;
@@ -5398,15 +5406,32 @@ function jDispenser(c, p, x, y, z, face) {
   return true;
 }
 
+// a saved chunk brought up to today's generator: what is still exactly as the old generator made it (its sugar cane, its
+// Nether springs and their running lava) becomes what the generator makes now; the chests are compared on the main thread
+function fixSaved(m) {
+  const B = m.blocks, M = m.meta; let old;
+  LEGACY = { cane: 1, springs: 1, loot: 1 }; try { old = genChunk(m.seed, m.cx, m.cz, m.dim, m.exp); } finally { LEGACY = {}; }
+  const neu = genChunk(m.seed, m.cx, m.cz, m.dim, m.exp); let changed = 0; const srcs = [];
+  if (m.dim === 0) for (let i = 0; i < B.length; i++) { if (B[i] === 36 && old.blocks[i] === 36 && neu.blocks[i] !== 36) { B[i] = neu.blocks[i]; M[i] = neu.meta[i]; changed++; } }
+  if (m.dim === -1) {
+    for (let i = 0; i < B.length; i++) { if (B[i] !== 28) continue;
+      if (M[i] !== 0 && neu.blocks[i] !== 28) { B[i] = 0; M[i] = 0; changed++; } // (running lava: it runs again from the sources that stay)
+      else if (M[i] === 0 && old.blocks[i] === 28 && neu.blocks[i] !== 28) { B[i] = neu.blocks[i]; M[i] = neu.meta[i]; changed++; } } // (a spring the old count added)
+    for (let i = 0; i < B.length; i++) if (B[i] === 28 && M[i] === 0) { const x = i & 15, z = (i >> 4) & 15; if ((x > 0 && B[i - 1] === 0) || (x < 15 && B[i + 1] === 0) || (z > 0 && B[i - 16] === 0) || (z < 15 && B[i + 16] === 0) || (i >= 256 && B[i - 256] === 0)) srcs.push(i); }
+  }
+  const chests = r => r.tiles.filter(t => t.t === 'chest').map(t => [t.i, t.loot, t.loot.table || null]);
+  return { blocks: B, meta: M, changed, srcs, oldChests: chests(old), newChests: chests(neu) };
+}
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { rollLoot, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, fixSaved, setLegacy: o => { LEGACY = o || {}; }, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
   self.onmessage = e => {
     const m = e.data;
+    if (m.type === 'fix') { S.setGenVersion(m.gen); const r = S.fixSaved(m); self.postMessage({ type: 'fix', id: m.id, ...r }, [r.blocks.buffer, r.meta.buffer]); return; }
     if (m.type === 'gen') {
       S.setGenVersion(m.gen); const r = S.genChunk(m.seed, m.cx, m.cz, m.dim, m.exp);
       self.postMessage({ type: 'gen', id: m.id, cx: m.cx, cz: m.cz, blocks: r.blocks, meta: r.meta, light: r.light, biome: r.biome, tiles: r.tiles }, [r.blocks.buffer, r.meta.buffer, r.light.buffer, r.biome.buffer]);
@@ -8286,6 +8311,7 @@ function onWorker(w, m) {
   if (W.pump) W.pump(); // keep workers saturated between frames
 }
 function handleWorker(m) {
+  if (m.type === 'fix') { const f = FIXP.get(m.id); if (f) { FIXP.delete(m.id); f(m); } return; }
   if (m.type === 'gen') {
     const k = ckey(m.cx, m.cz);
     if (W.pending.get(k) !== m.id) return;
@@ -8351,6 +8377,8 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.type) c.tiles.set(t.i, t);
   }
   if (d.lifted) c.modified = true; // kept in the 1.18 layout from now on
+  c.fx = d.fromSave ? d.fx || 0 : FIX_VER; // (the generator fixes this chunk has had: see fixSavedChunk)
+  if (d.fixed) { c.modified = c.edited = true; for (const i of d.fixSrcs || []) schedule(cx * 16 + (i & 15), (i >> 8) + MINY, cz * 16 + ((i >> 4) & 15), 5 + (i % 40)); }
   if (d.fromSave && W.dim === 0 && fixVillageIron(c)) c.modified = c.edited = true; // saved with the old desert-village bug: iron ore where sand should be
   stitchLight(c);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const n = chunkAt(cx + dx, cz + dz); if (n) n.dirty = true; }
@@ -8359,6 +8387,29 @@ function addChunk(cx, cz, d, tiles) {
   if (W.onChunkLoaded) W.onChunkLoaded(c, !d.fromSave);
   joinConnections(c); signTiles(c);
   if (W.mpLogs && W.mpLogs.has(dkey(cx, cz)) && !(typeof MP !== 'undefined' && MP.on && MP.server)) applyMpLog(c); // (MP.server can be left over from a session just ended)
+}
+// ---------- bringing saved chunks up to today's generator ----------
+// 1: sugar cane in Java's patches, Java's Nether spring counts, loot tables read as Java reads them. A worker generates
+// the chunk with the old rules and the new: what the save still holds exactly as the old rules made it (cane, springs and
+// their running lava, a chest no one has opened) is replaced by what the new rules make; anything the player built,
+// planted, poured or opened stays
+const FIX_VER = 1, FIXP = new Map();
+function chestItemsFrom(cx, cz, i, loot) { const items = new Array(27).fill(null), wx = cx * 16 + (i & 15), wz = cz * 16 + ((i >> 4) & 15); for (const [slot, key, n, x] of loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); return items; }
+function fixSavedChunk(d, dim) {
+  const w = idleWorker(3) || workers[0]; if (!w) return Promise.resolve();
+  const id = jobId++; w.busy++;
+  return new Promise(res => { FIXP.set(id, r => {
+    d.blocks = r.blocks; d.meta = r.meta;
+    if (r.changed) { d.light = new Uint8Array(d.blocks.length); S.lightChunk(d.blocks, d.light, d.meta); d.fixSrcs = r.srcs; }
+    const oldC = new Map(r.oldChests.map(([i, loot]) => [i, loot])), newC = new Map(r.newChests.map(([i, loot, tb]) => [i, [loot, tb]]));
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    d.tileList = d.tileList.map(([i, t]) => { // a chest still holding exactly what it was made with: the new roll instead
+      if (!t || t.type !== 'chest' || !oldC.has(i) || !newC.has(i)) return [i, t];
+      if (!same(t.items, chestItemsFrom(d.cx, d.cz, i, oldC.get(i)))) return [i, t];
+      const [loot, tb] = newC.get(i), nt = { ...t, items: chestItemsFrom(d.cx, d.cz, i, loot) }; if (tb) nt.lt = tb; r.changed++; return [i, nt]; });
+    d.fx = FIX_VER; d.fixed = true; res(); });
+    w.postMessage({ type: 'fix', id, seed: W.seed, gen: W.gen || 1, cx: d.cx, cz: d.cz, dim, exp: W.exp, blocks: d.blocks, meta: d.meta }, [d.blocks.buffer, d.meta.buffer]);
+  });
 }
 function requestGen(cx, cz) {
   const w = idleWorker(2); if (!w) return false; // leave the third slot for meshing
@@ -8429,7 +8480,7 @@ function rleEnc(a) { // keeps the element type: block ids are 16 bit, meta and l
 }
 function rleDec(b, len, T = Uint8Array) { const a = new T(len); let p = 0; for (let i = 0; i < b.length; i += 2) { a.fill(b[i + 1], p, p + b[i]); p += b[i]; } return a; }
 // RLE encoding runs in a small worker so saving (autosave, unloading while flying) never stalls a frame
-const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,my:m.my,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
+const saveWorker = new Worker(URL.createObjectURL(new Blob([`const rleEnc=${rleEnc.toString()};onmessage=e=>{const m=e.data;postMessage({k:m.k,rec:{v:3,it:m.it,ch:m.ch,my:m.my,fx:m.fx,b:rleEnc(m.b),m:rleEnc(m.m),l:rleEnc(m.l),bio:m.bio,t:m.t,mobs:m.mobs}});};`], { type: 'text/javascript' })));
 const savePending = new Map(), saveWaiters = new Map();
 saveWorker.onmessage = e => {
   const { k, rec } = e.data;
@@ -8446,10 +8497,11 @@ function saveChunk(c, unloading, sync) {
   const k = dkey(c.cx, c.cz), dk = W.id + ':' + k; W.saved.add(k);
   // untouched terrain is regenerated from the seed; only its animals are stored
   if (!c.edited) { dbReq('chunks', 'readwrite', st => st.put({ v: 2, it: ITEM_TABLE, mobs: c.mobs || null }, dk)); return; }
-  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, my: MINY, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
+  const fx = c.fx || 0;
+  if (sync) { dbReq('chunks', 'readwrite', st => st.put({ v: 3, it: ITEM_TABLE, ch: CH, my: MINY, fx, b: rleEnc(c.blocks), m: rleEnc(c.meta), l: rleEnc(c.light), bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, dk)); return; }
   const b = unloading ? c.blocks : c.blocks.slice(), m = unloading ? c.meta : c.meta.slice(), l = unloading ? c.light : c.light.slice();
   savePending.set(dk, (savePending.get(dk) || 0) + 1);
-  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, my: MINY, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
+  saveWorker.postMessage({ k: dk, it: ITEM_TABLE, ch: CH, my: MINY, fx, b, m, l, bio: c.biome.slice(), t: serTiles(c), mobs: c.mobs || null }, [b.buffer, m.buffer, l.buffer]);
 }
 async function loadChunk(cx, cz) {
   const key = ckey(cx, cz); W.pending.set(key, 'load');
@@ -8469,6 +8521,8 @@ async function loadChunk(cx, cz) {
   let d; try { d = { cx, cz, blocks: dec(rec.b, 0, Uint16Array), meta: dec(rec.m), light: dec(rec.l, 0xf0), biome: rec.bio && rec.bio.length >= 256 ? rec.bio : null, mobs: Array.isArray(rec.mobs) ? rec.mobs : null, fromSave: true, tileList: Array.isArray(rec.t) ? rec.t : [] }; if (!d.biome) throw new Error('no biome data');
     fitRows(d, rec.my || 0, oldH, dim); unshiftRows(d, dim); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
+  d.fx = rec.fx || 0;
+  if (d.fx < FIX_VER && (dim === 0 || dim === -1)) { W.pending.set(key, 'fix'); try { await fixSavedChunk(d, dim); } catch (e) { console.warn('chunk fix failed', e); } if (W.pending.get(key) !== 'fix' || wid !== W.id || dim !== W.dim) return; W.pending.delete(key); }
   W.inbox.push(d);
 }
 // a chunk saved with another world height (before 1.18: y 0..255, or 128 high) put into this world's rows (-64..319):
@@ -9871,6 +9925,14 @@ function mobSafeAhead(e, mx, mz) {
   for (let d = 1; d <= 4; d++) { const b = getBlock(ix, y - d, iz); if (bad(b)) return false; if (FLUID[b] === 1) return true; if (SOLID[b]) return d <= 4; }
   return false;
 }
+// a step into water (feet in it, or a drop into it): Java's land mobs stroll only to dry ground (WaterAvoidingRandomStroll)
+// and path around water (its cost of 8), so they keep out unless chasing something
+function mobWaterAhead(e, mx, mz) {
+  const ax = e.x + mx * (e.w + 0.45), az = e.z + mz * (e.w + 0.45), ix = Math.floor(ax), iz = Math.floor(az), y = Math.floor(e.y + 0.01);
+  if (FLUID[getBlock(ix, y, iz)] === 1) return true;
+  for (let d = 1; d <= 4; d++) { const b = getBlock(ix, y - d, iz); if (FLUID[b] === 1) return true; if (SOLID[b]) return false; }
+  return false;
+}
 function mobTick(e) {
   const d = e.def;
   if (e.inBoat && !e.deathT) { const b = e.inBoat; if (b.dead) { e.inBoat = null; b.mob = null; } else { e.px = e.x; e.py = e.y; e.pz = e.z; e.x = b.x + Math.sin(b.yaw) * 0.5; e.z = b.z + Math.cos(b.yaw) * 0.5; e.y = b.y - 0.1; e.vx = e.vy = e.vz = 0; e.yaw = e.yawTarget = b.yaw; e.age++; return; } } // sitting in a boat's back seat
@@ -9984,7 +10046,8 @@ function mobTick(e) {
   if (e.inWater && !d.sinks && !d.swim && !e.target && e.age % 20 === 0 && (!e.goal || waterCol(e.goal[0], e.goal[1]))) { const g = landSeek(e); if (g) e.goal = g; } // out of the water: to the nearest bank
   // movement physics
   const inF = e.inWater || e.inLava;
-  if ((mx || mz) && e.onGround && !inF && !d.fly && !mobSafeAhead(e, mx, mz)) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } } // a ledge or lava ahead: stop (and pick somewhere else to go)
+  if ((mx || mz) && e.onGround && !inF && !d.fly && !mobSafeAhead(e, mx, mz)) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } }
+  if ((mx || mz) && e.onGround && !inF && !d.fly && !d.swim && !d.water && !e.target && !(e.panic > 0) && !e.rider && mobWaterAhead(e, mx, mz)) { mx = mz = 0; e.goal = null; e.path = null; } // (keep out of water when just wandering) // a ledge or lava ahead: stop (and pick somewhere else to go)
   if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0; e.lastX = e.x; e.lastZ = e.z; if (e.goal && !e.target) { const pr = e.prog || (e.prog = [e.x, e.z, W.tickN]); if (W.tickN - pr[2] >= 40) { if (Math.hypot(e.x - pr[0], e.z - pr[1]) < 0.5) { if (e.onGround && !e.progJ) { e.vy = 0.42; e.progJ = 1; } else { e.goal = null; e.path = null; e.progJ = 0; } } else e.progJ = 0; e.prog = [e.x, e.z, W.tickN]; } } else e.prog = null; /* two seconds with less than half a block gained: a hop, then somewhere else */ // walking into a wall for two seconds: give up on that spot
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
   e.vx += (mx * speed - e.vx) * acc; e.vz += (mz * speed - e.vz) * acc;
@@ -10173,35 +10236,77 @@ function arrowTick(e) {
   if ((e.age > 1200 && !(e.trident && e.owner === PL)) || (e.y < voidY() && !e.trident)) removeEnt(e);
 }
 // ---------- spawning ----------
-function trySpawnHostile() {
-  const cap = Math.round(20 * Math.min(1, R.rd / 6)) + 6; // (a short view distance on a slow computer still gets a cave's worth)
-  // the cap counts the monsters around you (64 blocks): the night's monsters far up on the surface no longer keep a cave
-  // empty (they fade sooner, see the despawn); all of them together stay a few over the cap (weak computers)
-  if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - PL.x, e.y - PL.y, e.z - PL.z) < 64) >= cap || countMobs(e => e.def.hostile) >= cap + 8) return;
-  const under = PL.y < topY(Math.floor(PL.x), Math.floor(PL.z)) - 8; // in a cave or a mine
-  for (let a = 0; a < 6; a++) { // (Java tries a spot in every chunk around you each tick; six spots every half second come closer than two)
-    const ang = Math.random() * Math.PI * 2, r = 24 + Math.random() * Math.max(8, Math.min(R.rd * 16 - 30, under ? 40 : 96));
-    const x = Math.floor(PL.x + Math.cos(ang) * r), z = Math.floor(PL.z + Math.sin(ang) * r);
-    if (!isLoaded(x, z)) continue;
-    if (W.dim === 0 && biomeBase(x, z) === S.BIO.MUSHROOM) continue; // no monsters in mushroom fields
-    const top = topY(x, z);
-    let y = !under && Math.random() < 0.5 ? top + 1 : under && Math.random() < 0.7 ? Math.max(MINY + 1, Math.min(top, Math.floor(PL.y + (Math.random() - .5) * 40))) : MINY + 1 + Math.floor(Math.random() * (top - MINY)); // near your depth when you're underground, else anywhere down the column
-    for (let k = 0; k < 16 && y > MINY + 1 && !(!SOLID[getBlock(x, y, z)] && OPQ[getBlock(x, y - 1, z)]); k++) y--; // down to a floor (a spot inside rock or in mid-air would just fail)
-    if (under && (SOLID[getBlock(x, y, z)] || !OPQ[getBlock(x, y - 1, z)])) { const y0 = Math.floor(PL.y); y = null; for (let d = 0; d <= 24 && y == null; d++) for (const yy of [y0 + d, y0 - d]) if (yy > MINY + 1 && yy < top && !SOLID[getBlock(x, yy, z)] && !SOLID[getBlock(x, yy + 1, z)] && OPQ[getBlock(x, yy - 1, z)]) { y = yy; break; } if (y == null) continue; } // underground: the nearest cave floor in that column to your depth
-    if (FLUID[getBlock(x, y - 1, z)] === 1 && Math.random() < 0.25 && (getLight(x, y - 1, z) & 15) === 0 && Math.max(0, (getLight(x, y - 1, z) >> 4) - skyDarken()) < 8) { spawnMob('drowned', x + .5, y - 2, z + .5); break; }
-    if (!OPQ[getBlock(x, y - 1, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || FLUID[getBlock(x, y, z)] || getBlock(x, y - 1, z) === BID.bedrock) continue;
-    const l = getLight(x, y, z), sky = Math.max(0, (l >> 4) - skyDarken()), blk = l & 15;
-    if (sky > 7 || blk > 0) continue; // 1.18: monsters only where no block light reaches
-    if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) < 24) continue;
-    const types = ['zombie', 'skeleton', 'creeper', 'spider'];
-    const t = overworldReplace(overworldExtra(x, y, z) || types[Math.floor(Math.random() * 4)], x, y, z);
-    if (t === 'enderman' && (SOLID[getBlock(x, y + 2, z)] || countMobs(m => m.type === 'enderman') >= 3)) continue;
-    if (t === 'spider' && (SOLID[getBlock(x + 1, y, z)] || SOLID[getBlock(x, y, z + 1)])) continue;
-    // Java's pack: up to four of a kind, each on its own dark floor a few blocks from the first
-    const n = 1 + Math.floor(Math.random() * 4), ok = (sx, sy, sz) => !SOLID[getBlock(sx, sy, sz)] && !SOLID[getBlock(sx, sy + 1, sz)] && OPQ[getBlock(sx, sy - 1, sz)] && !FLUID[getBlock(sx, sy, sz)] && (getLight(sx, sy, sz) & 15) === 0 && Math.max(0, (getLight(sx, sy, sz) >> 4) - skyDarken()) <= 7;
-    jockeyChance(spawnMob(t, x + .5, y, z + .5));
-    for (let i = 1; i < n; i++) for (let k = 0; k < 4; k++) { const sx = x + Math.floor(Math.random() * 7) - 3, sz = z + Math.floor(Math.random() * 7) - 3; let sy = y + 1; while (sy > y - 3 && !ok(sx, sy, sz)) sy--; if (ok(sx, sy, sz) && Math.hypot(sx - PL.x, sy - PL.y, sz - PL.z) >= 24) { jockeyChance(spawnMob(t, sx + .5, sy, sz + .5)); break; } }
-    break;
+// ---------- monsters: Java's NaturalSpawner ----------
+// Each tick every loaded chunk within 8 of the player gets one try while the monsters (not counting persistent ones) are
+// under the cap of 70 for a full 17 x 17 chunks (fewer chunks, a smaller cap): a spot from the bottom of the world up to
+// the surface, then up to three packs from it, each a random walk of up to four steps; the first fitting member picks
+// the kind (by the biome's weights) and the pack's size. A monster needs a solid floor, room where it stands and above
+// that holds no fluid, no block light, and the dark: sky light <= a random 0-31, then brightness <= a random 0-7
+const MON_BASE = [['spider', 100, 4, 4], ['zombie', 95, 4, 4], ['zombie_villager', 5, 1, 1], ['skeleton', 100, 4, 4], ['creeper', 100, 4, 4], ['slime', 100, 4, 4], ['enderman', 10, 1, 4], ['witch', 5, 1, 1]];
+const MON_LISTS = new Map();
+function monsterList(x, z) {
+  const B = S.BIO, b = biomeBase(x, z);
+  if (b === B.MUSHROOM) return null;
+  const key = b === B.DESERT ? 'desert' : b === B.TUNDRA || b === B.ICE_SPIKES ? 'snowy' : b === B.RIVER ? 'river' : S.isOceanBio(b) ? 'ocean' : b === B.SWAMP ? 'swamp' : 'base';
+  let L = MON_LISTS.get(key); if (L) return L;
+  L = MON_BASE.map(e => e.slice());
+  if (key === 'desert') { L = L.filter(e => e[0] !== 'zombie' && e[0] !== 'zombie_villager'); L.push(['zombie', 19, 4, 4], ['zombie_villager', 1, 1, 1], ['husk', 80, 4, 4]); }
+  if (key === 'snowy') { L = L.filter(e => e[0] !== 'skeleton'); L.push(['skeleton', 20, 4, 4], ['stray', 80, 4, 4]); }
+  if (key === 'ocean') L.push(['drowned', 5, 1, 1]);
+  if (key === 'river') L.push(['drowned', 100, 1, 1]);
+  if (key === 'swamp') L.push(['slime', 1, 1, 1]);
+  L.total = L.reduce((a, e) => a + e[1], 0); MON_LISTS.set(key, L); return L;
+}
+// the column heights (WORLD_SURFACE) of a chunk, kept a while
+function chunkSurface(c) {
+  if (c.surf && W.tickN - c.surfT < 600) return c.surf;
+  const h = c.surf || (c.surf = new Int16Array(256)); c.surfT = W.tickN;
+  const top = Math.min(CH - 1, (c.maxY || CH - 1) + 1);
+  for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) { let r = top; while (r > 0 && !c.blocks[(r << 8) | (lz << 4) | lx]) r--; h[lz * 16 + lx] = r + MINY; }
+  return h;
+}
+const monDark = (x, y, z) => { const l = getLight(x, y, z), sky = l >> 4; if (sky > Math.floor(Math.random() * 32)) return false; if ((l & 15) > 0) return false; return Math.max(0, sky - skyDarken()) <= Math.floor(Math.random() * 8); };
+function monSpotOK(t, x, y, z) {
+  const d = MOBDEF[t]; if (!d) return false;
+  if (t === 'drowned') { // IN_WATER: in water with water under it; rivers 1 in 15, the ocean 1 in 40 and 5 under sea level
+    if (FLUID[getBlock(x, y, z)] !== 1 || FLUID[getBlock(x, y - 1, z)] !== 1 || OPQ[getBlock(x, y + 1, z)]) return false;
+    const river = biomeBase(x, z) === S.BIO.RIVER; return monDark(x, y, z) && (river ? Math.random() < 1 / 15 : Math.random() < 1 / 40 && y < S.SEA - 5);
+  }
+  const below = getBlock(x, y - 1, z), bd = BLOCKS[below];
+  if (!SOLID[below] || FLUID[below] || below === BID.bedrock || (bd && (bd.leaves || below === BID.glass || below === BID.ice || below === BID.packed_ice || below === BID.magma_block || below === BID.barrier))) return false;
+  const free = (bx, by, bz) => { const b = getBlock(bx, by, bz); return !SOLID[b] && !FLUID[b] && b !== BID.fire && b !== BID.lava && !(BLOCKS[b] && BLOCKS[b].rail); };
+  const h = Math.ceil(d.h || 1.95); for (let k = 0; k < h; k++) if (!free(x, y + k, z)) return false;
+  if ((d.w || 0.3) > 0.5) for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (SOLID[getBlock(x + ax, y, z + az)]) return false; // (a spider's 1.4 blocks)
+  if (t === 'slime') { const swamp = biomeBase(x, z) === S.BIO.SWAMP, chunk = S.hash32(W.seed, x >> 4, z >> 4, 99) % 10 === 0;
+    if (swamp && y > 50 && y < 70 && Math.random() < 0.5 && Math.random() < MOON_SIZE[moonPhase()] && (Math.max(0, (getLight(x, y, z) >> 4) - skyDarken()) <= Math.floor(Math.random() * 8))) return true;
+    return chunk && y < 40 && Math.random() < 0.1; }
+  if (!monDark(x, y, z)) return false;
+  if ((t === 'husk' || t === 'stray') && y + 1 <= topY(x, z)) return false; // (they need the open sky)
+  return true;
+}
+function trySpawnHostile(rounds = 1, who = PL) {
+  if (PL.difficulty === 0) return;
+  const pcx = Math.floor(who.x) >> 4, pcz = Math.floor(who.z) >> 4, near = [];
+  for (let cx = pcx - 8; cx <= pcx + 8; cx++) for (let cz = pcz - 8; cz <= pcz + 8; cz++) { const c = chunkAt(cx, cz); if (c) near.push(c); }
+  const cap = Math.floor(70 * near.length / 289); let n = countMobs(e => e.def.hostile && !e.persistent);
+  for (let r = 0; r < rounds; r++) for (const c of near) {
+    if (n >= cap) return;
+    const lx = Math.floor(Math.random() * 16), lz = Math.floor(Math.random() * 16), sx = c.cx * 16 + lx, sz = c.cz * 16 + lz, top = chunkSurface(c)[lz * 16 + lx] + 1;
+    const y = MINY + Math.floor(Math.random() * (top - MINY + 1)); if (y < MINY + 1) continue;
+    { const b0 = getBlock(sx, y, sz); if (SOLID[b0] && OPQ[b0]) continue; }
+    let spawned = 0;
+    for (let k = 0; k < 3 && spawned < 4; k++) {
+      let x = sx, z = sz, kind = null, size = Math.ceil(Math.random() * 4), inPack = 0;
+      for (let j = 0; j < size; j++) {
+        x += Math.floor(Math.random() * 6) - Math.floor(Math.random() * 6); z += Math.floor(Math.random() * 6) - Math.floor(Math.random() * 6);
+        const dd = Math.hypot(x + .5 - who.x, y - who.y, z + .5 - who.z); if (dd <= 24 || dd > 128) continue;
+        if (!kind) { const L = monsterList(x, z); if (!L) break; let w = Math.random() * L.total; for (const e of L) { w -= e[1]; if (w < 0) { kind = e; break; } } if (!kind) break; size = kind[2] + Math.floor(Math.random() * (1 + kind[3] - kind[2])); }
+        let t = kind[0]; if (!monSpotOK(t, x, y, z)) continue;
+        if (t === 'enderman' && countMobs(m => m.type === 'enderman') >= 6) continue;
+        const m = spawnMob(t, x + .5, y, z + .5); if (!m) continue; jockeyChance(m);
+        n++; spawned++; inPack++; if (spawned >= 4) break; if (inPack >= kind[3]) break;
+      }
+    }
   }
 }
 function spawnAnimalsForChunk(c) {
@@ -11157,6 +11262,7 @@ function walkPhysics(e, mx, mz, speed) {
     if (gl > 2.5 && (gx * mx + gz * mz) / (gl * ml) > 0.8) { const pd = pathDir(e, e.goal[0], e.y, e.goal[1]); if (pd[0] || pd[1]) { mx = pd[0] * ml; mz = pd[1] * ml; e.yawTarget = Math.atan2(-pd[0], -pd[1]); } }
   }
   if ((mx || mz) && e.onGround && !inF && !d.fly && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } }
+  if ((mx || mz) && e.onGround && !inF && !d.fly && !d.swim && !d.water && !e.target && !(e.panic > 0) && !e.rider && !e.leash && typeof mobWaterAhead === 'function' && mobWaterAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; e.goal = null; e.path = null; } // (Java: they stroll to dry ground)
   if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0;
   e.lastX = e.x; e.lastZ = e.z; if (e.goal && !e.target) { const pr = e.prog || (e.prog = [e.x, e.z, W.tickN]); if (W.tickN - pr[2] >= 40) { if (Math.hypot(e.x - pr[0], e.z - pr[1]) < 0.5) { if (e.onGround && !e.progJ) { e.vy = 0.42; e.progJ = 1; } else { e.goal = null; e.path = null; e.progJ = 0; } } else e.progJ = 0; e.prog = [e.x, e.z, W.tickN]; } } else e.prog = null; /* two seconds with less than half a block gained: a hop, then somewhere else */
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
@@ -19844,7 +19950,8 @@ if (!MP.name) { MP.name = '플레이어' + (10000 + Math.floor(Math.random() * 9
 // pages hosts that serve files only: they can't be a multiplayer server
 const MP_STATIC = /(^|\.)(github\.io|claude\.ai|claudeusercontent\.com|netlify\.app|vercel\.app|pages\.dev)$/i;
 const mpStaticHost = a => { try { return MP_STATIC.test(new URL(mpWsUrl(a)).hostname); } catch (e) { return false; } };
-const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a && !mpStaticHost(a)) return a; } catch (e) {}
+const MP_OLD_SERVER = /mark-w65a\.onrender\.com/i; // (the server moved to Cloudflare: an address saved from before gives way to the new one)
+const mpDefaultAddr = () => { try { const a = localStorage.getItem(MP_ADDR_KEY); if (a && !mpStaticHost(a) && !MP_OLD_SERVER.test(a)) return a; } catch (e) {}
   if (typeof NEMO_CONFIG !== 'undefined' && NEMO_CONFIG.server) return mpWsUrl(NEMO_CONFIG.server);
   if (/^https?:$/.test(location.protocol) && !MP_STATIC.test(location.hostname)) return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/mp';
   return location.protocol === 'https:' ? '' : 'ws://192.168.0.2:8080/mp'; }; // on GitHub Pages: empty, the field shows what to write
@@ -19859,14 +19966,14 @@ async function mpUnpack(code) { const u8 = mpUnB64(code.replace(/\s+/g, ''), Uin
 // relay server: the server forwards guests' messages to the host and the host's to one guest or all of them
 // "my-server.onrender.com", "https://my-server.onrender.com" or "192.168.0.2:8080" -> a WebSocket address ending in /mp
 function mpWsUrl(a) {
-  a = String(a || '').trim(); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
+  a = String(a || '').trim().replace(MP_OLD_SERVER, 'mark.yubinl3756.workers.dev'); if (!/^[a-z]+:\/\//i.test(a)) a = (/^(localhost|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(a) ? 'ws://' : 'wss://') + a;
   a = a.replace(/^http(s?):\/\//i, 'ws$1://'); try { const u = new URL(a); if (u.pathname === '/' || u.pathname === '') u.pathname = '/mp'; return u.href; } catch (e) { return a; }
 }
 // a hosted server (Render's free plan and the like) sleeps when nobody uses it and takes up to a minute to wake:
 // knock on its web page, then keep trying for a while instead of failing at once
 async function mpWebSocket(url, role, extra) {
-  if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.onrender.com)');
-  if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. Render 서버 주소(이름.onrender.com)를 넣어 주세요');
+  if (!String(url || '').trim()) throw new Error('서버 주소를 넣어 주세요 (예: 이름.workers.dev)');
+  if (mpStaticHost(url)) throw new Error('이 주소는 게임 파일만 있는 곳이라 멀티플레이 서버가 아닙니다. 멀티플레이 서버 주소(이름.workers.dev)를 넣어 주세요');
   url = mpWsUrl(url); const local = /^wss?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url), t0 = Date.now();
   const say = t => { MP.status = t; const el = $('mpStatus'); if (el) el.textContent = t; };
   for (let k = 0; ; k++) {
@@ -19885,9 +19992,15 @@ function mpWsOnce(url, role, extra) {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
     const late = new Map(), link = { kind: 'ws', send(o, to) { // a slow upload keeps only the newest position (and the like) until it catches up
       if (ws.readyState !== 1) return; const s = JSON.stringify(to != null ? { ...o, to } : o);
+      // a server that takes them (Cloudflare counts every incoming message): what this game says in a tenth of a second
+      // goes as one message, only the newest position (and the like) of each kind in it
+      if (link.hello && link.hello.multi) { const k = MP_DROP.has(o.t) ? o.t + ':' + (to != null ? to : '') : null; if (k && link.qk.has(k)) link.q[link.qk.get(k)] = s; else { if (k) link.qk.set(k, link.q.length); link.q.push(s); }
+        if (!link.qt) link.qt = setTimeout(link.flushQ, 100); return; }
       if (MP_DROP.has(o.t) && ws.bufferedAmount > 128 * 1024) { late.set(o.t + ':' + (to != null ? to : ''), s); return; }
       if (late.size && ws.bufferedAmount < 64 * 1024) { for (const v of late.values()) ws.send(v); late.clear(); }
-      ws.send(s); }, close() { try { ws.close(); } catch (e) {} } };
+      ws.send(s); }, close() { try { ws.close(); } catch (e) {} }, q: [], qk: new Map(), qt: 0,
+      flushQ() { link.qt = 0; if (ws.readyState !== 1 || !link.q.length) { link.q = []; link.qk.clear(); return; } if (ws.bufferedAmount > 256 * 1024) { link.qt = setTimeout(link.flushQ, 100); return; } /* a slow upload: the queue waits (positions in it are still replaced) */
+        const l = link.q; link.q = []; link.qk.clear(); ws.send(l.length === 1 ? l[0] : '{"t":"multi","l":[' + l.join(',') + ']}'); } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { link.rx = Date.now(); if (ok && MP.link !== link && !(MP.core && role === 'host')) return; /* an old connection still talking after the game moved on */ let m; try { m = JSON.parse(e.data); } catch (er) { return; }
@@ -20480,7 +20593,7 @@ function mpTick() {
   for (const p of here) {
     if (Math.abs(p.s.x - PL.x) < 48 && Math.abs(p.s.z - PL.z) < 48) continue; // already covered by the host's own area
     randomTicks(Math.floor(p.s.x), Math.floor(p.s.z));
-    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); });
+    if (W.tickN % 10 === 0 && gr('doMobSpawning')) mpProxy(p, () => { if (W.dim === 0) trySpawnHostile(10); else trySpawnDimension(); }); // (ten ticks' worth at once)
   }
   // experience orbs fly to the nearest player, guests included, and a guest gets the points on touching one
   if (here.length) for (const e of ENT) {
@@ -21134,7 +21247,7 @@ addEventListener('blur', () => mpShowList(false));
 
 // ---------- menus ----------
 function mpMenu(name) {
-  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Render 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.onrender.com"></label>`;
+  const nameRow = ACC.user ? `<label>내 이름 (로그인함 — 바꾸려면 타이틀에서 로그아웃)<input id="mpName" value="${esc(ACC.user.name)}" maxlength="16" disabled></label>` : `<label>내 이름<input id="mpName" value="${esc(MP.name)}" maxlength="16"></label>`, addr = `<label>서버 주소 (Cloudflare 서버나 node tools/server.js)<input id="mpAddr" value="${esc(mpDefaultAddr())}" placeholder="이름.workers.dev"></label>`;
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}
@@ -22190,7 +22303,7 @@ function gameTick() {
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
   furnaceTick();
   const spawnOK = gr('doMobSpawning');
-  if (spawnOK && W.tickN % 10 === 0) { if (W.dim === 0) trySpawnHostile(); else trySpawnDimension(); }
+  if (spawnOK) { if (W.dim === 0) trySpawnHostile(); else if (W.tickN % 10 === 0) trySpawnDimension(); } // (Java: monsters every tick)
   if (W.tickN % 40 === 0) ensureDragon();
   if (spawnOK && W.tickN % 100 === 0) trySpawnStrider();
   if (spawnOK && W.tickN % 200 === 50) trySpawnAmbient();

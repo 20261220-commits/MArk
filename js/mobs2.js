@@ -396,6 +396,7 @@ function walkPhysics(e, mx, mz, speed) {
     if (gl > 2.5 && (gx * mx + gz * mz) / (gl * ml) > 0.8) { const pd = pathDir(e, e.goal[0], e.y, e.goal[1]); if (pd[0] || pd[1]) { mx = pd[0] * ml; mz = pd[1] * ml; e.yawTarget = Math.atan2(-pd[0], -pd[1]); } }
   }
   if ((mx || mz) && e.onGround && !inF && !d.fly && typeof mobSafeAhead === 'function' && !mobSafeAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; if (!e.target) { e.goal = null; e.path = null; } }
+  if ((mx || mz) && e.onGround && !inF && !d.fly && !d.swim && !d.water && !e.target && !(e.panic > 0) && !e.rider && !e.leash && typeof mobWaterAhead === 'function' && mobWaterAhead(e, mx / (Math.hypot(mx, mz) || 1), mz / (Math.hypot(mx, mz) || 1))) { mx = mz = 0; e.goal = null; e.path = null; } // (Java: they stroll to dry ground)
   if ((mx || mz) && Math.hypot(e.x - (e.lastX ?? e.x + 1), e.z - (e.lastZ ?? e.z)) < 0.01) { if ((e.stuckT = (e.stuckT || 0) + 1) > 40 && !e.target) { e.goal = null; e.path = null; e.stuckT = 0; } } else e.stuckT = 0;
   e.lastX = e.x; e.lastZ = e.z; if (e.goal && !e.target) { const pr = e.prog || (e.prog = [e.x, e.z, W.tickN]); if (W.tickN - pr[2] >= 40) { if (Math.hypot(e.x - pr[0], e.z - pr[1]) < 0.5) { if (e.onGround && !e.progJ) { e.vy = 0.42; e.progJ = 1; } else { e.goal = null; e.path = null; e.progJ = 0; } } else e.progJ = 0; e.prog = [e.x, e.z, W.tickN]; } } else e.prog = null; /* two seconds with less than half a block gained: a hop, then somewhere else */
   const acc = e.onGround ? 0.5 : inF ? 0.2 : 0.1;
