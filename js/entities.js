@@ -410,6 +410,23 @@ function fireOverlay(o, on, x, y, z, w, h) {
 }
 function dropFireOverlay(o) { if (o.fireOvl) { scene.remove(o.fireOvl); o.fireOvl = null; } }
 // ---------- the good sense of animals (Java's stroll, float and panic goals) ----------
+// Java's PanicGoal: for 5 s after a hit, one dash after another to a spot picked at random within 5 blocks (out of ten
+// tries, grass first) - round about where it was hit, not away from the player. Villagers running from a zombie (Java:
+// SetWalkTargetAwayFrom) and the like keep running away from it.
+function panicGoal(e) {
+  const away = e.fleeFrom && (e.type === 'villager' || e.type === 'wandering_trader');
+  let best = null, bv = -1e9;
+  for (let k = 0; k < 10; k++) {
+    let gx = Math.floor(Math.random() * 11) - 5, gz = Math.floor(Math.random() * 11) - 5;
+    if (away) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; if (gx * fx + gz * fz < 0) { gx = -gx; gz = -gz; } gx += Math.round(fx / l * 3); gz += Math.round(fz / l * 3); }
+    const x = Math.floor(e.x) + gx, z = Math.floor(e.z) + gz; if (!isLoaded(x, z)) continue;
+    let y = Math.floor(e.y + 0.01), ok = false; for (let dy = 0; dy <= 8 && !ok; dy++) { const yy = y + (dy & 1 ? -(dy + 1 >> 1) : dy >> 1); if (typeof pfWalkable !== 'function' || pfWalkable(x, yy, z, Math.ceil(e.h || 1))) { y = yy; ok = true; } }
+    if (!ok || FLUID[getBlock(x, y, z)]) continue;
+    const v = getBlock(x, y - 1, z) === BID.grass_block ? 10 : (getLight(x, y, z) >> 4) / 15 - 0.5; // (an animal's walk target value)
+    if (v > bv) { bv = v; best = [x + .5, z + .5]; }
+  }
+  return best || [e.x + (Math.random() - .5) * 10, e.z + (Math.random() - .5) * 10];
+}
 // water at the top of a column (a stroll never ends there; an animal in the water heads for a bank)
 function waterCol(x, z) { const ix = Math.floor(x), iz = Math.floor(z); if (!isLoaded(ix, iz)) return true; const y = topY(ix, iz); return !!FLUID[getBlock(ix, y, iz)]; }
 // a random spot on land within r, not far up or down (Java's WaterAvoidingRandomStrollGoal), or null
@@ -706,17 +723,28 @@ function mobTick(e) {
     const tx = dx / (Math.hypot(dx, dz) || 1), tz = dz / (Math.hypot(dx, dz) || 1);
     e.yawTarget = Math.atan2(-dx, -dz); if (d.chase) speed = d.chase * (e.babySpeed || 1);
     if (d.ranged) {
-      if (dist > 10) { mx = tx; mz = tz; } else if (dist < 5) { mx = -tx; mz = -tz; }
-      else { mx = -tz * 0.5; mz = tx * 0.5; }
-      if (e.attackCd <= 0 && dist < 15 && canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z)) {
-        e.attackCd = 20 + (PL.difficulty === 3 ? 20 : 40);
+      // Java's RangedBowAttackGoal: in sight for a second and within 15 it stops and strafes (a quarter of its speed,
+      // sideways and forward or back: back inside 7.5, forward beyond 13, each way flipped now and then), else it walks
+      // up; the bow is drawn for a second and let go while it sees you, then 2 s (hard: 1 s) before the next draw
+      const see = canSee(e.x, e.y + 1.6, e.z, PL.x, PL.y + 1.4, PL.z);
+      if (see !== !!e.sawT) e.seeTime = 0; e.sawT = see; e.seeTime = (e.seeTime || 0) + (see ? 1 : -1);
+      if (dist <= 15 && e.seeTime >= 20) { e.path = null; e.strafeT = (e.strafeT == null || e.strafeT < 0 ? 0 : e.strafeT) + 1; } else { [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); e.strafeT = -1; }
+      if (e.strafeT >= 20) { if (Math.random() < 0.3) e.cw = !e.cw; if (Math.random() < 0.3) e.back = !e.back; e.strafeT = 0; }
+      if (e.strafeT > -1) { if (dist > 15 * Math.sqrt(0.75)) e.back = false; else if (dist < 15 * 0.5) e.back = true;
+        const f = e.back ? -0.5 : 0.5, rt = e.cw ? 0.5 : -0.5; mx = tx * f - tz * rt; mz = tz * f + tx * rt; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+        speed = 4.317 * Math.hypot(f, rt) * 0.25 * 0.25 / 0.1 / 14.3 * (e.babySpeed || 1); } // (strafing: input (0.5, 0.5) at a speed of 0.25 x 0.25)
+      if (e.useT > 0) { e.useT++; if (!see && e.seeTime < -60) e.useT = 0; }
+      else if (e.attackCd <= 0 && e.seeTime >= -60) e.useT = 1; /* (attackCd counts down with the others) */
+      e.drawing = e.useT > 0;
+      if (e.useT >= 20 && see && dist < 15 * 1.5) {
+        e.useT = 0; e.attackCd = PL.difficulty === 3 ? 20 : 40;
         const sx = e.x, sy = e.y + 1.5, sz = e.z, ddx = PL.x - sx, ddy = PL.y + PL.h / 3 - sy, ddz = PL.z - sz, hd = Math.hypot(ddx, ddz); // MC aims at 1/3 of target height
         const v = 1.6, l = Math.hypot(ddx, ddy + hd * 0.2, ddz);
         shootArrow(sx + ddx / hd * 0.6, sy, sz + ddz / hd * 0.6, ddx / l * v + (Math.random() - .5) * 0.05, (ddy + hd * 0.2) / l * v, ddz / l * v + (Math.random() - .5) * 0.05, e, mobArrowBase());
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if (dist < 3 || (e.fuse > 0 && dist < 7)) { if (e.fuse === 0) play('fuse'); e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
+      if ((dist < 3 || (e.fuse > 0 && dist < 7)) && canSee(e.x, e.y + 1.4, e.z, PL.x, PL.y + 1.6, PL.z)) { if (e.fuse === 0) play('fuse'); /* (Java's SwellGoal: within 3 to start, 7 to keep on, and in sight) */ e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -727,7 +755,7 @@ function mobTick(e) {
     }
   } else {
     const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && plVisible && !e.rider && !(e.panic > 0); // (Java's TemptGoal: 10 blocks, either hand)
-    if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) { let gx = (Math.random() - .5) * 8, gz = (Math.random() - .5) * 8; if (e.fleeFrom) { const fx = e.x - e.fleeFrom[0], fz = e.z - e.fleeFrom[1], l = Math.hypot(fx, fz) || 1; gx += fx / l * 8; gz += fz / l * 8; } e.goal = [e.x + gx, e.z + gz]; } speed = jv ? jsp(jv.panic) : d.speed * 2.2; }
+    if (e.panic > 0) { if (!e.goal || (e.panicT = (e.panicT || 0) + 1) > 60) { e.goal = panicGoal(e); e.panicT = 0; } speed = jv ? jsp(jv.panic) : d.speed * 2.2; }
     else if (food) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); if (jv) speed = jsp(jv.tempt); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
@@ -1152,7 +1180,7 @@ function entityRender(alpha, now) {
       const P = e.mesh.userData.parts, sw = Math.sin(e.walk) * 0.9 * e.walkAmt;
       const legs = [['rleg', 1], ['lleg', -1], ['rleg2', -1], ['lleg2', 1]];
       for (const [n, s] of legs) if (P[n]) P[n].rotation.x = sw * s;
-      if (P.rarm) { if (e.def.armsOut || (e.type === 'skeleton' && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
+      if (P.rarm) { if (e.def.armsOut || ((e.type === 'skeleton' || e.type === 'stray') && e.target)) { P.rarm.rotation.x = Math.PI / 2 + sw * 0.1; P.larm.rotation.x = Math.PI / 2 - sw * 0.1; } else { P.rarm.rotation.x = -sw; P.larm.rotation.x = sw; } }
       if (P.head && e.target) { const hy = Math.atan2(-(PL.x - x), -(PL.z - z)) - yaw; P.head.rotation.y = ((hy + Math.PI * 3) % (Math.PI * 2)) - Math.PI; P.head.rotation.y = Math.max(-1, Math.min(1, P.head.rotation.y)); }
       if (e.def.fish && P.tail) P.tail.rotation.y = Math.sin(now / 90 + e.id) * 0.6;
       if (e.def.water && P.t0) { for (let i = 0; i < 8; i++) { P['t' + i].rotation.x = Math.sin(e.walk + i) * 0.25 + 0.15 * Math.cos(i / 8 * 6.283); P['t' + i].rotation.z = -0.15 * Math.sin(i / 8 * 6.283) + Math.cos(e.walk * 0.7 + i) * 0.1; } e.mesh.rotation.x = Math.max(-0.6, Math.min(0.6, -e.vy * 8)); }

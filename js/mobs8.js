@@ -157,7 +157,7 @@ const withDefault = fn => (e, dist, dx, dz) => { if (fn(e, dist) === 'default') 
 function genericAnimal(e, dist) {
   const d = e.def, jv = d.jv, js = m => jv ? mobJSpeed(jv.a * m) * (e.babySpeed || 1) : d.speed; let mx = 0, mz = 0, sp = js(jv ? jv.stroll : 1); // (Java's movement attribute and goal speeds, mobai.js)
   const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && plTargetable();
-  if (e.panic > 0) { if (!e.goal || Math.random() < 0.05) e.goal = [e.x + (Math.random() - .5) * 16, e.z + (Math.random() - .5) * 16]; sp = jv ? js(jv.panic) : sp * 2.2; }
+  if (e.panic > 0) { if (!e.goal || (e.panicT = (e.panicT || 0) + 1) > 60) { e.goal = panicGoal(e); e.panicT = 0; } sp = jv ? js(jv.panic) : sp * 2.2; } // (Java's PanicGoal: entities.js)
   else if (food) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; if (jv) sp = js(jv.tempt); }
   else if (e.love > 0) { const mate = ENT.find(o => o !== e && o.type === e.type && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8); if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; { const kid = spawnMob(e.type, e.x, e.y, e.z, { baby: true, variant: Math.random() < 0.5 ? e.variant : mate.variant }); if (e.def.onBred) e.def.onBred(kid, e, mate); } spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
   else if (!e.goal && Math.random() < 1 / 120) e.goal = wanderGoal(e, 10);
