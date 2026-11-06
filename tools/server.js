@@ -407,8 +407,20 @@ server.on('upgrade', (req, sock) => {
   const url = new URL(req.url, 'http://x'); if (!url.pathname.startsWith('/mp')) { sock.destroy(); return; }
   let roomName = null, room = null, w = null; // w: the server world this player is in
   const id = nextId++; let role = null, wp = false;
+  // a game sends what it says in a tenth of a second as one message ({"t":"multi","l":[...]}) to a server that takes it
   const c = wsAccept(req, sock, text => {
     let m; try { m = JSON.parse(text); } catch (e) { return; }
+    if (m && m.t === 'multi' && Array.isArray(m.l)) { for (const x of m.l) { try { handle(x); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } return; }
+    handle(m);
+  }, why => {
+    { const p = wp && w.core.players.get(id); if (p && p.joined || role) noteDrop({ at: new Date().toISOString(), side: 'server', world: wp ? w.id : roomName, name: p ? p.name : role, why }); }
+    if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
+    if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
+    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
+    if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
+  });
+  function handle(m) {
+    if (!m || typeof m !== 'object') return;
     if (m.t === 'hb' && !wp && role !== 'guest') return; // a player's game saying it is still there (in a background tab too): the world (or the host's) marks it seen
     if (wp) {
       if (m.t === 'restore') { restorePart(w, id, m); return; }
@@ -439,23 +451,17 @@ server.on('upgrade', (req, sock) => {
       if (m.role === 'world') { const ww = openWorld(wid || worldName), pk = ww.state.meta && ww.state.meta.priv && ww.state.meta.priv.key;
         if (pk && String(m.key || '') !== pk) { c.send(JSON.stringify({ t: 'error', msg: '비공개 서버입니다. 초대 코드가 맞지 않습니다' })); c.close(); dropIfEmpty(ww); return; } // (a private world: only with its invite key)
         role = 'world'; wp = true; w = ww; w.conns.set(id, c); roomName = w.id;
-        c.send(JSON.stringify({ t: 'hello', id, world: w.state.meta ? { name: w.state.meta.name, seed: w.state.meta.seed } : null, kind: 'world', wid: w.id })); return; }
+        c.send(JSON.stringify({ t: 'hello', id, world: w.state.meta ? { name: w.state.meta.name, seed: w.state.meta.seed } : null, kind: 'world', wid: w.id, multi: 1 })); return; }
       if (m.role === 'host') { roomName = code && !(rooms.get(code) || {}).host ? code : newCode();
         room = { host: c, guests: new Map(), hostName: String(m.name || '플레이어').slice(0, 16), worldName: String(m.world || '').slice(0, 40), mode: m.mode === 'creative' ? 'creative' : 'survival' }; rooms.set(roomName, room); role = 'host'; }
       else { roomName = code || 'main'; room = rooms.get(roomName); if (!room || !room.host) { c.send(JSON.stringify({ t: 'error', msg: '아직 세계를 연 호스트가 없습니다' })); c.close(); return; } room.guests.set(id, c); role = 'guest'; }
-      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
+      c.send(JSON.stringify({ t: 'hello', id: role === 'host' ? 0 : id, kind: role, room: roomName, multi: 1 })); console.log(`[${roomName}] ${role} ${id} 접속`); return;
     }
     const dr = DROPPABLE.has(m.t) && m.t + ':' + (m.id != null ? m.id : role === 'guest' ? id : '');
     if (role === 'guest') { if (room.host) room.host.send(JSON.stringify({ ...m, from: id }), dr); return; }
     const to = m.to; delete m.to; const s = JSON.stringify(m);
     if (to != null) { const g = room.guests.get(to); if (g) g.send(s, dr); } else for (const g of room.guests.values()) g.send(s, dr);
-  }, why => {
-    { const p = wp && w.core.players.get(id); if (p && p.joined || role) noteDrop({ at: new Date().toISOString(), side: 'server', world: wp ? w.id : roomName, name: p ? p.name : role, why }); }
-    if (wp) { w.conns.delete(id); w.core.leave(id); if (w.restorer === id) { w.restorer = null; saveWorld(w); } if (!w.conns.size) { w.stateDirty = true; saveWorld(w); dropIfEmpty(w); backupNow('모두 나감'); } return; }
-    if (role === 'guest') { room.guests.delete(id); if (room.host) room.host.send(JSON.stringify({ t: 'leave', from: id })); }
-    else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(JSON.stringify({ t: 'hostgone' })); g.close(); } room.guests.clear(); rooms.delete(roomName); }
-    if (role) console.log(`[${roomName}] ${role} ${id} 나감`);
-  });
+  }
 });
 restoreIfEmpty().then(() => server.listen(port, () => {
   const addrs = Object.values(os.networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal).map(a => a.address);

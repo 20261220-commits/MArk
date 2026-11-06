@@ -12,7 +12,7 @@ async function startServer() {
   const proc = spawn(process.execPath, [path.join(root, 'tools', 'server.js')], { env: { ...process.env, PORT: String(port), WORLDS_DIR: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; proc.stdout.on('data', d => { log += d; }); proc.stderr.on('data', d => { log += d; });
   for (let i = 0; i < 100 && !/멀티플레이 주소/.test(log); i++) await new Promise(r => setTimeout(r, 100));
-  return { port, url: 'http://localhost:' + port + '/', ws: 'ws://localhost:' + port + '/mp', log: () => log, stop: () => { proc.kill(); try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} } };
+  return { port, url: 'http://localhost:' + port + '/', ws: process.env.NEMO_TEST_WS || 'ws://localhost:' + port + '/mp', /* NEMO_TEST_WS: play against another server (wrangler dev for cf/worker.js) */ log: () => log, stop: () => { proc.kill(); try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} } };
 }
 async function browser() { const pw = playwright(); return pw.chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] }); }
 // a page with the game loaded; errs collects page errors
