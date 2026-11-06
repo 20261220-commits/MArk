@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.06 10:10';
+const NEMO_VERSION = '2026.11.06 10:19';
 
 </script>
 <script>/* js/shared.js */
@@ -2118,7 +2118,7 @@ const VSTYLE = {
 const VPROF = ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman'];
 const LOOT = {
   smith: [['iron_horse_armor', 1], ['iron_ingot', 5], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['iron_helmet', 1], ['iron_chestplate', 1], ['obsidian', 6], ['oak_sapling', 5], ['diamond', 2], ['gold_ingot', 3]],
-  house: [['bread', 4], ['apple', 3], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 2], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 0], ['honeycomb', 3], ['candle', 2]],
+  house: [['bread', 4], ['apple', 5], ['wheat', 7], ['wheat_seeds', 5], ['emerald', 4], ['coal', 4], ['torch', 6], ['oak_sapling', 2], ['potato', 7], ['gold_nugget', 3], ['dandelion', 1], ['poppy', 1], ['book', 1], ['feather', 1]], // (Java's village house chests: 3-8 of these)
   stronghold: [['music_disc_otherside', 1, 0.15], ['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['ender_pearl', 1], ['iron_ingot', 5], ['gold_ingot', 3], ['redstone', 9], ['bread', 3], ['apple', 3], ['iron_pickaxe', 1], ['iron_sword', 1], ['diamond', 3], ['saddle', 1], ['golden_apple', 1], ['book', 3]],
   end_city: [['golden_horse_armor', 1], ['diamond_horse_armor', 1], ['diamond', 3], ['iron_ingot', 7], ['gold_ingot', 7], ['emerald', 6], ['saddle', 1], ['diamond_sword', 1], ['diamond_chestplate', 1], ['diamond_pickaxe', 1], ['iron_helmet', 1], ['ender_pearl', 3]],
   mineshaft: [['rail', 8], ['torch', 8], ['bread', 3], ['iron_ingot', 4], ['gold_ingot', 3], ['redstone', 8], ['lapis_lazuli', 8], ['coal', 8], ['diamond', 2], ['melon_seeds', 4], ['pumpkin_seeds', 4], ['beetroot_seeds', 4], ['golden_apple', 1], ['name_tag', 1], ['powered_rail', 4], ['activator_rail', 4], ['detector_rail', 4], ['glow_berries', 6], ['iron_pickaxe', 1]],
@@ -2183,7 +2183,7 @@ function stampTemplate(st, t, ox, oy, oz, r, sty, R, tiles, piece) {
         case 't': id = 45; break;
         case 'c': id = 41; break;
         case 'f': id = 42; m = rf(1); break;
-        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', 3 + R.int(4)) }); break;
+        case 'H': id = 44; m = rf(2); tiles.push({ t: 'chest', i: (y << 8) | ((wz & 15) << 4) | (wx & 15), loot: rollLoot(R, t.loot || 'house', 3 + R.int(6)) }); break;
         case 'X': id = 133; break;
         case 'a': id = 132; m = rf(1); break;
         case 'k': id = 47; break;
@@ -3710,9 +3710,20 @@ function genChunk0(seed, cx, cz, dim, exp) {
       if (v < 0.006 && x > 0 && z > 0 && x < 15 && z < 15) { const n = 1 + R.int(3); for (let k = 1; k <= n && h + k < CH0 && cactusRoom(blocks, x, h + k, z); k++) blocks[I(x, h + k, z)] = 37; }
       else if (v < 0.012) blocks[above] = 35;
     }
-    if ((top === 2 || top === 9 || top === 3) && h === SEA && R() < 0.25) {
-      let wet = false; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (hgt[(z + 1 + az) * 18 + x + 1 + ax] < SEA) wet = true;
-      if (wet) { const n = 1 + R.int(3); for (let k = 1; k <= n; k++) blocks[I(x, h + k, z)] = 36; }
+  }
+  // sugar cane as Java's patch_sugar_cane: a patch in 1 chunk of 6 (1 of 3 in swamps, every chunk in deserts, 1 of 5 in
+  // badlands), 20 tries within 4 blocks of its centre, each a column of 2-4 (biased low) on grass, dirt or sand beside water
+  { const cb = biome[8 * 16 + 8], every = cb === BIO.DESERT ? 1 : cb === BIO.SWAMP ? 3 : cb === BIO.BADLANDS ? 5 : 6;
+    if (!isOceanBio(cb) && R.int(every) === 0) {
+      const px = R.int(16), pz = R.int(16);
+      for (let t = 0; t < 20; t++) {
+        const x = px + R.int(5) - R.int(5), z = pz + R.int(5) - R.int(5); if (x < 0 || z < 0 || x > 15 || z > 15) continue;
+        const h = hgt[(z + 1) * 18 + x + 1], gb = blocks[I(x, h, z)]; if (h < SEA || h + 4 >= CH0 || blocks[I(x, h + 1, z)] !== 0) continue;
+        if (gb !== 2 && gb !== 3 && gb !== 9 && gb !== BID.red_sand && gb !== BID.podzol && gb !== BID.coarse_dirt && gb !== BID.mycelium && gb !== BID.moss_block) continue;
+        let wet = false; for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + ax, nz = z + az; if (nx >= 0 && nz >= 0 && nx <= 15 && nz <= 15 ? blocks[I(nx, h, nz)] === 27 : hgt[(nz + 1) * 18 + nx + 1] < h) { wet = true; break; } }
+        if (!wet) continue;
+        const n = 2 + R.int(R.int(3) + 1); for (let k = 1; k <= n && blocks[I(x, h + k, z)] === 0; k++) blocks[I(x, h + k, z)] = 36;
+      }
     }
   }
   function placePumpkins(x, h, z) { for (let k = 0; k < 5; k++) { const px = x + R.int(5) - 2, pz = z + R.int(5) - 2; if (px < 0 || pz < 0 || px > 15 || pz > 15) continue; const ph = hgt[(pz + 1) * 18 + px + 1]; if (blocks[I(px, ph, pz)] === 2 && blocks[I(px, ph + 1, pz)] === 0) { blocks[I(px, ph + 1, pz)] = 54; meta[I(px, ph + 1, pz)] = R.int(4); } } }
@@ -4631,8 +4642,13 @@ function rollVanillaLoot(R, name) {
   const tbl = STRUCTS.loot && STRUCTS.loot[name]; if (!tbl) { const k = LOOT_FALLBACK(name); return k ? rollLoot(R, k, 4 + R.int(5)) : []; }
   const out = [], free = shuffled(R, [...Array(27).keys()]); out.table = name;
   const num = v => typeof v === 'number' ? v : v && v.min != null ? v.min + R() * (v.max - v.min) : 1;
+  // a whole number the way Java's providers give one: uniform from min to max inclusive (Mth.nextInt), binomial n tries at p
+  const numI = v => { if (typeof v === 'number') return Math.floor(v); if (!v) return 1; const t = String(v.type || '');
+    if (t.endsWith('binomial')) { let k = 0; const n = numI(v.n), q = num(v.p); for (let i = 0; i < n; i++) if (R() < q) k++; return k; }
+    if (v.min != null) { const lo = Math.floor(num(v.min)), hi = Math.floor(num(v.max)); return lo + R.int(Math.max(0, hi - lo) + 1); }
+    return v.value != null ? numI(v.value) : 1; };
   for (const pool of tbl.pools || []) {
-    const rolls = Math.floor(num(pool.rolls) + 0.0001);
+    const rolls = numI(pool.rolls) + Math.floor(num(pool.bonus_rolls || 0) * 0); // (bonus rolls go with luck: none here)
     const ents = (pool.entries || []).filter(e => e.type === 'minecraft:item' || e.type === 'minecraft:empty' || e.type === 'item' || e.type === 'empty'), tot = ents.reduce((a, e) => a + (e.weight || 1), 0);
     for (let r = 0; r < rolls; r++) {
       let w = R() * tot, e = null; for (const x of ents) { w -= x.weight || 1; if (w < 0) { e = x; break; } }
@@ -4640,7 +4656,7 @@ function rollVanillaLoot(R, name) {
       let n = 1; const extra = {};
       for (const f of e.functions || []) {
         const fn = (f.function || '').replace('minecraft:', '');
-        if (fn === 'set_count') n = Math.max(0, Math.floor(num(f.count) + 0.0001));
+        if (fn === 'set_count') n = Math.max(0, numI(f.count));
         else if (fn === 'set_damage') extra.dmg = num(f.damage);
         else if (fn === 'enchant_randomly' || fn === 'enchant_with_levels') extra.ench = fn === 'enchant_with_levels' ? Math.floor(num(f.levels)) : 1;
         else if (fn === 'exploration_map') extra.map = f.destination || 'buried_treasure';
