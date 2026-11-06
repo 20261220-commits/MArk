@@ -255,12 +255,15 @@ async function worldSnapshot() {
 let backingUp = null;
 // a backup that would lose a world, or most of one, against the last good one is kept aside instead (…-suspect)
 function backupSuspect(counts) { const m = BK.manifest; if (!m) return null; for (const id in m) { const n0 = m[id], n = counts[id]; if (n == null) return '세계 ' + id + '이(가) 없어짐'; if (n0 >= 10 && n < n0 * 0.7) return '세계 ' + id + '의 청크가 ' + n0 + '개에서 ' + n + '개로 줄어듦'; } return null; }
+let lastBackupHash = null;
 async function backupNow(why) {
   if (!BACKUP || backingUp) return backingUp;
   if (BK.blocked) { console.log('백업 건너뜀: 서버가 아직 백업을 불러오지 못했습니다'); return null; } // (an empty server must not be backed up over the worlds)
   backingUp = worldSnapshot().then(async snap => { if (!snap) return null; const counts = worldCounts(), bad = backupSuspect(counts);
       if (bad) { console.log('⚠ 이상한 백업이라 덮어쓰지 않고 따로 둡니다 (' + bad + ')'); BK.lastError = '의심 백업: ' + bad; await BACKUP.save(snap, { suspect: true }); return null; }
-      const n = await BACKUP.save(snap); BK.manifest = counts; return n; }).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
+      const hash = require('crypto').createHash('sha1').update(Buffer.isBuffer(snap) ? snap : JSON.stringify(snap)).digest('hex');
+      if (hash === lastBackupHash) { console.log('백업 건너뜀: 지난 백업과 같습니다'); for (const w of worlds.values()) w.changedSinceBackup = false; return null; }
+      const n = await BACKUP.save(snap); lastBackupHash = hash; BK.manifest = counts; return n; }).then(n => { if (n == null) return; for (const w of worlds.values()) w.changedSinceBackup = false; lastBackup = { at: new Date().toISOString(), why, kb: Math.round(n / 1024) }; console.log(`세계 백업 완료 (${why}, ${(n / 1024).toFixed(0)} KB → ${process.env.GITHUB_BACKUP_REPO})`); }).catch(e => { lastBackup = { at: new Date().toISOString(), why, error: e.message }; console.log('세계 백업 실패: ' + e.message); }).finally(() => { backingUp = null; });
   return backingUp;
 }
 // the one-object backups ({"v":2,"worlds":{id:{"state":{..},"chunks":{dk:{..}}}}}) read a piece at a time: a small
@@ -365,7 +368,11 @@ setInterval(() => {
   if (global.gc) global.gc();
   console.log(`메모리 ${Math.round(rss / 1048576)} MB: 쓰지 않는 청크를 비웠습니다 → ${Math.round(process.memoryUsage().rss / 1048576)} MB`);
 }, 10000).unref();
-if (BACKUP) { setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow('5분마다'); }, 5 * 60 * 1000); setInterval(() => backupNow('1시간마다'), 60 * 60 * 1000); }
+// every backup goes out as upload traffic (a 2 MB world, a third more in transit), and the free plan allows 5 GB a month:
+// the worlds go up when they changed, at most every 30 minutes (and when everyone leaves, and before the server stops);
+// a backup the same as the last one isn't sent at all
+const BACKUP_EVERY = Math.max(5, +process.env.BACKUP_MINUTES || 30) * 60 * 1000;
+if (BACKUP) setInterval(() => { if ([...worlds.values()].some(w => w.changedSinceBackup)) backupNow(Math.round(BACKUP_EVERY / 60000) + '분마다'); }, BACKUP_EVERY);
 // Render gives the service's own address; asking it for /ping every 10 minutes counts as a visit, so the free plan's
 // 15-minute sleep never comes (KEEP_AWAKE=0 turns this off; KEEP_AWAKE_URL sets the address on other hosts)
 const SELF_URL = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL || '';
