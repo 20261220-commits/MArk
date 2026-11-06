@@ -403,7 +403,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.06 08:36';
+const NEMO_VERSION = '2026.11.06 08:55';
 
 </script>
 <script>/* js/shared.js */
@@ -441,7 +441,8 @@ const TILES = ('stone grass_top grass_side grass_side_snowed dirt cobblestone oa
      'deepslate_bricks', 'deepslate_tiles', 'polished_deepslate', 'chiseled_deepslate', 'cracked_deepslate_bricks', 'cracked_deepslate_tiles', 'chiseled_polished_blackstone', 'cracked_polished_blackstone_bricks', 'chiseled_red_sandstone', 'quartz_block_bottom'])
   .concat(['lectern_base', 'grindstone_pivot', 'stonecutter_saw', 'weeping_vines', 'weeping_vines_plant', 'twisting_vines', 'twisting_vines_plant', 'frosted_ice', 'cake_top', 'cake_side', 'cake_bottom', 'cake_inner', 'ender_chest_side', 'ender_chest_top', 'ender_chest_front', 'shulker_box', 'respawn_anchor_side', 'respawn_anchor_top', 'respawn_anchor_top_off', 'respawn_anchor_bottom', 'scaffolding_side', 'scaffolding_top', 'scaffolding_bottom', 'lectern_book'], ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'].flatMap(c => [c + '_glazed_terracotta', c + '_shulker_box']))
   // beds from the jar's entity textures: the foot half's long side and each half's outer end (bed_side is the head half's side)
-  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]));
+  .concat(['', '_white', '_orange', '_magenta', '_light_blue', '_yellow', '_lime', '_pink', '_gray', '_light_gray', '_cyan', '_purple', '_blue', '_brown', '_green', '_black'].flatMap(c => ['bed_sidef' + c, 'bed_endh' + c, 'bed_endf' + c]))
+  .concat(['water_flow', 'lava_flow']); // (Java's flowing water and lava: down the sides of a fall and along a slope)
 const T = {}; TILES.forEach((n, i) => T[n] = i);
 
 // ---------- blocks ----------
@@ -3939,6 +3940,21 @@ function meshChunk(B, M, L, bio, opts) {
     }
     flipArr.push(flip ? 1 : 0);
   }
+  // a quad with its own texture coordinate (in tile pixels, 0-16) at each corner: fluids' flow textures
+  function quadUV(buf, flipArr, cs, tile, uv, lights, sh) {
+    const tu = (tile % TPR) * 16, tv = ((tile / TPR) | 0) * 16;
+    if (buf.n * 3 + 12 >= buf.pos.length) buf.grow();
+    const P = buf.pos, U = buf.uv, Lt = buf.lt, Co = buf.col;
+    for (let k = 0; k < 4; k++) {
+      const c = cs[k], l = lights[k], n = buf.n++, u = uv[k * 2], v = uv[k * 2 + 1];
+      P[n * 3] = Math.round((c[0] + 1) * 16); P[n * 3 + 1] = Math.round(c[1] * 16); P[n * 3 + 2] = Math.round((c[2] + 1) * 16);
+      U[n * 2] = (tu + u) * 16 + (u < 8 ? 1 : u > 8 ? -1 : 0); U[n * 2 + 1] = (tv + v) * 16 + (v < 8 ? 1 : v > 8 ? -1 : 0);
+      Lt[n * 4] = l[0]; Lt[n * 4 + 1] = l[1]; Lt[n * 4 + 2] = sh[k] >= 1 ? 255 : sh[k] * 255; Lt[n * 4 + 3] = 255;
+      Co[n * 4] = cr; Co[n * 4 + 1] = cg; Co[n * 4 + 2] = cb; Co[n * 4 + 3] = 255;
+    }
+    flipArr.push(0);
+  }
+  const UV8 = new Float32Array(8);
   const L4 = [[0, 0], [0, 0], [0, 0], [0, 0]], SH4 = [1, 1, 1, 1], CS = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
   function flatLight(x, y, z) { const l = lightAt(x, y, z); const s = (l >> 4) * 17, b = (l & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = s; L4[k][1] = b; } }
   function cubeTile(id, meta, f, x, y, z) {
@@ -4263,27 +4279,40 @@ function meshChunk(B, M, L, bio, opts) {
     }
   }
   function bw(x, y, z) { const b = blk(x, y, z); return WLOG[b] && isWet(b, M[pidx(x, y, z)]) ? 27 : b; } // waterlogged cells count as water
-  function fh(x, y, z, id) { // fluid surface height of cell (or -1 if not this fluid)
-    const b = bw(x, y, z); if (b !== id) return -1;
-    if (bw(x, y + 1, z) === id) return 1;
-    if (b !== blk(x, y, z)) return 0.89;
-    const m = M[pidx(x, y, z)]; if (m & 8) return 0.9; return m === 0 ? 0.89 : (8 - m) / 9;
+  // LiquidBlockRenderer (Java): a fluid's own height is its amount / 9 (a source 8/9), 1 under the same fluid; a corner
+  // averages the cell, its two side neighbours and (when one of those holds fluid) the diagonal, a full or nearly full
+  // cell (0.8 and up) weighing ten times; an open cell counts as 0, a solid one not at all; a cell next to fluid that
+  // reaches the block above stands full
+  function own(x, y, z, id) { const b = bw(x, y, z); if (b !== id) return -1; if (b !== blk(x, y, z)) return 8 / 9; const m = M[pidx(x, y, z)]; return (m === 0 || (m & 8) ? 8 : 8 - (m & 7)) / 9; }
+  function fh(x, y, z, id) { const b = bw(x, y, z); if (b === id) return bw(x, y + 1, z) === id ? 1 : own(x, y, z, id); return SOLID[b] && !FLUID[b] ? -1 : 0; }
+  function cornerH(center, a, c, diag) {
+    if (a >= 1 || c >= 1) return 1;
+    let s = 0, w = 0; const add = h => { if (h >= 0.8) { s += h * 10; w += 10; } else if (h >= 0) { s += h; w += 1; } };
+    if (a > 0 || c > 0) { if (diag >= 1) return 1; add(diag); }
+    add(center); add(c); add(a); return w ? s / w : 0;
   }
-  function corner(x, y, z, id, dx, dz) {
-    let s = 0, n = 0;
-    for (const [ax, az] of [[0, 0], [dx, 0], [0, dz], [dx, dz]]) {
-      const cx2 = x + ax, cz2 = z + az;
-      if (bw(cx2, y + 1, cz2) === id) return 1;
-      const h = fh(cx2, y, cz2, id);
-      if (h >= 0) { s += h; n++; } else if (!SOLID[blk(cx2, y, cz2)]) { n++; }
+  // FlowingFluid.getFlow: which way it runs (toward lower neighbours, or over an edge)
+  function flowVec(x, y, z, id) {
+    const me = own(x, y, z, id); let vx = 0, vz = 0;
+    for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nb = bw(x + dx, y, z + dz); let f1 = 0;
+      if (nb === id) { const f = own(x + dx, y, z + dz, id); if (f > 0) f1 = me - f; }
+      else if (!FLUID[nb] && !SOLID[nb]) { const f = own(x + dx, y - 1, z + dz, id); if (f > 0) f1 = me - (f - 8 / 9); }
+      vx += dx * f1; vz += dz * f1;
     }
-    return n ? s / n : 0.89;
+    const l = Math.hypot(vx, vz); return l < 1e-4 ? null : [vx / l, vz / l];
   }
   function fluid(id, meta, x, y, z) {
-    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, tile = FT[id * 4];
-    const top = bw(x, y + 1, z) === id;
-    const h00 = top ? 1 : corner(x, y, z, id, -1, -1), h10 = top ? 1 : corner(x, y, z, id, 1, -1), h11 = top ? 1 : corner(x, y, z, id, 1, 1), h01 = top ? 1 : corner(x, y, z, id, -1, 1);
+    const water = id === 27, buf = water ? Wt : O, fl = water ? wFlip : oFlip, still = FT[id * 4], flowT = T[water ? 'water_flow' : 'lava_flow'];
+    const top = bw(x, y + 1, z) === id, c0 = fh(x, y, z, id);
+    let h00 = 1, h10 = 1, h11 = 1, h01 = 1;
+    if (!top) {
+      const n = fh(x, y, z - 1, id), sth = fh(x, y, z + 1, id), e = fh(x + 1, y, z, id), w = fh(x - 1, y, z, id);
+      h00 = cornerH(c0, n, w, fh(x - 1, y, z - 1, id)); h10 = cornerH(c0, n, e, fh(x + 1, y, z - 1, id));
+      h11 = cornerH(c0, sth, e, fh(x + 1, y, z + 1, id)); h01 = cornerH(c0, sth, w, fh(x - 1, y, z + 1, id));
+    }
     const HH = (cx, cz) => cx ? (cz ? h11 : h10) : (cz ? h01 : h00);
+    const flow = top ? null : flowVec(x, y, z, id);
     for (let f = 0; f < 6; f++) {
       const F = FACES[f], nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2], nb = bw(nx, ny, nz);
       if (nb === id) continue;
@@ -4294,8 +4323,22 @@ function meshChunk(B, M, L, bio, opts) {
       const ownL = lightAt(x, y, z); if (f === 2 || ((ownL >> 4) > (lightAt(nx, ny, nz) >> 4))) { const s = (ownL >> 4) * 17, b = (ownL & 15) * 17; for (let k = 0; k < 4; k++) { L4[k][0] = Math.max(L4[k][0], s); L4[k][1] = Math.max(L4[k][1], b); } }
       SH4[0] = SH4[1] = SH4[2] = SH4[3] = F.s;
       for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + c[0]; CS[k][2] = z + c[2]; CS[k][1] = y + (c[1] ? HH(c[0], c[2]) : 0); }
-      quad(buf, fl, CS, tile, 0, 0, 16, 16, 0, L4, SH4, false);
-      if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, tile, 0, 0, 16, 16, 0, L4, SH4, false); }
+      if (f === 2 && flow) { // a running surface: the flow texture turned to run along it (Java's atan2 - 90 degrees)
+        const a = Math.round((Math.atan2(flow[1], flow[0]) - Math.PI / 2) / (Math.PI / 2)) * (Math.PI / 2), f19 = Math.sin(a) * 0.25, f20 = Math.cos(a) * 0.25;
+        for (let k = 0; k < 4; k++) { const c = F.c[k], cx = c[0], cz = c[2];
+          const E = !cx && !cz ? [-f20 - f19, -f20 + f19] : !cx && cz ? [-f20 + f19, f20 + f19] : cx && cz ? [f20 + f19, f20 - f19] : [f20 - f19, -f20 - f19];
+          UV8[k * 2] = 8 + E[0] * 32; UV8[k * 2 + 1] = 8 + E[1] * 32; }
+        quadUV(buf, fl, CS, flowT, UV8, L4, SH4);
+        if (water) { const tmp = [CS[1], CS[0], CS[3], CS[2]], uv2 = [UV8[2], UV8[3], UV8[0], UV8[1], UV8[6], UV8[7], UV8[4], UV8[5]]; quadUV(buf, fl, tmp, flowT, uv2, L4, SH4); }
+        continue;
+      }
+      if (f !== 2 && f !== 3) { // the sides: the flow texture, its top cut at the surface (Java: (1 - height) * 8 of 16 down)
+        for (let k = 0; k < 4; k++) { const c = F.c[k]; UV8[k * 2] = k === 0 || k === 3 ? 0 : 16; UV8[k * 2 + 1] = c[1] ? (1 - HH(c[0], c[2])) * 16 : 16; }
+        quadUV(buf, fl, CS, flowT, UV8, L4, SH4);
+        continue;
+      }
+      quad(buf, fl, CS, still, 0, 0, 16, 16, 0, L4, SH4, false);
+      if (water && f === 2) { const tmp = [CS[1], CS[0], CS[3], CS[2]]; quad(buf, fl, tmp, still, 0, 0, 16, 16, 0, L4, SH4, false); }
     }
   }
   // translucent blocks (ice, stained glass, slime, honey) after the water under or beside them: without sorting,
@@ -5433,7 +5476,7 @@ for (const t of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', '
 for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of ['', 'dead_']) for (const k of ['_coral', '_coral_fan', '_coral_block']) TILE[d + c + k] = d + c + k;
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
-const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma' };
+const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma', water_flow: 'water_flow', lava_flow: 'lava_flow' };
 // biome-tinted plant textures are grey in vanilla and get their colour from the biome; a pack that ships them already
 // coloured (Pixel Perfection's orange birch, green spruce...) would be coloured twice, so they are turned grey first,
 // at vanilla's average brightness for that texture
@@ -5584,7 +5627,12 @@ function packBuild(load, extraTiles = [], extraItems = []) {
     const base = load('block/grass_block_side'), ov = load('block/grass_block_side_overlay');
     if (base && ov) { const px = new Uint8Array(crop16(base)), o = crop16(ov); for (let i = 0; i < px.length; i += 4) if (o[i + 3] >= 128) { px[i] = o[i]; px[i + 1] = o[i + 1]; px[i + 2] = o[i + 2]; px[i + 3] = 240; } out.tiles.grass_side = put(px); }
   }
-  for (const [k, f] of Object.entries(ANIM)) { const img = load('block/' + f); if (img && img.h > img.w) out.anim[k] = [put(new Uint8Array(img.px)), img.h / img.w]; }
+  for (const [k, f] of Object.entries(ANIM)) { const img = load('block/' + f); if (!img || !(img.h > img.w)) continue;
+    if (img.w === 16) { out.anim[k] = [put(new Uint8Array(img.px)), img.h / img.w]; continue; }
+    // a 32-pixel flow texture: each frame's top-left 16 x 16 (what Java draws across one block: half the sprite)
+    const n = img.h / img.w, w = img.w, px = new Uint8Array(n * 1024);
+    for (let f = 0; f < n; f++) for (let y = 0; y < 16; y++) px.set(img.px.subarray ? img.px.subarray((f * w + y) * w * 4, (f * w + y) * w * 4 + 64) : img.px.slice((f * w + y) * w * 4, (f * w + y) * w * 4 + 64), (f * 16 + y) * 64);
+    out.anim[k] = [put(px), n]; }
   { // chest and bed tiles composed from their entity textures
     // 1.15+ chest textures: the lid's top at (28,0), the front (with the latch notch) is the fourth strip and the sides
     // are upside down, because the model is drawn turned round
@@ -5670,7 +5718,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 7; // 7: structure containers keep what they hold (end ship's potions); 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends; 6: villager level badges
+const UPACK = { name: null }, UPACK_VER = 8; // 8: water and lava flow textures; 7: structure containers keep what they hold (end ship's potions); 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends; 6: villager level badges
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -6796,6 +6844,7 @@ PAINT.powder_snow = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(h
 PAINT.ice = r => { fill((x, y) => [...pal(r, [hex(0x9cbcf4), hex(0x93b4ef), hex(0xa7c4f6)]), 190]); for (let i = 0; i < 5; i++) { let x = r.int(16), y = r.int(16); for (let k = 0; k < 5; k++) { P(x, y, hex(0xd6e4fb), 210); x++; y += r() < .5 ? 1 : 0; } } };
 PAINT.water = r => paintWater(r, 0);
 PAINT.lava = r => paintLava(r, 0);
+PAINT.water_flow = r => paintWater(r, 0); PAINT.lava_flow = r => paintLava(r, 0);
 function paintWater(r, t) {
   fill((x, y) => { const w = Math.sin((x + t * 0.7) * 0.8 + Math.sin((y + t) * 0.5) * 1.5) + Math.sin((y * 0.9 - t * 0.4) + x * 0.3); const v = 0.72 + w * 0.06 + (((x * 7 + y * 13) % 5) - 2) * 0.012; return [...gray(Math.round(v * 220)), 168]; });
 }
@@ -7159,7 +7208,8 @@ function animateAtlas(dt) {
   animT += dt * 6;
   curTile = S.T.water; paintWater(null, animT);
   curTile = S.T.lava; paintLava(null, animT * 0.5);
-  for (const t of [S.T.water, S.T.lava]) atlasCtx.putImageData(atlasImg, 0, 0, (t % TPR) * TS, ((t / TPR) | 0) * TS, TS, TS);
+  curTile = S.T.water_flow; paintWater(null, animT * 2); curTile = S.T.lava_flow; paintLava(null, animT);
+  for (const t of [S.T.water, S.T.lava, S.T.water_flow, S.T.lava_flow]) atlasCtx.putImageData(atlasImg, 0, 0, (t % TPR) * TS, ((t / TPR) | 0) * TS, TS, TS);
 }
 
 // ---------- resource pack (Pixel Perfection CE, CC BY-SA 4.0) ----------
@@ -7184,6 +7234,12 @@ function applyPackData(P, D) {
   for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
   for (const [k, [off, w, h]] of Object.entries(P.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
   if (P.sky) { const [off, w, h] = P.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }
+  // a pack without flow textures: the still ones stand in for them (and run with them)
+  for (const [fk, sk] of [['water_flow', 'water'], ['lava_flow', 'lava']]) if (!P.anim[fk] && P.tiles[fk] == null && S.T[fk] != null) {
+    if (PACKPX.anim[sk] && (!PACKPX.anim[fk] || PACKPX.anim[fk].alias)) PACKPX.anim[fk] = { ...PACKPX.anim[sk], alias: 1 };
+    const src = S.T[sk], t = S.T[fk], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
+    for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4);
+  }
   for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(a.data.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
 }
 async function loadPack() {
@@ -7923,61 +7979,100 @@ function joinConnections(c) {
 const TRACKED = new Map();
 function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); return TRACKED.get(id); }
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
+// Java's FlowingFluid: a fluid's amount is 8 for a source or a falling column, 8 - level when flowing (meta: 0 source,
+// 1-7 flowing, 8 falling). Each tick a flowing block first works out what it should be from its neighbours
+// (getNewLiquid), then spreads: down when it can, else (or a source with 3 source neighbours) sideways toward the
+// nearest drop within 4 blocks (water, Nether lava) or 2 (lava), found by a search around corners (getSlopeDistance).
+// Water loses 1 a block, lava 2 (1 in the Nether); two water sources beside one on a solid floor (or over water) make a
+// source. Lava touching water from above or the sides becomes obsidian (a source) or cobblestone, lava flowing down onto
+// water makes stone, and water never gives way to lava from the side.
 function fluidUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
-  const water = b === 27, drop = water || W.dim === -1 ? 1 : 2, m = getMeta(x, y, z); // lava runs 7 blocks in the Nether, 3 elsewhere
-  let lvl = m & 7, falling = (m & 8) !== 0;
-  const other = water ? 28 : 27;
-  // lava over soul soil next to blue ice makes basalt (Java 1.16)
-  if (!water && getBlock(x, y - 1, z) === BID.soul_soil && N6.some(([dx, dy, dz]) => dy === 0 && getBlock(x + dx, y, z + dz) === BID.blue_ice)) { setBlock(x, y, z, BID.basalt); return; }
-  // lava meets water
-  if (!water) for (const [dx, dy, dz] of N6) if (dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27) { setBlock(x, y, z, lvl === 0 && !falling ? BID.obsidian : BID.cobblestone); return; }
-  if (lvl !== 0 || falling) {
-    let expect;
-    const above = getBlock(x, y + 1, z);
-    if (above === b) expect = 8;
-    else {
-      let best = 99, sources = 0;
-      for (const [dx, , dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) {
-        if (getBlock(x + dx, y, z + dz) !== b) continue;
-        const nm = getMeta(x + dx, y, z + dz), nl = (nm & 8) ? 0 : nm & 7;
-        if (nm === 0) sources++;
-        best = Math.min(best, nl);
-      }
-      expect = best + drop;
-      if (water && sources >= 2) { const bl = getBlock(x, y - 1, z); if (SOLID[bl] || (bl === 27 && getMeta(x, y - 1, z) === 0)) expect = 0; }
+  if (b === 28 && lavaTouch(x, y, z)) return;
+  const F = fluidRules(b); let m = getMeta(x, y, z);
+  if (m !== 0) { // a flowing block becomes what its neighbours make it
+    const nm = F.newLiquid(x, y, z);
+    if (nm < 0) { setBlock(x, y, z, 0); return; }
+    if (nm !== m) {
+      const grew = F.amt(nm) > F.amt(m) && !(m & 8) && !(nm & 8);
+      setBlock(x, y, z, b, nm); m = nm;
+      if (b === 28 && grew && Math.random() < 0.75) W.sched.set(x + ',' + y + ',' + z, W.tickN + F.delay * 4); // (Java: rising lava often waits four times as long)
     }
-    if (expect >= 8 && above !== b) { setBlock(x, y, z, 0); return; } // only fluid right above makes falling (level 8): a flow's last block must dry up, not turn into a new source
-    const nm = expect === 8 ? 8 : expect;
-    if (nm !== m) { setBlock(x, y, z, b, nm); return; }
-    lvl = nm & 7; falling = nm === 8;
   }
-  // flow down
-  const bl = getBlock(x, y - 1, z);
-  if (y > MINY && (bl === 0 || (REPL[bl] && !FLUID[bl]) || bl === other)) {
-    if (bl === other) { setBlock(x, y - 1, z, water ? (getMeta(x, y - 1, z) === 0 ? BID.obsidian : BID.cobblestone) : BID.stone); return; }
-    if (bl && W.onDrop && !FLUID[bl]) W.onDrop(x, y - 1, z, blockDrops(bl, 0, null).items, 0);
-    setBlock(x, y - 1, z, b, 8); return;
+  F.spread(x, y, z, m);
+}
+const H4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]; // north, south, west, east (Java's horizontal order)
+function fluidRules(b) {
+  const water = b === 27, other = water ? 28 : 27, drop = water || W.dim === -1 ? 1 : 2, slope = water || W.dim === -1 ? 4 : 2, delay = water ? 5 : W.dim === -1 ? 10 : 30;
+  const same = (t, mm) => t === b || (water && S.WLOG[t] && S.isWet(t, mm)); // (waterlogged blocks count as water sources)
+  const isSrc = (px, py, pz) => { const t = getBlock(px, py, pz), mm = getMeta(px, py, pz); return t === b ? mm === 0 : same(t, mm); };
+  const amt = mm => mm === 0 || (mm & 8) ? 8 : 8 - (mm & 7);
+  const amtAt = (px, py, pz) => { const t = getBlock(px, py, pz), mm = getMeta(px, py, pz); return t === b ? amt(mm) : same(t, mm) ? 8 : 0; };
+  // canHoldFluid: air, a fluid, or a block that doesn't stop movement (plants, torches...)
+  const holds = t => t === 0 || !!FLUID[t] || (!!REPL[t] && !FLUID[t]);
+  const newLiquid = (px, py, pz) => { // -> meta, or -1 for none
+    let i = 0, j = 0;
+    for (const [dx, dz] of H4) { const t = getBlock(px + dx, py, pz + dz); if (!same(t, getMeta(px + dx, py, pz + dz))) continue; if (isSrc(px + dx, py, pz + dz)) j++; i = Math.max(i, amtAt(px + dx, py, pz + dz)); }
+    if (water && j >= 2) { const bl = getBlock(px, py - 1, pz); if (SOLID[bl] && !FLUID[bl] || isSrc(px, py - 1, pz)) return 0; }
+    if (same(getBlock(px, py + 1, pz), getMeta(px, py + 1, pz))) return 8;
+    const k = i - drop; return k <= 0 ? -1 : 8 - k;
+  };
+  // isWaterHole: the block below holds this fluid or could
+  const hole = (px, py, pz) => { const t = getBlock(px, py - 1, pz); return t === b || holds(t); };
+  const pass = (px, py, pz) => { const t = getBlock(px, py, pz); return !(t === b && getMeta(px, py, pz) === 0) && holds(t) && !(water && t === 27 && false); };
+  const slopeDist = (px, py, pz, depth, fromK) => {
+    let best = 1000;
+    for (let k = 0; k < 4; k++) { if (k === fromK) continue; const [dx, dz] = H4[k], qx = px + dx, qz = pz + dz;
+      if (!pass(qx, py, qz)) continue;
+      if (hole(qx, py, qz)) return depth;
+      if (depth < slope) { const j = slopeDist(qx, py, qz, depth + 1, k ^ 1); if (j < best) best = j; } }
+    return best;
+  };
+  // canSpreadTo + spreadTo for one neighbour (dir: 'down' or a side)
+  const spreadTo = (px, py, pz, nm, down) => {
+    const t = getBlock(px, py, pz);
+    if (t === b) return; // (the same fluid there updates itself)
+    if (t === other) {
+      if (water) { if (getMeta(px, py, pz) === 0 || getMeta(px, py, pz) <= 4) { setBlock(px, py, pz, getMeta(px, py, pz) === 0 ? BID.obsidian : BID.cobblestone); fizz(px, py, pz); } return; } // (lava there turns first)
+      if (down) { setBlock(px, py, pz, BID.stone); fizz(px, py, pz); } return; // lava pouring onto water: stone; from the side water holds
+    }
+    if (!holds(t)) return;
+    if (t && W.onDrop) { if (water) W.onDrop(px, py, pz, blockDrops(t, getMeta(px, py, pz), null).items, 0); else fizz(px, py, pz); } // (water washes a plant off as an item; lava burns it)
+    setBlock(px, py, pz, b, nm);
+    if (!water) lavaTouch(px, py, pz);
+  };
+  const sides = (x, y, z, m) => {
+    let i = amt(m) - drop; if (m & 8) i = 7; if (i <= 0) return;
+    let best = 1000, out = [];
+    for (let k = 0; k < 4; k++) { const [dx, dz] = H4[k], px = x + dx, pz = z + dz;
+      if (!pass(px, y, pz)) continue;
+      const nm = newLiquid(px, y, pz); if (nm < 0) continue;
+      const j = hole(px, y, pz) ? 0 : slopeDist(px, y, pz, 1, k ^ 1);
+      if (j < best) out = []; if (j <= best) { out.push([px, pz, nm]); best = j; } }
+    for (const [px, pz, nm] of out) spreadTo(px, y, pz, nm, false);
+  };
+  const spread = (x, y, z, m) => {
+    const bl = getBlock(x, y - 1, z);
+    const canDown = y > MINY && (bl === other ? (water ? true : true) : bl !== b && holds(bl));
+    if (canDown) {
+      spreadTo(x, y - 1, z, 8, true);
+      let n = 0; for (const [dx, dz] of H4) if (isSrc(x + dx, y, z + dz)) n++; if (n >= 3) sides(x, y, z, m);
+    } else if (m === 0 || !hole(x, y, z)) sides(x, y, z, m);
+  };
+  return { amt, newLiquid, spread, delay };
+}
+function fizz(x, y, z) { if (typeof play === 'function' && Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.4 }); if (typeof R !== 'undefined' && R.simpleParticle) for (let i = 0; i < 6; i++) R.simpleParticle(x + Math.random(), y + 1, z + Math.random(), [0.3, 0.3, 0.3], { size: 0.15, vy: 0.8, grav: -0.1, life: 0.8 }); }
+// LiquidBlock.shouldSpreadLiquid: lava with water above or beside it hardens (obsidian from a source, else cobblestone);
+// over soul soil beside blue ice it makes basalt
+function lavaTouch(x, y, z) {
+  if (getBlock(x, y, z) !== 28) return false;
+  const soul = getBlock(x, y - 1, z) === BID.soul_soil;
+  for (const [dx, dy, dz] of [[0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]]) {
+    const t = getBlock(x + dx, y + dy, z + dz);
+    if (t === 27 || (S.WLOG[t] && S.isWet(t, getMeta(x + dx, y + dy, z + dz)))) { setBlock(x, y, z, getMeta(x, y, z) === 0 ? BID.obsidian : BID.cobblestone); fizz(x, y, z); return true; }
+    if (soul && t === BID.blue_ice) { setBlock(x, y, z, BID.basalt); fizz(x, y, z); return true; }
   }
-  if (bl === b && (getMeta(x, y - 1, z) !== 0 || !(lvl === 0 && !falling))) { if (getMeta(x, y - 1, z) !== 8 && getMeta(x, y - 1, z) !== 0) setBlock(x, y - 1, z, b, 8); return; } // over flowing fluid it pours down; only still fluid below lets it spread
-  const nl = (falling ? 0 : lvl) + drop; if (nl >= 8) return;
-  // choose directions towards the nearest drop
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const range = water || W.dim === -1 ? 4 : 2;
-  const canFlow = (px, pz) => { const t = getBlock(px, y, pz); return t === 0 || (REPL[t] && !FLUID[t]) || (t === b && getMeta(px, y, pz) !== 0 && (getMeta(px, y, pz) & 7) > nl) || t === other; };
-  const dist = dirs.map(([dx, dz]) => {
-    if (!canFlow(x + dx, z + dz)) return 99;
-    for (let s = 1; s <= range; s++) { const px = x + dx * s, pz = z + dz * s; if (s > 1 && !canFlow(px, pz)) break; const u = getBlock(px, y - 1, pz); if (u === 0 || (REPL[u] && !FLUID[u]) || u === b) return s; }
-    return 50;
-  });
-  const min = Math.min(...dist); if (min >= 99) return;
-  dirs.forEach(([dx, dz], k) => {
-    if (dist[k] !== min) return;
-    const px = x + dx, pz = z + dz, t = getBlock(px, y, pz);
-    if (t === other) { setBlock(px, y, pz, water ? (getMeta(px, y, pz) === 0 ? BID.obsidian : BID.cobblestone) : BID.cobblestone); return; }
-    if (t && !FLUID[t] && W.onDrop) W.onDrop(px, y, pz, blockDrops(t, 0, null).items, 0);
-    setBlock(px, y, pz, b, nl);
-  });
+  return false;
 }
 function fallCheck(x, y, z, b) {
   const below = getBlock(x, y - 1, z);
@@ -7990,7 +8085,7 @@ function tickScheduled() {
     W.sched.delete(k);
     const [x, y, z] = k.split(',').map(Number);
     if (isLoaded(x, z)) fluidUpdate(x, y, z);
-    if (++n > 160) break;
+    if (++n > 2000) break; // (a big flood keeps up: Java runs all of a tick's fluid ticks)
   }
 }
 // ---------- random ticks ----------
@@ -8947,7 +9042,7 @@ const animTiles = []; let animIdx = 0;
 function stepAnimation(dt) {
   R.animT = (R.animT || 0) + dt; if (R.animT < 0.1) return; R.animT = 0;
   if (!PACKPX.data) { animateAtlas(0.1); atlasTex.needsUpdate = true; return; } // procedural fallback
-  if (!animTiles.length) for (const k in PACKPX.anim) { const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' ? 2 : 1 }); }
+  if (!animTiles.length) for (const k in PACKPX.anim) { const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' || k === 'lava_flow' ? 2 : 1 }); }
   animIdx++;
   for (const a of animTiles) { if (animIdx % a.slow) continue; a.data.set(animFrame(a.k, (animIdx / a.slow) | 0)); a.tex.needsUpdate = true; renderer.copyTextureToTexture(a.pos, a.tex, atlasTex);
     if (atlasTex.mipmaps && atlasTex.mipmaps.length) { // the same frame into the smaller levels (8, 4, 2, 1 pixels)

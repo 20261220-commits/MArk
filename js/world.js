@@ -308,61 +308,100 @@ function joinConnections(c) {
 const TRACKED = new Map();
 function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); return TRACKED.get(id); }
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
+// Java's FlowingFluid: a fluid's amount is 8 for a source or a falling column, 8 - level when flowing (meta: 0 source,
+// 1-7 flowing, 8 falling). Each tick a flowing block first works out what it should be from its neighbours
+// (getNewLiquid), then spreads: down when it can, else (or a source with 3 source neighbours) sideways toward the
+// nearest drop within 4 blocks (water, Nether lava) or 2 (lava), found by a search around corners (getSlopeDistance).
+// Water loses 1 a block, lava 2 (1 in the Nether); two water sources beside one on a solid floor (or over water) make a
+// source. Lava touching water from above or the sides becomes obsidian (a source) or cobblestone, lava flowing down onto
+// water makes stone, and water never gives way to lava from the side.
 function fluidUpdate(x, y, z) {
   const b = getBlock(x, y, z); if (!FLUID[b]) { if (SCHED_TICK[b]) { SCHED_TICK[b](x, y, z, b, getMeta(x, y, z)); return; } const d = BLOCKS[b]; if (d && d.fall) fallCheck(x, y, z, b); return; }
-  const water = b === 27, drop = water || W.dim === -1 ? 1 : 2, m = getMeta(x, y, z); // lava runs 7 blocks in the Nether, 3 elsewhere
-  let lvl = m & 7, falling = (m & 8) !== 0;
-  const other = water ? 28 : 27;
-  // lava over soul soil next to blue ice makes basalt (Java 1.16)
-  if (!water && getBlock(x, y - 1, z) === BID.soul_soil && N6.some(([dx, dy, dz]) => dy === 0 && getBlock(x + dx, y, z + dz) === BID.blue_ice)) { setBlock(x, y, z, BID.basalt); return; }
-  // lava meets water
-  if (!water) for (const [dx, dy, dz] of N6) if (dy !== -1 && getBlock(x + dx, y + dy, z + dz) === 27) { setBlock(x, y, z, lvl === 0 && !falling ? BID.obsidian : BID.cobblestone); return; }
-  if (lvl !== 0 || falling) {
-    let expect;
-    const above = getBlock(x, y + 1, z);
-    if (above === b) expect = 8;
-    else {
-      let best = 99, sources = 0;
-      for (const [dx, , dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) {
-        if (getBlock(x + dx, y, z + dz) !== b) continue;
-        const nm = getMeta(x + dx, y, z + dz), nl = (nm & 8) ? 0 : nm & 7;
-        if (nm === 0) sources++;
-        best = Math.min(best, nl);
-      }
-      expect = best + drop;
-      if (water && sources >= 2) { const bl = getBlock(x, y - 1, z); if (SOLID[bl] || (bl === 27 && getMeta(x, y - 1, z) === 0)) expect = 0; }
+  if (b === 28 && lavaTouch(x, y, z)) return;
+  const F = fluidRules(b); let m = getMeta(x, y, z);
+  if (m !== 0) { // a flowing block becomes what its neighbours make it
+    const nm = F.newLiquid(x, y, z);
+    if (nm < 0) { setBlock(x, y, z, 0); return; }
+    if (nm !== m) {
+      const grew = F.amt(nm) > F.amt(m) && !(m & 8) && !(nm & 8);
+      setBlock(x, y, z, b, nm); m = nm;
+      if (b === 28 && grew && Math.random() < 0.75) W.sched.set(x + ',' + y + ',' + z, W.tickN + F.delay * 4); // (Java: rising lava often waits four times as long)
     }
-    if (expect >= 8 && above !== b) { setBlock(x, y, z, 0); return; } // only fluid right above makes falling (level 8): a flow's last block must dry up, not turn into a new source
-    const nm = expect === 8 ? 8 : expect;
-    if (nm !== m) { setBlock(x, y, z, b, nm); return; }
-    lvl = nm & 7; falling = nm === 8;
   }
-  // flow down
-  const bl = getBlock(x, y - 1, z);
-  if (y > MINY && (bl === 0 || (REPL[bl] && !FLUID[bl]) || bl === other)) {
-    if (bl === other) { setBlock(x, y - 1, z, water ? (getMeta(x, y - 1, z) === 0 ? BID.obsidian : BID.cobblestone) : BID.stone); return; }
-    if (bl && W.onDrop && !FLUID[bl]) W.onDrop(x, y - 1, z, blockDrops(bl, 0, null).items, 0);
-    setBlock(x, y - 1, z, b, 8); return;
+  F.spread(x, y, z, m);
+}
+const H4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]; // north, south, west, east (Java's horizontal order)
+function fluidRules(b) {
+  const water = b === 27, other = water ? 28 : 27, drop = water || W.dim === -1 ? 1 : 2, slope = water || W.dim === -1 ? 4 : 2, delay = water ? 5 : W.dim === -1 ? 10 : 30;
+  const same = (t, mm) => t === b || (water && S.WLOG[t] && S.isWet(t, mm)); // (waterlogged blocks count as water sources)
+  const isSrc = (px, py, pz) => { const t = getBlock(px, py, pz), mm = getMeta(px, py, pz); return t === b ? mm === 0 : same(t, mm); };
+  const amt = mm => mm === 0 || (mm & 8) ? 8 : 8 - (mm & 7);
+  const amtAt = (px, py, pz) => { const t = getBlock(px, py, pz), mm = getMeta(px, py, pz); return t === b ? amt(mm) : same(t, mm) ? 8 : 0; };
+  // canHoldFluid: air, a fluid, or a block that doesn't stop movement (plants, torches...)
+  const holds = t => t === 0 || !!FLUID[t] || (!!REPL[t] && !FLUID[t]);
+  const newLiquid = (px, py, pz) => { // -> meta, or -1 for none
+    let i = 0, j = 0;
+    for (const [dx, dz] of H4) { const t = getBlock(px + dx, py, pz + dz); if (!same(t, getMeta(px + dx, py, pz + dz))) continue; if (isSrc(px + dx, py, pz + dz)) j++; i = Math.max(i, amtAt(px + dx, py, pz + dz)); }
+    if (water && j >= 2) { const bl = getBlock(px, py - 1, pz); if (SOLID[bl] && !FLUID[bl] || isSrc(px, py - 1, pz)) return 0; }
+    if (same(getBlock(px, py + 1, pz), getMeta(px, py + 1, pz))) return 8;
+    const k = i - drop; return k <= 0 ? -1 : 8 - k;
+  };
+  // isWaterHole: the block below holds this fluid or could
+  const hole = (px, py, pz) => { const t = getBlock(px, py - 1, pz); return t === b || holds(t); };
+  const pass = (px, py, pz) => { const t = getBlock(px, py, pz); return !(t === b && getMeta(px, py, pz) === 0) && holds(t) && !(water && t === 27 && false); };
+  const slopeDist = (px, py, pz, depth, fromK) => {
+    let best = 1000;
+    for (let k = 0; k < 4; k++) { if (k === fromK) continue; const [dx, dz] = H4[k], qx = px + dx, qz = pz + dz;
+      if (!pass(qx, py, qz)) continue;
+      if (hole(qx, py, qz)) return depth;
+      if (depth < slope) { const j = slopeDist(qx, py, qz, depth + 1, k ^ 1); if (j < best) best = j; } }
+    return best;
+  };
+  // canSpreadTo + spreadTo for one neighbour (dir: 'down' or a side)
+  const spreadTo = (px, py, pz, nm, down) => {
+    const t = getBlock(px, py, pz);
+    if (t === b) return; // (the same fluid there updates itself)
+    if (t === other) {
+      if (water) { if (getMeta(px, py, pz) === 0 || getMeta(px, py, pz) <= 4) { setBlock(px, py, pz, getMeta(px, py, pz) === 0 ? BID.obsidian : BID.cobblestone); fizz(px, py, pz); } return; } // (lava there turns first)
+      if (down) { setBlock(px, py, pz, BID.stone); fizz(px, py, pz); } return; // lava pouring onto water: stone; from the side water holds
+    }
+    if (!holds(t)) return;
+    if (t && W.onDrop) { if (water) W.onDrop(px, py, pz, blockDrops(t, getMeta(px, py, pz), null).items, 0); else fizz(px, py, pz); } // (water washes a plant off as an item; lava burns it)
+    setBlock(px, py, pz, b, nm);
+    if (!water) lavaTouch(px, py, pz);
+  };
+  const sides = (x, y, z, m) => {
+    let i = amt(m) - drop; if (m & 8) i = 7; if (i <= 0) return;
+    let best = 1000, out = [];
+    for (let k = 0; k < 4; k++) { const [dx, dz] = H4[k], px = x + dx, pz = z + dz;
+      if (!pass(px, y, pz)) continue;
+      const nm = newLiquid(px, y, pz); if (nm < 0) continue;
+      const j = hole(px, y, pz) ? 0 : slopeDist(px, y, pz, 1, k ^ 1);
+      if (j < best) out = []; if (j <= best) { out.push([px, pz, nm]); best = j; } }
+    for (const [px, pz, nm] of out) spreadTo(px, y, pz, nm, false);
+  };
+  const spread = (x, y, z, m) => {
+    const bl = getBlock(x, y - 1, z);
+    const canDown = y > MINY && (bl === other ? (water ? true : true) : bl !== b && holds(bl));
+    if (canDown) {
+      spreadTo(x, y - 1, z, 8, true);
+      let n = 0; for (const [dx, dz] of H4) if (isSrc(x + dx, y, z + dz)) n++; if (n >= 3) sides(x, y, z, m);
+    } else if (m === 0 || !hole(x, y, z)) sides(x, y, z, m);
+  };
+  return { amt, newLiquid, spread, delay };
+}
+function fizz(x, y, z) { if (typeof play === 'function' && Math.hypot(PL.x - x, PL.y - y, PL.z - z) < 16) play('fizz', { vol: 0.4 }); if (typeof R !== 'undefined' && R.simpleParticle) for (let i = 0; i < 6; i++) R.simpleParticle(x + Math.random(), y + 1, z + Math.random(), [0.3, 0.3, 0.3], { size: 0.15, vy: 0.8, grav: -0.1, life: 0.8 }); }
+// LiquidBlock.shouldSpreadLiquid: lava with water above or beside it hardens (obsidian from a source, else cobblestone);
+// over soul soil beside blue ice it makes basalt
+function lavaTouch(x, y, z) {
+  if (getBlock(x, y, z) !== 28) return false;
+  const soul = getBlock(x, y - 1, z) === BID.soul_soil;
+  for (const [dx, dy, dz] of [[0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]]) {
+    const t = getBlock(x + dx, y + dy, z + dz);
+    if (t === 27 || (S.WLOG[t] && S.isWet(t, getMeta(x + dx, y + dy, z + dz)))) { setBlock(x, y, z, getMeta(x, y, z) === 0 ? BID.obsidian : BID.cobblestone); fizz(x, y, z); return true; }
+    if (soul && t === BID.blue_ice) { setBlock(x, y, z, BID.basalt); fizz(x, y, z); return true; }
   }
-  if (bl === b && (getMeta(x, y - 1, z) !== 0 || !(lvl === 0 && !falling))) { if (getMeta(x, y - 1, z) !== 8 && getMeta(x, y - 1, z) !== 0) setBlock(x, y - 1, z, b, 8); return; } // over flowing fluid it pours down; only still fluid below lets it spread
-  const nl = (falling ? 0 : lvl) + drop; if (nl >= 8) return;
-  // choose directions towards the nearest drop
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const range = water || W.dim === -1 ? 4 : 2;
-  const canFlow = (px, pz) => { const t = getBlock(px, y, pz); return t === 0 || (REPL[t] && !FLUID[t]) || (t === b && getMeta(px, y, pz) !== 0 && (getMeta(px, y, pz) & 7) > nl) || t === other; };
-  const dist = dirs.map(([dx, dz]) => {
-    if (!canFlow(x + dx, z + dz)) return 99;
-    for (let s = 1; s <= range; s++) { const px = x + dx * s, pz = z + dz * s; if (s > 1 && !canFlow(px, pz)) break; const u = getBlock(px, y - 1, pz); if (u === 0 || (REPL[u] && !FLUID[u]) || u === b) return s; }
-    return 50;
-  });
-  const min = Math.min(...dist); if (min >= 99) return;
-  dirs.forEach(([dx, dz], k) => {
-    if (dist[k] !== min) return;
-    const px = x + dx, pz = z + dz, t = getBlock(px, y, pz);
-    if (t === other) { setBlock(px, y, pz, water ? (getMeta(px, y, pz) === 0 ? BID.obsidian : BID.cobblestone) : BID.cobblestone); return; }
-    if (t && !FLUID[t] && W.onDrop) W.onDrop(px, y, pz, blockDrops(t, 0, null).items, 0);
-    setBlock(px, y, pz, b, nl);
-  });
+  return false;
 }
 function fallCheck(x, y, z, b) {
   const below = getBlock(x, y - 1, z);
@@ -375,7 +414,7 @@ function tickScheduled() {
     W.sched.delete(k);
     const [x, y, z] = k.split(',').map(Number);
     if (isLoaded(x, z)) fluidUpdate(x, y, z);
-    if (++n > 160) break;
+    if (++n > 2000) break; // (a big flood keeps up: Java runs all of a tick's fluid ticks)
   }
 }
 // ---------- random ticks ----------
