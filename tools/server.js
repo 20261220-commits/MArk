@@ -130,7 +130,7 @@ function wsAccept(req, sock, onText, onClose) {
   const deflate = /permessage-deflate/i.test(req.headers['sec-websocket-extensions'] || '') && !/^(0|false|no)$/i.test(process.env.WS_DEFLATE || '');
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + (deflate ? '\r\nSec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover' : '') + '\r\n\r\n');
   const TAIL = Buffer.from([0, 0, 255, 255]);
-  const out = s => { const raw = Buffer.from(s); if (deflate && raw.length > 200) { const z = zlib.deflateRawSync(raw, { level: 6 }), body = z.length >= 4 && z.subarray(z.length - 4).equals(TAIL) ? z.subarray(0, z.length - 4) : z; return frame(1, body, true); } return frame(1, raw); };
+  const out = s => { const raw = Buffer.from(s); if (deflate && raw.length > 200) { const z = zlib.deflateRawSync(raw, { level: 6, finishFlush: zlib.constants.Z_SYNC_FLUSH }), /* (a sync flush ending in 00 00 ff ff, taken off: what RFC 7692 asks for) */ body = z.length >= 4 && z.subarray(z.length - 4).equals(TAIL) ? z.subarray(0, z.length - 4) : z; return frame(1, body, true); } return frame(1, raw); };
   let buf = Buffer.alloc(0), parts = [], closed = false, zin = false;
   // drop: a message the next one replaces (positions, mob lists, the clock). When a player's connection can't keep up,
   // these are skipped instead of piling up: a queue that only grows makes everything arrive later and later
@@ -152,7 +152,7 @@ function wsAccept(req, sock, onText, onClose) {
       buf = buf.subarray(p + len);
       if (op === 8) { why = '플레이어가 나감'; closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(why); return; }
       if (op === 9) { sock.write(frame(10, data)); continue; }
-      if (op === 1 || op === 2 || op === 0) { if (op !== 0) zin = !!rsv1; parts.push(data); if (fin) { let mb = Buffer.concat(parts); parts = []; if (zin) { try { mb = zlib.inflateRawSync(Buffer.concat([mb, TAIL])); } catch (e) { console.log('압축 메시지를 풀지 못했습니다'); continue; } } const msg = mb.toString(); try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
+      if (op === 1 || op === 2 || op === 0) { if (op !== 0) zin = !!rsv1; parts.push(data); if (fin) { let mb = Buffer.concat(parts); parts = []; if (zin) { try { mb = zlib.inflateRawSync(Buffer.concat([mb, TAIL]), { finishFlush: zlib.constants.Z_SYNC_FLUSH }); } catch (e) { console.log('압축 메시지를 풀지 못했습니다'); continue; } } const msg = mb.toString(); try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
   // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself). A connection
