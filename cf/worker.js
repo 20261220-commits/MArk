@@ -134,7 +134,7 @@ export class NemoServer {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env; this.sql = ctx.storage.sql;
     this.worlds = new Map(); this.rooms = new Map(); this.nextId = 1;
-    this.TRAFFIC = { since: Date.now(), total: 0, kinds: {} }; this.DROPS = []; this.STARTED = Date.now();
+    this.TRAFFIC = { since: Date.now(), total: 0, kinds: {} }; this.IN = { frames: 0, kinds: {} }; /* (incoming messages are what the free plan counts: 20 to a request) */ this.DROPS = []; this.STARTED = Date.now();
     this.BK = { blocked: false, lastError: null, restoredFrom: null, lastBackup: null };
     this.worldName = (env.WORLD || 'world').replace(/[^\w\-가-힣]/g, '_');
     this.requireLogin = /^(1|true|yes)$/i.test(env.REQUIRE_LOGIN || '');
@@ -302,6 +302,7 @@ export class NemoServer {
   stats() {
     const T = this.TRAFFIC;
     return { host: 'cloudflare', traffic: { sinceMin: Math.round((Date.now() - T.since) / 60000), MB: +(T.total / 1048576).toFixed(2), byKindKB: Object.fromEntries(Object.entries(T.kinds).sort((x, y) => y[1] - x[1]).slice(0, 15).map(([k, v]) => [k, Math.round(v / 1024)])) },
+      incoming: { frames: this.IN.frames, requests: Math.ceil(this.IN.frames / 20), perMin: +(this.IN.frames / Math.max(1, (Date.now() - T.since) / 60000)).toFixed(1), byKind: Object.fromEntries(Object.entries(this.IN.kinds).sort((x, y) => y[1] - x[1]).slice(0, 15)) },
       uptimeMin: Math.round((Date.now() - this.STARTED) / 60000), lastBackup: this.BK.lastBackup, backup: { on: !!this.backup, locked: this.BK.blocked, lastError: this.BK.lastError, restoredFrom: this.BK.restoredFrom, lastAt: this.kv('backupAt'), changed: !!this.kv('changed') },
       worlds: [...this.worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.state.meta.priv ? '(비공개)' : w.id, name: w.state.meta.priv ? '(비공개 서버)' : w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunks: w.keysLoaded ? w.keys.size : null, cached: w.core.cacheSize(), unsaved: w.dirty.size })),
       rooms: [...this.rooms.values()].filter(r => r.host).length, recentDrops: this.DROPS.slice().reverse() };
@@ -337,6 +338,7 @@ export class NemoServer {
     this.allConns.add(c);
     const handle = m => {
       if (!m || typeof m !== 'object') return;
+      S.IN.kinds[m.t] = (S.IN.kinds[m.t] || 0) + 1;
       if (m.t === 'multi' && Array.isArray(m.l)) { for (const x of m.l) { try { handle(x); } catch (e) { S.log('메시지 처리 오류: ' + (e && e.stack || e)); } } return; }
       if (m.t === 'hb' && !wp && role !== 'guest') return;
       if (wp) {
@@ -381,7 +383,7 @@ export class NemoServer {
       else if (role === 'host') { room.host = null; for (const g of room.guests.values()) { g.send(J({ t: 'hostgone' })); g.close(); } room.guests.clear(); S.rooms.delete(roomName); }
       S.stopTimersIfIdle();
     };
-    ws.addEventListener('message', e => { c.seen = Date.now(); if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch (er) { return; } try { handle(m); } catch (er) { S.log('메시지 처리 오류: ' + (er && er.stack || er)); } });
+    ws.addEventListener('message', e => { c.seen = Date.now(); S.IN.frames++; if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch (er) { return; } try { handle(m); } catch (er) { S.log('메시지 처리 오류: ' + (er && er.stack || er)); } });
     ws.addEventListener('close', () => { try { ws.close(); } catch (e) {} gone('플레이어 쪽에서 닫힘'); });
     ws.addEventListener('error', () => gone('네트워크 오류'));
   }

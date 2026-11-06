@@ -56,6 +56,7 @@ async function mpWebSocket(url, role, extra) {
   }
 }
 const MP_DROP = new Set(['pl', 'mobs', 'vehs', 'items', 'xps']);
+const MP_BATCH_MS = 200; // (a server that counts incoming messages: Cloudflare's free plan)
 function mpWsOnce(url, role, extra) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch (e) { rej(e); return; }
@@ -63,13 +64,17 @@ function mpWsOnce(url, role, extra) {
       if (ws.readyState !== 1) return; const s = JSON.stringify(to != null ? { ...o, to } : o);
       // a server that takes them (Cloudflare counts every incoming message): what this game says in a tenth of a second
       // goes as one message, only the newest position (and the like) of each kind in it
-      if (link.hello && link.hello.multi) { const k = MP_DROP.has(o.t) ? o.t + ':' + (to != null ? to : '') : null; if (k && link.qk.has(k)) link.q[link.qk.get(k)] = s; else { if (k) link.qk.set(k, link.q.length); link.q.push(s); }
-        if (!link.qt) link.qt = setTimeout(link.flushQ, 100); return; }
+      // every 0.2 s; a position (or mob list...) the same as the last one sent isn't sent again for 3 s: a player standing
+      // still sends next to nothing
+      if (link.hello && link.hello.multi) { const k = MP_DROP.has(o.t) || o.t === 'pl' ? o.t + ':' + (to != null ? to : '') : null;
+        if (k) { const now = Date.now(); if (link.lastS.get(k) === s && now - link.lastT.get(k) < 3000) return; link.lastS.set(k, s); link.lastT.set(k, now); }
+        if (k && link.qk.has(k)) link.q[link.qk.get(k)] = s; else { if (k) link.qk.set(k, link.q.length); link.q.push(s); }
+        if (!link.qt) link.qt = setTimeout(link.flushQ, MP_BATCH_MS); return; }
       if (MP_DROP.has(o.t) && ws.bufferedAmount > 128 * 1024) { late.set(o.t + ':' + (to != null ? to : ''), s); return; }
       if (late.size && ws.bufferedAmount < 64 * 1024) { for (const v of late.values()) ws.send(v); late.clear(); }
-      ws.send(s); }, close() { try { ws.close(); } catch (e) {} }, q: [], qk: new Map(), qt: 0,
+      ws.send(s); }, close() { try { ws.close(); } catch (e) {} }, q: [], qk: new Map(), qt: 0, lastS: new Map(), lastT: new Map(), lastTx: 0,
       flushQ() { link.qt = 0; if (ws.readyState !== 1 || !link.q.length) { link.q = []; link.qk.clear(); return; } if (ws.bufferedAmount > 256 * 1024) { link.qt = setTimeout(link.flushQ, 100); return; } /* a slow upload: the queue waits (positions in it are still replaced) */
-        const l = link.q; link.q = []; link.qk.clear(); ws.send(l.length === 1 ? l[0] : '{"t":"multi","l":[' + l.join(',') + ']}'); } };
+        const l = link.q; link.q = []; link.qk.clear(); link.lastTx = Date.now(); ws.send(l.length === 1 ? l[0] : '{"t":"multi","l":[' + l.join(',') + ']}'); } };
     let ok = false;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', role, ...(extra || {}) }));
     ws.onmessage = e => { link.rx = Date.now(); if (ok && MP.link !== link && !(MP.core && role === 'host')) return; /* an old connection still talking after the game moved on */ let m; try { m = JSON.parse(e.data); } catch (er) { return; }
@@ -83,7 +88,7 @@ function mpWsOnce(url, role, extra) {
     ws.onclose = () => { clearInterval(link.dog); clearInterval(link.hb); if (ok && MP.link === link) mpLost('서버와 연결이 끊겼습니다'); };
     // nothing from the server for 60 s (it sends the clock every second): the connection is dead even if the browser
     // hasn't noticed - give it up and connect again at once instead of waiting minutes for the browser's own timeout
-    link.hb = setInterval(() => { if (ws.readyState === 1 && ok) ws.send('{"t":"hb"}'); }, 10000); // a word every 10 s, even from a background tab: the server knows this player is still there
+    link.hb = setInterval(() => { if (ws.readyState === 1 && ok && !(link.hello && link.hello.multi && Date.now() - link.lastTx < 9000)) { link.lastTx = Date.now(); ws.send('{"t":"hb"}'); } }, 10000); /* (not when other messages went out meanwhile) */ // a word every 10 s, even from a background tab: the server knows this player is still there
     link.ws = ws; link.rx = Date.now(); link.dog = setInterval(() => { if (!ok || MP.link !== link || ws.readyState > 1) return; if (Date.now() - link.rx > (link.hello && link.hello.kind === "world" ? 60000 : 90000)) { clearInterval(link.dog); mpLost('서버 응답이 없어 다시 연결합니다'); try { ws.close(); } catch (er) {} } }, 3000);
   });
 }
@@ -349,7 +354,7 @@ function mpHandle(m, from) {
     case 'nick': { if (m.id === MP.id) { MP.name = m.name; chatMsg('닉네임이 ' + m.name + '(으)로 바뀌었습니다', '#ffff55'); return; } const p = MP.peers.get(m.id); if (p) { p.name = m.name; mpDropAvatar(p); } chatMsg(m.old + '님이 닉네임을 ' + m.name + '(으)로 바꿨습니다', '#ffff55'); return; } // (the name tag is drawn again)
     case 'leave': if (host) mpPeerGone(from); return;
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
-    case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); (p.hist || (p.hist = [])).push([p.at, +m.x, +m.y, +m.z]); if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
+    case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); { const H0 = p.hist || (p.hist = []), g = H0.length ? Math.min(300, p.at - H0[H0.length - 1][0]) : 50; p.gap = Math.min(600, (p.gap || 50) * 0.8 + g * 0.2); H0.push([p.at, +m.x, +m.y, +m.z]); } if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
     case 'set': mpApplySet(m); return;
     case 'proj': mpGotProj(m, from); return;
@@ -650,7 +655,7 @@ function mpTick() {
   { const [h, off] = handItems(); mpSend({ t: 'pl', id: MP.role === 'host' && !MP.server ? 0 : MP.id, x: +PL.x.toFixed(3), y: +PL.y.toFixed(3), z: +PL.z.toFixed(3), yaw: +PL.yaw.toFixed(3), pitch: +PL.pitch.toFixed(3), dim: W.dim,
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s && !s.hid ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
-  if (MP.server && W.tickN % 100 === 0) mpSendPdata(); // every 5 s
+  if (MP.server && W.tickN % 100 === 0) mpSendPdata(true); // every 5 s (not when nothing changed)
   if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -819,7 +824,7 @@ const pdKey = () => MIR.host ? MIR.host + '|' + (ACC.user ? 'a:' + ACC.user.name
 function pdLoadPrev() { if (!MIR.host || !ACC.user || !(ACC.prev && ACC.prev.length)) return null; try { const all = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); for (const q of ACC.prev) { const r = all[MIR.host + '|a:' + String(q.name).toLowerCase()]; if (r && r.d) return r; } } catch (e) {} return null; } // (kept under the ID used before a change)
 function pdLoad() { const k = pdKey(); if (!k) return null; try { return (JSON.parse(localStorage.getItem(PD_KEY) || '{}'))[k] || null; } catch (e) { return null; } }
 function pdStore(patch) { const k = pdKey(); if (!k) return; try { const all = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); all[k] = { ...(all[k] || {}), ...patch }; const ks = Object.keys(all); while (ks.length > 30) delete all[ks.shift()]; localStorage.setItem(PD_KEY, JSON.stringify(all)); } catch (e) {} }
-function mpSendPdata() { if (!(MP.server && W.active && MP.pdataOk)) return; const d = mpPdata(), seq = MP.pdSeq = (MP.pdSeq || 0) + 1; pdStore({ d, dirty: seq }); mpSend({ t: 'pdata', d, seq }); } // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen) // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen)
+function mpSendPdata(periodic) { if (!(MP.server && W.active && MP.pdataOk)) return; const d = mpPdata(); if (periodic) { const j = JSON.stringify(d), now = Date.now(); if (j === MP.pdLastJ && now - (MP.pdLastT || 0) < 60000) return; MP.pdLastJ = j; MP.pdLastT = now; } const seq = MP.pdSeq = (MP.pdSeq || 0) + 1; pdStore({ d, dirty: seq }); mpSend({ t: 'pdata', d, seq }); } // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen) // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen)
 let mpSharedLast = '';
 function mpSendShared() { const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k]; const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
 function mpServerLeave(stay) { // keep everything in the world's store before going (stay: the host closes multiplayer and plays on)
@@ -1105,7 +1110,7 @@ function mpRender(dt) {
     const m = mpAvatar(p), st = m.userData.st, k = Math.min(1, dt * 12);
     // drawn a little in the past, between the two updates around that moment, so the figure moves at an even pace
     // (updates come 20 times a second); the legs swing with the speed between updates, as Java's limbDistance does
-    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - 80; let a = H[H.length - 1], b = a;
+    const last = p.pos || [s.x, s.y, s.z], H = p.hist || [], rt = performance.now() - Math.max(80, (p.gap || 50) * 1.5); /* (updates in 0.2 s batches: drawn further in the past) */ let a = H[H.length - 1], b = a;
     for (let i = H.length - 1; i > 0; i--) if (H[i - 1][0] <= rt) { a = H[i - 1]; b = H[i]; break; }
     const f = b && a && b[0] > a[0] ? Math.min(1, Math.max(0, (rt - a[0]) / (b[0] - a[0]))) : 1;
     p.pos = a ? [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f] : [s.x, s.y, s.z];
