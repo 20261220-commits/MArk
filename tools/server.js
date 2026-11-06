@@ -113,29 +113,38 @@ async function profileLookup(req, res) {
 }
 
 // ---------- a minimal WebSocket (RFC 6455): text frames, fragments, ping, close ----------
-function frame(op, payload) {
-  const n = payload.length, head = n < 126 ? Buffer.from([0x80 | op, n]) : n < 65536 ? Buffer.from([0x80 | op, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([0x80 | op, 127]), (() => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(n)); return b; })()]);
+function frame(op, payload, rsv1) {
+  const b0 = 0x80 | op | (rsv1 ? 0x40 : 0), n = payload.length, head = n < 126 ? Buffer.from([b0, n]) : n < 65536 ? Buffer.from([b0, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([b0, 127]), (() => { const b = Buffer.alloc(8); b.writeBigUInt64BE(BigInt(n)); return b; })()]);
   return Buffer.concat([head, payload]);
 }
+// what goes out, by message kind (bytes as sent): the free plan's traffic allowance is the limit, so /stats shows it
+const TRAFFIC = { since: Date.now(), total: 0, kinds: {} };
+function countOut(s, n) { TRAFFIC.total += n; const m = /"t":"([a-z_]+)"/.exec(s.slice(0, 60)), k = m ? m[1] : '?'; TRAFFIC.kinds[k] = (TRAFFIC.kinds[k] || 0) + n; }
 function wsAccept(req, sock, onText, onClose) {
   const key = req.headers['sec-websocket-key']; if (!key) { sock.destroy(); return null; }
   try { sock.setNoDelay(true); } catch (e) {} // small game messages go out at once, not batched
   const acc = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
-  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + '\r\n\r\n');
-  let buf = Buffer.alloc(0), parts = [], closed = false;
+  // permessage-deflate (RFC 7692), when the browser offers it (they all do): every message bigger than a few hundred
+  // bytes goes out compressed on its own (no shared window either way, so each one stands alone). The game's JSON
+  // shrinks to a fraction, and the free plan counts the bytes that go out
+  const deflate = /permessage-deflate/i.test(req.headers['sec-websocket-extensions'] || '') && !/^(0|false|no)$/i.test(process.env.WS_DEFLATE || '');
+  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + acc + (deflate ? '\r\nSec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover' : '') + '\r\n\r\n');
+  const TAIL = Buffer.from([0, 0, 255, 255]);
+  const out = s => { const raw = Buffer.from(s); if (deflate && raw.length > 200) { const z = zlib.deflateRawSync(raw, { level: 6 }), body = z.length >= 4 && z.subarray(z.length - 4).equals(TAIL) ? z.subarray(0, z.length - 4) : z; return frame(1, body, true); } return frame(1, raw); };
+  let buf = Buffer.alloc(0), parts = [], closed = false, zin = false;
   // drop: a message the next one replaces (positions, mob lists, the clock). When a player's connection can't keep up,
   // these are skipped instead of piling up: a queue that only grows makes everything arrive later and later
   // (the newest of each kind - each player's position, the mob list - is kept and goes out the moment the connection
   // drains, so the latest state always arrives, only the stale ones in between are skipped)
   const latest = new Map();
-  const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) sock.write(frame(1, Buffer.from(s))); };
+  const flush = () => { if (closed || !latest.size) return; const l = [...latest.values()]; latest.clear(); for (const s of l) { const f = out(s); countOut(s, f.length); sock.write(f); } };
   sock.on('drain', flush);
-  const c = { backlog: () => sock.writableLength, send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); sock.write(frame(1, Buffer.from(s))); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose('서버가 닫음'); } } };
+  const c = { backlog: () => sock.writableLength, send(s, drop) { if (closed) return; if (drop && sock.writableLength > 256 * 1024) { latest.set(drop, s); return; } if (latest.size && !drop) flush(); const f = out(s); countOut(s, f.length); sock.write(f); }, close() { if (!closed) { closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose('서버가 닫음'); } } };
   sock.on('data', d => {
     seen = Date.now(); buf = buf.length ? Buffer.concat([buf, d]) : d;
     for (;;) {
       if (buf.length < 2) return;
-      const fin = buf[0] & 0x80, op = buf[0] & 15, masked = buf[1] & 0x80; let len = buf[1] & 127, p = 2;
+      const fin = buf[0] & 0x80, op = buf[0] & 15, rsv1 = buf[0] & 0x40, masked = buf[1] & 0x80; let len = buf[1] & 127, p = 2;
       if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); p = 4; } else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); p = 10; }
       if (buf.length < p + (masked ? 4 : 0) + len) return;
       const mask = masked ? buf.subarray(p, p + 4) : null; p += masked ? 4 : 0;
@@ -143,7 +152,7 @@ function wsAccept(req, sock, onText, onClose) {
       buf = buf.subarray(p + len);
       if (op === 8) { why = '플레이어가 나감'; closed = true; try { sock.end(frame(8, Buffer.alloc(0))); } catch (e) {} onClose(why); return; }
       if (op === 9) { sock.write(frame(10, data)); continue; }
-      if (op === 1 || op === 2 || op === 0) { parts.push(data); if (fin) { const msg = Buffer.concat(parts).toString(); parts = []; try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
+      if (op === 1 || op === 2 || op === 0) { if (op !== 0) zin = !!rsv1; parts.push(data); if (fin) { let mb = Buffer.concat(parts); parts = []; if (zin) { try { mb = zlib.inflateRawSync(Buffer.concat([mb, TAIL])); } catch (e) { console.log('압축 메시지를 풀지 못했습니다'); continue; } } const msg = mb.toString(); try { onText(msg); } catch (e) { console.log('메시지 처리 오류: ' + (e && e.stack || e)); } } }
     }
   });
   // a ping now and then: hosting proxies close connections that stay quiet (the browser answers by itself). A connection
@@ -188,8 +197,12 @@ function saveWorld(w, force) {
   for (const [dk, c] of w.dirty) { const e = { rec: c.rec, edits: c.edits, tiles: c.tiles }; ver[dk] = (ver[dk] || 0) + 1; w.stateDirty = true; writeAtomic(w.fileOf(dk), JSON.stringify(e)); out.push([dk, ver[dk], e]); }
   if (w.stateDirty) { writeAtomic(path.join(w.dir, 'world.json'), JSON.stringify(st)); w.stateDirty = false; }
   w.dirty.clear();
-  if (out.length || force || Date.now() - w.mirrorStateAt > 30000) mirrorOut(w, out);
+  // the players' copies (a safety net under the GitHub backup): changed chunks gathered and sent at most every 5 minutes,
+  // the newest version of each only (sent every 5 seconds they were most of the server's traffic)
+  const pend = w.mirPend || (w.mirPend = new Map()); for (const o of out) pend.set(o[0], o);
+  if (force || (pend.size && Date.now() - (w.mirrorStateAt || 0) > MIRROR_EVERY) || Date.now() - (w.mirrorStateAt || 0) > MIRROR_EVERY * 2) { mirrorOut(w, [...pend.values()]); pend.clear(); }
 }
+const MIRROR_EVERY = Math.max(10, +process.env.MIRROR_SECONDS || 300) * 1000;
 const saveAllWorlds = () => { for (const w of worlds.values()) { w.stateDirty = true; saveWorld(w); } };
 // a world slot opened for a new world that was never made (the player left the create screen) goes away again
 function dropIfEmpty(w) { if (w.state.meta || w.conns.size) return; worlds.delete(w.id); try { fs.rmdirSync(w.cdir); fs.rmdirSync(w.dir); } catch (e) {} }
@@ -201,7 +214,7 @@ function dropIfEmpty(w) { if (w.state.meta || w.conns.size) return; worlds.delet
 const mirrorState = w => { const o = { ...w.state }; delete o.logins; return o; };
 const joinedConns = w => [...w.conns].filter(([id]) => { const p = w.core.players.get(id); return p && p.joined; }).map(([, c]) => c);
 function mirrorOut(w, l) {
-  const to = joinedConns(w); if (!to.length || !w.state.meta) return; w.mirrorStateAt = Date.now();
+  const to = joinedConns(w); w.mirrorStateAt = Date.now(); if (!to.length || !w.state.meta) return;
   const s = JSON.stringify({ t: 'mirror', wid: w.state.wid, state: mirrorState(w), l }); for (const c of to) c.send(s);
 }
 // a player who just came in says which versions it has; it gets the rest a few chunks at a time
@@ -352,7 +365,7 @@ const STARTED = Date.now(); let lastBackup = null; const DROPS = [];
 const noteDrop = d => { DROPS.push(d); if (DROPS.length > 40) DROPS.shift(); }; // the last connections that ended, and why (as the server saw it, and as players' games reported it)
 function serverStats() {
   const m = process.memoryUsage(), MB = x => Math.round(x / 1048576); let lc = null; try { lc = process.env.NEMO_LASTCRASH ? JSON.parse(process.env.NEMO_LASTCRASH) : null; } catch (e) {}
-  return { pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup, backup: { on: !!BACKUP, locked: BK.blocked, lastError: BK.lastError, restoredFrom: BK.restoredFrom },
+  return { traffic: { sinceMin: Math.round((Date.now() - TRAFFIC.since) / 60000), MB: +(TRAFFIC.total / 1048576).toFixed(2), byKindKB: Object.fromEntries(Object.entries(TRAFFIC.kinds).sort((x, y) => y[1] - x[1]).slice(0, 15).map(([k, v]) => [k, Math.round(v / 1024)])) }, pid: process.pid, uptimeMin: Math.round((Date.now() - STARTED) / 60000), memMB: { rss: MB(m.rss), heap: MB(m.heapUsed), heapTotal: MB(m.heapTotal), external: MB(m.external) }, restarts: +process.env.NEMO_RESTARTS || 0, lastCrash: lc, lastBackup, backup: { on: !!BACKUP, locked: BK.blocked, lastError: BK.lastError, restoredFrom: BK.restoredFrom },
     worlds: [...worlds.values()].filter(w => w.state.meta).map(w => ({ id: w.state.meta.priv ? '(비공개)' : w.id, name: w.state.meta.priv ? '(비공개 서버)' : w.state.meta.name, players: [...w.core.players.values()].filter(q => q.joined).length, conns: w.conns.size, chunksOnDisk: w.keys.size, cached: w.core.cacheSize ? w.core.cacheSize() : null, unsaved: w.dirty.size })),
     rooms: [...rooms.values()].filter(r => r.host).length, recentDrops: DROPS.slice().reverse() };
 }
