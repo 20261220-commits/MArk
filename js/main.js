@@ -193,10 +193,11 @@ async function createWorld(c) {
 }
 function findSpawn(seed) {
   const g = S.makeGen(seed);
-  for (let r = 0; r < 2048; r += 16) for (let a = 0; a < Math.max(1, r / 4); a++) {
+  // the nearest dry lowland (Java spawns on a grass surface inland, not up a mountain), else any land under 120
+  for (const top of [86, 120]) for (let r = 0; r < 2048; r += 16) for (let a = 0; a < Math.max(1, r / 4); a++) {
     const ang = a / Math.max(1, r / 4) * Math.PI * 2, x = Math.round(Math.cos(ang) * r), z = Math.round(Math.sin(ang) * r);
     const [h, b] = g.column(x, z);
-    if (h > S.SEA + 1 && h < 120 && !S.isOceanBio(b) && b !== S.BIO.RIVER) return [x, h + 1, z];
+    if (h > S.SEA + 1 && h < top && !S.isOceanBio(b) && b !== S.BIO.RIVER && b !== S.BIO.MOUNTAINS) return [x, h + 1, z];
   }
   return [0, 100, 0];
 }
