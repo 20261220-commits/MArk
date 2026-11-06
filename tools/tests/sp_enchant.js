@@ -12,7 +12,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     setBlock(X + 2, Y, Z, BID.enchanting_table); const table = (st) => { UI.openScreen('enchant', { x: X + 2, y: Y, z: Z, items: [st, { id: IID.lapis_lazuli, n: 64 }] }); const l = enchantOptions().list; return l; };
     o.stick = table({ id: IID.stick, n: 1 }).length; o.sword = table({ id: IID.iron_sword, n: 1 }).filter(x => Object.keys(x.e).length).length;
     o.enchanted = table({ id: IID.iron_sword, n: 1, e: { sharpness: 1 } }).length;
-    const bk = { id: IID.book, n: 1 }; table(bk); const btn = document.createElement('div'); btn.dataset.ench = '2'; document.getElementById('screen').appendChild(btn); btn.click(); btn.remove();
+    const bk = { id: IID.book, n: 1 }, bl = table(bk), best = bl.map((x, i) => x.ok ? i : -1).filter(i => i >= 0).pop(); const btn = document.createElement('div'); btn.dataset.ench = String(best); /* (no shelves: a slot costing less than its number is off, as Java) */ document.getElementById('screen').appendChild(btn); btn.click(); btn.remove();
     o.book = [bk.id === IID.enchanted_book, Object.keys(bk.e || {}).length]; UI.closeScreen();
     // weights and ranges over many rolls
     const cnt = {}; let both = 0, axeSharp = 0;
@@ -34,7 +34,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     for (let i = 0; i < 30; i++) { UI.paused = false; gameTick(); PL.health = 20; if (i % 4 === 0) await wait(2); }
     o.rocket = [+(hp0 - z.hp).toFixed(1), INV.slots[INV.sel].ch || null];
     return o; });
-  ok(r.stick === 0 && r.sword >= 2 && r.enchanted === 0, 'the table: nothing for a stick or an enchanted sword, choices for a plain sword', r);
+  ok(r.stick === 0 && r.sword >= 1 && r.enchanted === 0, /* (no shelves: the dearer slots can be off, as Java) */ 'the table: nothing for a stick or an enchanted sword, choices for a plain sword', r);
   ok(r.book[0] && r.book[1] >= 1, 'a book on the table becomes an enchanted book', r.book);
   ok(r.roll.eff > r.roll.silk * 3 && r.roll.silk > 0 && r.roll.both === 0 && r.roll.axeSharp === 0 && r.roll.effMax <= 5, 'rolls follow Java\'s weights (efficiency common, silk touch rare, never with fortune; no sharpness on an axe from the table)', r.roll);
   ok(r.stickSurv === null && r.stickCre && r.stickCre.knockback === 2, 'the anvil: a book does nothing to a stick in survival, works in creative (Java)', [r.stickSurv, r.stickCre]);

@@ -539,25 +539,26 @@ function runCommandBasic(cmd) { // (the older handler: still answers /locate, /g
 }
 
 // ---------- enchanting table ----------
-function bookshelves(c) {
-  let n = 0;
-  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) {
-    if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
-    if (getBlock(c.x + dx, c.y + dy, c.z + dz) === BID.bookshelf && getBlock(c.x + Math.sign(dx), c.y + dy, c.z + Math.sign(dz)) === 0) n++;
-  }
-  return Math.min(15, n);
-}
+// Java 1.18's EnchantmentTableBlock: a bookshelf counts on the ring two blocks out (on the table's level or one up) when
+// the block halfway to it is air - halfway as Java takes it, the offset halved toward zero, so for a shelf at (2, 1) the
+// gap is (1, 0); 15 at most
+const ENCH_SHELF_OFFSETS = []; for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 1; dy++) if (Math.abs(dx) === 2 || Math.abs(dz) === 2) ENCH_SHELF_OFFSETS.push([dx, dy, dz]);
+const enchShelfOK = (x, y, z, [dx, dy, dz]) => getBlock(x + dx, y + dy, z + dz) === BID.bookshelf && getBlock(x + Math.trunc(dx / 2), y + dy, z + Math.trunc(dz / 2)) === 0;
+function bookshelves(c) { let n = 0; for (const o of ENCH_SHELF_OFFSETS) if (enchShelfOK(c.x, c.y, c.z, o)) n++; return Math.min(15, n); }
+// Java's EnchantmentMenu: the player's enchanting seed seeds one random that gives each slot its own cost in turn
+// (EnchantmentHelper.getEnchantmentCost: 1-8 + shelves/2 + 0-shelves; a third of it (at least 1), two thirds + 1, all of
+// it but at least twice the shelves); a slot costing less than its number is off; each slot's enchantments come from
+// the seed + its number, and the clue shown is one of them at random
 function enchantOptions() {
   const c = GUI.ctx, st = c.items[0], shelves = bookshelves(c), list = [];
   if (!st || !enchantability(st.id) || (st.e && Object.keys(st.e).length) || (st.id !== IID.book && !enchKinds(st.id).length) || (st.id === IID.book && st.n > 1)) return { shelves, list }; // (Java: only an unenchanted tool, armour piece, bow, rod or a single book; a stick gets nothing)
   PL.enchSeed = PL.enchSeed || ((Math.random() * 2 ** 31) | 0);
-  const r = S.rng(PL.enchSeed), b = shelves;
-  const base = 1 + r.int(8) + Math.floor(b / 2) + r.int(b + 1);
-  const costs = [Math.max(Math.floor(base / 3), 1), Math.floor(base * 2 / 3) + 1, Math.max(base, b * 2)];
-  const lapis = c.items[1] ? c.items[1].n : 0;
+  const r = S.rng(PL.enchSeed), b = shelves, lapis = c.items[1] ? c.items[1].n : 0;
+  const costs = [0, 1, 2].map(i => { const j = 1 + r.int(8) + (b >> 1) + r.int(b + 1), v = i === 0 ? Math.max(Math.floor(j / 3), 1) : i === 1 ? Math.floor(j * 2 / 3) + 1 : Math.max(j, b * 2); return v < i + 1 ? 0 : v; });
   costs.forEach((cost, i) => {
-    const e = rollEnchant(st.id, cost, PL.enchSeed + i * 7919), first = Object.keys(e)[0]; if (!first) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
-    list.push({ cost, e, text: first ? ENCH[first][0] + (ENCH[first][1] > 1 ? ' ' + ROMAN[e[first]] : '') + ' . . . ?' : '?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
+    const e = cost ? rollEnchant(st.id, cost, PL.enchSeed + i * 7919) : {}, ks = Object.keys(e); if (!ks.length) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
+    const clue = ks[r.int(ks.length)];
+    list.push({ cost, e, text: ENCH[clue][0] + (ENCH[clue][1] > 1 ? ' ' + ROMAN[e[clue]] : '') + ' . . . ?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
   });
   return { shelves, list };
 }
