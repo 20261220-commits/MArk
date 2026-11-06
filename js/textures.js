@@ -472,7 +472,7 @@ function applyPackData(P, D) {
     for (const k of ['bed_sidef', 'bed_endh', 'bed_endf']) { if (P.tiles[k + c] != null) continue; const t = S.T[k + c], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
       for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4); }
   }
-  for (const [k, [off, frames]] of Object.entries(P.anim)) if (S.T[k] != null) PACKPX.anim[k] = { data: D, off, frames };
+  for (const [k, [off, frames]] of Object.entries(P.anim)) if (S.T[k] != null || k === 'fire1') /* (fire_1: only the burning overlay's) */ PACKPX.anim[k] = { data: D, off, frames };
   for (const [k, off] of Object.entries(P.items)) PACKPX.items[k] = D.subarray(off, off + 1024);
   for (const [k, [off, w, h]] of Object.entries(P.ent)) PACKPX.ent[k] = { px: D.subarray(off, off + w * h * 4), w, h };
   if (P.sky) { const [off, w, h] = P.sky; PACKPX.sky = { px: D.subarray(off, off + w * h * 4), w, h }; }

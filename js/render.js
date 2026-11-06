@@ -488,8 +488,14 @@ const animTiles = []; let animIdx = 0;
 function stepAnimation(dt) {
   R.animT = (R.animT || 0) + dt; if (R.animT < 0.1) return; R.animT = 0;
   if (!PACKPX.data) { animateAtlas(0.1); atlasTex.needsUpdate = true; return; } // procedural fallback
-  if (!animTiles.length) for (const k in PACKPX.anim) { const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' || k === 'lava_flow' ? 2 : 1 }); }
+  if (!animTiles.length) for (const k in PACKPX.anim) { if (S.T[k] == null) continue; /* (fire1: not an atlas tile, only the burning overlay's) */ const t = S.T[k], data = new Uint8Array(1024), tex = new THREE.DataTexture(data, 16, 16, THREE.RGBAFormat); animTiles.push({ k, data, tex, pos: new THREE.Vector2((t % S.TPR) * 16, ((t / S.TPR) | 0) * 16), slow: k === 'magma' ? 6 : k === 'lava' || k === 'lava_flow' ? 2 : 1 }); }
   animIdx++;
+  // the fire drawn over a burning entity: Java's two fire textures (fire_0, fire_1), both animated, in a texture of
+  // their own (16 x 32, one above the other), so its edges never take in the atlas tiles beside them
+  // (a pack without fire_1, like the built-in one: fire_0 again, half its animation further on, so the two still differ)
+  if (PACKPX.anim.fire) {
+    if (!R.fireTex) { R.fireTex = new THREE.DataTexture(new Uint8Array(16 * 32 * 4), 16, 32, THREE.RGBAFormat); R.fireTex.magFilter = R.fireTex.minFilter = THREE.NearestFilter; R.fireTex.generateMipmaps = false; }
+    const d = R.fireTex.image.data; d.set(animFrame('fire', animIdx), 0); d.set(PACKPX.anim.fire1 ? animFrame('fire1', animIdx) : animFrame('fire', animIdx + (PACKPX.anim.fire.frames >> 1)), 1024); R.fireTex.needsUpdate = true; }
   for (const a of animTiles) { if (animIdx % a.slow) continue; a.data.set(animFrame(a.k, (animIdx / a.slow) | 0)); a.tex.needsUpdate = true; renderer.copyTextureToTexture(a.pos, a.tex, atlasTex);
     if (atlasTex.mipmaps && atlasTex.mipmaps.length) { // the same frame into the smaller levels (8, 4, 2, 1 pixels)
       if (!a.mips) a.mips = [1, 2, 3, 4].map(l => { const n = 16 >> l; return { l, n, tex: new THREE.DataTexture(new Uint8Array(n * n * 4), n, n, THREE.RGBAFormat), pos: new THREE.Vector2(a.pos.x >> l, a.pos.y >> l) }; });

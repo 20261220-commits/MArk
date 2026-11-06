@@ -64,7 +64,7 @@ for (const t of ['spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'crimson', '
 for (const c of ['tube', 'brain', 'bubble', 'fire', 'horn']) for (const d of ['', 'dead_']) for (const k of ['_coral', '_coral_fan', '_coral_block']) TILE[d + c + k] = d + c + k;
 for (const c of ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']) TILE[c + '_glazed_terracotta'] = c + '_glazed_terracotta';
 Object.assign(TILE, { carved_pumpkin_face: 'carved_pumpkin', frosted_ice: 'frosted_ice_0', respawn_anchor_side: 'respawn_anchor_side0', bamboo_leaves: 'bamboo_large_leaves' });
-const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', magma: 'magma', water_flow: 'water_flow', lava_flow: 'lava_flow' };
+const ANIM = { water: 'water_still', lava: 'lava_still', nether_portal: 'nether_portal', fire: 'fire_0', fire1: 'fire_1', magma: 'magma', water_flow: 'water_flow', lava_flow: 'lava_flow' };
 // biome-tinted plant textures are grey in vanilla and get their colour from the biome; a pack that ships them already
 // coloured (Pixel Perfection's orange birch, green spruce...) would be coloured twice, so they are turned grey first,
 // at vanilla's average brightness for that texture

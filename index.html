@@ -89,7 +89,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#fff;font-f
 #ovSleep{background:#000;opacity:0}
 #sleepTip{position:fixed;left:50%;bottom:22%;transform:translateX(-50%);color:#fff;text-shadow:2px 2px #3f3f3f;font-size:calc(8 * var(--px));pointer-events:none;z-index:6}
 #ovSpy{background:radial-gradient(circle at center,transparent 0,transparent 32vmin,#000 32.4vmin)}
-#ovFire{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}
+#ovFire{overflow:hidden}#ovFire.grad{background:linear-gradient(transparent 55%,rgba(255,120,20,.35) 80%,rgba(255,200,40,.55))}#ovFire canvas{position:absolute;image-rendering:pixelated;opacity:.9}
 /* ---------- screens (GUI) ---------- */
 #screen{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(16,16,16,.55);overflow:auto;padding:calc(4 * var(--px)) 0}
 .panel{background:#c6c6c6;border:calc(var(--px)) solid #000;box-shadow:inset calc(2 * var(--px)) calc(2 * var(--px)) 0 #fff,inset calc(-2 * var(--px)) calc(-2 * var(--px)) 0 #555;border-radius:calc(2 * var(--px));padding:calc(6 * var(--px)) calc(7 * var(--px)) calc(7 * var(--px));color:#404040;display:flex;flex-direction:column;gap:calc(2 * var(--px))}
