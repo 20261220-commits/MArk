@@ -338,7 +338,7 @@ function mpHandle(m, from) {
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
-    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) mpEnterServerWorld(m); else if (!host) mpEnterHostWorld(m); return;
+    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) { mpEnterServerWorld(m); if (!ACC.user && !MP.nudged) { MP.nudged = true; setTimeout(() => { if (MP.on && !ACC.user) { chatMsg('🔒 로그인하지 않고 들어왔어요. 내 아이템은 이름에만 묶여 있어서 같은 이름으로 들어온 사람이 가져갈 수 있어요.', '#ffcc44'); chatMsg('나가서 타이틀 → 로그인에서 닉네임과 비밀번호를 정하면 내 것이 안전하게 지켜져요.', '#ffcc44'); } }, 4000); } } else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
     case 'created': case 'restored': if (m.t === 'restored') chatMsg('저장해 둔 사본으로 서버 세계를 되살렸습니다', '#55ff55'); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() }); return;
     case 'mirror': mirSave(m); return;
@@ -1325,7 +1325,7 @@ function mpMenu(name) {
   const st = `<p class="muted" id="mpStatus">${esc(MP.status || '')}</p>`;
   if (name === 'mp_create') return `<h2>서버 세계 만들기</h2><div class="form"><p class="muted">이 서버에는 아직 세계가 없습니다. 새로 만들면 서버 컴퓨터에 저장되어, 만든 사람이 없어도 누구나 접속해 플레이할 수 있습니다.</p><label>세계 이름<input id="mpWName" value="서버 세계" maxlength="40"></label><label>시드 (비우면 무작위)<input id="mpSeed" maxlength="32"></label><label>게임 모드<select id="mpMode"><option value="survival">서바이벌</option><option value="creative">크리에이티브</option></select></label><label class="chk"><input type="checkbox" id="mpCheats"> 명령어 허용</label>${btn('만들고 들어가기', 'mp_createworld')}${st}</div><div class="btncol">${btn('취소', 'mp_cancel')}</div>`;
   if (name === 'mp_join') { setTimeout(() => { if (MPL.state !== 'loading' && UI.menu === 'mp_join') mpRefreshList(MPL.addr || undefined); }); return `<h2>멀티플레이</h2><div class="form">${nameRow}
-    <div class="mpsrv"><span id="mpSrv">${mpSrvLine()}</span>${btn('새로고침', 'mp_refresh', 'sm')}</div>${mpSrvPick()}
+    ${mpLoginNudge()}<div class="mpsrv"><span id="mpSrv">${mpSrvLine()}</span>${btn('새로고침', 'mp_refresh', 'sm')}</div>${mpSrvPick()}
     <div class="wlist mpl" id="mpList">${mpListHtml()}</div>
     <div class="mprow"><input id="mpRoom" maxlength="8" placeholder="방 코드 (예: K7QF)" autocomplete="off" spellcheck="false">${btn('방 코드로 참가', 'mp_code')}</div>
     ${st}<p class="muted">같이 하는 방법: ① 한 명이 자기 세계에서 Esc → <b>멀티플레이 열기</b> → <b>서버로 열기</b> ② 다른 사람은 여기 목록에서 그 세계의 <b>참가</b>를 누르거나 방 코드를 넣기 · 서버 세계는 누구나 언제든 들어갈 수 있어요</p>
@@ -1368,6 +1368,13 @@ function mpListHtml() {
   if (d) rows.push(`<div class="mpi"><div><b>🌱 새 서버 세계 만들기</b><span>서버에 계속 남는 새 세계를 만듭니다. 만든 사람이 없어도 누구나 언제든 들어올 수 있어요</span></div>${btn('만들기', d.worlds ? 'mp_go:@+' : 'mp_go:', 'sm')}</div>`);
   if (rows.length) return rows.join('');
   return `<p class="muted mpempty">${MPL.state === 'err' ? esc(MPL.msg || '서버에 연결하지 못했습니다') : MPL.state === 'ok' ? '열린 세계가 없습니다' : esc(MPL.msg || '서버 목록을 불러오는 중...')}</p>`;
+}
+// not logged in: a word on why to (a player's things in a server world are kept under the name alone - whoever comes in
+// later with that name gets them)
+const MP_LOGIN_TIP = '로그인하지 않으면 서버 세계에 남긴 아이템·경험치·위치가 이름에만 묶여 있어서, 내가 없을 때 누가 같은 이름으로 들어오면 그대로 가져갈 수 있어요. 로그인하면 비밀번호로 지켜지고, 다른 기기에서도 내 것 그대로 이어서 할 수 있어요.';
+function mpLoginNudge() {
+  if (ACC.user) return '';
+  return `<div class="mpnudge" style="border:1px solid #c8a030;background:rgba(200,160,48,.15);padding:6px 8px;margin:4px auto;max-width:540px;box-sizing:border-box;font-size:13px;line-height:1.45"><b>🔒 로그인하고 내 아이템을 지키세요</b><br>${MP_LOGIN_TIP}<div style="margin-top:4px">${btn('로그인하기 (닉네임 + 비밀번호)', 'account', 'sm')}</div></div>`;
 }
 // the servers this game knows (js/config.js): one button each, the one in use marked; worlds on each are their own
 function mpSrvPick() {
