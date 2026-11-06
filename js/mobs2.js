@@ -408,7 +408,7 @@ function walkPhysics(e, mx, mz, speed) {
   physMove(e, e.vx, e.vy, e.vz, 0.6);
   if (!inF) e.vy = (e.vy - 0.08) * 0.98;
   if (!e.onGround) { e.vx *= 0.91; e.vz *= 0.91; } else { e.vx *= 0.6; e.vz *= 0.6; }
-  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6;
+  const hs = Math.hypot(e.vx, e.vz); e.walkAmt += (Math.min(1, hs * 8) - e.walkAmt) * 0.3; e.walk += hs * 6; if (typeof mobLimb === 'function') mobLimb(e, hs);
 }
 function golemAI(e, dist) {
   if (e.target && (e.target.dead || (e.target !== PL && Math.hypot(e.target.x - e.x, e.target.z - e.z) > 20) || (e.target === PL && (!plTargetable() || dist > 24)))) e.target = null;
