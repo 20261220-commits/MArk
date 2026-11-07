@@ -61,6 +61,7 @@
 - 필요한 비밀 값: Worker → Settings → Variables and Secrets 에 **Secret** `GITHUB_TOKEN`(백업 저장소 Contents 읽기·쓰기 권한). 없으면 서버 세계는 잠겨 있습니다(빈 서버가 백업을 덮어쓰지 않도록).
 - 게임은 0.1초 동안 보낼 메시지를 한 묶음(`{"t":"multi"}`)으로 보냅니다: 무료 플랜이 받는 메시지 수를 세기 때문입니다.
 - 상태: `https://mark.yubinl3756.workers.dev/stats`
+- **두 주소 동기화**: 게임은 claude.ai 링크와 `mark.yubinl3756.workers.dev` 두 곳에서 열 수 있는데, 브라우저는 주소마다 저장 공간을 따로 씁니다. 로그인(같은 닉네임·비밀번호)하면 싱글플레이 세계·설정·조작 키·스킨·멀티 이름/서버·비공개 서버 초대가 Cloudflare 서버(`/sync`, `js/cloudsync.js`)를 거쳐 두 곳에 똑같이 맞춰집니다(더 최근 것이 이김, 지운 세계는 다른 곳에서도 지워짐, 계정당 120MB·세계 하나 40MB까지). jar 텍스처(Mojang 파일)는 서버로 보내지 않으므로 각 주소에서 한 번씩 넣어야 합니다.
 
 ### 인터넷 서버 (Render)
 - Render 대시보드에서 **New → Web Service** 로 이 저장소를 고르고 **Start Command** 를 `node tools/server.js` 로 둡니다(Build Command 는 비워 두거나 `echo ok`). 또는 **New → Blueprint** 로 고르면 `render.yaml` 설정으로 만들어집니다. 포트는 Render 가 주는 `PORT` 를 그대로 씁니다.
