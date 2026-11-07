@@ -15,7 +15,7 @@ export default {
     if (u === '/skin') return skinProxy(url);
     if (u === '/profile') return profileLookup(url);
     if (u === '/ping') return new Response('ok', { headers: { 'cache-control': 'no-store' } });
-    if (u.startsWith('/mp') || u === '/rooms' || u === '/stats' || u === '/report') return env.NEMO.get(env.NEMO.idFromName('main')).fetch(req);
+    if (u.startsWith('/mp') || u === '/rooms' || u === '/stats' || u === '/report' || u.startsWith('/sync')) return env.NEMO.get(env.NEMO.idFromName('main')).fetch(req);
     if (env.ASSETS && (u === '/' || u === '/index.html')) { const r = await env.ASSETS.fetch(new Request(new URL('/nemo-1.18.html', url))); return new Response(r.body, { status: r.status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' } }); }
     if (env.ASSETS) return env.ASSETS.fetch(req);
     return new Response('not found', { status: 404 });
@@ -321,9 +321,61 @@ export class NemoServer {
     if (u === '/rooms') return new Response(J(this.roomList()), { headers: jh });
     if (u === '/stats') return new Response(JSON.stringify(this.stats(), null, 1), { headers: jh });
     if (u === '/report') { try { const o = JSON.parse((await req.text()).slice(0, 2000)); this.noteDrop({ at: new Date().toISOString(), side: 'game', name: String(o.name || '').slice(0, 16), why: String(o.why || '').slice(0, 200), world: String(o.world || '').slice(0, 40), secs: +o.secs || 0 }); } catch (e) {} return new Response(null, { status: 204, headers: cors }); }
+    if (u.startsWith('/sync')) return this.sync(req, url);
     if (req.headers.get('upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
     const pair = new WebSocketPair(), ws = pair[1]; ws.accept(); this.connect(ws, url);
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+  // ---------- one account's things kept for its games on other sites (js/cloudsync.js) ----------
+  // The game on claude.ai and on this server's own address keep their saves apart (each site its own browser storage);
+  // a logged-in player's single-player worlds and settings are kept here under the account so both have them. The
+  // account is its name and the login proof the game already makes (js/account.js); the first sync claims the name.
+  // Worlds are kept as the game sends them (gzipped), in parts under SQLite's row limit.
+  async sync(req, url) {
+    const H = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, x-nemo-user, x-nemo-cred', 'access-control-allow-methods': 'GET, PUT, DELETE, OPTIONS', 'cache-control': 'no-store' };
+    const res = (body, status = 200, type = 'application/json') => new Response(typeof body === 'string' || body instanceof ArrayBuffer || body instanceof Uint8Array ? body : J(body), { status, headers: { ...H, 'content-type': type } });
+    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...H, 'access-control-max-age': '86400' } });
+    const sql = this.sql;
+    if (!this.syncReady) { this.syncReady = true;
+      sql.exec('CREATE TABLE IF NOT EXISTS sync_acct (name TEXT PRIMARY KEY, salt TEXT, hash TEXT)');
+      sql.exec('CREATE TABLE IF NOT EXISTS sync_meta (name TEXT, wid TEXT, wname TEXT, last INTEGER, size INTEGER, del INTEGER, PRIMARY KEY (name, wid))');
+      sql.exec('CREATE TABLE IF NOT EXISTS sync_part (name TEXT, wid TEXT, i INTEGER, data BLOB, PRIMARY KEY (name, wid, i))');
+      sql.exec('CREATE TABLE IF NOT EXISTS sync_pref (name TEXT, k TEXT, at INTEGER, v TEXT, PRIMARY KEY (name, k))'); }
+    const name = String(req.headers.get('x-nemo-user') || '').trim().toLowerCase(), cred = String(req.headers.get('x-nemo-cred') || '');
+    if (!/^[^\s<>"'&\\]{1,16}$/.test(name) || !/^[0-9a-f]{64}$/.test(cred)) return res({ error: '로그인이 필요합니다' }, 401);
+    const hashOf = async salt => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + '\n' + cred)));
+    const acct = sql.exec('SELECT salt, hash FROM sync_acct WHERE name = ?', name).toArray()[0];
+    if (!acct) { const salt = randHex(8); sql.exec('INSERT INTO sync_acct VALUES (?, ?, ?)', name, salt, await hashOf(salt)); }
+    else if (await hashOf(acct.salt) !== acct.hash) return res({ error: '비밀번호가 이 계정의 동기화 비밀번호와 다릅니다' }, 403);
+    const what = url.pathname.slice(5), wid = String(url.searchParams.get('id') || '');
+    if (what === '/list') return res({ worlds: sql.exec('SELECT wid AS id, wname AS name, last, size, del FROM sync_meta WHERE name = ?', name).toArray(), prefs: Object.fromEntries(sql.exec('SELECT k, at FROM sync_pref WHERE name = ?', name).toArray().map(r => [r.k, r.at])) });
+    if (what === '/prefs' && req.method === 'GET') return res(Object.fromEntries(sql.exec('SELECT k, at, v FROM sync_pref WHERE name = ?', name).toArray().map(r => [r.k, { at: r.at, v: r.v }])));
+    if (what === '/prefs' && req.method === 'PUT') {
+      let o; try { o = JSON.parse(await req.text()); } catch (e) { return res({ error: 'bad' }, 400); }
+      let n = 0; for (const k in o) { const e = o[k]; if (!/^nemo-[\w-]{1,40}$/.test(k) || !e || typeof e.v !== 'string' || e.v.length > 400000 || !(+e.at > 0)) continue;
+        const cur = sql.exec('SELECT at FROM sync_pref WHERE name = ? AND k = ?', name, k).toArray()[0]; if (cur && cur.at >= +e.at) continue;
+        sql.exec('INSERT OR REPLACE INTO sync_pref VALUES (?, ?, ?, ?)', name, k, +e.at, e.v); n++; }
+      return res({ ok: n }); }
+    if (!/^[\w-]{1,60}$/.test(wid)) return res({ error: 'bad id' }, 400);
+    if (what === '/world' && req.method === 'GET') {
+      const parts = sql.exec('SELECT data FROM sync_part WHERE name = ? AND wid = ? ORDER BY i', name, wid).toArray(); if (!parts.length) return res({ error: 'none' }, 404);
+      const len = parts.reduce((a, p) => a + p.data.byteLength, 0), out = new Uint8Array(len); let o = 0; for (const p of parts) { out.set(new Uint8Array(p.data), o); o += p.data.byteLength; }
+      return res(out, 200, 'application/octet-stream'); }
+    if (what === '/world' && req.method === 'PUT') {
+      const last = +url.searchParams.get('last') || 0, wname = String(url.searchParams.get('name') || '').slice(0, 60);
+      const body = new Uint8Array(await req.arrayBuffer()); if (!body.length || body.length > 40 * 1048576) return res({ error: '세계가 너무 큽니다 (40MB까지)' }, 413);
+      const used = sql.exec('SELECT COALESCE(SUM(size), 0) AS n FROM sync_meta WHERE name = ? AND wid != ? AND del = 0', name, wid).toArray()[0].n;
+      if (used + body.length > 120 * 1048576) return res({ error: '이 계정에 저장할 수 있는 양(120MB)을 넘습니다' }, 413);
+      const cur = sql.exec('SELECT last FROM sync_meta WHERE name = ? AND wid = ?', name, wid).toArray()[0]; if (cur && cur.last > last) return res({ error: 'older', last: cur.last }, 409);
+      sql.exec('DELETE FROM sync_part WHERE name = ? AND wid = ?', name, wid);
+      const P = 1000000; for (let i = 0; i * P < body.length; i++) sql.exec('INSERT INTO sync_part VALUES (?, ?, ?, ?)', name, wid, i, body.slice(i * P, (i + 1) * P).buffer);
+      sql.exec('INSERT OR REPLACE INTO sync_meta VALUES (?, ?, ?, ?, ?, 0)', name, wid, wname, last, body.length);
+      return res({ ok: true }); }
+    if (what === '/world' && req.method === 'DELETE') { // a world deleted on one site: kept as a mark so the other site lets its copy go too
+      const at = +url.searchParams.get('at') || Date.now();
+      sql.exec('DELETE FROM sync_part WHERE name = ? AND wid = ?', name, wid); sql.exec('INSERT OR REPLACE INTO sync_meta VALUES (?, ?, ?, ?, 0, 1)', name, wid, '', at);
+      return res({ ok: true }); }
+    return res({ error: 'unknown' }, 404);
   }
   deadCheck() { const now = Date.now(); for (const c of this.allConns) if (now - c.seen > 120000) c.kill('2분 동안 응답 없음'); }
 
