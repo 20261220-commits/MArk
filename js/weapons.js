@@ -8,7 +8,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   if (!shieldUp() || (cause !== 'mob' && cause !== 'player' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
   const src = from || attacker; if (!src) return false;
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
-  if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
+  if (l > 0.45 && (dx * fx + dz * fz) / l < 0) return false; // only what is in front of you (an attacker pressed right up against you counts: in Java it can't get inside you)
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
   play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); PL.shieldBlockAt = W.tickN; if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
   // another player's axe: Java's disableShield, 25% (and 75% more if they sprinted) for 5 seconds

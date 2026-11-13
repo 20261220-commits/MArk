@@ -916,7 +916,7 @@ function mpNearestGuest(e) {
 }
 function mpProxy(p, fn) {
   const save = {}; for (const k of PROXY_KEYS) save[k] = PL[k];
-  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: false, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
+  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: !!s.dead, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
   MP.proxy = p;
   try { fn(); } finally {
     const kb = [PL.vx, PL.vy, PL.vz], fire = PL.fire; MP.proxy = null; for (const k of PROXY_KEYS) PL[k] = save[k]; if (fire > 0) mpSend({ t: 'ignite', f: fire }, p.id); // set alight by a blaze or a bolt: the guest burns, not the host

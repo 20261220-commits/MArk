@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.07 20:46';
+const NEMO_VERSION = '2026.11.13 18:50';
 
 </script>
 <script>/* js/shared.js */
@@ -9877,6 +9877,9 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
+  // a blast that sets fires (a ghast's fireball, a bed or anchor in the wrong dimension): one in three of the blocks it
+  // cleared, where there is something solid underneath (Java's Explosion.finalizeExplosion)
+  if (fire && !noGrief) for (const k of broken.keys()) { const [bx, by, bz] = k.split(',').map(Number); if (Math.random() < 1 / 3 && getBlock(bx, by, bz) === 0 && SOLID[getBlock(bx, by - 1, bz)] && !FLUID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
   for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
@@ -11047,7 +11050,7 @@ function pathDir(e, tx, ty, tz) {
 function spawnFireball(x, y, z, dx, dy, dz, owner, small, dragon) {
   const e = Ent('fireball', x, y, z); e.kind = 'fireball'; e.hittable = !small && !dragon; e.small = small; e.dragon = !!dragon; e.owner = owner; e.w = small ? 0.16 : 0.5; e.h = small ? 0.32 : 1;
   const l = Math.hypot(dx, dy, dz) || 1; e.ax = dx / l * 0.1; e.ay = dy / l * 0.1; e.az = dz / l * 0.1;
-  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.45 : 1.5); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect;
+  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.45 : 1.5); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect; if (e.hittable) e.pickR = 1; /* (Java's Fireball.getPickRadius: a block further out all round, so it can be hit back) */
   play(small ? 'blaze' : 'fireball', { vol: 0.6 }); return addEnt(e);
 }
 function fireballDeflect(e) { const [dx, dy, dz] = lookDir(); e.ax = dx * 0.1; e.ay = dy * 0.1; e.az = dz * 0.1; e.vx = dx; e.vy = dy; e.vz = dz; e.owner = PL; play('hit'); }
@@ -11070,8 +11073,8 @@ function fireballTick(e) {
         spawnCloud(nx, Math.floor(cy) + (hit === true ? 1.05 : 0.05), nz, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 600 }); play('fizz', { vol: 0.6 });
       } else {
         if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
-        if (hit === 'pl') hurtPlayer(diffDmg(6), 'explosion', e.owner);
-        explode(nx, cy, nz, 1, true);
+        if (hit === 'pl') hurtPlayer(diffDmg(6), 'fireball', e.owner, { x: e.x, y: e.y, z: e.z });
+        MOB_BLAST = e.owner && e.owner.kind === 'mob' ? e.owner : false; try { explode(hit === true ? e.x : nx, hit === true ? e.y + e.h / 2 : cy, hit === true ? e.z : nz, 1, true); } finally { MOB_BLAST = false; } // (against a block: from just outside it, so the blast isn't spent inside the block it hit)
       }
       return;
     }
@@ -12743,7 +12746,7 @@ function shieldBlocks(dmg, cause, attacker, from) {
   if (!shieldUp() || (cause !== 'mob' && cause !== 'player' && cause !== 'arrow' && cause !== 'explosion' && cause !== 'fireball')) return false;
   const src = from || attacker; if (!src) return false;
   const dx = src.x - PL.x, dz = src.z - PL.z, l = Math.hypot(dx, dz) || 1, fx = -Math.sin(PL.yaw), fz = -Math.cos(PL.yaw);
-  if ((dx * fx + dz * fz) / l < 0) return false; // only what is in front of you
+  if (l > 0.45 && (dx * fx + dz * fz) / l < 0) return false; // only what is in front of you (an attacker pressed right up against you counts: in Java it can't get inside you)
   if (dmg >= 3) damageItem(INV.slots, INV.sel, 1 + Math.floor(dmg));
   play('hit', { vol: 0.7 }); play('door', { vol: 0.4 }); PL.shieldBlockAt = W.tickN; if (from && typeof advGrant === 'function') advGrant('story/deflect_arrow');
   // another player's axe: Java's disableShield, 25% (and 75% more if they sprinted) for 5 seconds
@@ -15967,10 +15970,17 @@ const OFF = { swapped: false, slot: 0 };
 const MAIN_USE_IDS = () => OFF.ids || (OFF.ids = new Set(['bow', 'crossbow', 'trident', 'shield', 'spyglass', 'bucket', 'water_bucket', 'lava_bucket', 'powder_snow_bucket', 'axolotl_bucket', 'tropical_fish_bucket', 'pufferfish_bucket', 'cod_bucket', 'salmon_bucket',
   'milk_bucket', 'flint_and_steel', 'fire_charge', 'ender_pearl', 'ender_eye', 'snowball', 'egg', 'experience_bottle', 'fishing_rod', 'oak_boat', 'bone_meal', 'map', 'writable_book', 'written_book', 'firework_rocket',
   'lead', 'carrot_on_a_stick', 'warped_fungus_on_a_stick', 'saddle', 'name_tag', 'shears', 'item_frame', 'glow_item_frame', 'painting', 'armor_stand', 'glass_bottle', 'honeycomb', 'compass', 'redstone', 'string', 'goat_horn'].map(k => IID[k])));
+// (as Java: the main hand's use comes first and the off hand's only when that does nothing - an axe not aimed at a log,
+// a block with nothing to put it against, food when full, a bow with no arrows)
+const OFF_AXE = /(_log|_stem|_wood|_hyphae)$|copper/, OFF_SHOVEL = new Set(['grass_block', 'dirt', 'podzol', 'mycelium', 'coarse_dirt', 'rooted_dirt', 'campfire', 'soul_campfire']), OFF_HOE = new Set(['grass_block', 'dirt', 'dirt_path', 'coarse_dirt', 'rooted_dirt']);
 function mainHandIdle(h) {
   if (!h) return true;
-  const d = ITEMS[h.id];
-  if (d.tool) return d.tool.type === S.TOOL.SWORD || d.tool.type === S.TOOL.PICK;
+  const d = ITEMS[h.id], tb = TARGET && TARGET.type === 'block' ? TARGET : null, tk = tb && BLOCKS[tb.id] ? BLOCKS[tb.id].key || '' : '';
+  if (d.tool) { const T = S.TOOL, t = d.tool.type; if (t === T.SWORD || t === T.PICK) return true;
+    if (t === T.AXE) return !(tb && OFF_AXE.test(tk) && !/^stripped_/.test(tk)); if (t === T.SHOVEL) return !(tb && OFF_SHOVEL.has(tk)); if (t === T.HOE) return !(tb && OFF_HOE.has(tk)); return false; }
+  if (d.food && !d.drink && h.id !== IID.milk_bucket) return !(PL.food < 20 || d.always || creative() || PL.difficulty === 0) && !(tb && (d.place != null || h.id === IID.glow_berries)); /* (full: nothing to eat; a carrot can still be planted) */
+  if ((h.id === IID.bow || h.id === IID.crossbow) && !creative() && !h.ch && typeof arrowSlot === 'function' && arrowSlot() < 0) return true;
+  if (d.place != null && !tb && !d.food) return true;
   return d.place == null && !d.food && !d.drink && !d.cart && !d.boat && !d.splash && !d.lingering && d.candle == null && !MAIN_USE_IDS().has(h.id) && !ITEMS[h.id].key.endsWith('_dye');
 }
 function offSwap() { const i = INV.sel, a = INV.slots[i]; INV.slots[i] = INV.off; INV.off = a; OFF.swapped = true; OFF.slot = i; UI.hudDirty = true; }
@@ -17062,7 +17072,7 @@ function raycast(reach, fluids) {
   // entities
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
-    const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
+    const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
@@ -17181,6 +17191,10 @@ function deathMessage(cause, attacker, proj) {
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
+  // death ends every effect (Java: removeAllEffects on respawn) and the fire; whatever was after you lets go, and the
+  // neutral ones forgive you (Java's forgiveDeadPlayers)
+  if (typeof clearEffects === 'function') clearEffects(PL); PL.absorb = 0; PL.fire = 0; PL.freeze = 0; if (typeof renderEffects === 'function') renderEffects();
+  for (const e of ENT) if (e.kind === 'mob') { if (e.target === PL) { e.target = null; e.path = null; e.unseen = 0; } if (e.angry) e.angry = 0; if (e.angerT) e.angerT = 0; if (e.fuse > 0) e.fuse = 0; if (e.spitAt === PL) e.spitAt = null; }
   if (UI.screen) UI.closeScreen(); // what was on the cursor or in a crafting grid goes back first, then falls with the rest
   if (!W.keepInv && !gr('keepInventory')) {
     offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
@@ -21033,7 +21047,7 @@ function mpNearestGuest(e) {
 }
 function mpProxy(p, fn) {
   const save = {}; for (const k of PROXY_KEYS) save[k] = PL[k];
-  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: false, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
+  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: !!s.dead, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
   MP.proxy = p;
   try { fn(); } finally {
     const kb = [PL.vx, PL.vy, PL.vz], fire = PL.fire; MP.proxy = null; for (const k of PROXY_KEYS) PL[k] = save[k]; if (fire > 0) mpSend({ t: 'ignite', f: fire }, p.id); // set alight by a blaze or a bolt: the guest burns, not the host

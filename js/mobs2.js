@@ -106,7 +106,7 @@ function pathDir(e, tx, ty, tz) {
 function spawnFireball(x, y, z, dx, dy, dz, owner, small, dragon) {
   const e = Ent('fireball', x, y, z); e.kind = 'fireball'; e.hittable = !small && !dragon; e.small = small; e.dragon = !!dragon; e.owner = owner; e.w = small ? 0.16 : 0.5; e.h = small ? 0.32 : 1;
   const l = Math.hypot(dx, dy, dz) || 1; e.ax = dx / l * 0.1; e.ay = dy / l * 0.1; e.az = dz / l * 0.1;
-  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.45 : 1.5); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect;
+  e.mesh = R.itemMesh(IID.fire_charge); e.mesh.scale.setScalar(small ? 0.45 : 1.5); e.tick = fireballTick; e.render = spinRender; e.onHit = fireballDeflect; if (e.hittable) e.pickR = 1; /* (Java's Fireball.getPickRadius: a block further out all round, so it can be hit back) */
   play(small ? 'blaze' : 'fireball', { vol: 0.6 }); return addEnt(e);
 }
 function fireballDeflect(e) { const [dx, dy, dz] = lookDir(); e.ax = dx * 0.1; e.ay = dy * 0.1; e.az = dz * 0.1; e.vx = dx; e.vy = dy; e.vz = dz; e.owner = PL; play('hit'); }
@@ -129,8 +129,8 @@ function fireballTick(e) {
         spawnCloud(nx, Math.floor(cy) + (hit === true ? 1.05 : 0.05), nz, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 600 }); play('fizz', { vol: 0.6 });
       } else {
         if (typeof hit === 'object') { HURTPROJ = { fireball: true }; hurtMob(hit, hit.type === 'ghast' && e.owner === PL ? 1000 : 6, e.owner === PL ? PL : null, 0, 0, e.owner === PL ? 'player' : null); HURTPROJ = null; }
-        if (hit === 'pl') hurtPlayer(diffDmg(6), 'explosion', e.owner);
-        explode(nx, cy, nz, 1, true);
+        if (hit === 'pl') hurtPlayer(diffDmg(6), 'fireball', e.owner, { x: e.x, y: e.y, z: e.z });
+        MOB_BLAST = e.owner && e.owner.kind === 'mob' ? e.owner : false; try { explode(hit === true ? e.x : nx, hit === true ? e.y + e.h / 2 : cy, hit === true ? e.z : nz, 1, true); } finally { MOB_BLAST = false; } // (against a block: from just outside it, so the blast isn't spent inside the block it hit)
       }
       return;
     }

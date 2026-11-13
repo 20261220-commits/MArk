@@ -575,6 +575,9 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
+  // a blast that sets fires (a ghast's fireball, a bed or anchor in the wrong dimension): one in three of the blocks it
+  // cleared, where there is something solid underneath (Java's Explosion.finalizeExplosion)
+  if (fire && !noGrief) for (const k of broken.keys()) { const [bx, by, bz] = k.split(',').map(Number); if (Math.random() < 1 / 3 && getBlock(bx, by, bz) === 0 && SOLID[getBlock(bx, by - 1, bz)] && !FLUID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
   for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
