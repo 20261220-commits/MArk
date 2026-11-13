@@ -1,2 +1,2 @@
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.13 18:50';
+const NEMO_VERSION = '2026.11.13 18:56';

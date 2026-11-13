@@ -193,6 +193,7 @@ function swimAssist(e) { if (e.def.swim && e.inWater && e.target) { e.vy += Math
 // ---------- player interaction with the new mobs ----------
 function mobInteract(e, h, d) {
   if (e.def.interact && e.def.interact(e, h, d)) return true;
+  if (e.def.explode && d && h.id === IID.flint_and_steel && !e.ignited) { e.ignited = true; play('ignite'); if (!creative()) damageItem(INV.slots, INV.sel, 1); swing(); return true; } // (a creeper lit: it goes off whatever it sees)
   if (e.type === 'piglin' && d && h.id === IID.gold_ingot && !e.target && !e.barter) { advGrant('nether/distract_piglin', 'distract_piglin_directly'); e.barter = 120; consume(); swing(); play('hmm'); return true; }
   if (e.type === 'wolf') {
     if (e.owner === 'player') { if (d && h.id === IID.bone && e.hp < e.def.hp) { e.hp = Math.min(e.def.hp, e.hp + 4); consume(); } else e.sitting = e.sitting ? 0 : 1; swing(); return true; }
