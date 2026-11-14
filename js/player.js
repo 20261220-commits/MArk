@@ -69,8 +69,9 @@ function raycast(reach, fluids) {
   // entities
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
-    const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
+    if (e.boxes) { for (let i = 0; i < e.boxes.length; i++) { const h = rayBox(ox, oy, oz, dx, dy, dz, e.boxes[i]); if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0], part: e.boxParts && e.boxParts[i] }; } continue; } // (a body of several parts: the ender dragon's)
+    const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
   return best;
@@ -453,7 +454,7 @@ function swing() { if (R.hand.swing <= 0 || R.hand.swing < 0.5) R.hand.swing = 1
 function onAttackPress() {
   swing();
   const t = TARGET;
-  if (t && t.type === 'ent') { attackEntity(t.e); return; }
+  if (t && t.type === 'ent') { t.e.hitPart = t.part || null; attackEntity(t.e); return; }
   PL.attackT = 0;
 }
 function attackEntity(e) {

@@ -11,7 +11,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     spawnFireball(PL.x + 3, PL.y + 3, PL.z, 0, -1, 0, dragon(), false, true); await go(40); o.cloud = clouds() > c0 || ENT.some(e => e.breath || (e.opts && e.opts.breath));
     // the first fight ends: egg, gateway, 12000 XP
     const d = dragon(); d.hp = 0; d.phase = 'dying'; d.phaseT = 0; let xp = 0; const sx = spawnXP; spawnXP = (x, y, z, n) => { if (Math.hypot(x - d.x, z - d.z) < 3) xp += n; return sx(x, y, z, n); }; // only the dragon's own orbs
-    for (let i = 0; i < 260 && !W.meta.dragonKilled; i++) await go(1); spawnXP = sx;
+    for (let i = 0; i < 700 && !W.meta.dragonKilled; i++) gameTick(); spawnXP = sx;
     const Y = S.END_PORTAL_Y; o.first = { killed: W.meta.dragonKilled, egg: getBlock(0, Y + 4, 0) === BID.dragon_egg, gates: (W.meta.gateways || []).length, xp, portal: getBlock(1, Y, 1) === BID.end_portal };
     // summoning it again with four crystals on the portal's sides
     setBlock(0, Y + 4, 0, 0); for (const e of ENT) if (e.type === 'end_crystal') removeEnt(e);
@@ -19,7 +19,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     for (const [x, z] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) { const bx = x, bz = z; INV.slots[INV.sel] = { id: IID.end_crystal, n: 1 }; setBlock(bx, Y, bz, BID.bedrock); placeEndCrystal({ x: bx, y: Y, z: bz, nx: 0, ny: 1, nz: 0 }); }
     await wait(3600); await go(20);
     o.again = { dragon: !!dragon(), crystals: crystals(), killed: W.meta.dragonKilled };
-    const d2 = dragon(); if (d2) { d2.hp = 0; d2.phase = 'dying'; d2.phaseT = 0; xp = 0; spawnXP = (x, y, z, n) => { if (Math.hypot(x - d2.x, z - d2.z) < 3) xp += n; return sx(x, y, z, n); }; for (let i = 0; i < 260 && !W.meta.dragonKilled; i++) await go(1); spawnXP = sx; }
+    const d2 = dragon(); if (d2) { d2.hp = 0; d2.phase = 'dying'; d2.phaseT = 0; xp = 0; spawnXP = (x, y, z, n) => { if (Math.hypot(x - d2.x, z - d2.z) < 3) xp += n; return sx(x, y, z, n); }; for (let i = 0; i < 700 && !W.meta.dragonKilled; i++) gameTick(); spawnXP = sx; }
     o.second = { egg: getBlock(0, Y + 4, 0) === BID.dragon_egg, gates: (W.meta.gateways || []).length, xp };
     return o; });
   ok(r.dragon && r.crystals === 10, 'the End has its dragon and ten crystals on the pillars', r);

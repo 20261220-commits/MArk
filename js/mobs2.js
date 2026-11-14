@@ -431,7 +431,12 @@ function golemAI(e, dist) {
 function golemAnim(e, P) { if (P.rarm) { const s = e.swing > 0 ? -1.6 * Math.sin(e.swing / 10 * Math.PI) : 0; P.rarm.rotation.x = s - Math.sin(e.walk) * 0.5 * e.walkAmt; P.larm.rotation.x = s + Math.sin(e.walk) * 0.5 * e.walkAmt; } }
 function crystalAI(e) { e.vx = e.vy = e.vz = 0; e.walk += 0.05; }
 function crystalAnim(e, P, now) { if (P.glass) { P.glass.rotation.y = now / 400; P.glass.position.y = (24 - 8) / 16 + Math.sin(now / 300) * 0.3; } if (P.base) P.base.visible = true; }
-function crystalHurt(e) { if (e.dead) return false; removeEnt(e); explode(e.x, e.y + 1, e.z, 6); const dr = ENT.find(o => o.type === 'ender_dragon' && !o.dead); if (dr && dr.healFrom === e) dr.healFrom = null; return true; }
+// a crystal blown up: the one healing the dragon hurts it (10, as a blast to the head), and a dragon going round turns on
+// whoever did it (or the nearest player within 64) (Java's onCrystalDestroyed)
+function crystalHurt(e, dmg, attacker) { if (e.dead) return false; removeEnt(e); explode(e.x, e.y + 1, e.z, 6); const dr = ENT.find(o => o.type === 'ender_dragon' && !o.dead);
+  if (dr) { if (dr.healFrom === e) { dr.healFrom = null; dr.inv = 0; dr.headHit = true; dragonHurt(dr, 10, null); }
+    if (dr.phase === 'hold' && plTargetable() && (attacker === PL || Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 64)) dragonPhase(dr, 'strafe'); }
+  return true; }
 function blazeAnim(e, P, now) {
   const t = now / 1000 * 2;
   for (let i = 0; i < 12; i++) {
@@ -447,85 +452,228 @@ function bossBar(e, name) {
   if (!bossEl) { bossEl = document.createElement('div'); bossEl.id = 'bossbar'; bossEl.innerHTML = '<div class="bn">엔더 드래곤</div><div class="bb"><i></i></div>'; document.body.appendChild(bossEl); }
   bossEl.hidden = !e; if (e) bossEl.querySelector('.bn').textContent = name || '엔더 드래곤'; if (e) bossEl.querySelector('i').style.width = Math.max(0, e.hp / e.def.hp * 100) + '%';
 }
+// The dragon as Java 1.18 flies and fights it (EnderDragon + the dragon phases):
+//  - flight (EnderDragon.aiStep): it always pushes forward along its facing (0.06 a tick), turns toward where it is
+//    going at a rate that drops as it speeds up, and climbs or dives only gently (more steeply when landing or charging);
+//    it passes through blocks, breaking all but end stone, obsidian, bedrock, iron bars and the portal
+//  - holding pattern: from node to node of the 24 round the island (12 outer, 8 inner, 4 between; with every crystal
+//    gone it keeps to the inner ring), 0-20 above each; at each node it may land (1 in crystals + 3) or go for the
+//    player (likelier the nearer the player is to the portal and the fewer the crystals)
+//  - strafing: it flies at the player and spits a fireball once it has faced them for a moment; a crystal blown up
+//    sends it at whoever did it
+//  - landing on the portal's pillar, then sitting: it looks for a player within 20 and turns to them, roars, and
+//    breathes a cloud of dragon's breath in front of its head; after four breaths it takes off, or with nobody near for
+//    5 seconds it charges the nearest player within 150; a quarter of its health lost while sitting makes it take off
+//  - its body hurts: the head and neck hit for 10, the wings throw anyone near them away and hit for 5 (not while it sits)
+//  - only the head takes full damage; the rest a quarter (plus up to 1); sitting, arrows glance off
+//  - its health is kept in the world (leaving the End or dying there and coming back no longer heals it)
+const DRAGON_SIT = { sit_scan: 1, sit_roar: 1, sit_flame: 1 };
+const dragonSitting = e => !!DRAGON_SIT[e.phase];
+let DRAGON_NODES = null;
+function dragonNodes() {
+  if (DRAGON_NODES && DRAGON_NODES.ok) return DRAGON_NODES;
+  const n = []; let ok = true;
+  for (let i = 0; i < 24; i++) { let x, z, j = 5;
+    if (i < 12) { const a = 2 * (-Math.PI + 0.2617994 * i); x = Math.floor(60 * Math.cos(a)); z = Math.floor(60 * Math.sin(a)); }
+    else if (i < 20) { const a = 2 * (-Math.PI + 0.3926991 * (i - 12)); x = Math.floor(40 * Math.cos(a)); z = Math.floor(40 * Math.sin(a)); j += 10; }
+    else { const a = 2 * (-Math.PI + 0.7853982 * (i - 20)); x = Math.floor(20 * Math.cos(a)); z = Math.floor(20 * Math.sin(a)); }
+    let top = isLoaded(x >> 4, z >> 4) ? topY(x, z) : null; if (top == null) { ok = false; top = 60; } else if (top < 40) top = 50;
+    n.push([x, Math.max(10, top + j), z]); }
+  n.ok = ok; return DRAGON_NODES = n;
+}
+function dragonClosestNode(x, y, z, crystals) {
+  const N = dragonNodes(); let bi = 0, bd = 1e18;
+  for (let i = crystals === 0 ? 12 : 0; i < 24; i++) { const d = (N[i][0] - x) ** 2 + (N[i][1] - y) ** 2 + (N[i][2] - z) ** 2; if (d < bd) { bd = d; bi = i; } }
+  return bi;
+}
+// a node as a target: 0-20 above it
+function dragonToNode(e, i) { const nd = dragonNodes()[i]; e.node = i; e.tgt = [nd[0], nd[1] + Math.random() * 20, nd[2]]; }
+const dragonCrystals = () => ENT.reduce((n, o) => n + (o.type === 'end_crystal' && !o.dead ? 1 : 0), 0);
+const dragonPodium = () => [0, S.END_PORTAL_Y + 4, 0];
+function dragonPhase(e, p) { e.phase = p; e.phaseT = 0; e.tgt = null;
+  if (p === 'hold') e.pathDone = true;
+  if (p === 'sit_scan') e.scanT = 0;
+  if (p === 'sit_flame') { e.flames = (e.flames || 0) + 1; e.flameAt = null; }
+  if (p === 'sit_roar') play('growl');
+  if (p === 'land_approach' || p === 'takeoff') e.pathDone = false;
+}
 function dragonHurt(e, dmg, attacker) {
-  if (e.phase === 'dying' || e.inv > 0) return false;
-  if (e.phase === 'perch' && HURTPROJ && HURTPROJ.kind === 'arrow') { HURTPROJ.fire = Math.max(HURTPROJ.fire || 0, 20); return false; } // (Java's sitting phases: arrows and tridents glance off it)
-  dmg = e.phase === 'perch' ? dmg : dmg / 4 + Math.min(dmg, 1); // (Java: the body takes a quarter, plus up to 1; perched, its head is in reach)
+  if (e.phase === 'dying' || e.phase === 'death' || e.inv > 0) return false;
+  if (attacker && attacker !== PL && attacker.kind === 'mob') return false; // (Java: only players and blasts hurt it)
+  if (dragonSitting(e) && HURTPROJ && (HURTPROJ.kind === 'arrow' || HURTPROJ.kind === 'trident')) { HURTPROJ.fire = Math.max(HURTPROJ.fire || 0, 20); return false; } // (sitting: arrows and tridents glance off it)
+  const head = e.hitPart === 'head' || (HURTPROJ && dragonPartAt(e, HURTPROJ.x, HURTPROJ.y, HURTPROJ.z, 0.3) === 'head') || e.headHit; e.hitPart = null; e.headHit = false;
+  if (!head) dmg = dmg / 4 + Math.min(dmg, 1);
+  if (dmg < 0.01) return false;
   e.hp -= dmg; e.hurt = 10; e.inv = 10; play('growl', { vol: 0.6 });
-  if (e.phase === 'perch' && Math.random() < 0.3) e.phaseT = 0;
-  if (e.hp <= 0) { e.hp = 0; e.phase = 'dying'; e.phaseT = 0; }
+  if (dragonSitting(e)) { e.sitDmg = (e.sitDmg || 0) + dmg; if (e.sitDmg > e.def.hp * 0.25) { e.sitDmg = 0; dragonPhase(e, 'takeoff'); } }
+  if (e.hp <= 0) { e.hp = 0; dragonPhase(e, 'dying'); }
+  dragonKeep(e);
   return true;
 }
+// the parts of its body (Java's EnderDragonPart boxes: head, neck, body, wings, tail), placed by its facing
+function dragonParts(e) {
+  const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw), sx = -fz, sz = fx, hy = dragonSitting(e) ? -1 : Math.max(-2, Math.min(2, -(e.vy || 0) * 10)), B = [];
+  const box = (n, cx, cy, cz, w, h) => B.push([n, cx - w / 2, cy, cz - w / 2, cx + w / 2, cy + h, cz + w / 2]);
+  box('head', e.x + fx * 6.5, e.y + hy, e.z + fz * 6.5, 1, 1);
+  box('neck', e.x + fx * 5.5, e.y + hy, e.z + fz * 5.5, 3, 3);
+  box('body', e.x + fx * 0.5, e.y, e.z + fz * 0.5, 5, 3);
+  box('wing', e.x + sx * 4.5, e.y + 2, e.z + sz * 4.5, 4, 2); box('wing', e.x - sx * 4.5, e.y + 2, e.z - sz * 4.5, 4, 2);
+  for (let k = 0; k < 3; k++) { const d = 1.5 + 2 * (k + 1); box('tail', e.x - fx * d, e.y + 1.5, e.z - fz * d, 2, 2); }
+  return B;
+}
+function dragonPartAt(e, x, y, z, pad = 0) { for (const b of dragonParts(e)) if (x > b[1] - pad && x < b[4] + pad && y > b[2] - pad && y < b[5] + pad && z > b[3] - pad && z < b[6] + pad) return b[0]; return null; }
+const plIn = (b, ix, iy, iz) => PL.x + 0.3 > b[1] - ix && PL.x - 0.3 < b[4] + ix && PL.y + 1.8 > b[2] - iy && PL.y < b[5] + iy && PL.z + 0.3 > b[3] - iz && PL.z - 0.3 < b[6] + iz;
+// its health and place, kept in the world
+function dragonKeep(e) { if (W.meta && !e.dead) W.meta.dragon = { hp: Math.round(e.hp * 10) / 10, x: Math.round(e.x), y: Math.round(e.y), z: Math.round(e.z) }; }
 function dragonAI(e) {
-  const C = [0, S.END_PORTAL_Y, 0];
+  const P = dragonPodium(), tick = W.tickN;
   e.phaseT = (e.phaseT || 0) + 1;
-  if (!e.phase) { e.phase = 'circle'; e.ang = Math.atan2(e.z, e.x); }
-  // crystals heal the dragon
-  if (e.phase !== 'dying') {
-    if (!e.healFrom || e.healFrom.dead) { e.healFrom = null; if (e.age % 10 === 0) { let bd = 32; for (const o of ENT) if (o.type === 'end_crystal' && !o.dead) { const d = Math.hypot(o.x - e.x, o.y - e.y, o.z - e.z); if (d < bd) { bd = d; e.healFrom = o; } } } }
-    if (e.healFrom && e.age % 10 === 0) e.hp = Math.min(e.def.hp, e.hp + 1);
+  if (!e.phase || e.phase === 'circle') dragonPhase(e, 'hold');
+  e.boxes = dragonParts(e).map(b => b.slice(1)); e.boxParts = dragonParts(e).map(b => b[0]);
+  if (e.phaseT % 20 === 0) dragonKeep(e);
+  // crystals heal it (Java's checkCrystals)
+  if (e.phase !== 'dying' && e.phase !== 'death') {
+    if (e.healFrom && e.healFrom.dead) e.healFrom = null;
+    if (e.healFrom && e.age % 10 === 0 && e.hp < e.def.hp) e.hp = Math.min(e.def.hp, e.hp + 1);
+    if (Math.random() < 0.1) { let bd = 1e9; e.healFrom = null; for (const o of ENT) if (o.type === 'end_crystal' && !o.dead && Math.abs(o.x - e.x) < 34 && Math.abs(o.y - e.y) < 32 && Math.abs(o.z - e.z) < 34) { const d = (o.x - e.x) ** 2 + (o.y - e.y) ** 2 + (o.z - e.z) ** 2; if (d < bd) { bd = d; e.healFrom = o; } } }
   }
-  let tx, ty, tz, sp = 0.45;
+  const crystals = dragonCrystals(), dPl = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z), tgtD2 = () => e.tgt ? (e.tgt[0] - e.x) ** 2 + (e.tgt[1] - e.y) ** 2 + (e.tgt[2] - e.z) ** 2 : 0;
+  let fly = 0.6, turnK = null;
   switch (e.phase) {
-    case 'circle':
-      e.ang += 0.012; tx = Math.cos(e.ang) * 60; tz = Math.sin(e.ang) * 60; ty = 80 + Math.sin(e.ang * 3) * 12;
-      if (e.phaseT > 300 && Math.random() < 0.01) { const r = Math.random(), live = ENT.filter(o => o.type === 'end_crystal' && !o.dead).length; // Java lands more often as its crystals are destroyed
-        e.phase = r < 0.3 && plTargetable() && W.dim === 1 ? 'charge' : r < 0.55 && plTargetable() && W.dim === 1 ? 'strafe' : r < 0.75 + (live ? 0 : 0.15) ? 'land' : 'circle'; e.phaseT = 0; if (e.phase === 'charge') play('growl'); }
-      break;
-    case 'strafe': { // fly towards the player and spit a fireball from a distance
-      const a = Math.atan2(e.z - PL.z, e.x - PL.x); tx = PL.x + Math.cos(a) * 30; ty = PL.y + 18; tz = PL.z + Math.sin(a) * 30; sp = 0.5;
-      const d = Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z);
-      if (e.phaseT > 40 && d < 64 && plTargetable()) { const hx = e.x - Math.sin(e.yaw) * 4, hz = e.z - Math.cos(e.yaw) * 4; spawnFireball(hx, e.y + 1, hz, PL.x - hx, PL.y + 1 - e.y - 1, PL.z - hz, e, false, true); e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
-      if (e.phaseT > 200 || !plTargetable()) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
+    case 'hold': {
+      const d2 = tgtD2();
+      if (!e.tgt || d2 < 100 || d2 > 22500) {
+        if (e.tgt && e.pathDone) { // a node reached: land, or go for the player
+          if (Math.floor(Math.random() * (crystals + 3)) === 0) { dragonPhase(e, 'land_approach'); break; }
+          if (plTargetable() && W.dim === 1 && Math.hypot(PL.x - P[0], PL.y - P[1], PL.z - P[2]) < 64) { const dd = ((PL.x - P[0]) ** 2 + (PL.y - P[1]) ** 2 + (PL.z - P[2]) ** 2) / 512;
+            if (Math.floor(Math.random() * (Math.abs(Math.floor(dd)) + 2)) === 0 || Math.floor(Math.random() * (crystals + 2)) === 0) { dragonPhase(e, 'strafe'); break; } }
+        }
+        const i = dragonClosestNode(e.x, e.y, e.z, crystals); let j = i;
+        if (Math.random() < 1 / 8) { e.cw = !e.cw; j += 6; }
+        j += e.cw ? 1 : -1;
+        if (crystals === 0) { j -= 12; j &= 7; j += 12; } else { j %= 12; if (j < 0) j += 12; }
+        dragonToNode(e, j); e.pathDone = true;
+      }
       break; }
-    case 'charge':
-      tx = PL.x; ty = PL.y + 1; tz = PL.z; sp = 0.65;
-      if (Math.hypot(PL.x - e.x, PL.y - e.y, PL.z - e.z) < 5) { if (hurtPlayer(diffDmg(10), 'mob', e)) { const l = Math.hypot(PL.x - e.x, PL.z - e.z) || 1; PL.vx += (PL.x - e.x) / l * 2; PL.vz += (PL.z - e.z) / l * 2; PL.vy = 0.8; } e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
-      if (e.phaseT > 200 || !plTargetable()) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); }
-      break;
-    case 'land': tx = C[0]; ty = C[1] + 12; tz = C[2] + 0.5; sp = 0.35; if (Math.hypot(e.x - tx, e.z - tz) < 3) { e.phase = 'descend'; e.phaseT = 0; } break;
-    case 'descend': tx = C[0]; ty = C[1] + 4; tz = C[2] + 0.5; sp = 0.12; if (e.y < C[1] + 4.6) { e.phase = 'perch'; e.phaseT = 0; play('growl'); } break;
-    case 'perch':
-      tx = e.x; ty = C[1] + 4; tz = e.z; sp = 0;
-      if (plTargetable()) { faceTo(e, PL.x, PL.z); const d = Math.hypot(PL.x - e.x, PL.z - e.z); if (d < 9 && Math.abs(PL.y - e.y) < 6 && e.age % 30 === 0) { attackPlayer(e, 10, (PL.x - e.x) / d, (PL.z - e.z) / d); e.bite = 10; } }
-      if (e.phaseT === 70 || e.phaseT === 170) { const a = Math.atan2(PL.z - e.z, PL.x - e.x); spawnCloud(e.x + Math.cos(a) * 5, C[1] + 1.05, e.z + Math.sin(a) * 5, 'harming', { breath: true, col: 0xb43cd2, r: 3, dur: 400 }); play('fireball', { vol: 0.6 }); } // dragon's breath
-      if (e.phaseT > 260) { e.phase = 'takeoff'; e.phaseT = 0; }
-      break;
-    case 'takeoff': tx = e.x + Math.cos(e.ang) * 30; ty = 90; tz = e.z + Math.sin(e.ang) * 30; sp = 0.3; if (e.y > 82) { e.phase = 'circle'; e.phaseT = 0; e.ang = Math.atan2(e.z, e.x); } break;
-    case 'dying':
-      e.vx *= 0.9; e.vz *= 0.9; e.vy = 0.03; e.y += e.vy;
-      if (e.phaseT % 5 === 0) for (let i = 0; i < 4; i++) R.simpleParticle(e.x + (Math.random() - .5) * 8, e.y + Math.random() * 4, e.z + (Math.random() - .5) * 8, [1, 0.9, 0.6], { size: 1.2, vy: 1, grav: 0, life: 0.6 });
-      if (e.phaseT % 10 === 0) spawnXP(e.x, e.y + 2, e.z, W.meta.dragonDone ? 25 : 600); // 12000 the first time, 500 after (Java)
-      if (e.phaseT === 1) play('growl');
-      if (e.phaseT >= 200) { dragonDefeated(e); }
-      bossBar(e); return;
+    case 'strafe': {
+      if (!plTargetable() || W.dim !== 1 || e.phaseT > 600) { dragonPhase(e, 'hold'); break; }
+      const h = Math.hypot(PL.x - e.x, PL.z - e.z); e.tgt = [PL.x, PL.y + Math.min(0.4 + h / 80 - 1, 10), PL.z];
+      if (dPl < 64 && canSee(e.x, e.y + 1, e.z, PL.x, PL.y + 1.6, PL.z)) {
+        e.fbCharge = (e.fbCharge || 0) + 1;
+        const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw), ang = Math.acos(Math.max(-1, Math.min(1, (fx * (PL.x - e.x) + fz * (PL.z - e.z)) / (h || 1)))) * 180 / Math.PI + 0.5;
+        if (e.fbCharge >= 5 && ang < 10) { const hd = dragonParts(e)[0], hx = (hd[1] + hd[4]) / 2 - fx, hyy = hd[2] + 1, hz = (hd[3] + hd[6]) / 2 - fz;
+          spawnFireball(hx, hyy, hz, PL.x - hx, PL.y + 0.9 - hyy, PL.z - hz, e, false, true); play('fireball', { vol: 0.6 }); e.fbCharge = 0; dragonPhase(e, 'hold'); }
+      } else if (e.fbCharge > 0) e.fbCharge--;
+      break; }
+    case 'charge': {
+      fly = 3;
+      if (!e.tgt) { dragonPhase(e, 'hold'); break; }
+      if (e.chargeT > 0 && e.chargeT++ >= 10) { dragonPhase(e, 'hold'); break; }
+      { const d2 = tgtD2(); if (d2 < 100 || d2 > 22500) e.chargeT = (e.chargeT || 0) + 1; }
+      if (e.phaseT > 400) dragonPhase(e, 'hold');
+      break; }
+    case 'land_approach': {
+      const top = [P[0], P[1] + 6, P[2]];
+      if (!e.tgt) e.tgt = [...dragonNodes()[dragonClosestNode(top[0], top[1], top[2], crystals)]];
+      if (!e.pathDone && tgtD2() < 100) { e.pathDone = true; e.tgt = top; }
+      if (e.pathDone) { e.tgt = top; if (tgtD2() < 100) dragonPhase(e, 'land'); }
+      if (e.phaseT > 800) dragonPhase(e, 'land');
+      break; }
+    case 'land': {
+      fly = 1.5; turnK = 'fast'; e.tgt = [P[0], P[1], P[2] + 0.5];
+      if (tgtD2() < 1 || e.phaseT > 400) { e.flames = 0; e.sitDmg = 0; e.x = P[0]; e.z = P[2] + 0.5; e.y = P[1]; e.vx = e.vy = e.vz = 0; dragonPhase(e, 'sit_scan'); play('growl'); }
+      break; }
+    case 'sit_scan': {
+      e.scanT++;
+      const near = plTargetable() && Math.hypot(PL.x - e.x, PL.z - e.z) < 20 && Math.abs(PL.y - e.y) <= 10;
+      if (near) {
+        if (e.scanT > 25) dragonPhase(e, 'sit_roar');
+        else { const hd = dragonParts(e)[0], hx = (hd[1] + hd[4]) / 2, hz = (hd[3] + hd[6]) / 2, dx = PL.x - hx, dz = PL.z - hz, fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw), h = Math.hypot(PL.x - e.x, PL.z - e.z) || 1;
+          const ang = Math.acos(Math.max(-1, Math.min(1, (fx * (PL.x - e.x) + fz * (PL.z - e.z)) / h))) * 180 / Math.PI + 0.5;
+          if (ang < 0 || ang > 10) { const J = -e.yaw * 180 / Math.PI, want = 180 - Math.atan2(dx, dz) * 180 / Math.PI; let d = ((want - J) % 360 + 540) % 360 - 180; d = Math.max(-100, Math.min(100, d));
+            e.yRotA = (e.yRotA || 0) * 0.8; const f2 = Math.hypot(dx, dz) + 1; e.yRotA += d * 0.7 / Math.min(40, f2) / f2; e.yaw = -(J + e.yRotA) * Math.PI / 180; } }
+      } else if (e.scanT >= 100) {
+        if (plTargetable() && W.dim === 1 && dPl < 150) { dragonPhase(e, 'charge'); e.tgt = [PL.x, PL.y, PL.z]; e.chargeT = 0; play('growl'); }
+        else dragonPhase(e, 'takeoff');
+      }
+      e.yawTarget = e.yaw;
+      break; }
+    case 'sit_roar': if (e.phaseT >= 40) dragonPhase(e, 'sit_flame'); break;
+    case 'sit_flame': {
+      const hd = dragonParts(e)[0], hx = (hd[1] + hd[4]) / 2, hz = (hd[3] + hd[6]) / 2, fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
+      if (e.phaseT < 10 && e.phaseT % 2 === 0) for (let i = 0; i < 6; i++) R.simpleParticle(hx + fx * Math.random() * 2, hd[2] + 0.5, hz + fz * Math.random() * 2, [0.75, 0.25, 0.85], { size: 0.5, vy: 0, grav: 0, life: 0.8 });
+      if (e.phaseT === 10) { const cx = hx + fx * 2.5, cz = hz + fz * 2.5; let gy = Math.floor(hd[2] + 0.5); for (let k = 0; k < 12 && gy > MINY && !SOLID[getBlock(Math.floor(cx), gy - 1, Math.floor(cz))]; k++) gy--;
+        spawnCloud(cx, gy + 0.05, cz, 'harming', { breath: true, col: 0xb43cd2, r: 5, dur: 200 }); play('fireball', { vol: 0.6 }); }
+      if (e.phaseT >= 200) dragonPhase(e, e.flames >= 4 ? 'takeoff' : 'sit_scan');
+      break; }
+    case 'takeoff': {
+      if (!e.tgt) { const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw); dragonToNode(e, dragonClosestNode(fx * 40, 105, fz * 40, crystals)); }
+      if (Math.hypot(e.x - P[0], e.y - P[1], e.z - P[2]) >= 10 && e.phaseT > 5) dragonPhase(e, 'hold');
+      break; }
+    case 'dying': { // (Java's DragonDeathPhase: to the portal, then the death itself)
+      e.tgt = [P[0], P[1] + 6, P[2]];
+      if (tgtD2() < 100 || e.phaseT >= 200) { dragonPhase(e, 'death'); play('growl'); }
+      break; }
+    case 'death': {
+      e.vx = e.vy = e.vz = 0; e.y += 0.1; e.yaw -= 20 * Math.PI / 180; e.yawTarget = e.yaw;
+      if (e.phaseT >= 180 && e.phaseT % 2 === 0) for (let i = 0; i < 3; i++) R.simpleParticle(e.x + (Math.random() - .5) * 8, e.y + 2 + (Math.random() - .5) * 4, e.z + (Math.random() - .5) * 8, [1, 0.9, 0.6], { size: 1.2, vy: 1, grav: 0, life: 0.6 });
+      const total = W.meta.dragonDone ? 500 : 12000; // (Java: 8% every 5 ticks after 150, the last 20% at 200)
+      if (e.phaseT > 150 && e.phaseT % 5 === 0) spawnXP(e.x, e.y + 2, e.z, Math.floor(total * 0.08));
+      if (e.phaseT >= 200) { spawnXP(e.x, e.y + 2, e.z, Math.floor(total * 0.2)); dragonDefeated(e); }
+      bossBar(e); return; }
   }
-  if (e.phase !== 'perch') {
-    const dx = tx - e.x, dy = ty - e.y, dz = tz - e.z, l = Math.hypot(dx, dy, dz) || 1;
-    e.vx += (dx / l * sp - e.vx) * 0.06; e.vy += (dy / l * sp * 0.7 - e.vy) * 0.06; e.vz += (dz / l * sp - e.vz) * 0.06;
-    e.yawTarget = Math.atan2(-e.vx, -e.vz);
-  } else { e.vx *= 0.5; e.vy = (ty - e.y) * 0.2; e.vz *= 0.5; }
-  turn(e, 0.08);
-  e.x += e.vx; e.y += e.vy; e.z += e.vz;
-  // the body smashes through anything that is not end stone, obsidian or bedrock
-  if (e.age % 4 === 0 && e.phase !== 'perch' && e.phase !== 'descend') for (let k = 0; k < 6; k++) {
-    const bx = Math.floor(e.x + (Math.random() - .5) * 6), by = Math.floor(e.y + Math.random() * 3), bz = Math.floor(e.z + (Math.random() - .5) * 6), b = getBlock(bx, by, bz);
-    if (b && b !== BID.end_stone && b !== BID.obsidian && b !== BID.bedrock && b !== BID.iron_bars && b !== BID.end_portal && !FLUID[b] && BLOCKS[b].hard >= 0) setBlock(bx, by, bz, 0);
+  // flight (EnderDragon.aiStep)
+  if (!dragonSitting(e) && e.tgt) {
+    const dx = e.tgt[0] - e.x, dz = e.tgt[2] - e.z, h = Math.hypot(dx, dz); let dy = e.tgt[1] - e.y;
+    const d3 = dx * dx + dy * dy + dz * dz;
+    if (h > 0) dy = Math.max(-fly, Math.min(fly, dy / h));
+    e.vy += dy * 0.01;
+    const l = Math.sqrt(d3) || 1, fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw), vl = Math.hypot(fx, e.vy, fz) || 1;
+    const f8 = Math.max(((fx * dx + e.vy * (e.tgt[1] - e.y) + fz * dz) / l / vl + 0.5) / 1.5, 0);
+    if (Math.abs(dx) > 1e-5 || Math.abs(dz) > 1e-5) {
+      const J = -e.yaw * 180 / Math.PI, want = 180 - Math.atan2(dx, dz) * 180 / Math.PI; let d5 = ((want - J) % 360 + 540) % 360 - 180; d5 = Math.max(-50, Math.min(50, d5));
+      const sp = Math.hypot(e.vx, e.vz) + 1, ts = turnK === 'fast' ? Math.min(sp, 40) / sp : 0.7 / Math.min(sp, 40) / sp;
+      e.yRotA = (e.yRotA || 0) * 0.8 + d5 * ts; e.yaw = -(J + e.yRotA * 0.1) * Math.PI / 180;
+    }
+    const f19 = 2 / (d3 + 1), th = 0.06 * (f8 * f19 + (1 - f19)), nfx = -Math.sin(e.yaw), nfz = -Math.cos(e.yaw);
+    e.vx += nfx * th; e.vz += nfz * th;
+    const k = e.inWall ? 0.8 : 1; e.x += e.vx * k; e.y += e.vy * k; e.z += e.vz * k;
+    const ml = Math.hypot(e.vx, e.vy, e.vz) || 1, d6 = 0.8 + 0.15 * (((e.vx * nfx + e.vy * e.vy / vl + e.vz * nfz) / ml) + 1) / 2;
+    e.vx *= d6; e.vy *= 0.91; e.vz *= d6;
+    e.yawTarget = e.yaw;
+  } else if (dragonSitting(e)) { e.vx = e.vy = e.vz = 0; e.y = P[1]; }
+  // the body breaks through blocks (Java's checkWalls: not end stone, obsidian, bedrock, iron bars or the portal)
+  e.inWall = false;
+  if (!dragonSitting(e) && gr('mobGriefing')) for (const b of e.boxes) { if (Math.random() < 0.6) continue;
+    const bx = Math.floor(b[0] + Math.random() * (b[3] - b[0])), by = Math.floor(b[1] + Math.random() * (b[4] - b[1])), bz = Math.floor(b[2] + Math.random() * (b[5] - b[2])), id = getBlock(bx, by, bz);
+    if (!id || FLUID[id]) continue;
+    if (id === BID.end_stone || id === BID.obsidian || id === BID.bedrock || id === BID.iron_bars || id === BID.end_portal || id === BID.end_portal_frame || id === BID.crying_obsidian || BLOCKS[id].hard < 0) { if (SOLID[id]) e.inWall = true; }
+    else setBlock(bx, by, bz, 0);
   }
-  // touching the body hurts
-  if (plTargetable() && Math.abs(PL.x - e.x) < 3 && Math.abs(PL.z - e.z) < 3 && PL.y > e.y - 1 && PL.y < e.y + 3 && e.attackCd <= 0) { e.attackCd = 10; attackPlayer(e, 5, Math.sign(PL.x - e.x), Math.sign(PL.z - e.z)); }
+  // its body hurts (only while it isn't flashing from a hit, as Java)
+  if (plTargetable() && !(e.hurt > 0)) {
+    const B = dragonParts(e), bodyX = (B[2][1] + B[2][4]) / 2, bodyZ = (B[2][3] + B[2][6]) / 2;
+    for (const b of B) if (b[0] === 'wing' && plIn([0, b[1], b[2] - 2, b[3], b[4], b[5] - 2, b[6]], 4, 2, 4)) {
+      const d2 = PL.x - bodyX, d3 = PL.z - bodyZ, d4 = Math.max(d2 * d2 + d3 * d3, 0.1);
+      PL.vx += d2 / d4 * 4; PL.vy += 0.2; PL.vz += d3 / d4 * 4;
+      if (!dragonSitting(e) && !(PL.dragonHitT > tick - 2)) { PL.dragonHitT = tick; hurtPlayer(diffDmg(5), 'mob', e); }
+      break;
+    }
+    for (const b of [B[0], B[1]]) if (plIn(b, 1, 1, 1)) { const cx = (b[1] + b[4]) / 2, cz = (b[3] + b[6]) / 2; attackPlayer(e, 10, PL.x - cx, PL.z - cz); break; }
+  }
   if (e.age % 140 === 0) play('growl', { vol: 0.5 });
   bossBar(e);
 }
 function dragonAnim(e, P, now) {
-  const f = Math.sin(now / 260), g = Math.sin(now / 260 - 0.8), perch = e.phase === 'perch';
+  const f = Math.sin(now / 260), g = Math.sin(now / 260 - 0.8), perch = dragonSitting(e);
+  if (e.remote) { const B = dragonParts(e); e.boxes = B.map(b => b.slice(1)); e.boxParts = B.map(b => b[0]); } // (another player's dragon: its parts for hitting it)
   if (P.lwing) { P.lwing.rotation.z = perch ? -0.9 : f * 0.6; P.rwing.rotation.z = perch ? 0.9 : -f * 0.6; P.ltip.rotation.z = perch ? 1.8 : g * 0.5 - 0.2; P.rtip.rotation.z = perch ? -1.8 : -g * 0.5 + 0.2; }
   for (let i = 0; i < 12; i++) if (P['tail' + i]) { P['tail' + i].position.x = Math.sin(now / 600 + i * 0.4) * i * 0.06; P['tail' + i].position.y = (24 - 10 - i * 0.6) / 16 + Math.sin(now / 500 + i * 0.5) * i * 0.03; }
   for (let i = 0; i < 5; i++) if (P['neck' + i]) P['neck' + i].position.y = (24 - 13 + i * 1.5) / 16 + (perch ? -i * 0.25 : Math.sin(now / 400 + i * 0.4) * 0.05 * i);
   if (P.head) { P.head.position.y = (24 - 6) / 16 + (perch ? -1.4 : Math.sin(now / 400 + 2) * 0.25); }
-  if (P.jaw) P.jaw.rotation.x = e.bite > 0 ? -0.5 : -Math.max(0, Math.sin(now / 900)) * 0.15;
+  if (P.jaw) P.jaw.rotation.x = e.phase === 'sit_roar' || (e.phase === 'sit_flame' && e.phaseT < 30) || e.bite > 0 ? -0.5 : -Math.max(0, Math.sin(now / 900)) * 0.15;
   if (e.bite > 0) e.bite--;
-  e.mesh.rotation.x = e.phase === 'dying' ? 0 : -Math.max(-0.4, Math.min(0.4, e.vy * 1.5));
+  e.mesh.rotation.x = e.phase === 'death' || perch ? 0 : -Math.max(-0.4, Math.min(0.4, e.vy * 1.5));
 }
 function dragonDefeated(e) {
   removeEnt(e); bossBar(null);
@@ -537,7 +685,7 @@ function dragonDefeated(e) {
   if (free.length) { const i = free[S.hash32(W.seed, used.length, 0, 7) % free.length], ga = 2 * (-Math.PI + 0.15707963267948966 * i), gx = Math.floor(96 * Math.cos(ga)), gz = Math.floor(96 * Math.sin(ga)); used.push(i);
     for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
     setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true }); }
-  W.meta.dragonKilled = true; W.meta.dragonDone = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
+  W.meta.dragon = null; W.meta.dragonKilled = true; W.meta.dragonDone = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
   play('levelup');
 }
 // the respawn sequence (four crystals on the exit portal): the pillars are rebuilt with their crystals and cages
@@ -552,7 +700,8 @@ function endRespawnPillars() {
 }
 function ensureDragon() {
   if (W.dim !== 1 || W.meta.dragonKilled || ENT.some(o => o.type === 'ender_dragon' && !o.dead) || !isLoaded(0, 0)) return;
-  const e = spawnMob('ender_dragon', 40, 85, 0); e.persistent = true; e.phase = 'circle'; e.ang = 0;
+  const k = W.meta.dragon, e = spawnMob('ender_dragon', k ? k.x : 40, k ? k.y : 85, k ? k.z : 0); e.persistent = true; dragonPhase(e, 'hold');
+  if (k && k.hp > 0) e.hp = Math.min(e.def.hp, k.hp); // (the fight goes on where it was left)
 }
 // ---------- villagers & trading ----------
 const TRADES = {
