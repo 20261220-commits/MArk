@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.14 20:05';
+const NEMO_VERSION = '2026.11.14 20:17';
 
 </script>
 <script>/* js/shared.js */
@@ -5655,7 +5655,7 @@ Object.assign(ENT, { witch: 'entity/witch', wandering_trader: 'entity/wandering_
 // 1.17 mobs (not in Pixel Perfection CE; a vanilla 1.17 jar or newer pack has them)
 Object.assign(ENT, { goat: 'entity/goat/goat', glow_squid: 'entity/squid/glow_squid' });
 for (const c of ['lucy', 'wild', 'gold', 'cyan', 'blue']) ENT['axolotl_' + c] = 'entity/axolotl/axolotl_' + c;
-for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
+for (const t of ['plains', 'desert', 'snow', 'taiga', 'swamp', 'savanna', 'jungle']) ENT['vtype_' + t] = 'entity/villager/type/' + t;
 for (const l of ['stone', 'iron', 'gold', 'emerald', 'diamond']) ENT['vlvl_' + l] = 'entity/villager/profession_level/' + l; // the badge on the belt: novice to master
 for (const p of ['farmer', 'librarian', 'armorer', 'toolsmith', 'weaponsmith', 'butcher', 'cleric', 'fletcher', 'shepherd', 'mason', 'leatherworker', 'cartographer', 'fisherman', 'nitwit']) ENT['vprof_' + p] = 'entity/villager/profession/' + p;
 
@@ -5804,7 +5804,7 @@ if (typeof module !== 'undefined') module.exports = PACKMAP;
 // A resource pack or client.jar the player picks (설정 → 리소스 팩). Its textures are converted right here on the
 // player's device and kept in this browser's IndexedDB; nothing is uploaded or bundled with the game. Whatever the
 // chosen pack lacks keeps the built-in Pixel Perfection CE textures.
-const UPACK = { name: null }, UPACK_VER = 8; // 8: water and lava flow textures; 7: structure containers keep what they hold (end ship's potions); 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends; 6: villager level badges
+const UPACK = { name: null }, UPACK_VER = 9; // 9: savanna and jungle villagers' clothes; 8: water and lava flow textures; 7: structure containers keep what they hold (end ship's potions); 2: HUD, sky, particles, paintings... and end city / mansion pieces; 3: container screens; 4: chest lids, bed pillows, shield icon; 5: bed sides and ends; 6: villager level badges
 function upDB() { return new Promise((res, rej) => { const q = indexedDB.open('nemo-userpack', 1); q.onupgradeneeded = () => q.result.createObjectStore('p'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
 async function upGet() {
   try { const db = await upDB(); return await new Promise(res => { const t = db.transaction('p').objectStore('p').get('pack'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); }
@@ -9641,7 +9641,9 @@ function villagerTexture(type, prof, lvl) {
   const key = 'v:' + type + ':' + prof + ':' + badge; if (entTex[key]) return entTex[key];
   const base = PACKPX.ent.villager; if (!base) return null;
   const px = new Uint8Array(base.px);
-  for (const k of ['vtype_' + type, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
+  // the biome's clothes (a pack without them, Pixel Perfection has no savanna or jungle ones: the plains clothes, not bare)
+  const tk = PACKPX.ent['vtype_' + type] && PACKPX.ent['vtype_' + type].w === base.w ? 'vtype_' + type : 'vtype_plains';
+  for (const k of [tk, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
   const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }

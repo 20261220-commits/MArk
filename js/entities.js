@@ -287,7 +287,9 @@ function villagerTexture(type, prof, lvl) {
   const key = 'v:' + type + ':' + prof + ':' + badge; if (entTex[key]) return entTex[key];
   const base = PACKPX.ent.villager; if (!base) return null;
   const px = new Uint8Array(base.px);
-  for (const k of ['vtype_' + type, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
+  // the biome's clothes (a pack without them, Pixel Perfection has no savanna or jungle ones: the plains clothes, not bare)
+  const tk = PACKPX.ent['vtype_' + type] && PACKPX.ent['vtype_' + type].w === base.w ? 'vtype_' + type : 'vtype_plains';
+  for (const k of [tk, 'vprof_' + prof, badge]) { const o = k && PACKPX.ent[k]; if (!o || o.w !== base.w) continue; for (let i = 0; i < px.length; i += 4) { const a = o.px[i + 3] / 255; if (!a) continue; for (let c = 0; c < 3; c++) px[i + c] = px[i + c] * (1 - a) + o.px[i + c] * a; px[i + 3] = Math.max(px[i + 3], o.px[i + 3]); } }
   const t = new THREE.DataTexture(px, base.w, base.h, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return entTex[key] = t;
 }
