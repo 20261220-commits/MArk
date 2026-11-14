@@ -347,6 +347,7 @@ function mpHandle(m, from) {
     case 'stored': W.saved.add(m.dk); return;
     case 'chunkmobs': if (host) mpRestoreMobs(m.l); return;
     case 'tookprev': mpTookPrev(); return;
+    case 'shared': if (m.shared && typeof m.shared === 'object' && W.meta) for (const k of MP_SHARED) if (k in m.shared) W.meta[k] = m.shared[k]; return; // (what another player changed of the world's shared record)
     case 'pdataok': { const loc = pdLoad(); if (loc && loc.dirty === m.seq) pdStore({ at: m.at, dirty: 0 }); else if (loc) pdStore({ at: Math.max(loc.at || 0, m.at || 0) }); return; } // the server has kept it
     case 'skin': { const p = MP.peers.get(m.id); if (!p || m.id === MP.id) return; if (p.skinKey) { if (entTex[p.skinKey]) { entTex[p.skinKey].dispose(); delete entTex[p.skinKey]; } delete PACKPX.ent[p.skinKey]; } if (p.capeKey && PACKPX.ent[p.capeKey]) { if (entTex[p.capeKey]) { entTex[p.capeKey].dispose(); delete entTex[p.capeKey]; } delete PACKPX.ent[p.capeKey]; } p.capeKey = null; p.skin = m.skin; p.skinKey = null; p.skinReady = false; mpDropAvatar(p); return; }
     case 'peer': if (m.id === MP.id) return; MP.peers.set(m.id, { id: m.id, name: m.name, skin: m.skin, s: null }); chatMsg(m.name + '님이 참가했습니다', '#ffff55'); return;
@@ -844,7 +845,7 @@ function pdLoad() { const k = pdKey(); if (!k) return null; try { return (JSON.p
 function pdStore(patch) { const k = pdKey(); if (!k) return; try { const all = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); all[k] = { ...(all[k] || {}), ...patch }; const ks = Object.keys(all); while (ks.length > 30) delete all[ks.shift()]; localStorage.setItem(PD_KEY, JSON.stringify(all)); } catch (e) {} }
 function mpSendPdata(periodic) { if (!(MP.server && W.active && MP.pdataOk)) return; const d = mpPdata(); if (periodic) { const j = JSON.stringify(d), now = Date.now(); if (j === MP.pdLastJ && now - (MP.pdLastT || 0) < 60000) return; MP.pdLastJ = j; MP.pdLastT = now; } const seq = MP.pdSeq = (MP.pdSeq || 0) + 1; pdStore({ d, dirty: seq }); mpSend({ t: 'pdata', d, seq }); } // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen) // (from the moment your saved self is loaded, also while the dimension's runner is still being chosen)
 let mpSharedLast = '';
-function mpSendShared() { const sh = {}; for (const k of MP_SHARED) if (W.meta[k] !== undefined) sh[k] = W.meta[k]; const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
+function mpSendShared() { const sh = {}, ownDragon = W.dim === 1 && ENT.some(e => e.type === 'ender_dragon' && !e.dead && !e.remote); for (const k of MP_SHARED) if (W.meta[k] !== undefined && (k !== 'dragon' || ownDragon || W.meta.dragon === null)) sh[k] = W.meta[k]; /* (the dragon's health only from whoever runs it: anyone else's copy may be old) */ const j = JSON.stringify(sh) + JSON.stringify(W.meta.gamerules || {}); if (j === mpSharedLast) return; mpSharedLast = j; mpSend({ t: 'meta', shared: sh, gamerules: W.meta.gamerules || {} }); }
 function mpServerLeave(stay) { // keep everything in the world's store before going (stay: the host closes multiplayer and plays on)
   if (!W.active) return;
   mpSendPdata();
