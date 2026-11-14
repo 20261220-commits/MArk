@@ -616,6 +616,9 @@ const FLASH_SKY = new THREE.Color(0xdde4ff);
 // night vision lifts the darkness (and flickers in its last 10 seconds, like Java)
 const nightVision = () => { const e = PL.eff && (PL.eff.night_vision || (PL.eff.conduit_power && PL.eyeFluid === 1 && PL.eff.conduit_power)); if (!e) return 0.035; return e.t > 200 || Math.sin(e.t * 0.3) > 0 ? 0.8 : 0.035; };
 R.nightVision = nightVision;
+// night vision on the fog (Java's FogRenderer): its colour scaled up until its brightest part is full, so the distance
+// fades into a lit haze instead of the black of the night
+function nvFog(c) { if (nightVision() < 0.5) return; const m = Math.max(c.r, c.g, c.b); if (m > 0.001) c.multiplyScalar(1 / m); }
 const END_SKY = new THREE.Color(0x0b0811), netherFog = new THREE.Color(0x330808);
 function renderFrame(dt, eye, under) {
   if (W.dim) return renderOtherDim(dt, eye, under);
@@ -637,6 +640,7 @@ function renderFrame(dt, eye, under) {
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (under === 'snow') { fog.color.setRGB(0.85, 0.9, 0.95); fog.near = 0; fog.far = 2; }
   else { const end = rd - 12; fog.color.copy(fogCol); fog.near = end * (W.rain > 0.5 ? 0.35 : 0.75); fog.far = end * (W.rain > 0.5 ? 0.85 : 1.0); } // ends inside the loaded chunks, wherever the eye stands in its own chunk
+  if (under !== 'lava' && under !== 'snow') { nvFog(fog.color); if (nightVision() >= 0.5) skyMat.uniforms.bottom.value.copy(fog.color); } // (the horizon too, where the fog meets the sky)
   if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; } // blindness: thick black fog
   renderer.setClearColor(fog.color); fogCull();
   sky.visible = !under; sky.position.copy(camera.position);
@@ -667,6 +671,8 @@ function renderOtherDim(dt, eye, under) {
   else if (under === 'lava') { fog.color.copy(LAVA_FOG); fog.near = 0.1; fog.far = 2; }
   else if (nether) { fog.color.copy(netherFog); fog.near = Math.min(rd - 12, 96) * 0.05; fog.far = Math.min(rd - 12, 96) * 0.9; }
   else { fog.color.copy(END_SKY); fog.near = (rd - 12) * 0.5; fog.far = rd - 12; stars.position.copy(camera.position); starMat.opacity = 0.35; }
+  if (under !== 'lava') nvFog(fog.color);
+  if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; }
   renderer.setClearColor(fog.color); fogCull();
   for (const m of [matOpaque, matCutout, matTrans]) {
     m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
