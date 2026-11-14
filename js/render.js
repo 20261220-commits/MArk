@@ -43,7 +43,7 @@ function buildAtlasMips() {
 R.buildAtlasMips = buildAtlasMips;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
+  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uEndTile: { value: new THREE.Vector2(-9, -9) }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
 uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin; uniform vec4 uDyn[6];
@@ -74,7 +74,23 @@ varying vec2 vUv; varying vec2 vTile; varying vec3 vLight; varying vec3 vTint;
 // sampled no nearer the tile's edge than the middle of its edge texel: the same texel, but a GPU whose shaders work in
 // low precision (many phones) no longer rounds onto the next tile of the atlas (a line of lava along stone's edge)
 vec4 tileTex(){ return texture2D(map, (floor(vTile + 0.5) * 256.0 + clamp(vUv, 8.0, 248.0)) / 8192.0); }
+uniform vec2 uEndTile; uniform float uTime;
+// the End portal and gateway (Java's end portal shader): a near-black depth with layers of coloured specks drifting
+// each its own way, fixed to the screen rather than the block, unlit
+vec3 endPortal(){
+  vec2 sc = gl_FragCoord.xy / 420.0; vec3 c = vec3(0.03, 0.055, 0.07);
+  for (int i = 0; i < 10; i++) { float fi = float(i), a = fi * 2.39996;
+    vec2 p = mat2(cos(a), -sin(a), sin(a), cos(a)) * sc * (1.0 + fi * 0.45) + vec2(cos(a * 1.3), sin(a * 0.7)) * uTime * (0.006 + fi * 0.002) + fi * 7.31;
+    vec2 g = floor(p * 14.0), f = fract(p * 14.0); float h = fract(sin(dot(g, vec2(12.9898, 78.233)) + fi * 3.1) * 43758.5453);
+    float star = step(0.9, h) * (1.0 - smoothstep(0.08, 0.32, max(abs(f.x - 0.5), abs(f.y - 0.5))));
+    vec3 col = mix(vec3(0.16, 0.55, 0.47), vec3(0.42, 0.33, 0.78), fract(h * 7.0 + fi * 0.19)); col = mix(col, vec3(0.6, 0.85, 0.8), step(0.985, h));
+    c += col * star * (1.1 - fi * 0.08); }
+  return c;
+}
 void main(){
+  if (floor(vTile + 0.5) == uEndTile) { gl_FragColor = vec4(endPortal(), 1.0);
+    #include <fog_fragment>
+    return; }
   vec4 t = tileTex();
   if (t.a < 0.5) discard;
   float tm = step(t.a, 0.97);
@@ -115,6 +131,7 @@ const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexSha
 for (const m of [matOpaque, matCutout, matTrans]) m.uniforms.uDyn.value = DYN;
 matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
+for (const m of [matOpaque, matCutout]) m.uniforms.uEndTile.value.set(S.T.end_portal % S.TPR, Math.floor(S.T.end_portal / S.TPR));
 
 function makeChunkGeo(d) {
   const g = new THREE.BufferGeometry();
@@ -655,7 +672,7 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment
-  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = nightVision(); m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uTime.value = performance.now() / 1000; m.uniforms.uMin.value = nightVision(); m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();
@@ -675,7 +692,7 @@ function renderOtherDim(dt, eye, under) {
   if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; }
   renderer.setClearColor(fog.color); fogCull();
   for (const m of [matOpaque, matCutout, matTrans]) {
-    m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
+    m.uniforms.uTime.value = performance.now() / 1000; m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
     m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma;
   }
   updateParticles(dt);

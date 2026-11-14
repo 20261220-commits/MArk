@@ -100,13 +100,13 @@ function blocks6Use(t, h, dry) {
   return null;
 }
 // respawning at an anchor uses up one charge; without a charged anchor the player goes to the world spawn
-function anchorArrive() {
+function anchorArrive(keep) { // (keep: walking out of the End alive takes no charge)
   const sp = PL.spawn, ok = sp && getBlock(sp[0], sp[1], sp[2]) === ANCHOR && (getMeta(sp[0], sp[1], sp[2]) & 7) > 0;
   if (!ok) {
     PL.spawn = null; PL.spawnDim = 0; UI.flash('충전된 리스폰 정박기가 없어요');
     const ws = W.worldSpawn; switchDim(0, ws[0] + .5, ws[1], ws[2] + .5, 'spawn'); return;
   }
-  setMeta(sp[0], sp[1], sp[2], getMeta(sp[0], sp[1], sp[2]) - 1);
+  if (!keep) setMeta(sp[0], sp[1], sp[2], getMeta(sp[0], sp[1], sp[2]) - 1);
   for (let r = 1; r <= 2; r++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) for (let dy = -1; dy <= 1; dy++) {
     const x = sp[0] + dx, y = sp[1] + dy, z = sp[2] + dz;
     if (SOLID[getBlock(x, y - 1, z)] && !SOLID[getBlock(x, y, z)] && !SOLID[getBlock(x, y + 1, z)] && !FLUID[getBlock(x, y, z)]) { PL.x = x + .5; PL.y = y; PL.z = z + .5; PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; return; }

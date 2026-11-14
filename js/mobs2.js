@@ -355,30 +355,49 @@ function slimeAI(e, dist) {
   if (!e.onGround) { e.vx *= 0.98; e.vz *= 0.98; }
   e.squish = (e.squish || 0) * 0.85;
 }
+// The enderman as Java 1.18 (EnderMan and its goals):
+//  - looking at its head (Java's isLookingAtMe: within 1 - 0.025 / distance of straight at its eyes, nothing between,
+//    no carved pumpkin worn) within 64 blocks provokes it: it screams and comes for you a quarter second later
+//  - while you look at it from within 16 blocks it stands still and stares back (EndermanFreezeWhenLookedAtGoal), and
+//    within 4 blocks it teleports away; looked away, it runs at you half again as fast (+0.15 speed) and hits for 7
+//    when within reach (its width doubled, squared, plus yours: about 1.4 blocks), once a second
+//  - more than 16 blocks off and not looked at, it teleports 16 blocks toward you every 1.5 s (teleportTowards)
+//  - water and rain hurt it and make it teleport; hurt by anything but a living thing it teleports 9 times in 10;
+//    projectiles never touch it (it teleports out of their way)
+function endermanLooked(e) {
+  const helm = INV.armor[3]; if (helm && ITEMS[helm.id] && ITEMS[helm.id].key === 'carved_pumpkin') return false;
+  const [lx, ly, lz] = lookDir(), hx = e.x - PL.x, hy = e.y + 2.55 - (PL.y + PL.eyeH), hz = e.z - PL.z, hl = Math.hypot(hx, hy, hz) || 1;
+  return (lx * hx + ly * hy + lz * hz) / hl > 1 - 0.025 / hl && canSee(PL.x, PL.y + PL.eyeH, PL.z, e.x, e.y + 2.55, e.z);
+}
 function endermanAI(e, dist) {
   const d = e.def;
-  // looking at an enderman's head provokes it
-  if (!e.target && plTargetable() && dist < 64) {
-    const [lx, ly, lz] = lookDir(), hx = e.x - PL.x, hy = e.y + 2.6 - (PL.y + PL.eyeH), hz = e.z - PL.z, hl = Math.hypot(hx, hy, hz);
-    if ((lx * hx + ly * hy + lz * hz) / hl > 1 - 0.025 / hl * 4 && canSee(PL.x, PL.y + PL.eyeH, PL.z, e.x, e.y + 2.6, e.z)) { e.stare = (e.stare || 0) + 1; if (e.stare > 5) { e.target = PL; play('enderman'); } }
-  }
-  if (e.target && (!plTargetable() || dist > 48)) e.target = null;
-  if ((W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(e.x), Math.floor(e.y + 2), Math.floor(e.z)) >> 4) === 15) || e.inWater) { if (e.age % 20 === 0) { if (e.inWater) hurtMob(e, 1, null); endermanTeleport(e); } }
+  if (!e.target && e.provoke == null && plTargetable() && dist < 64 && endermanLooked(e)) { e.provoke = 5; play('enderman'); }
+  if (e.provoke != null && --e.provoke <= 0) { e.provoke = null; if (plTargetable()) { e.target = PL; e.tpT = 0; } }
+  if (e.target && (!plTargetable() || dist > 64)) e.target = null;
+  if ((W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(e.x), Math.floor(e.y + 2), Math.floor(e.z)) >> 4) === 15) || e.inWater) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   let mx = 0, mz = 0, speed = d.speed;
   if (e.target) {
-    faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); speed = 0.25;
-    if (dist < 1.6 && Math.abs(PL.y - e.y) < 2.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, d.dmg, mx, mz); }
-    if (dist > 12 && Math.random() < 0.02) endermanTeleport(e, PL.x, PL.z);
+    faceTo(e, PL.x, PL.z);
+    if (dist < 16 && endermanLooked(e)) { // stared at: still, staring back; too close and it is gone
+      if (dist < 4) endermanTeleport(e);
+      e.tpT = 0;
+    } else {
+      [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); speed = d.speed * 1.5;
+      const reach = (e.w * 4) ** 2 + 0.6, d2 = (PL.x - e.x) ** 2 + (PL.y - e.y) ** 2 + (PL.z - e.z) ** 2;
+      if (d2 <= reach && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, d.dmg, PL.x - e.x, PL.z - e.z); }
+      if (dist > 16 && ++e.tpT >= 30) { const l = dist || 1; if (endermanTeleport(e, e.x + (PL.x - e.x) / l * 16, e.z + (PL.z - e.z) / l * 16, 8)) e.tpT = 0; }
+    }
   } else {
     if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 7);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   walkPhysics(e, mx, mz, speed);
 }
-function endermanTeleport(e, cx = e.x, cz = e.z) {
+// a teleport to a random spot (Java: 32 blocks each way, 32 up or down) or near a point; it lands on solid ground
+function endermanTeleport(e, cx = e.x, cz = e.z, spread = 64) {
   for (let k = 0; k < 16; k++) {
-    const x = Math.floor(cx + (Math.random() - .5) * 32), z = Math.floor(cz + (Math.random() - .5) * 32); if (!isLoaded(x, z)) continue;
-    let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
+    const x = Math.floor(cx + (Math.random() - .5) * spread), z = Math.floor(cz + (Math.random() - .5) * spread); if (!isLoaded(x, z)) continue;
+    let y = Math.floor(e.y + (Math.random() - .5) * 32); for (let i = 0; i < 32 && y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || FLUID[getBlock(x, y, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)]) continue;
     for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.3, grav: 0 });
     e.x = e.px = x + .5; e.y = e.py = y; e.z = e.pz = z + .5; e.path = null; play('teleport', { vol: 0.5 }); return true;
@@ -687,8 +706,7 @@ function dragonDefeated(e) {
   // an end gateway to the outer islands: Java's 20 places on a ring 96 out at y 75, one more each fight, in a shuffled order
   const used = W.meta.gateways || (W.meta.gateways = []), free = [...Array(20).keys()].filter(i => !used.includes(i));
   if (free.length) { const i = free[S.hash32(W.seed, used.length, 0, 7) % free.length], ga = 2 * (-Math.PI + 0.15707963267948966 * i), gx = Math.floor(96 * Math.cos(ga)), gz = Math.floor(96 * Math.sin(ga)); used.push(i);
-    for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
-    setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true }); }
+    buildGateway(gx, 75, gz); }
   W.meta.dragon = null; W.meta.dragonKilled = true; W.meta.dragonDone = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
   play('levelup');
 }
