@@ -1117,19 +1117,55 @@ function spawnAnimalsForChunk(c) {
     spawnMob(t, x + .5, y + 1, z + .5);
   }
 }
+// Java 1.18's BaseSpawner: with a player within 16 blocks the spawner counts down (20 ticks at first); at zero it makes
+// four tries at a spot within 4 blocks across (closer ones likelier: the difference of two randoms) and 1 up or down,
+// floor or no floor, where the mob fits and its own spawn rule holds (most monsters: the dark, as natural spawning;
+// blazes and magma cubes: any light; silverfish: any light, no player within 5). Six of that kind within 4 blocks of it
+// stop it for a full delay. Only when something came out does it wait again, 200 to 799 ticks; else it tries every tick
+const SPAWNER_ANY_LIGHT = new Set(['blaze', 'magma_cube', 'silverfish', 'endermite', 'zombified_piglin', 'piglin', 'hoglin', 'strider', 'ghast', 'wither_skeleton']);
+function spawnerRuleOK(type, x, y, z) {
+  const d = MOBDEF[type]; if (!d) return false;
+  if (d.hostile && PL.difficulty === 0) return false;
+  if (type === 'silverfish' && spawnerPlayers().some(p => Math.hypot(p.x - x, p.y - y, p.z - z) < 5)) return false;
+  if (d.hostile && !SPAWNER_ANY_LIGHT.has(type) && !monDark(Math.floor(x), Math.floor(y), Math.floor(z))) return false;
+  return true;
+}
+function spawnerFits(d, x, y, z) { // the mob's box clear of anything solid (water is fine, as in Java)
+  const w = d.w || 0.3, h = d.h || 1.8;
+  for (let bx = Math.floor(x - w); bx <= Math.floor(x + w - 1e-4); bx++) for (let bz = Math.floor(z - w); bz <= Math.floor(z + w - 1e-4); bz++) for (let by = Math.floor(y); by <= Math.floor(y + h - 1e-4); by++) {
+    const b = getBlock(bx, by, bz); if (SOLID[b] || b === BID.lava || b === 28) return false; }
+  return true;
+}
+// the players who keep spawners going: you, and (running a dimension for others) the players there with you
+function spawnerPlayers() {
+  const l = PL.dead || PL.mode === 'spectator' ? [] : [{ x: PL.x, y: PL.y, z: PL.z }];
+  if (typeof MP !== 'undefined' && MP.on && MP.role === 'host' && MP.peers) for (const p of MP.peers.values()) if (p.s && p.s.dim === W.dim && !p.s.dead && p.s.mode !== 'spectator' && performance.now() - p.at < 5000) l.push({ x: p.s.x, y: p.s.y, z: p.s.z });
+  return l;
+}
 function spawnerTick() {
-  const px2 = Math.floor(PL.x), py2 = Math.floor(PL.y), pz2 = Math.floor(PL.z);
-  for (let cx = (px2 >> 4) - 1; cx <= (px2 >> 4) + 1; cx++) for (let cz = (pz2 >> 4) - 1; cz <= (pz2 >> 4) + 1; cz++) {
-    const c = chunkAt(cx, cz); if (!c) continue;
+  const pls = spawnerPlayers(); if (!pls.length) return;
+  const seen = new Set();
+  for (const p of pls) for (let cx = (Math.floor(p.x) >> 4) - 1; cx <= (Math.floor(p.x) >> 4) + 1; cx++) for (let cz = (Math.floor(p.z) >> 4) - 1; cz <= (Math.floor(p.z) >> 4) + 1; cz++) {
+    const c = chunkAt(cx, cz); if (!c || seen.has(c)) continue; seen.add(c);
     for (const [i, t] of c.tiles) {
-      if (t.type !== 'spawner') continue;
+      if (t.type !== 'spawner' || !t.mob) continue;
       const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
-      if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
+      if (!pls.some(q => Math.hypot(x + .5 - q.x, y + .5 - q.y, z + .5 - q.z) <= 16)) continue;
       if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
-      if (--t.delay > 0) continue;
-      t.delay = 200 + Math.floor(Math.random() * 600);
-      if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - x, e.z - z) < 9) >= 6) continue;
-      for (let k = 0; k < 4; k++) { const sx = x + Math.floor((Math.random() - .5) * 8), sz = z + Math.floor((Math.random() - .5) * 8), sy = y + Math.floor(Math.random() * 3) - 1; if (!SOLID[getBlock(sx, sy, sz)] && !SOLID[getBlock(sx, sy + 1, sz)] && SOLID[getBlock(sx, sy - 1, sz)]) spawnMob(t.mob, sx + .5, sy, sz + .5); }
+      if (!(t.delay >= 0)) t.delay = 20;
+      if (t.delay > 0) { t.delay--; continue; }
+      const d = MOBDEF[t.mob]; if (!d) continue;
+      let made = false, full = false;
+      for (let k = 0; k < 4; k++) {
+        const near = countMobs(e => e.type === t.mob && e.x >= x - 4 && e.x <= x + 5 && e.y >= y - 4 && e.y <= y + 5 && e.z >= z - 4 && e.z <= z + 5);
+        if (near >= 6) { full = true; break; }
+        const sx = x + (Math.random() - Math.random()) * 4 + .5, sy = y + Math.floor(Math.random() * 3) - 1, sz = z + (Math.random() - Math.random()) * 4 + .5;
+        if (!spawnerFits(d, sx, sy, sz) || !spawnerRuleOK(t.mob, sx, sy, sz)) continue;
+        const m = spawnMob(t.mob, sx, sy, sz); if (!m) continue;
+        m.yaw = m.yawTarget = Math.random() * Math.PI * 2; m.fromSpawner = true; made = true;
+        for (let n = 0; n < 12; n++) R.simpleParticle(sx + (Math.random() - .5) * (d.w || .3) * 2, sy + Math.random() * (d.h || 1.8), sz + (Math.random() - .5) * (d.w || .3) * 2, [0.6, 0.6, 0.6], { kind: 'smoke', size: 0.15, vy: 0.2, grav: 0, life: 0.6 });
+      }
+      if (made || full) t.delay = 200 + Math.floor(Math.random() * 600);
     }
   }
 }

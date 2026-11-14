@@ -658,7 +658,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 };
       if (t.items) for (const [sl, id, n, pot] of t.items) { const P = pot && POTION[pot], iid = P ? P.items[id === 'splash_potion' ? 'splash' : id === 'lingering_potion' ? 'lingering' : 'potion'] : IID[id]; if (iid != null && sl >= 0 && sl < 5) b.items[sl] = { id: iid, n: Math.max(1, n) }; } /* a structure file's brewing stand, as it was built (the end ship's healing II) */
       c.tiles.set(t.i, b); }
-    else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
+    else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 20 }); // (Java: a new spawner's first count is 20 ticks)
     else if (t.t === 'mob') { if (!d.fromSave) (c.spawns || (c.spawns = [])).push(t); } // (a chunk coming back keeps the ones it saved; making them again copied every minecart, villager and frame)
     else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);
