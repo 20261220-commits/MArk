@@ -235,15 +235,17 @@ async function startWorld(id, meta) {
   PL.mode = meta.mode; PL.hardcore = !!meta.hardcore; PL.difficulty = meta.diff;
   if (p) {
     remapItems(p, itemRemapFor(p.it));
-    if (p.pend) W.pendGive = p.pend.filter(st => st && ITEMS[st.id]);
-    Object.assign(PL, p.s);
+    const arr = v => Array.isArray(v) ? v : []; // (a damaged or partial record: what isn't a list is an empty one, so entering never stops halfway, a black screen)
+    if (p.pend) W.pendGive = arr(p.pend).filter(st => st && ITEMS[st.id]);
+    if (p.s && typeof p.s === 'object') Object.assign(PL, p.s);
+    if (!PL.eff || typeof PL.eff !== 'object') PL.eff = {};
     { const D = { health: 20, food: 20, sat: 5, exh: 0, air: 300, level: 0, xpP: 0, xpTotal: 0, fire: 0, absorb: 0, rest: 0, yaw: 0, pitch: 0 }; // a damaged save: defaults for numbers that aren't
       for (const k in D) if (typeof PL[k] !== 'number' || !isFinite(PL[k])) PL[k] = D[k];
       if (![PL.x, PL.y, PL.z].every(v => typeof v === 'number' && isFinite(v))) { PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1]; PL.z = W.worldSpawn[2] + .5; } }
-    INV.slots = p.inv.map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
-    INV.armor = (p.armor || [null, null, null, null]).map(s => s && ITEMS[s.id] ? s : null); INV.sel = p.sel || 0;
-    if (p.ender) PL.ender = p.ender.map(s => s && ITEMS[s.id] ? s : null);
-    INV.off = p.off && ITEMS[p.off.id] ? p.off : null;
+    INV.slots = arr(p.inv).slice(0, 36).map(s => s && ITEMS[s.id] ? s : null); while (INV.slots.length < 36) INV.slots.push(null);
+    INV.armor = arr(p.armor).slice(0, 4).map(s => s && ITEMS[s.id] ? s : null); while (INV.armor.length < 4) INV.armor.push(null); INV.sel = p.sel >= 0 && p.sel < 9 ? p.sel | 0 : 0;
+    PL.ender = arr(p.ender).slice(0, 27).map(s => s && ITEMS[s.id] ? s : null); while (PL.ender.length < 27) PL.ender.push(null);
+    INV.off = p.off && typeof p.off === 'object' && ITEMS[p.off.id] ? p.off : null;
     W.time = meta.time || 1000; W.rain = meta.rain || 0; W.rainTarget = W.rain; W.thunderOn = !!meta.thunder; W.thunder = W.thunderOn && W.rain > 0.5 ? 1 : 0;
   } else {
     PL.x = W.worldSpawn[0] + .5; PL.y = W.worldSpawn[1] + 1; PL.z = W.worldSpawn[2] + .5; PL.yaw = Math.random() * 6; PL.pitch = 0; W.time = 1000; W.rain = 0; W.rainTarget = 0; W.thunderOn = false; W.thunder = 0;
@@ -321,34 +323,106 @@ addEventListener('beforeunload', e => { if (W.active) { saveAll(true); e.prevent
 document.addEventListener('visibilitychange', () => { if (document.hidden) { saveAll(true); if (W.active && !UI.paused && !PL.dead && OPT.pauseOnBlur !== false) pauseGame(); } });
 
 // ---------- game tick ----------
+// a mistake somewhere in the game must not stop everything (a black screen where nothing answers): each part of a tick
+// and of a frame goes on without the one that failed; the mistake is shown once in the chat and told to the server
+const GERR = new Set();
+function gameErr(where, e) {
+  const msg = String(e && e.message || e).slice(0, 160), st = String(e && e.stack || '').split('\n').slice(1, 3).map(l => l.trim().replace(/^at /, '').replace(/https?:\/\/[^ )]*\//g, '')).join(' < ');
+  const key = where + msg; if (GERR.has(key) || GERR.size > 30) return; GERR.add(key);
+  console.error('[nemo ' + where + ']', e);
+  try { if (typeof chatMsg === 'function') chatMsg('게임 오류(' + where + '): ' + msg + ' — 게임은 계속됩니다. 이 글을 알려 주세요', '#ff5555'); } catch (e2) {}
+  try { if (typeof MP !== 'undefined' && MP.lastUrl) { const u = MP.lastUrl.replace(/^ws/, 'http').replace(/\/mp.*$/, '/report');
+    fetch(u, { method: 'POST', body: JSON.stringify({ name: typeof accName === 'function' ? accName() : '', why: '게임 오류 ' + where + ': ' + msg + ' @ ' + st + (typeof NEMO_VERSION !== 'undefined' ? ' [' + NEMO_VERSION + ']' : ''), world: W.meta && W.meta.name, secs: 0 }), keepalive: true, mode: 'no-cors', headers: { 'content-type': 'text/plain' } }).catch(() => {}); } } catch (e2) {}
+}
+// items this game doesn't know (from another version of it, or a damaged record) are dropped from the inventory: one
+// left in the hand stopped every tick
+function invSweep() {
+  const ok = st => st && typeof st === 'object' && ITEMS[st.id] ? st : null;
+  for (const k of ['slots', 'armor']) { const a = INV[k]; if (Array.isArray(a)) for (let i = 0; i < a.length; i++) if (a[i] && !ok(a[i])) a[i] = null; }
+  if (INV.off && !ok(INV.off)) INV.off = null; if (INV.cursor && !ok(INV.cursor)) INV.cursor = null;
+  if (!(INV.sel >= 0 && INV.sel < 9)) INV.sel = 0;
+}
 function gameTick() {
+  if (W.tickN % 20 === 0) try { invSweep(); } catch (e) {}
+  try {
   W.tickN++; // the game's tick count advances for everyone (a guest, whose scheduled ticks the host runs, too: every "each N ticks" check reads it)
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (gr('doDaylightCycle')) W.time = MP.on && MP.timeAt ? Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)) : W.time + 1; // in a server world everyone (the dimension's runner too) follows the server's clock in real time (no jumps when frames are slow)
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (gr('doWeatherCycle') && --W.rainTimer <= 0) { W.rainTarget = W.rainTarget > 0 ? 0 : 1; W.rainTimer = W.rainTarget ? 3600 + Math.random() * 8000 : 12000 + Math.random() * 120000; }
+  } catch (e) { gameErr('tick', e); }
+  try {
   W.rain += Math.sign(W.rainTarget - W.rain) * Math.min(Math.abs(W.rainTarget - W.rain), 0.01);
+  } catch (e) { gameErr('tick', e); }
+  try {
   weatherTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   animalTick(); oceanTick(); if (typeof bubbleColTick === 'function') bubbleColTick(); mapViewTick(); templeTick(); blocks6Tick(); items6Tick(); mobs9Tick(); mcmodels2Tick(); villagerLifeTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   playerTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   statsTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   entityTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   tickScheduled();
+  } catch (e) { gameErr('tick', e); }
+  try {
   rsTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   tileTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   randomTicks(Math.floor(PL.x), Math.floor(PL.z));
+  } catch (e) { gameErr('tick', e); }
+  try {
   furnaceTick();
+  } catch (e) { gameErr('tick', e); }
   const spawnOK = gr('doMobSpawning');
+  try {
   if (spawnOK) { if (W.dim === 0) trySpawnHostile(); else if (W.tickN % 10 === 0) trySpawnDimension(); } // (Java: monsters every tick)
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (W.tickN % 40 === 0) ensureDragon();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (spawnOK && W.tickN % 100 === 0) trySpawnStrider();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (spawnOK && W.tickN % 200 === 50) trySpawnAmbient();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (spawnOK && W.tickN % 200 === 150) trySpawnAxolotl();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (spawnOK && W.tickN % 200 === 100) trySpawnGlowSquid();
+  } catch (e) { gameErr('tick', e); }
+  try {
   displayTick(); if (typeof enchTableTick === 'function') { enchTableTick(); enchGlyphTick(); }
+  } catch (e) { gameErr('tick', e); }
+  try {
   spawnerTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (W.tickN % 20 === 0) { UI.hudDirty = true; advScan(); renderEffects(); beaconTick(); jukeboxVolume(); }
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (W.tickN % 40 === 0) campfireCleanup();
+  } catch (e) { gameErr('tick', e); }
+  try {
   bannerTick();
+  } catch (e) { gameErr('tick', e); }
+  try {
   if (W.tickN % 600 === 0) saveAll();
+  } catch (e) { gameErr('tick', e); }
 }
 
 // ---------- camera ----------
@@ -410,16 +484,21 @@ function frame(now) {
   if (!W.active) { if (W.pano) panoramaFrame(dt); else { renderer.setClearColor(0x000000); renderer.clear(); } return; }
   // world streaming & worker results (time-budgeted)
   PERF.n++; let t0 = performance.now();
+  try {
   processInbox(UI.menu === 'loading' ? 30 : W.meshInbox.length > 12 ? 6 : 3, UI.menu === 'loading' ? 50 : W.meshInbox.length > 12 ? 8 : (fps < 45 ? 2 : 4)); /* fewer GPU uploads per frame when the frame rate dips */ pf('inbox', t0); t0 = performance.now();
   streamChunks(PL.x, PL.z, R.rd, { fancy: OPT.fancy, smooth: OPT.smooth }, UI.menu === 'loading' ? 8 : 5); pf('stream', t0); caveCull();
   if (UI.menu === 'loading') { if (worldReady()) finishLoading(); }
+  } catch (e) { gameErr('chunks', e); }
   if (!UI.paused || (MP.on && W.active && UI.menu !== 'loading')) { // in multiplayer the world goes on while a menu is open
     acc += dt * 1000;
-    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { gameTick(); acc -= 50; n++; } pf('tick', t0); if (MP.on && MP.timeAt && W.active && gr('doDaylightCycle')) W.time = Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)); // the server's clock every frame, even when a slow page fell behind on ticks
+    let n = 0; t0 = performance.now(); while (acc >= 50 && n < 5) { try { gameTick(); } catch (e) { gameErr('tick', e); } acc -= 50; n++; } pf('tick', t0); if (MP.on && MP.timeAt && W.active && gr('doDaylightCycle')) W.time = Math.max(W.time, MP.timeBase + Math.floor((performance.now() - MP.timeAt) / 50)); // the server's clock every frame, even when a slow page fell behind on ticks
     if (n >= 5) acc = 0;
   }
   const alpha = UI.paused ? 1 : acc / 50;
-  const [px, py, pz] = updateCamera(alpha, dt);
+  let px = PL.x, py = PL.y, pz = PL.z;
+  const h = PL.held();
+  try { [px, py, pz] = updateCamera(alpha, dt); } catch (e) { gameErr('camera', e); camera.position.set(PL.x, PL.y + 1.62, PL.z); }
+  try {
   // selection & crack
   const t = !UI.paused && TARGET && TARGET.type === 'block' ? TARGET : null;
   if (t && view === 0 && !UI.hideHud) R.setSelection(t.x, t.y, t.z, selShape(t.id, t.m) || [[0, 0, 0, 16, 16, 16]]); else R.sel.visible = false;
@@ -427,21 +506,24 @@ function frame(now) {
   // hand
   if (R.hand.swing > 0) R.hand.swing = Math.max(0, R.hand.swing - dt * 3.5);
   if (IN.attack && MINE.prog > 0 && R.hand.swing <= 0) R.hand.swing = 1;
-  const h = PL.held();
   const hb = OPT.bob ? PL.bobAmt || 0 : 0, bob = PL.bobPrev + (PL.bob - PL.bobPrev) * alpha;
   { const [mh, oh] = handItems(); R.hand.glint = [mh && (mh.e || ITEMS[mh.id].glint), oh && (oh.e || ITEMS[oh.id].glint)]; R.updateHand(dt, PL.dead ? -1 : (mh ? mh.id : 0), lightBright(px, py + 1.6, pz), Math.sin(bob * Math.PI) * 0.03 * hb, -Math.abs(Math.cos(bob * Math.PI)) * 0.04 * hb, PL.dead ? -1 : (oh ? oh.id : 0), OFF.swapped ? 1 : 0); }
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   dynLights(px, py, pz); effSwirls(dt, px, pz);
   t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); // (the enchanting table's book and glyphs)
+  } catch (e) { gameErr('scene', e); }
+  try {
   // atlas animation (water/lava) ~8 fps
   R.stepAnimation(dt);
   updateSkyBox();
   R.updateRain(dt, px, py, pz, W.dim ? 0 : W.rain);
   ambientParticles(dt, px, py, pz);
+  } catch (e) { gameErr('sky', e); }
   const eyeB = PL.eyeFluid === 1 ? 'water' : PL.eyeFluid === 2 ? 'lava' : PL.inSnow ? 'snow' : null;
-  debugOverlays(px, py, pz);
-  t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); screenshotAfterRender(); t0 = performance.now();
+  try { debugOverlays(px, py, pz); } catch (e) { gameErr('debug', e); }
+  try { t0 = performance.now(); R.renderFrame(dt, camera.position, eyeB); pf('render', t0); screenshotAfterRender(); } catch (e) { gameErr('render', e); } t0 = performance.now();
+  try {
   // overlays & HUD
   $('ovWater').hidden = eyeB !== 'water'; $('ovSnow').hidden = !PL.inSnow;
   $('ovHurt').style.opacity = PL.hurtT > 0 ? PL.hurtT / 10 * 0.5 : (PL.health <= 4 && PL.mode !== 'creative' ? 0.25 + 0.1 * Math.sin(now / 200) : 0);
@@ -454,6 +536,7 @@ function frame(now) {
   if (PL.health !== lastHealth) { lastHealth = PL.health; UI.hudDirty = true; }
   renderHud(dt); renderDebug(dt, fps); pf('hud', t0);
   if ((frame.chatT = (frame.chatT || 0) + dt) > 0.5) { frame.chatT = 0; renderChat(); }
+  } catch (e) { gameErr('hud', e); }
 }
 // ---------- title screen panorama: a real generated world, slowly rotating ----------
 const PANO_SEED = 11711;

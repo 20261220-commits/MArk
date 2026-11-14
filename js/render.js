@@ -47,11 +47,13 @@ const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
 uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin; uniform vec4 uDyn[6];
-varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
+varying vec2 vUv; varying vec2 vTile; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_vertex>
 float curve(float l){ float b = l / (4.0 - 3.0 * l); return mix(b, 1.0 - pow(1.0 - b, 4.0), uGamma); }
 void main(){
-  vUv = uv / 8192.0; // 1/16 pixel units in a 512 px atlas
+  // the face's tile of the atlas and the place in it (1/16 pixel units, 0-256): every corner of a face lies in one tile
+  // (pulled 1/16 pixel in), so the fragment shader can keep its sampling inside it
+  vTile = floor(uv / 256.0); vUv = uv - vTile * 256.0;
   float sky = curve(lt.x * uSky);
   vec3 wp = (modelMatrix * vec4(position / 16.0 - vec3(1.0, 0.0, 1.0), 1.0)).xyz;
   float dl = 0.0; // light carried by players (a torch in either hand) and lying on the ground: level minus the distance in blocks
@@ -67,10 +69,13 @@ void main(){
 }`;
 const CHUNK_FS = `
 uniform sampler2D map;
-varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
+varying vec2 vUv; varying vec2 vTile; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_fragment>
+// sampled no nearer the tile's edge than the middle of its edge texel: the same texel, but a GPU whose shaders work in
+// low precision (many phones) no longer rounds onto the next tile of the atlas (a line of lava along stone's edge)
+vec4 tileTex(){ return texture2D(map, (floor(vTile + 0.5) * 256.0 + clamp(vUv, 8.0, 248.0)) / 8192.0); }
 void main(){
-  vec4 t = texture2D(map, vUv);
+  vec4 t = tileTex();
   if (t.a < 0.5) discard;
   float tm = step(t.a, 0.97);
   gl_FragColor = vec4(t.rgb * mix(vec3(1.0), vTint, tm) * vLight, 1.0);
@@ -78,10 +83,13 @@ void main(){
 }`;
 const TRANS_FS = `
 uniform sampler2D map;
-varying vec2 vUv; varying vec3 vLight; varying vec3 vTint;
+varying vec2 vUv; varying vec2 vTile; varying vec3 vLight; varying vec3 vTint;
 #include <fog_pars_fragment>
+// sampled no nearer the tile's edge than the middle of its edge texel: the same texel, but a GPU whose shaders work in
+// low precision (many phones) no longer rounds onto the next tile of the atlas (a line of lava along stone's edge)
+vec4 tileTex(){ return texture2D(map, (floor(vTile + 0.5) * 256.0 + clamp(vUv, 8.0, 248.0)) / 8192.0); }
 void main(){
-  vec4 t = texture2D(map, vUv);
+  vec4 t = tileTex();
   if (t.a < 0.02) discard;
   gl_FragColor = vec4(t.rgb * vTint * vLight, t.a);
   #include <fog_fragment>

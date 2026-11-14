@@ -338,7 +338,7 @@ function mpHandle(m, from) {
         at: [PL.x, PL.y, PL.z], spawn: W.worldSpawn, edited: [...new Set(edited)], host: { name: MP.name, skin: mpSkin() }, players: [...MP.peers.values()].filter(q => q.id !== from).map(q => ({ id: q.id, name: q.name, skin: q.skin })), gr: W.meta.gamerules || null }, from);
       mpSend({ t: 'peer', id: from, name: p.name, skin: p.skin }); chatMsg(p.name + '님이 참가했습니다', '#ffff55'); if (UI.menu === 'mp_host') showMenu('mp_host'); return;
     }
-    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) { mpEnterServerWorld(m); if (!ACC.user && !MP.nudged) { MP.nudged = true; setTimeout(() => { if (MP.on && !ACC.user) { chatMsg('🔒 로그인하지 않고 들어왔어요. 내 아이템은 이름에만 묶여 있어서 같은 이름으로 들어온 사람이 가져갈 수 있어요.', '#ffcc44'); chatMsg('나가서 타이틀 → 로그인에서 닉네임과 비밀번호를 정하면 내 것이 안전하게 지켜져요.', '#ffcc44'); } }, 4000); } } else if (!host) mpEnterHostWorld(m); return;
+    case 'welcome': if (MP.isHost) mpHostWelcome(m); else if (MP.server) { mpEnterServerWorld(m).catch(e => mpEnterFailed(e)); if (!ACC.user && !MP.nudged) { MP.nudged = true; setTimeout(() => { if (MP.on && !ACC.user) { chatMsg('🔒 로그인하지 않고 들어왔어요. 내 아이템은 이름에만 묶여 있어서 같은 이름으로 들어온 사람이 가져갈 수 있어요.', '#ffcc44'); chatMsg('나가서 타이틀 → 로그인에서 닉네임과 비밀번호를 정하면 내 것이 안전하게 지켜져요.', '#ffcc44'); } }, 4000); } } else if (!host) mpEnterHostWorld(m); return;
     case 'noworld': showMenu('mp_create'); return;
     case 'created': case 'restored': if (m.t === 'restored') chatMsg('저장해 둔 사본으로 서버 세계를 되살렸습니다', '#55ff55'); mpSend({ t: 'join', name: accName(), skin: mpSkin(), login: accLoginMsg(), dev: mpDev() }); return;
     case 'mirror': mirSave(m); return;
@@ -752,6 +752,11 @@ function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x -
 // The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
 // back to the server; the others follow as guests. When the runner leaves, the server names the next one.
 const MP_SHARED = ['dragonKilled', 'dragonDone', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
+// entering stopped by a mistake: said on the screen (and told to the server) instead of a black screen that never answers
+function mpEnterFailed(e) {
+  if (typeof gameErr === 'function') gameErr('join', e);
+  if (!W.active) { try { showMenu('title'); UI.flash && UI.flash('서버 세계에 들어가다 오류가 났어요: ' + String(e && e.message || e).slice(0, 120)); } catch (e2) {} }
+}
 async function mpEnterServerWorld(m) {
   if (MP.soft && W.active && W.meta && W.meta.server) { mpSoftWelcome(m); return; }
   MP.id = m.you; MP.auth = m.auth || {}; MP.peers.clear();
