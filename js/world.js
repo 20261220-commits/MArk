@@ -173,7 +173,10 @@ function observerCheck(x, y, z) {
 }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get(BI(x, y, z)) : null; }
 function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set(BI(x, y, z), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing' || t.type === 'campfire') c.hasFurnace = true; c.noTicking = false; }
-function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
+// a tick at a block in a while (one per block: the first asked for stands), but a fluid's tick is never held back by a
+// later one already waiting there (Java keeps fluid and block ticks apart: water poured where lava, fire or a chunk
+// still loading had a slow tick waiting sat there unmoving)
+function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z, t = W.tickN + delay, was = W.sched.get(k); if (was == null || (was > t && FLUID[getBlock(x, y, z)])) W.sched.set(k, t); }
 // support rules of the 1.17 lush-cave plants (plant codes 10+)
 const LUSH_SOIL = new Set([2, 3, 53, 57, 87, 203, 204, 205, 1049]); // grass, dirt, clay, farmland, moss, podzol, mycelium, coarse dirt, rooted dirt
 function plantOK(b, x, y, z, m) {
@@ -197,6 +200,8 @@ function plantOK(b, x, y, z, m) {
   }
   return true;
 }
+// what a torch can hang on (Java: a sturdy side face: full blocks, glass, leaves)
+const torchWallOK = id => !!OPQ[id] || id === BID.glass || id === BID.tinted_glass || id === BID.stained_glass || !!S.LEAF[id];
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern && id !== BID.soul_lantern && id !== BID.vine) || id === BID.glass || S.LEAF[id] || id === BID.stained_glass;
 function breakNaturally(x, y, z, b, m) {
   setBlock(x, y, z, 0, 0);
@@ -227,7 +232,7 @@ function neighborUpdate(x, y, z) {
     if (!ok) breakNaturally(x, y, z, b, m);
     return;
   }
-  if (b === BID.torch || b === BID.soul_torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!OPQ[sup] && !(m === 0 && supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.torch || b === BID.soul_torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!(m >= 1 && m <= 4 ? torchWallOK(sup) : supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.ladder) { const f = m & 3; if (!OPQ[getBlock(x + DIRS[f][0], y, z + DIRS[f][2])]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.snow) { if (!OPQ[below] && !S.LEAF[below]) setBlock(x, y, z, 0); return; }
   if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }

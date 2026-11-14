@@ -249,7 +249,7 @@ function mpStop() {
   if (MP.link) { const l = MP.link; if (MP.server && MIR.host) { const done = () => { if (MIR.closing === done) MIR.closing = null; l.close(); }; MIR.closing = done; l.send({ t: 'flush' }); setTimeout(done, 5000); } else if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } /* a server world: wait for the final copy */ MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
-  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = []; MP.pdataOk = false;
+  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = []; MP.pdataOk = false; MP.pend = null;
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
@@ -357,7 +357,7 @@ function mpHandle(m, from) {
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
     case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); { const H0 = p.hist || (p.hist = []), g = H0.length ? Math.min(300, p.at - H0[H0.length - 1][0]) : 50; p.gap = Math.min(600, (p.gap || 50) * 0.8 + g * 0.2); H0.push([p.at, +m.x, +m.y, +m.z]); } if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'set': mpApplySet(m); return;
+    case 'set': mpApplyGuestSets([m]); mpGackTo(from, m.seq); return;
     case 'proj': mpGotProj(m, from); return;
     case 'deco': mpGotDeco(m, from); return;
     case 'tie': if (host && [m.x, m.y, m.z].every(Number.isInteger) && FENCES.has(getBlock(m.x, m.y, m.z))) { const id = MP.server ? m.from : from; for (const e of ENT) if (e.leash && e.leash.p === id && !e.dead) e.leash = [m.x, m.y, m.z]; } return; // a guest ties up what it leads
@@ -368,7 +368,8 @@ function mpHandle(m, from) {
     case 'primed': mpGotPrimed(m, from); return;
     case 'prime': if (host && [m.x, m.y, m.z].every(isFinite)) { primeTNT(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), Math.max(1, Math.min(200, +m.fuse || 80))); } return;
     case 'blast': if (host && [m.x, m.y, m.z, m.p].every(isFinite)) explode(+m.x, +m.y, +m.z, Math.max(0.5, Math.min(6, +m.p)), !!m.fire); return;
-    case 'setl': if (Array.isArray(m.l)) mpApplyGuestSets(m.l.slice(0, 4096).filter(e => e && e.dim === m.dim)); return;
+    case 'setl': if (Array.isArray(m.l)) mpApplyGuestSets(m.l.slice(0, 4096).filter(e => e && e.dim === m.dim)); mpGackTo(from, m.seq); return;
+    case 'gack': mpGack(+m.seq || 0); return;
     case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
@@ -550,17 +551,33 @@ function mpBlockChanged(x, y, z, id, m, metaOnly) {
   if (MP.role === 'host') { if (MP.peers.size || MP.server) (MP.batch || (MP.batch = [])).push(e); return; } // a server world keeps every change
   // everything one action changes goes together (both halves of a door or bed): the runner applies them all before
   // any block checks its neighbours, or the first half would find no partner and break
+  const seq = MP.gseq = (MP.gseq || 0) + 1; (MP.pend || (MP.pend = new Map())).set(x + ',' + y + ',' + z, { seq, t: performance.now(), late: null }); // (what the player did here stands until the runner says it has it: see mpApplySets)
   (MP.gsets || (MP.gsets = [])).push({ x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
   if (MP.gsets.length === 1) queueMicrotask(mpFlushSets);
 }
-function mpFlushSets() { const l = MP.gsets; MP.gsets = null; if (!l || !MP.on) return; if (l.length === 1) mpToAuth({ t: 'set', ...l[0] }); else mpToAuth({ t: 'setl', dim: l[0].dim, l }); }
+function mpFlushSets() { const l = MP.gsets; MP.gsets = null; if (!l || !MP.on) return; const seq = MP.gseq; if (l.length === 1) mpToAuth({ t: 'set', ...l[0], seq }); else mpToAuth({ t: 'setl', dim: l[0].dim, l, seq }); }
 function mpApplySets(m) { // guests: the host's changes
   if (m.dim !== W.dim) return;
   MP.applying = true;
-  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; } if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); } }
+  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; }
+      // a block this player just changed: the runner's news about it from before it had the change (water flowing there, the
+      // block before it was taken...) doesn't undo it; once the runner says it has the change (gack), or after 3 s, its word goes
+      const p = MP.pend && MP.pend.get(x + ',' + y + ',' + z);
+      if (p) { if (performance.now() - p.t < 3000) { p.late = [x, y, z, id, mt, mo]; continue; } MP.pend.delete(x + ',' + y + ',' + z); }
+      mpPutSet(x, y, z, id, mt, mo); } }
   finally { MP.applying = false; }
 }
+function mpPutSet(x, y, z, id, mt, mo) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); }
+// the runner has this player's changes up to seq: what it says from now on about those blocks is newer than them
+function mpGack(seq) { if (!MP.pend) return; for (const [k, p] of MP.pend) if (p.seq <= seq) MP.pend.delete(k); }
+// the runner never answered (an older version of the game): its last word about those blocks goes (checked every tick)
+function mpPendFlush() {
+  if (!MP.pend || !MP.pend.size) return; const now = performance.now();
+  for (const [k, p] of MP.pend) if (now - p.t >= 3000) { MP.pend.delete(k); if (p.late && isLoaded(p.late[0], p.late[2])) { MP.applying = true; try { mpPutSet(...p.late); } finally { MP.applying = false; } } }
+}
 function mpApplySet(m) { mpApplyGuestSets([m]); } // the host: a guest's action
+// the host: tell the guest its changes are in, after everything sent before them (so the guest knows what is older)
+function mpGackTo(from, seq) { if (MP.role !== 'host' || !seq || from == null) return; if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; } mpSend({ t: 'gack', seq }, from); }
 function mpApplyGuestSets(l) {
   if (MP.role !== 'host') return;
   const here = l.filter(m => m.dim === W.dim && isLoaded(m.x, m.z)), away = l.filter(m => !here.includes(m));
@@ -650,6 +667,7 @@ function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...
   return o;
 }
 function mpTick() {
+  mpPendFlush();
   if (!MP.on || !W.active) return; MP.sndN = 0;
   if (MP.soft || MP.holdChunk) { // held where it stands while connecting again, and until the ground under it is back
     if (MP.holdChunk && !MP.soft) { const c = chunkAt(Math.floor(PL.x) >> 4, Math.floor(PL.z) >> 4); if (c && c.mesh) MP.holdChunk = false; }

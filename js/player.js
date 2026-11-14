@@ -44,6 +44,20 @@ function rayBox(ox, oy, oz, dx, dy, dz, b) {
   return [Math.max(0, tmin), face];
 }
 const FACE_N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]; // face idx from rayBox: a*2+1 = min side (negative normal)
+// where a torch goes (Java's StandingAndWallBlockItem): first against the face clicked (unless the clicked block is
+// being replaced, like grass or snow), then the other ways in the order the player is looking: down onto the floor,
+// or against a wall; up is never a way. -> 0 standing, 1-4 on a wall (toward it: north, east, south, west), -1 nowhere
+const TORCH_WALLS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function torchPlace(t, x, y, z, replaced) {
+  const l = lookDir(), dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].sort((a, b) => (b[0] * l[0] + b[1] * l[1] + b[2] * l[2]) - (a[0] * l[0] + a[1] * l[1] + a[2] * l[2]));
+  if (!replaced) dirs.unshift([-t.nx, -t.ny, -t.nz]);
+  for (const [dx, dy, dz] of dirs) {
+    if (dy === 1) continue;
+    if (dy === -1) { if (supportedBy(getBlock(x, y - 1, z))) return 0; continue; }
+    if (torchWallOK(getBlock(x + dx, y, z + dz))) return TORCH_WALLS.findIndex(([a, c]) => a === dx && c === dz) + 1;
+  }
+  return -1;
+}
 function lookDir() { const cp = Math.cos(PL.pitch); return [-Math.sin(PL.yaw) * cp, Math.sin(PL.pitch), -Math.cos(PL.yaw) * cp]; }
 function raycast(reach, fluids) {
   const [dx, dy, dz] = lookDir();
@@ -880,7 +894,7 @@ function placeBlock(t, d) {
     if (!ok) return;
     if (id === BID.cactus && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)])) return;
   }
-  if (id === BID.torch || id === BID.soul_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
+  if (id === BID.torch || id === BID.soul_torch || id === BID.redstone_torch) { const tm = torchPlace(t, x, y, z, x === t.x && y === t.y && z === t.z); if (tm < 0) return; meta = tm; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
   if (isCampfire(id)) meta = fd | 4; // placed lit
@@ -893,7 +907,6 @@ function placeBlock(t, d) {
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
   if (id === BID.vine && (t.ny !== 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)])) return;
   if (id === BID.lily_pad && below !== 27) return;
-  if (id === BID.redstone_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.lever || id === BID.stone_button) { const a = S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === -t.ny && v[2] === -t.nz); if (a < 0 || !SOLID[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = a; }
   if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate || S.isRail(id)) && !supportedBy(below)) return;
   if (id === BID.repeater) meta = fd;
