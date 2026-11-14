@@ -113,11 +113,15 @@ function skinAdd(img, data, name, opts = {}) {
 }
 function skinFromDataUrl(data, name, opts) { const img = new Image(); img.onload = () => skinAdd(img, data, name, opts); img.onerror = () => UI.flash('그림을 읽지 못했어요'); img.src = data; }
 // the game server's address for /skin and /profile (the multiplayer server this game offers)
-function skinServer(path, q) { try { const a = typeof mpDefaultAddr === 'function' && mpDefaultAddr(); if (!a) return null; const u = new URL(mpRoomsUrl(a)); u.pathname = path; u.search = q; return u.href; } catch (e) { return null; } }
+// (the Cloudflare server first - it is always up - then the one chosen on the multiplayer screen, if it is another)
+function skinServers(path, q) { const out = []; const add = a => { try { if (!a) return; const u = new URL(mpRoomsUrl(a)); u.pathname = path; u.search = q; if (!out.includes(u.href)) out.push(u.href); } catch (e) {} };
+  if (typeof NEMO_CONFIG !== 'undefined') add(NEMO_CONFIG.servers && NEMO_CONFIG.servers[0] ? NEMO_CONFIG.servers[0][1] : NEMO_CONFIG.server);
+  if (typeof mpDefaultAddr === 'function') add(mpDefaultAddr()); return out; }
+function skinServer(path, q) { return skinServers(path, q)[0] || null; }
 // any picture address -> a data: URL, straight from the site when it allows that, else through the game server
 async function imageData(url) {
   const sniff = b => b[0] === 0x89 && b[1] === 0x50 ? 'image/png' : b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg' : b[0] === 0x47 && b[1] === 0x49 ? 'image/gif' : b[0] === 0x42 && b[1] === 0x4d ? 'image/bmp' : b[0] === 0x52 && b[8] === 0x57 ? 'image/webp' : null;
-  for (const t of [url, skinServer('/skin', '?u=' + encodeURIComponent(url))].filter(Boolean)) {
+  for (const t of [url, ...skinServers('/skin', '?u=' + encodeURIComponent(url))].filter(Boolean)) {
     try { const r = await fetch(t, { cache: 'no-store' }); if (!r.ok) continue; const blob = await r.blob(), type = sniff(new Uint8Array(await blob.slice(0, 12).arrayBuffer())); if (!type) continue;
       return await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).replace(/^data:[^;,]*/, 'data:' + type)); rd.onerror = rej; rd.readAsDataURL(blob); }); } catch (e) {}
   }
@@ -127,12 +131,20 @@ async function imageData(url) {
 // model and the cape (through the game server, which asks Mojang); without the server, mc-heads.net's copy of the skin
 async function skinFromName(name) {
   UI.flash(name + '의 스킨을 찾는 중...');
-  const pu = skinServer('/profile', '?name=' + encodeURIComponent(name));
-  if (pu) { try { const r = await fetch(pu, { cache: 'no-store' });
-    if (r.status === 404) { UI.flash('그런 자바 에디션 계정이 없어요: ' + name); return; }
-    if (r.ok) { const p = await r.json(), skin = p.skin && await imageData(p.skin), cape = p.cape && await imageData(p.cape);
-      if (skin) { skinFromDataUrl(skin, p.name || name, { slim: !!p.slim, cape: cape || null }); return; }
-      if (!p.skin) { skinFromDataUrl(await steveAlexData(p.slim), p.name || name, { slim: !!p.slim, cape: cape || null }); return; } } } catch (e) {} } // (an account with no skin of its own: the default one)
+  const use = async p => { const skin = p.skin && await imageData(p.skin), cape = p.cape && await imageData(p.cape);
+    if (skin) { skinFromDataUrl(skin, p.name || name, { slim: !!p.slim, cape: cape || null }); return true; }
+    if (p.id && !p.skin) { skinFromDataUrl(await steveAlexData(p.slim), p.name || name, { slim: !!p.slim, cape: cape || null }); return true; } // (an account with no skin of its own: the default one)
+    return false; };
+  let none = 0, tried = 0;
+  // the game servers (they ask Mojang, or sites that do)
+  for (const pu of skinServers('/profile', '?name=' + encodeURIComponent(name))) { tried++;
+    try { const r = await fetch(pu, { cache: 'no-store' }); if (r.status === 404) { none++; continue; } if (r.ok && await use(await r.json())) return; } catch (e) {} }
+  // straight from the browser, with no server: playerdb.co (Mojang's profile, textures and all), then mc-heads.net's copy
+  try { const r = await fetch('https://playerdb.co/api/player/minecraft/' + encodeURIComponent(name), { cache: 'no-store' }), j = r.ok ? await r.json() : null, pl = j && j.data && j.data.player;
+    if (pl && pl.id) { const tp = (pl.properties || []).find(q => q.name === 'textures'), tex = tp ? JSON.parse(decodeURIComponent(escape(atob(tp.value)))).textures || {} : {}, fx = u => u ? String(u).replace(/^http:/, 'https:') : null;
+      if (await use({ name: pl.username, id: pl.id, skin: fx(tex.SKIN && tex.SKIN.url) || pl.skin_texture || null, slim: !!(tex.SKIN && tex.SKIN.metadata && tex.SKIN.metadata.model === 'slim'), cape: fx(tex.CAPE && tex.CAPE.url) })) return; }
+    else if (j && /invalid|not.?found|unknown/i.test(String(j.code || "") + " " + String(j.message || ""))) none++; } catch (e) {}
+  if (none && none >= tried) { UI.flash('그런 자바 에디션 계정이 없어요: ' + name); return; }
   const d = await imageData('https://mc-heads.net/skin/' + encodeURIComponent(name));
   if (d) skinFromDataUrl(d, name); else UI.flash('스킨을 찾지 못했어요 (닉네임·인터넷 연결 확인)');
 }

@@ -634,6 +634,9 @@ function mpChunkLoaded(c) {
   const list = own ? W.meta.mpEdits && W.meta.mpEdits[dk] : mpEdits.get(c.key);
   if (!list) return;
   MP.applying = true; MP.replaying = MP.server; try { for (const [x, y, z, id, m, mo] of list) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); } } finally { MP.applying = false; MP.replaying = false; }
+  // water or lava put there (or a block taken from beside some) while this chunk wasn't loaded on the runner's side was
+  // only set in place: it starts flowing now (it used to stay a single still block)
+  if (host) for (const [x, y, z] of list) { if (FLUID[getBlock(x, y, z)]) schedule(x, y, z, 5); for (const [dx, dy, dz] of N6) if (FLUID[getBlock(x + dx, y + dy, z + dz)]) schedule(x + dx, y + dy, z + dz, 5); }
   if (own) delete W.meta.mpEdits[dk]; else mpEdits.delete(c.key);
   if (MP.server && host) c.modified = c.edited = true; // stored again with the changes in it
 }
@@ -656,6 +659,9 @@ function mpTick() {
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s && !s.hid ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 100 === 0) mpSendPdata(true); // every 5 s (not when nothing changed)
+  // what you carry changed (put in a chest, dropped, picked up, died): the server world hears of it within half a second,
+  // not at the next 5 s save - a connection lost in between used to bring the old inventory back beside what had left it
+  if (MP.server && W.tickN % 10 === 5) { const sig = JSON.stringify([INV.slots, INV.armor, INV.off, INV.cursor]); if (sig !== MP.invSig) { if (MP.invSig != null) mpSendPdata(); MP.invSig = sig; } }
   if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -794,6 +800,13 @@ function mpGotAuth(dim, id) {
 function mpBecomeRunner() {
   for (const e of [...ENT]) if (e.remote) removeEnt(e);
   const dks = [...W.chunks.values()].map(c => dkey(c.cx, c.cz)); if (dks.length) mpSend({ t: 'chunkmobs', dks });
+  // the fluids the last runner had on the move stopped with it: every water or lava block near here that could still
+  // flow (air below or beside it) is looked at again
+  try { const pcx = Math.floor(PL.x) >> 4, pcz = Math.floor(PL.z) >> 4; let n = 0;
+    for (const c of W.chunks.values()) { if (Math.abs(c.cx - pcx) > 4 || Math.abs(c.cz - pcz) > 4 || !c.blocks) continue; const B = c.blocks, top = Math.min(CH - 1, (c.maxY || CH - 1) + 1);
+      for (let i = 256; i < (top << 8) && n < 4000; i++) { const b = B[i]; if (b !== 27 && b !== 28) continue; const lx = i & 15, lz = (i >> 4) & 15;
+        if (B[i - 256] === 0 || (lx > 0 && B[i - 1] === 0) || (lx < 15 && B[i + 1] === 0) || (lz > 0 && B[i - 16] === 0) || (lz < 15 && B[i + 16] === 0)) { schedule(c.cx * 16 + lx, (i >> 8) + MINY, c.cz * 16 + lz, 5 + (n & 15)); n++; } } }
+  } catch (e) {}
   chatMsg('이 차원의 계산을 맡았습니다', '#aaaaaa');
 }
 function mpRestoreMobs(l) {
@@ -916,7 +929,7 @@ function mpNearestGuest(e) {
 }
 function mpProxy(p, fn) {
   const save = {}; for (const k of PROXY_KEYS) save[k] = PL[k];
-  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: false, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
+  const s = p.s; Object.assign(PL, { x: s.x, y: s.y, z: s.z, px: s.x, py: s.y, pz: s.z, vx: 0, vy: 0, vz: 0, mode: s.mode || 'survival', dead: !!s.dead, eff: {}, h: s.h || 1.8, sneaking: !!s.sneak, onGround: true, fire: 0 });
   MP.proxy = p;
   try { fn(); } finally {
     const kb = [PL.vx, PL.vy, PL.vz], fire = PL.fire; MP.proxy = null; for (const k of PROXY_KEYS) PL[k] = save[k]; if (fire > 0) mpSend({ t: 'ignite', f: fire }, p.id); // set alight by a blaze or a bolt: the guest burns, not the host

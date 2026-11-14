@@ -607,6 +607,7 @@ const NETHER_FOG = { 13: new THREE.Color(0x330808), 14: new THREE.Color(0x330303
 const FLASH_SKY = new THREE.Color(0xdde4ff);
 // night vision lifts the darkness (and flickers in its last 10 seconds, like Java)
 const nightVision = () => { const e = PL.eff && (PL.eff.night_vision || (PL.eff.conduit_power && PL.eyeFluid === 1 && PL.eff.conduit_power)); if (!e) return 0.035; return e.t > 200 || Math.sin(e.t * 0.3) > 0 ? 0.8 : 0.035; };
+R.nightVision = nightVision;
 const END_SKY = new THREE.Color(0x0b0811), netherFog = new THREE.Color(0x330808);
 function renderFrame(dt, eye, under) {
   if (W.dim) return renderOtherDim(dt, eye, under);
@@ -660,7 +661,7 @@ function renderOtherDim(dt, eye, under) {
   else { fog.color.copy(END_SKY); fog.near = (rd - 12) * 0.5; fog.far = rd - 12; stars.position.copy(camera.position); starMat.opacity = 0.35; }
   renderer.setClearColor(fog.color); fogCull();
   for (const m of [matOpaque, matCutout, matTrans]) {
-    m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = nether ? 0.24 : 0.08;
+    m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
     m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma;
   }
   updateParticles(dt);

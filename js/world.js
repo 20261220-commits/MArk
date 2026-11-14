@@ -275,6 +275,7 @@ async function applyMpLog(c) {
   const lg = await dbReq('chunks', 'readonly', st => st.get(key)); if (!lg || typeof lg !== 'object' || wid !== W.id || W.chunks.get(c.key) !== c) return;
   for (const [x, y, z, id, m, mo] of lg.edits || []) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); }
   for (const i in lg.tiles || {}) c.tiles.set(+i, lg.tiles[i]);
+  for (const [x, y, z] of lg.edits || []) { if (FLUID[getBlock(x, y, z)]) schedule(x, y, z, 5); for (const [dx, dy, dz] of N6) if (FLUID[getBlock(x + dx, y + dy, z + dz)]) schedule(x + dx, y + dy, z + dz, 5); } // (fluids put there by others while it was away start flowing)
   c.modified = c.edited = true; saveChunk(c, false, true); dbReq('chunks', 'readwrite', st => st.delete(key));
 }
 // fences and panes store their N/E/S/W connections in meta (like block states)
@@ -413,7 +414,7 @@ function tickScheduled() {
     if (t > W.tickN) continue;
     W.sched.delete(k);
     const [x, y, z] = k.split(',').map(Number);
-    if (isLoaded(x, z)) fluidUpdate(x, y, z);
+    if (isLoaded(x, z)) fluidUpdate(x, y, z); else if (W.sched.size < 6000) W.sched.set(k, W.tickN + 100); // (its chunk isn't loaded yet: it waits, and flows when it is)
     if (++n > 2000) break; // (a big flood keeps up: Java runs all of a tick's fluid ticks)
   }
 }
@@ -657,7 +658,7 @@ function addChunk(cx, cz, d, tiles) {
     else if (t.t === 'brew') { const b = newBrewing(); const pid = POTION[t.potion] && POTION[t.potion].items.splash; if (pid != null) b.items[0] = { id: pid, n: 1 };
       if (t.items) for (const [sl, id, n, pot] of t.items) { const P = pot && POTION[pot], iid = P ? P.items[id === 'splash_potion' ? 'splash' : id === 'lingering_potion' ? 'lingering' : 'potion'] : IID[id]; if (iid != null && sl >= 0 && sl < 5) b.items[sl] = { id: iid, n: Math.max(1, n) }; } /* a structure file's brewing stand, as it was built (the end ship's healing II) */
       c.tiles.set(t.i, b); }
-    else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 200 });
+    else if (t.t === 'spawner') c.tiles.set(t.i, { type: 'spawner', mob: t.mob, delay: 20 }); // (Java: a new spawner's first count is 20 ticks)
     else if (t.t === 'mob') { if (!d.fromSave) (c.spawns || (c.spawns = [])).push(t); } // (a chunk coming back keeps the ones it saved; making them again copied every minecart, villager and frame)
     else if (t.t === 'flow') schedule(cx * 16 + (t.i & 15), (t.i >> 8) + MINY, cz * 16 + ((t.i >> 4) & 15), 5 + (t.i % 40)); // a spring starts running
     else if (t.type) c.tiles.set(t.i, t);

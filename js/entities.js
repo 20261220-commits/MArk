@@ -62,7 +62,8 @@ function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
   const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv(Math.min(15, Math.max(l & 15, R.dynAt(x, y, z))) / 15);
-  return Math.max(W.dim === -1 ? 0.28 : 0.06, Math.min(1, Math.max(sky, blk * 0.95)));
+  // (night vision: mobs, items, your hand and other players are lit like the ground around them, not left black)
+  return Math.max(W.dim === -1 ? 0.28 : 0.06, R.nightVision ? R.nightVision() : 0, Math.min(1, Math.max(sky, blk * 0.95)));
 }
 
 // ---------- mob model textures (MC box UV layout) ----------
@@ -146,7 +147,7 @@ const MOBDEF = {
     tex: () => mobCanvas(g => { const r = r4(); paintBox(g, 0, 12, 10, 8, 12, () => hex(0x3a332e), r, .2); paintBox(g, 0, 0, 6, 6, 6, () => hex(0x2e2824), r, .2);
       paintBox(g, 32, 4, 8, 8, 8, () => hex(0x2e2824), r, .2, { front: (g, x, y) => { px(g, x + 1, y + 2, '#d01818', 2, 1); px(g, x + 5, y + 2, '#d01818', 2, 1); px(g, x + 2, y + 4, '#d01818'); px(g, x + 5, y + 4, '#d01818'); px(g, x + 3, y + 3, '#ff3030', 2, 1); } });
       paintBox(g, 18, 0, 16, 2, 2, () => hex(0x2a2420), r, .2); }) },
-  pig: { hp: 10, w: 0.45, h: 0.9, speed: 0.05, xp: 2, snd: 'oink', drops: [['porkchop', 1, 3]], food: 'wheat',
+  pig: { hp: 10, w: 0.45, h: 0.9, speed: 0.05, xp: 2, snd: 'oink', drops: [['porkchop', 1, 3]], food: ['carrot', 'potato', 'beetroot'],
     parts: [...QUAD(6, 9, [-5, -4, -8, 10, 8, 16], [0, 12, -6], [-4, -4, -8, 8, 8, 8], 3, -5, 6), ['snout', [0, 12, -6], [-2, -3, -9, 4, 3, 1], [16, 16]]],
     tex: () => mobCanvas(g => { const r = r4(); const pk = () => hex(0xf0a5a2); paintBox(g, 28, 0, 10, 8, 16, pk, r, .08); paintBox(g, 0, 0, 8, 8, 8, pk, r, .08, { front: (g, x, y) => { px(g, x, y + 2, '#fff'); px(g, x + 1, y + 2, '#000'); px(g, x + 6, y + 2, '#000'); px(g, x + 7, y + 2, '#fff'); } }); paintBox(g, 0, 32, 4, 6, 4, (k, x, y) => y > 4 ? hex(0x9a6a6a) : pk(), r, .08); paintBox(g, 16, 16, 4, 3, 1, () => hex(0xe8807a), r, .05, { front: (g, x, y) => { px(g, x + 1, y + 1, '#9a4a4a'); px(g, x + 2, y + 1, '#9a4a4a'); } }); }) },
   cow: { hp: 10, w: 0.45, h: 1.4, speed: 0.05, xp: 2, snd: 'moo', drops: [['beef', 1, 3], ['leather', 0, 2]], food: 'wheat', milk: 1,
@@ -155,7 +156,7 @@ const MOBDEF = {
   sheep: { hp: 8, w: 0.45, h: 1.3, speed: 0.05, xp: 2, snd: 'baa', drops: [['mutton', 1, 2]], food: 'wheat', shear: 1,
     parts: [...QUAD(12, 17, [-4, -3, -8, 8, 6, 16], [0, 19, -8], [-3, -3, -6, 6, 6, 8], 3, -5, 7), ['wool', [0, 17, 0], [-4, -3, -8, 8, 6, 16], [0, 44], 1.75], ['whead', [0, 19, -8], [-3, -3, -4, 6, 6, 6], [40, 0], 0.6]],
     tex: () => mobCanvas(g => { const r = r4(); const sk = () => hex(0xd8c0a8); paintBox(g, 28, 0, 8, 6, 16, sk, r, .08); paintBox(g, 0, 0, 6, 6, 8, sk, r, .08, { front: (g, x, y) => { px(g, x, y + 2, '#fff'); px(g, x + 1, y + 2, '#000'); px(g, x + 4, y + 2, '#000'); px(g, x + 5, y + 2, '#fff'); px(g, x + 2, y + 4, '#e8a8a0', 2, 1); } }); paintBox(g, 0, 32, 4, 12, 4, (k, x, y) => y < 6 ? hex(0xe8e8e8) : sk(), r, .08); paintBox(g, 0, 44, 8, 6, 16, () => hex(0xe9ecec), r, .1); paintBox(g, 40, 0, 6, 6, 6, (k, x, y) => k === 'front' ? null : hex(0xe9ecec), r, .1); }) },
-  chicken: { hp: 4, w: 0.2, h: 0.7, speed: 0.05, xp: 1, snd: 'cluck', drops: [['chicken', 1, 1], ['feather', 0, 2]], food: 'wheat_seeds', flap: 1,
+  chicken: { hp: 4, w: 0.2, h: 0.7, speed: 0.05, xp: 1, snd: 'cluck', drops: [['chicken', 1, 1], ['feather', 0, 2]], food: ['wheat_seeds', 'melon_seeds', 'pumpkin_seeds', 'beetroot_seeds'], flap: 1,
     parts: [['body', [0, 8, 0], [-3, -3, -4, 6, 6, 8], [0, 9]], ['head', [0, 9, -4], [-2, 0, -2, 4, 6, 3], [0, 0]], ['beak', [0, 9, -4], [-2, 2, -4, 4, 2, 2], [14, 0]], ['wattle', [0, 9, -4], [-1, 0, -3, 2, 2, 2], [14, 4]],
       ['rleg', [1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['lleg', [-1.5, 5, 1], [-1, -5, -1, 2, 5, 2], [26, 0]], ['rwing', [3, 10, 0], [0, -4, -3, 1, 4, 6], [24, 13]], ['lwing', [-3, 10, 0], [-1, -4, -3, 1, 4, 6], [24, 13]]],
     tex: () => mobCanvas(g => { const r = r4(); const w = () => hex(0xf4f4f4); paintBox(g, 0, 9, 6, 6, 8, w, r, .06); paintBox(g, 0, 0, 4, 6, 3, w, r, .06, { front: (g, x, y) => { px(g, x, y + 1, '#000'); px(g, x + 3, y + 1, '#000'); } }); paintBox(g, 14, 0, 4, 2, 2, () => hex(0xf2b43a), r); paintBox(g, 14, 4, 2, 2, 2, () => hex(0xd82020), r); paintBox(g, 26, 0, 2, 5, 2, () => hex(0xf2b43a), r); paintBox(g, 24, 13, 1, 4, 6, w, r, .06); }) },
@@ -370,6 +371,8 @@ function buildModel(type, opts = {}) {
   return root;
 }
 
+// another of its kind in love within 8 blocks: breeding comes before following food (Java's BreedGoal is above TemptGoal)
+const mateNear = e => ENT.some(o => o !== e && (o.type === e.type || (e.def.mates && e.def.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8);
 // a mob's breeding food: one item key or a list of them
 const isFood = (d, id) => Array.isArray(d.food) ? d.food.some(k => IID[k] === id) : IID[d.food] === id;
 // ---------- entity base ----------
@@ -575,6 +578,9 @@ function explode(x, y, z, power, fire) {
     setBlock(bx, by, bz, 0);
     if (Math.random() < 1 / power && !FLUID[b]) { const d = blockDrops(b, m, { id: IID.diamond_pickaxe, n: 1 }); for (const [id, n] of d.items) dropItem(bx + .5, by + .5, bz + .5, id, n); }
   }
+  // a blast that sets fires (a ghast's fireball, a bed or anchor in the wrong dimension): one in three of the blocks it
+  // cleared, where there is something solid underneath (Java's Explosion.finalizeExplosion)
+  if (fire && !noGrief) for (const k of broken.keys()) { const [bx, by, bz] = k.split(',').map(Number); if (Math.random() < 1 / 3 && getBlock(bx, by, bz) === 0 && SOLID[getBlock(bx, by - 1, bz)] && !FLUID[getBlock(bx, by - 1, bz)]) setBlock(bx, by, bz, BID.fire); }
   for (let i = 0; i < 30; i++) R.simpleParticle(x + (Math.random() - .5) * power * 1.5, y + (Math.random() - .5) * power, z + (Math.random() - .5) * power * 1.5, [0.85, 0.85, 0.85], { kind: 'explosion', size: 0.6 + Math.random() * 0.6, life: 0.6 + Math.random() * 0.6, grav: -0.05, vy: 0.5 });
   // damage entities & player
   const rad = power * 2;
@@ -735,13 +741,15 @@ function mobTick(e) {
   if (e.rider === PL && d.ride) { d.ride(e, dist); return; }
   mobLookTick(e, dist);
   if (d.ai) { d.ai(e, dist, dx, dz); if (e.y < voidY()) removeEnt(e); return; }
+  // a creeper lit with flint and steel: it swells to the end whatever happens (Java's Creeper.ignite)
+  if (d.explode && e.ignited) { if (e.fuse === 0) play('fuse'); if (++e.fuse >= 30) { removeEnt(e); MOB_BLAST = e; if (e.charged) chargedExplode(e); else explode(e.x, e.y + 0.8, e.z, 3); MOB_BLAST = false; return; } }
   // AI
   const jv = d.jv, jsp = m => jv ? mobJSpeed(jv.a * m) * (e.babySpeed || 1) : d.speed * (e.babySpeed || 1); // (Java's movement attribute and each goal's speed modifier)
   let mx = 0, mz = 0, speed = jsp(jv ? jv.stroll : 1);
   const plVisible = PL.mode !== 'creative' && PL.mode !== 'spectator' && !PL.dead;
   const fr = mobFollowRange(e), bright = d.neutralDay ? mobBrightLight(e) : false;
   const hostileNow = d.hostile && !d.neutral && !(bright && e.target == null);
-  if (hostileNow && !e.target && plVisible && e.age % 2 === 0 && dist < fr * mobSeeScale() && canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z)) { e.target = PL; e.unseen = 0; }
+  if (hostileNow && !e.target && plVisible && Math.random() < 0.1 /* (Java's NearestAttackableTargetGoal looks one tick in ten) */ && dist < fr * mobSeeScale() && canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z)) { e.target = PL; e.unseen = 0; }
   if (ZOMBIE_KIND.has(e.type) && e.age % 20 === 0 && (!e.target || e.target !== PL)) zombieSeekVillager(e, fr); // (Java: zombies go for villagers, traders and iron golems too; a player they see comes first)
   if (e.target === PL && e.age % 5 === 0) e.unseen = canSee(e.x, e.y + e.h * 0.85, e.z, PL.x, PL.y + 1.6, PL.z) ? 0 : (e.unseen || 0) + 5;
   if (e.target && bright && Math.random() < 0.01) e.target = null; // (a spider in bright light gives up now and then)
@@ -773,7 +781,7 @@ function mobTick(e) {
       }
     } else if (d.explode && catNear(e)) { mx = -tx; mz = -tz; e.fuse = 0; // creepers run from cats
     } else if (d.explode) {
-      if ((dist < 3 || (e.fuse > 0 && dist < 7)) && canSee(e.x, e.y + 1.4, e.z, PL.x, PL.y + 1.6, PL.z)) { if (e.fuse === 0) play('fuse'); /* (Java's SwellGoal: within 3 to start, 7 to keep on, and in sight) */ e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
+      if (e.ignited) { mx = mz = 0; } else if ((dist < 3 || (e.fuse > 0 && dist < 7)) && canSee(e.x, e.y + 1.4, e.z, PL.x, PL.y + 1.6, PL.z)) { if (e.fuse === 0) play('fuse'); /* (Java's SwellGoal: within 3 to start, 7 to keep on, and in sight) */ e.fuse++; mx = mz = 0; if (e.fuse >= 30) { removeEnt(e); if (e.charged) { MOB_BLAST = e; chargedExplode(e); } else { MOB_BLAST = e; explode(e.x, e.y + 0.8, e.z, 3); } MOB_BLAST = false; return; } }
       else { e.fuse = Math.max(0, e.fuse - 1); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); }
     } else {
       [mx, mz] = pathDir(e, PL.x, PL.y, PL.z);
@@ -783,12 +791,13 @@ function mobTick(e) {
       if (d.climb && e.hitH) { e.vy = 0.2; }
     }
   } else {
-    const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && plVisible && !e.rider && !(e.panic > 0); // (Java's TemptGoal: 10 blocks, either hand)
+    const food = d.food && (isFood(d, PL.held() && PL.held().id) || isFood(d, INV.off && INV.off.id)) && dist < 10 && !PL.dead && PL.mode !== 'spectator' && !e.rider && !(e.panic > 0); // (Java's TemptGoal: 10 blocks, either hand)
     if (e.panic > 0) { if (!e.goal || (e.panicT = (e.panicT || 0) + 1) > 60) { e.goal = panicGoal(e); e.panicT = 0; } speed = jv ? jsp(jv.panic) : d.speed * 2.2; }
-    else if (food) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); if (jv) speed = jsp(jv.tempt); }
+    else if (food && !(e.love > 0 && mateNear(e))) { e.goal = dist > 2.5 ? [PL.x, PL.z] : null; e.yawTarget = Math.atan2(-dx, -dz); if (jv) speed = jsp(jv.tempt); }
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
     if (e.goal && jv && e.parGoal > W.tickN && !(e.panic > 0)) speed = jsp(jv.parent);
+    if (e.heardBell > W.tickN && jv && !(e.panic > 0)) speed = jsp(0.75); // (hiding from the bell: at a run)
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
     // (looking at a player nearby: the head does it, mobLookTick, as Java's LookAtPlayerGoal)
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -1071,6 +1080,7 @@ function trySpawnHostile(rounds = 1, who = PL) {
       for (let j = 0; j < size; j++) {
         x += Math.floor(Math.random() * 6) - Math.floor(Math.random() * 6); z += Math.floor(Math.random() * 6) - Math.floor(Math.random() * 6);
         const dd = Math.hypot(x + .5 - who.x, y - who.y, z + .5 - who.z); if (dd <= 24 || dd > 128) continue;
+        if (W.worldSpawn && Math.hypot(x + .5 - W.worldSpawn[0], y - W.worldSpawn[1], z + .5 - W.worldSpawn[2]) < 24) continue; // (Java: nothing within 24 blocks of the world spawn)
         if (!kind) { const L = monsterList(x, z); if (!L) break; let w = Math.random() * L.total; for (const e of L) { w -= e[1]; if (w < 0) { kind = e; break; } } if (!kind) break; size = kind[2] + Math.floor(Math.random() * (1 + kind[3] - kind[2])); }
         let t = kind[0]; if (!monSpotOK(t, x, y, z)) continue;
         if (t === 'enderman' && countMobs(m => m.type === 'enderman') >= 6) continue;
@@ -1107,19 +1117,55 @@ function spawnAnimalsForChunk(c) {
     spawnMob(t, x + .5, y + 1, z + .5);
   }
 }
+// Java 1.18's BaseSpawner: with a player within 16 blocks the spawner counts down (20 ticks at first); at zero it makes
+// four tries at a spot within 4 blocks across (closer ones likelier: the difference of two randoms) and 1 up or down,
+// floor or no floor, where the mob fits and its own spawn rule holds (most monsters: the dark, as natural spawning;
+// blazes and magma cubes: any light; silverfish: any light, no player within 5). Six of that kind within 4 blocks of it
+// stop it for a full delay. Only when something came out does it wait again, 200 to 799 ticks; else it tries every tick
+const SPAWNER_ANY_LIGHT = new Set(['blaze', 'magma_cube', 'silverfish', 'endermite', 'zombified_piglin', 'piglin', 'hoglin', 'strider', 'ghast', 'wither_skeleton']);
+function spawnerRuleOK(type, x, y, z) {
+  const d = MOBDEF[type]; if (!d) return false;
+  if (d.hostile && PL.difficulty === 0) return false;
+  if (type === 'silverfish' && spawnerPlayers().some(p => Math.hypot(p.x - x, p.y - y, p.z - z) < 5)) return false;
+  if (d.hostile && !SPAWNER_ANY_LIGHT.has(type) && !monDark(Math.floor(x), Math.floor(y), Math.floor(z))) return false;
+  return true;
+}
+function spawnerFits(d, x, y, z) { // the mob's box clear of anything solid (water is fine, as in Java)
+  const w = d.w || 0.3, h = d.h || 1.8;
+  for (let bx = Math.floor(x - w); bx <= Math.floor(x + w - 1e-4); bx++) for (let bz = Math.floor(z - w); bz <= Math.floor(z + w - 1e-4); bz++) for (let by = Math.floor(y); by <= Math.floor(y + h - 1e-4); by++) {
+    const b = getBlock(bx, by, bz); if (SOLID[b] || b === BID.lava || b === 28) return false; }
+  return true;
+}
+// the players who keep spawners going: you, and (running a dimension for others) the players there with you
+function spawnerPlayers() {
+  const l = PL.dead || PL.mode === 'spectator' ? [] : [{ x: PL.x, y: PL.y, z: PL.z }];
+  if (typeof MP !== 'undefined' && MP.on && MP.role === 'host' && MP.peers) for (const p of MP.peers.values()) if (p.s && p.s.dim === W.dim && !p.s.dead && p.s.mode !== 'spectator' && performance.now() - p.at < 5000) l.push({ x: p.s.x, y: p.s.y, z: p.s.z });
+  return l;
+}
 function spawnerTick() {
-  const px2 = Math.floor(PL.x), py2 = Math.floor(PL.y), pz2 = Math.floor(PL.z);
-  for (let cx = (px2 >> 4) - 1; cx <= (px2 >> 4) + 1; cx++) for (let cz = (pz2 >> 4) - 1; cz <= (pz2 >> 4) + 1; cz++) {
-    const c = chunkAt(cx, cz); if (!c) continue;
+  const pls = spawnerPlayers(); if (!pls.length) return;
+  const seen = new Set();
+  for (const p of pls) for (let cx = (Math.floor(p.x) >> 4) - 1; cx <= (Math.floor(p.x) >> 4) + 1; cx++) for (let cz = (Math.floor(p.z) >> 4) - 1; cz <= (Math.floor(p.z) >> 4) + 1; cz++) {
+    const c = chunkAt(cx, cz); if (!c || seen.has(c)) continue; seen.add(c);
     for (const [i, t] of c.tiles) {
-      if (t.type !== 'spawner') continue;
+      if (t.type !== 'spawner' || !t.mob) continue;
       const x = cx * 16 + (i & 15), y = (i >> 8) + MINY, z = cz * 16 + ((i >> 4) & 15);
-      if (Math.hypot(x - PL.x, y - PL.y, z - PL.z) > 16) continue;
+      if (!pls.some(q => Math.hypot(x + .5 - q.x, y + .5 - q.y, z + .5 - q.z) <= 16)) continue;
       if (Math.random() < 0.3) R.simpleParticle(x + Math.random(), y + Math.random(), z + Math.random(), [1, 0.5, 0.1], { kind: 'flame', size: 0.1, vy: 0.3, grav: 0, life: 0.5 });
-      if (--t.delay > 0) continue;
-      t.delay = 200 + Math.floor(Math.random() * 600);
-      if (PL.difficulty === 0 || countMobs(e => e.def.hostile && Math.hypot(e.x - x, e.z - z) < 9) >= 6) continue;
-      for (let k = 0; k < 4; k++) { const sx = x + Math.floor((Math.random() - .5) * 8), sz = z + Math.floor((Math.random() - .5) * 8), sy = y + Math.floor(Math.random() * 3) - 1; if (!SOLID[getBlock(sx, sy, sz)] && !SOLID[getBlock(sx, sy + 1, sz)] && SOLID[getBlock(sx, sy - 1, sz)]) spawnMob(t.mob, sx + .5, sy, sz + .5); }
+      if (!(t.delay >= 0)) t.delay = 20;
+      if (t.delay > 0) { t.delay--; continue; }
+      const d = MOBDEF[t.mob]; if (!d) continue;
+      let made = false, full = false;
+      for (let k = 0; k < 4; k++) {
+        const near = countMobs(e => e.type === t.mob && e.x >= x - 4 && e.x <= x + 5 && e.y >= y - 4 && e.y <= y + 5 && e.z >= z - 4 && e.z <= z + 5);
+        if (near >= 6) { full = true; break; }
+        const sx = x + (Math.random() - Math.random()) * 4 + .5, sy = y + Math.floor(Math.random() * 3) - 1, sz = z + (Math.random() - Math.random()) * 4 + .5;
+        if (!spawnerFits(d, sx, sy, sz) || !spawnerRuleOK(t.mob, sx, sy, sz)) continue;
+        const m = spawnMob(t.mob, sx, sy, sz); if (!m) continue;
+        m.yaw = m.yawTarget = Math.random() * Math.PI * 2; m.fromSpawner = true; made = true;
+        for (let n = 0; n < 12; n++) R.simpleParticle(sx + (Math.random() - .5) * (d.w || .3) * 2, sy + Math.random() * (d.h || 1.8), sz + (Math.random() - .5) * (d.w || .3) * 2, [0.6, 0.6, 0.6], { kind: 'smoke', size: 0.15, vy: 0.2, grav: 0, life: 0.6 });
+      }
+      if (made || full) t.delay = 200 + Math.floor(Math.random() * 600);
     }
   }
 }

@@ -69,7 +69,7 @@ function raycast(reach, fluids) {
   // entities
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
-    const h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05, e.y, e.z - e.w - .05, e.x + e.w + .05, e.y + e.h, e.z + e.w + .05]);
+    const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
@@ -188,6 +188,10 @@ function deathMessage(cause, attacker, proj) {
 function die(cause) {
   stat('deaths'); if (W.meta && W.meta.stats) W.meta.stats.c.time_since_death = 0; if (PL.lastAttacker && PL.lastAttacker.type) statOf('killed_by', PL.lastAttacker.type);
   PL.dead = true; PL.sleeping = 0; PL.rest = 0;
+  // death ends every effect (Java: removeAllEffects on respawn) and the fire; whatever was after you lets go, and the
+  // neutral ones forgive you (Java's forgiveDeadPlayers)
+  if (typeof clearEffects === 'function') clearEffects(PL); PL.absorb = 0; PL.fire = 0; PL.freeze = 0; if (typeof renderEffects === 'function') renderEffects();
+  for (const e of ENT) if (e.kind === 'mob') { if (e.target === PL) { e.target = null; e.path = null; e.unseen = 0; } if (e.angry) e.angry = 0; if (e.angerT) e.angerT = 0; if (e.fuse > 0) e.fuse = 0; if (e.spitAt === PL) e.spitAt = null; }
   if (UI.screen) UI.closeScreen(); // what was on the cursor or in a crafting grid goes back first, then falls with the rest
   if (!W.keepInv && !gr('keepInventory')) {
     offUnswap(); const all = [...INV.slots, ...INV.armor, INV.off]; INV.slots.fill(null); INV.armor.fill(null); INV.off = null;
