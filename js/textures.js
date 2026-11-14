@@ -283,6 +283,13 @@ PAINT.amethyst_block = r => { const nz = tnoise(r, 4); fill((x, y) => { const v 
 PAINT.budding_amethyst = r => { PAINT.amethyst_block(r); for (let i = 0; i < 6; i++) { const x = 1 + r.int(13), y = 1 + r.int(13); P(x, y, hex(0x3a2160)); P(x + 1, y, hex(0x3a2160)); P(x, y + 1, hex(0x2a1648)); P(x + 1, y + 1, hex(0xe2c4fa)); } };
 PAINT.amethyst_cluster = r => { const cr = [[7, 2, 15], [4, 6, 15], [10, 5, 15], [2, 10, 15], [12, 9, 15]]; for (const [x, top, bot] of cr) for (let y = top; y <= bot; y++) { P(x, y, hex(0xcfa0f3)); P(x + 1, y, hex(0x9a6ad1)); if (y > top + 2) P(x - 1, y, hex(0x7f55b4)); } };
 PAINT.dripstone_block = r => { const nz = tnoise(r, 4); fill((x, y) => quant(shade(hex(0x86685a), 1 + (nz(x, y * 0.4) - .5) * .25 + ((x * 3) % 5 === 0 ? -0.08 : 0) + (r() - .5) * .08), 3)); };
+// the ten shapes of pointed dripstone (a pack without them: drawn here): half-widths from where it grows (row 0, for
+// one hanging down) to its end
+{ const DW = { base: [6, 5], middle: [4.5, 4], frustum: [4, 2], tip: [2.5, 0], tip_merge: [1.5, 0.5] };
+  for (const [th, [w0, w1]] of Object.entries(DW)) for (const dir of ['up', 'down']) PAINT['pointed_dripstone_' + dir + '_' + th] = r => {
+    for (let yy = 0; yy < 16; yy++) { const t = yy / 15, w = Math.round(w0 + (w1 - w0) * t * (th === 'tip' ? 1.2 : 1)), y = dir === 'down' ? yy : 15 - yy;
+      if (th === 'tip' && yy > 12) continue;
+      for (let x = 8 - Math.max(w, th === 'tip_merge' ? 1 : 0); x <= 7 + Math.max(w, th === 'tip_merge' ? 1 : 0); x++) P(x, y, shade(hex(0x86685a), 1 + (r() - .5) * .2 + (x < 8 ? .08 : -0.08) + ((x + yy) % 4 === 0 ? -0.06 : 0))); } }; }
 PAINT.pointed_dripstone = r => { for (let y = 0; y < 16; y++) { const w = Math.max(0, Math.round((16 - y) / 4)); for (let x = 8 - w; x <= 7 + w; x++) P(x, y, shade(hex(0x86685a), 1 + (r() - .5) * .2 + (x < 8 ? .08 : -0.08))); } };
 // ---- lush caves (1.17) ----
 const AZ = [hex(0x5e7a2a), hex(0x6e8c34), hex(0x4c6522), hex(0x7d9b3c)], AZFL = [hex(0xd86aa8), hex(0xf09ac8), hex(0xb24a86)];
