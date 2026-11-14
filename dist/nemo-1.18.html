@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.14 22:16';
+const NEMO_VERSION = '2026.11.14 22:43';
 
 </script>
 <script>/* js/shared.js */
@@ -7328,7 +7328,9 @@ function applyPackData(P, D) {
     const src = S.T[sk], t = S.T[fk], sx = (src % TPR) * TS, sy = ((src / TPR) | 0) * TS, tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS;
     for (let y = 0; y < TS; y++) AD.copyWithin(((ty + y) * ATLAS_W + tx) * 4, ((sy + y) * ATLAS_W + sx) * 4, ((sy + y) * ATLAS_W + sx + TS) * 4);
   }
-  for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k], tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(a.data.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
+  // (fire1 has no tile of its own: it is only the burning overlay's. Its rows went to the NaN offset, that is 0: the
+  // top row of the stone tile, a line of fire along the edge of every stone block for players with a jar)
+  for (const k in PACKPX.anim) { const a = PACKPX.anim[k], t = S.T[k]; if (t == null) continue; const tx = (t % TPR) * TS, ty = ((t / TPR) | 0) * TS; for (let y = 0; y < TS; y++) AD.set(a.data.subarray(a.off + y * 64, a.off + y * 64 + 64), ((ty + y) * ATLAS_W + tx) * 4); }
 }
 async function loadPack() {
   if (!window.DecompressionStream) return false;

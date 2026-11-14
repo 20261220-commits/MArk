@@ -14,4 +14,9 @@ module.exports = async ({ ok, srv, b, lib }) => {
   console.log(JSON.stringify(r));
   ok(r.quads > 1000 && r.bad === 0, 'every face of the terrain lies in one tile of the atlas', r);
   ok(r.fs, 'the terrain shader keeps sampling inside the face\'s tile');
+  // a jar's second fire texture (only the burning overlay's, no tile of its own) must not land on the stone tile
+  const f = await p.evaluate(() => { const D = new Uint8Array(1024 * 4); for (let i = 0; i < D.length; i += 4) { D[i] = 250; D[i + 1] = 120; D[i + 2] = 10; D[i + 3] = 255; }
+    const before = Array.from(AD.slice(0, 64)); applyPackData({ tiles: {}, anim: { fire1: [0, 4] }, items: {}, ent: {} }, D); const after = Array.from(AD.slice(0, 64));
+    return { same: JSON.stringify(before) === JSON.stringify(after), px: after.slice(0, 4) }; });
+  ok(f.same, 'a jar\'s fire_1 (no atlas tile) leaves the stone tile alone (it drew a line of fire along every stone block)', f);
 };
