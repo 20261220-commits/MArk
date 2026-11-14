@@ -35,7 +35,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     d.phase = 'hold'; d.inv = 0; let hp = d.hp; d.hitPart = 'body'; hurtMob(d, 10, PL); o.body = +(hp - d.hp).toFixed(2);
     d.inv = 0; hp = d.hp; d.hitPart = 'head'; hurtMob(d, 10, PL); o.headDmg = +(hp - d.hp).toFixed(2);
     // the raycast finds the head
-    PL.mode = 'creative'; const hd2 = dragonParts(d)[0]; PL.x = (hd2[1] + hd2[4]) / 2; PL.z = (hd2[3] + hd2[6]) / 2 - 3; PL.y = hd2[2] - 1.1; PL.yaw = Math.PI; /* (in front of its face: from behind, the neck is in the way, as in Java) */ PL.pitch = 0;
+    d.boxes = dragonParts(d).map(b => b.slice(1)); d.boxParts = dragonParts(d).map(b => b[0]); /* (as each tick does) */ PL.mode = 'creative'; const hd2 = dragonParts(d)[0]; PL.x = (hd2[1] + hd2[4]) / 2; PL.z = (hd2[3] + hd2[6]) / 2 - 3; PL.y = hd2[2] - 1.1; PL.yaw = Math.PI; /* (in front of its face: from behind, the neck is in the way, as in Java) */ PL.pitch = 0;
     const ray = raycast(5); o.ray = ray && ray.type === 'ent' ? ray.part : String(ray && ray.type); PL.mode = 'survival';
     // sitting: looks at a near player, roars, breathes
     d.hp = 200; d.phase = 'land'; d.phaseT = 0; d.tgt = null; d.x = 0; d.z = 0.5; d.y = S.END_PORTAL_Y + 4.3; d.vx = d.vy = d.vz = 0; PL.x = 0.5; PL.z = -9; PL.y = S.END_PORTAL_Y + 1; PL.health = 20; PL.inv = 0;
