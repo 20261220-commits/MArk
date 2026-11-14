@@ -838,7 +838,7 @@ const caveNoise = (seed, k) => { const key = seed * 4 + k; let n = CAVE_N.get(ke
 const isDripstoneCaves = (seed, x, z) => caveNoise(seed, 0).n2(x / 420, z / 420) > 0.5;
 const isLushCaves = (seed, x, z) => caveNoise(seed, 1).n2(x / 380, z / 380) > 0.55;
 // the cave biome at a spot well below the surface, or -1 (lush caves only with the experimental option, as in 1.17)
-function caveBiomeAt(seed, x, y, z, surface, exp) { if (y > Math.min(56, surface - 10)) return -1; if (exp && isLushCaves(seed, x, z)) return BIOK.lush_caves; return isDripstoneCaves(seed, x, z) ? BIOK.dripstone_caves : -1; }
+function caveBiomeAt(seed, x, y, z, surface, exp) { if (y > Math.min(56, surface - 10)) return -1; if ((exp || GENV >= 3) && isLushCaves(seed, x, z)) return BIOK.lush_caves; /* (1.18: lush caves are part of every world) */ return isDripstoneCaves(seed, x, z) ? BIOK.dripstone_caves : -1; }
 // ---------- the 1.17 biome layout: Java's layer stack (net.minecraft.world.level.newbiome.layer), with the same rules
 // and the same random numbers, so a seed gets the original's climates, biomes, hills, rare biomes, rivers and shores:
 // continents at 1:4096 are zoomed and given islands, then a climate (warm / temperate / cold / icy, never warm beside
@@ -2840,8 +2840,12 @@ function veinTall(blocks, R, id, size, y, x, z, repl) { // a blob of ore, as Jav
       const i = TI(bx, by, bz), b = blocks[i]; if (repl(b)) blocks[i] = typeof id === 'function' ? id(b) : id; } }
 }
 // 1.18 ore heights: [ore, deepslate ore, tries per chunk, size, lowest y, highest y, triangle (peak in the middle) or uniform]
-const DEEP_ORES = [['diamond_ore', 'deepslate_diamond_ore', 7, 6, -80, 16, 1], ['redstone_ore', 'deepslate_redstone_ore', 6, 8, -64, 15, 0], ['redstone_ore', 'deepslate_redstone_ore', 8, 8, -96, -32, 1],
-  ['lapis_ore', 'deepslate_lapis_ore', 2, 7, -32, 32, 1], ['gold_ore', 'deepslate_gold_ore', 4, 9, -64, 32, 1], ['iron_ore', 'deepslate_iron_ore', 10, 9, -24, 56, 1], ['copper_ore', 'deepslate_copper_ore', 4, 10, -16, 112, 1]];
+// (Java 1.18's placements. Diamonds: a triangle from 80 below the bottom to 80 above it, so the further down the more,
+// most at the very bottom - 7 small veins, 4 buried ones and a large one in every ninth chunk. A count under 1 is a chance)
+const DEEP_ORES = [['diamond_ore', 'deepslate_diamond_ore', 7, 4, -144, 16, 1], ['diamond_ore', 'deepslate_diamond_ore', 4, 8, -144, 16, 1], ['diamond_ore', 'deepslate_diamond_ore', 1 / 9, 12, -144, 16, 1],
+  ['redstone_ore', 'deepslate_redstone_ore', 4, 8, -64, 15, 0], ['redstone_ore', 'deepslate_redstone_ore', 8, 8, -96, -32, 1],
+  ['lapis_ore', 'deepslate_lapis_ore', 2, 7, -32, 32, 1], ['lapis_ore', 'deepslate_lapis_ore', 4, 7, -64, 64, 0], ['gold_ore', 'deepslate_gold_ore', 4, 9, -64, 32, 1], ['gold_ore', 'deepslate_gold_ore', 0.5, 9, -64, -48, 0],
+  ['iron_ore', 'deepslate_iron_ore', 10, 9, -24, 56, 1], ['iron_ore', 'deepslate_iron_ore', 10, 4, -64, 72, 0], ['copper_ore', 'deepslate_copper_ore', 16, 10, -16, 112, 1]];
 function deepFill(blocks, meta, seed, cx, cz) {
   const N = deepNoise(seed), R = rng(hash32(seed, cx, cz, 1818)), x0 = cx * 16, z0 = cz * 16, DS = BID.deepslate, BED = BID.bedrock, LAVA = 28, TUFF = BID.tuff;
   for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -2856,7 +2860,7 @@ function deepFill(blocks, meta, seed, cx, cz) {
   const deepOre = { [BID.stone]: 1, [DS]: 1, [TUFF]: 1 };
   for (let k = 0; k < 2; k++) veinTall(blocks, R, TUFF, 30, MINY + 5 + R.int(60), R.int(16), R.int(16), b => b === DS);
   for (const [o, d, n, size, lo, hi, tri] of DEEP_ORES) { const O = BID[o], D = BID[d];
-    for (let k = 0; k < n; k++) { const y = tri ? Math.round(lo + (R() + R()) / 2 * (hi - lo)) : lo + R.int(hi - lo + 1); if (y >= 0 || y <= MINY) continue; veinTall(blocks, R, b => b === DS || b === TUFF ? D : O, size, y, R.int(16), R.int(16), b => !!deepOre[b]); } }
+    for (let k = Math.floor(n) + (R() < n - Math.floor(n) ? 1 : 0); k > 0; k--) { const y = tri ? Math.round(lo + (R() + R()) / 2 * (hi - lo)) : lo + R.int(hi - lo + 1); if (y >= 0 || y <= MINY) continue; veinTall(blocks, R, b => b === DS || b === TUFF ? D : O, size, y, R.int(16), R.int(16), b => !!deepOre[b]); } }
 }
 // 1.18's large ore veins (OreVeinSampler): long ribbons where a vein toggle noise is strong and two ridged noises meet;
 // copper in granite between y 0 and 50, iron in tuff between -60 and -8, with now and then a block of raw ore
@@ -2892,11 +2896,49 @@ function aquifers(blocks, seed, cx, cz, keep) {
       blocks[i] = wall ? (y < 0 ? 76 : 1) : 27; }
   }
 }
+// 1.18's cave biomes, through every cave from the bottom of the world up to a little under the surface, column by
+// column (so their edges follow the biome, not the chunk): lush caves - moss on floors and ceilings in patches, moss
+// carpets, grass, azaleas, dripleaves, clay-bottomed pools, cave vines with glow berries and spore blossoms hanging;
+// dripstone caves - dripstone blocks in patches with stalactites above and stalagmites below
+function caveBiomes(blocks, meta, seed, cx, cz) {
+  const x0 = cx * 16, z0 = cz * 16, R = rng(hash32(seed, cx, cz, 1881)), P = caveNoise(seed, 2), TUFF = BID.tuff;
+  const rocky = b => b === 1 || b === 76 || b === 3 || b === 10 || b === 91 || b === 92 || b === 93 || b === TUFF;
+  const air = (x, y, z) => blocks[TI(x, y, z)] === 0;
+  for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    const wx = x0 + x, wz = z0 + z, lush = isLushCaves(seed, wx, wz), drip = !lush && isDripstoneCaves(seed, wx, wz); if (!lush && !drip) continue;
+    let top = SEA + 80; while (top > MINY && blocks[TI(x, top, z)] === 0) top--;
+    const lim = Math.min(56, top - 10);
+    for (let y = MINY + 6; y <= lim; y++) {
+      const i = TI(x, y, z); if (blocks[i] !== 0) continue;
+      const ib = TI(x, y - 1, z), ia = TI(x, y + 1, z), below = blocks[ib], above = blocks[ia];
+      if (lush) {
+        const patch = P.n3(wx / 14, y / 9, wz / 14) > -0.3;
+        if (rocky(below) && patch) {
+          if (R() < 0.04 && x > 0 && x < 15 && z > 0 && z < 15 && rocky(blocks[TI(x, y - 2, z)]) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => blocks[TI(x + dx, y - 1, z + dz)] !== 0)) { blocks[ib] = 27; meta[ib] = 0; blocks[TI(x, y - 2, z)] = 53; continue; } // a little pool on clay
+          blocks[ib] = 87; meta[ib] = 0; const v = R();
+          if (v < 0.25) blocks[i] = 1043; else if (v < 0.45) blocks[i] = 29; else if (v < 0.48) blocks[i] = 1039; else if (v < 0.495) blocks[i] = 1040;
+          else if (v < 0.52) { const h = 1 + R.int(3); let k = 0; while (k < h && y + k + 1 < lim && air(x, y + k + 1, z)) { blocks[TI(x, y + k, z)] = 1047; k++; } blocks[TI(x, y + k, z)] = 1046; meta[TI(x, y + k, z)] = R.int(4); }
+          else if (v < 0.54 && above === 0) { blocks[i] = 1048; blocks[ia] = 1048; meta[ia] = 8; }
+        } else if (rocky(above) && patch) {
+          blocks[ia] = 87; meta[ia] = 0; const v = R();
+          if (v < 0.2) { const n = 1 + R.int(6); for (let k = 0; k < n && y - k > MINY + 6 && air(x, y - k, z) && (k === 0 || air(x, y - k - 1, z)); k++) { const j = TI(x, y - k, z); blocks[j] = 1044; meta[j] = R() < 0.15 ? 1 : 0; } }
+          else if (v < 0.215) blocks[i] = 1045;
+        }
+      } else {
+        const patch = P.n3(wx / 11, y / 8, wz / 11) > -0.35;
+        if (rocky(below) && patch) { blocks[ib] = 85; meta[ib] = 0;
+          if (R() < 0.11) for (let k = 0, n = 1 + R.int(3); k < n && air(x, y + k, z) && air(x, y + k + 1, z); k++) { const j = TI(x, y + k, z); blocks[j] = 86; meta[j] = 1; } }
+        else if (rocky(above) && patch) { blocks[ia] = 85; meta[ia] = 0;
+          if (R() < 0.17) for (let k = 0, n = 1 + R.int(4); k < n && air(x, y - k, z) && air(x, y - k - 1, z); k++) { const j = TI(x, y - k, z); blocks[j] = 86; meta[j] = 0; } }
+      }
+    }
+  }
+}
 function genTall(r, dim, seed, cx, cz) {
   const off = (0 - MINY) << 8, blocks = new Uint16Array(CVOL), meta = new Uint8Array(CVOL);
   blocks.set(r.blocks, off); meta.set(r.meta, off);
   if (dim === 0) deepFill(blocks, meta, seed, cx, cz);
-  if (dim === 0 && GENV >= 3) { oreVeins(blocks, seed, cx, cz); aquifers(blocks, seed, cx, cz, r.keep); }
+  if (dim === 0 && GENV >= 3) { oreVeins(blocks, seed, cx, cz); aquifers(blocks, seed, cx, cz, r.keep); caveBiomes(blocks, meta, seed, cx, cz); }
   for (const t of r.tiles) if (t.i != null) t.i += off;
   const light = new Uint8Array(CVOL); lightChunk(blocks, light, meta);
   return { blocks, meta, light, biome: r.biome, tiles: r.tiles };
@@ -3161,7 +3203,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
   // 6. dripstone (sparse, 1.17); dripstone caves regions get many more clusters and extra copper ore
   const dripRegion = isDripstoneCaves(seed, x0 + 8, z0 + 8);
   if (dripRegion) for (let i = 0; i < 10; i++) vein(14, 17, uni(0, 95));
-  for (let a = 0, na = dripRegion ? 60 : 6; a < na; a++) {
+  for (let a = 0, na = dripRegion && GENV < 3 ? 60 : 6; a < na; a++) { // (1.18 worlds: the dripstone caves get theirs in caveBiomes, through every cave down to the bottom)
     const x = R.int(16), z = R.int(16), y0 = 12 + R.int(40);
     for (let y = y0; y < y0 + 20 && y < CH0 - 2; y++) {
       if (blocks[I(x, y, z)] === 0 && blocks[I(x, y + 1, z)] === 1) {
@@ -3180,7 +3222,7 @@ function genChunk0(seed, cx, cz, dim, exp) {
   // 7. lush cave patches: in 1.17 these generate only with the experimental "caves & cliffs" option (a world setting
   // here, off by default); otherwise the blocks come from wandering traders and bone meal, as in vanilla.
   // moss floors with azaleas and dripleaves, clay pools, cave vines and spore blossoms on the ceiling
-  if (exp && (R.int(10) === 0 || isLushCaves(seed, x0 + 8, z0 + 8))) {
+  if (GENV < 3 && exp && (R.int(10) === 0 || isLushCaves(seed, x0 + 8, z0 + 8))) { // (1.18 worlds: caveBiomes)
     const lx = R.int(16), lz = R.int(16), ly = 22 + R.int(26), rad = 6 + R.int(5);
     const rocky = v => v === 1 || v === 3 || v === 2 || v === 91 || v === 92 || v === 93 || v === 75 || v === 76;
     for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) {
@@ -5014,7 +5056,7 @@ function fixSaved(m) {
   return { blocks: B, meta: M, changed, srcs, oldChests: chests(old), newChests: chests(neu) };
 }
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
-return { rollLoot, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
+return { rollLoot, isLushCaves, isDripstoneCaves, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
   shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, fixSaved, setLegacy: o => { LEGACY = o || {}; }, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };

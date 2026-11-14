@@ -634,6 +634,9 @@ function mpChunkLoaded(c) {
   const list = own ? W.meta.mpEdits && W.meta.mpEdits[dk] : mpEdits.get(c.key);
   if (!list) return;
   MP.applying = true; MP.replaying = MP.server; try { for (const [x, y, z, id, m, mo] of list) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, m); else setBlock(x, y, z, id, m, { noUpdate: true, keepTile: true }); } } finally { MP.applying = false; MP.replaying = false; }
+  // water or lava put there (or a block taken from beside some) while this chunk wasn't loaded on the runner's side was
+  // only set in place: it starts flowing now (it used to stay a single still block)
+  if (host) for (const [x, y, z] of list) { if (FLUID[getBlock(x, y, z)]) schedule(x, y, z, 5); for (const [dx, dy, dz] of N6) if (FLUID[getBlock(x + dx, y + dy, z + dz)]) schedule(x + dx, y + dy, z + dz, 5); }
   if (own) delete W.meta.mpEdits[dk]; else mpEdits.delete(c.key);
   if (MP.server && host) c.modified = c.edited = true; // stored again with the changes in it
 }
@@ -797,6 +800,13 @@ function mpGotAuth(dim, id) {
 function mpBecomeRunner() {
   for (const e of [...ENT]) if (e.remote) removeEnt(e);
   const dks = [...W.chunks.values()].map(c => dkey(c.cx, c.cz)); if (dks.length) mpSend({ t: 'chunkmobs', dks });
+  // the fluids the last runner had on the move stopped with it: every water or lava block near here that could still
+  // flow (air below or beside it) is looked at again
+  try { const pcx = Math.floor(PL.x) >> 4, pcz = Math.floor(PL.z) >> 4; let n = 0;
+    for (const c of W.chunks.values()) { if (Math.abs(c.cx - pcx) > 4 || Math.abs(c.cz - pcz) > 4 || !c.blocks) continue; const B = c.blocks, top = Math.min(CH - 1, (c.maxY || CH - 1) + 1);
+      for (let i = 256; i < (top << 8) && n < 4000; i++) { const b = B[i]; if (b !== 27 && b !== 28) continue; const lx = i & 15, lz = (i >> 4) & 15;
+        if (B[i - 256] === 0 || (lx > 0 && B[i - 1] === 0) || (lx < 15 && B[i + 1] === 0) || (lz > 0 && B[i - 16] === 0) || (lz < 15 && B[i + 16] === 0)) { schedule(c.cx * 16 + lx, (i >> 8) + MINY, c.cz * 16 + lz, 5 + (n & 15)); n++; } } }
+  } catch (e) {}
   chatMsg('이 차원의 계산을 맡았습니다', '#aaaaaa');
 }
 function mpRestoreMobs(l) {

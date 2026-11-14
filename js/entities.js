@@ -62,7 +62,8 @@ function lightBright(x, y, z) {
   const l = getLight(Math.floor(x), Math.floor(y), Math.floor(z));
   const cv = v => { const b = v / (4 - 3 * v); return b + (1 - Math.pow(1 - b, 4) - b) * R.gamma; };
   const sky = W.dim === -1 ? 0 : cv((l >> 4) / 15 * (W.dim === 1 ? 0.92 : 0.18 + 0.82 * dayFactor())), blk = cv(Math.min(15, Math.max(l & 15, R.dynAt(x, y, z))) / 15);
-  return Math.max(W.dim === -1 ? 0.28 : 0.06, Math.min(1, Math.max(sky, blk * 0.95)));
+  // (night vision: mobs, items, your hand and other players are lit like the ground around them, not left black)
+  return Math.max(W.dim === -1 ? 0.28 : 0.06, R.nightVision ? R.nightVision() : 0, Math.min(1, Math.max(sky, blk * 0.95)));
 }
 
 // ---------- mob model textures (MC box UV layout) ----------
