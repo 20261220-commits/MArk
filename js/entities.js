@@ -994,7 +994,7 @@ function arrowTick(e) {
         if (hitP) { if (e.owner && e.owner.type === 'stray') addEffect(PL, 'slowness', 600, 0); if (e.potion) applyPotion(PL, e.potion, 0.125); } const l = Math.hypot(e.vx, e.vz) || 1; PL.vx += e.vx / l * 0.3; PL.vz += e.vz / l * 0.3; }
       removeEnt(e); return;
     }
-    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && nx > o.x - o.w - .3 && nx < o.x + o.w + .3 && nz > o.z - o.w - .3 && nz < o.z + o.w + .3 && ny > o.y - .3 && ny < o.y + o.h + .3) {
+    if (!e.hitDone) for (const o of ENT) if (o.kind === 'mob' && !o.dead && o !== e.owner && !(e.hitSet && e.hitSet.has(o)) && (o.boxes ? o.boxes.some(b => nx > b[0] - .3 && nx < b[3] + .3 && ny > b[1] - .3 && ny < b[4] + .3 && nz > b[2] - .3 && nz < b[5] + .3) : nx > o.x - o.w - .3 && nx < o.x + o.w + .3 && nz > o.z - o.w - .3 && nz < o.z + o.w + .3 && ny > o.y - .3 && ny < o.y + o.h + .3)) {
       if (e.thrown) { onThrownHit(e, nx, ny, nz, o); removeEnt(e); return; }
       if (o.type === 'enderman') { endermanTeleport(o); continue; }
       if (o.def.arrowImmune && o.def.arrowImmune(o) && !e.thrown) { e.vx *= -0.2; e.vz *= -0.2; e.vy = 0.2; e.hitDone = true; break; } // the wither's armour

@@ -16,8 +16,8 @@ module.exports = async ({ ok, srv, b, lib }) => {
     o.wither = { n: skulls.length, side: skulls.filter(s => s.side).length, blue: skulls.filter(s => s.blue).length, span: W.tickN - t0 };
     // the dragon: an arrow at it perched and flying
     const dr = spawnMob('ender_dragon', X + .5, Y + 2, Z - 6.5); dr.ai = null; dr.def = { ...dr.def, ai: () => {} }; dr.hp = 200;
-    dr.phase = 'perch'; HURTPROJ = { kind: 'arrow' }; const perched = hurtMob(dr, 9, PL); HURTPROJ = null; o.perch = [perched, dr.hp];
-    dr.inv = 0; dr.phase = 'circle'; HURTPROJ = { kind: 'arrow' }; hurtMob(dr, 9, PL); HURTPROJ = null; o.flying = +(200 - dr.hp).toFixed(2); removeEnt(dr);
+    dr.phase = 'sit_scan'; HURTPROJ = { kind: 'arrow' }; const perched = hurtMob(dr, 9, PL); HURTPROJ = null; o.perch = [perched, dr.hp];
+    dr.inv = 0; dr.phase = 'hold'; HURTPROJ = { kind: 'arrow' }; hurtMob(dr, 9, PL); HURTPROJ = null; o.flying = +(200 - dr.hp).toFixed(2); removeEnt(dr);
     // critical hits: falling, not while sprinting
     const z = spawnMob('zombie', X + .5, Y, Z - 1.5); z.persistent = true; z.ai = null; INV.slots[INV.sel] = { id: IID.iron_sword, n: 1 };
     const hit = sprint => { z.hp = 20; z.inv = 0; PL.attackT = 100; PL.onGround = false; PL.vy = -0.2; PL.sprinting = sprint; attackEntity(z); return +(20 - z.hp).toFixed(2); };

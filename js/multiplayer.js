@@ -751,7 +751,7 @@ function mpMobSound(e, snd, vol) { if (!snd) return; const d = Math.hypot(PL.x -
 // ---------- a saved server world (node tools/server.js) ----------
 // The server keeps the world; whoever is first in a dimension runs it (MP.role 'host' there) and stores its chunks
 // back to the server; the others follow as guests. When the runner leaves, the server names the next one.
-const MP_SHARED = ['dragonKilled', 'dragonDone', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
+const MP_SHARED = ['dragonKilled', 'dragonDone', 'dragon', 'gateways', 'maps', 'mapN', 'siegeDay', 'netherIn', 'keepInv'];
 // entering stopped by a mistake: said on the screen (and told to the server) instead of a black screen that never answers
 function mpEnterFailed(e) {
   if (typeof gameErr === 'function') gameErr('join', e);
