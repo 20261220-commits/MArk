@@ -54,22 +54,33 @@ async function skinProxy(url) {
     return new Response(found.buf, { headers: { 'content-type': imgType(found.buf), ...cors, 'cache-control': 'public, max-age=3600' } });
   } catch (e) { return end(502, 'fetch failed'); }
 }
+// a Java Edition account by name: Mojang first (name -> id -> profile with its textures); when Mojang won't answer this
+// server (it turns some requests from Cloudflare away), the same profile through playerdb.co, then api.ashcon.app
 async function profileLookup(url) {
   const send = (code, o) => new Response(JSON.stringify(o), { status: code, headers: { 'content-type': 'application/json; charset=utf-8', ...cors, 'cache-control': code === 200 ? 'public, max-age=300' : 'no-store' } });
   const name = (url.searchParams.get('name') || '').trim(); if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) return send(400, { error: 'bad name' });
-  const text = b => new TextDecoder().decode(b);
-  try {
+  const text = b => new TextDecoder().decode(b), json = async u => { const r = await getLimited(u, 200000, 'application/json').catch(() => ({})); if (!r.buf || !r.buf.length) return { status: r.status || 0 }; try { return { status: 200, j: JSON.parse(text(r.buf)) }; } catch (e) { return { status: 0 }; } };
+  const fix = x => x ? String(x).replace(/^http:/, 'https:') : null;
+  const fromTextures = (nm, id, props) => { const tp = (props || []).find(p => p.name === 'textures'); const tex = tp ? JSON.parse(text(b64dec(tp.value))).textures || {} : {};
+    return { name: nm || name, id, skin: fix(tex.SKIN && tex.SKIN.url), slim: !!(tex.SKIN && tex.SKIN.metadata && tex.SKIN.metadata.model === 'slim'), cape: fix(tex.CAPE && tex.CAPE.url) }; };
+  let missing = 0;
+  try { // Mojang
     let id = null;
-    for (const x of ['https://api.mojang.com/users/profiles/minecraft/' + name, 'https://api.minecraftservices.com/minecraft/profile/lookup/name/' + name]) {
-      const r = await getLimited(x, 100000, 'application/json').catch(() => ({})); if (r.buf && r.buf.length) { try { const j = JSON.parse(text(r.buf)); if (j.id) { id = j.id; break; } } catch (e) {} } }
-    if (!id) return send(404, { error: 'no such player' });
-    const r = await getLimited('https://sessionserver.mojang.com/session/minecraft/profile/' + id, 100000, 'application/json'); if (!r.buf) return send(502, { error: 'profile' });
-    const prof = JSON.parse(text(r.buf)), tp = (prof.properties || []).find(p => p.name === 'textures');
-    const tex = tp ? JSON.parse(text(b64dec(tp.value))).textures || {} : {}, fix = x => x ? String(x).replace(/^http:/, 'https:') : null;
-    return send(200, { name: prof.name || name, id, skin: fix(tex.SKIN && tex.SKIN.url), slim: !!(tex.SKIN && tex.SKIN.metadata && tex.SKIN.metadata.model === 'slim'), cape: fix(tex.CAPE && tex.CAPE.url) });
-  } catch (e) { return send(502, { error: 'lookup failed' }); }
+    for (const x of ['https://api.mojang.com/users/profiles/minecraft/' + name, 'https://api.minecraftservices.com/minecraft/profile/lookup/name/' + name]) { const r = await json(x); if (r.j && r.j.id) { id = r.j.id; break; } if (r.status === 404 || r.status === 204) missing++; }
+    if (id) { const r = await json('https://sessionserver.mojang.com/session/minecraft/profile/' + id); if (r.j) return send(200, fromTextures(r.j.name, id, r.j.properties)); }
+  } catch (e) {}
+  try { // playerdb.co
+    const r = await json('https://playerdb.co/api/player/minecraft/' + name), pl = r.j && r.j.data && r.j.data.player;
+    if (pl && pl.id) return send(200, fromTextures(pl.username, String(pl.raw_id || pl.id).replace(/-/g, ''), pl.properties));
+    if (r.j && /not.?found|invalid/i.test(String(r.j.code || ''))) missing++;
+  } catch (e) {}
+  try { // api.ashcon.app
+    const r = await json('https://api.ashcon.app/mojang/v2/user/' + name), t = r.j && r.j.textures;
+    if (r.j && r.j.uuid) return send(200, { name: r.j.username || name, id: r.j.uuid.replace(/-/g, ''), skin: fix(t && t.skin && t.skin.url), slim: !!(t && t.slim), cape: fix(t && t.cape && t.cape.url) });
+    if (r.status === 404) missing++;
+  } catch (e) {}
+  return missing >= 2 ? send(404, { error: 'no such player' }) : send(502, { error: 'lookup failed' });
 }
-
 // ---------------- bytes ----------------
 function b64dec(s) { const bin = atob(String(s).replace(/\s+/g, '')), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
 function b64enc(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
