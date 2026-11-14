@@ -129,7 +129,7 @@ function mpWorldCore(store, out) {
       case 'dim': setDim(p, +m.dim || 0); return;
       case 'pl': p.s = m; if (m.dim !== p.dim && p.joined) setDim(p, m.dim); others(p, m); return;
       case 'pdata': { const nm = p.key || p.name || (typeof m.name === 'string' ? m.name.slice(0, 16) : null); if (nm && m.d && typeof m.d === 'object') { const at = Math.max(Date.now(), ((S.players[nm] && S.players[nm].at) || 0) + 1); m.d.at = at; S.players[nm] = m.d; p.pdataAt = Date.now(); store.saveState(); send(p, { t: 'pdataok', at, seq: m.seq }); } return; } // stamped with the server's clock: the player's device keeps the stamp with its own copy
-      case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); } return;
+      case 'meta': if (S.meta && m.shared) { S.meta.shared = { ...S.meta.shared, ...m.shared }; if (m.spawn) S.meta.spawn = m.spawn; if (m.gamerules) S.meta.gamerules = m.gamerules; store.saveState(); others(p, { t: 'shared', shared: m.shared }); } return; // (the others keep it too: whoever runs the End next carries on with the dragon as it is)
       case 'timeset': S.time = +m.time || S.time; if (m.rain != null) { S.rain = m.rain; S.thunder = !!m.thunder; } return;
       case 'chunk': { const dk = prefix(m.dim) + m.cx + ',' + m.cz; if (!store.keys.has(dk)) { send(p, { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, none: true }); return; }
         entry(dk).then(c => { const o = { t: 'chunkdata', cx: m.cx, cz: m.cz, dim: m.dim, edits: c.edits.length ? c.edits : null, tiles: Object.keys(c.tiles).length ? c.tiles : null, tmy: tmy() };

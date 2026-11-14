@@ -508,6 +508,7 @@ function dragonHurt(e, dmg, attacker) {
   if (dragonSitting(e)) { e.sitDmg = (e.sitDmg || 0) + dmg; if (e.sitDmg > e.def.hp * 0.25) { e.sitDmg = 0; dragonPhase(e, 'takeoff'); } }
   if (e.hp <= 0) { e.hp = 0; dragonPhase(e, 'dying'); }
   dragonKeep(e);
+  if (typeof MP !== 'undefined' && MP.server && typeof mpSendShared === 'function') mpSendShared(); // (a server world: its health kept there at once, for whoever comes next)
   return true;
 }
 // the parts of its body (Java's EnderDragonPart boxes: head, neck, body, wings, tail), placed by its facing

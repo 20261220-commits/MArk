@@ -1,6 +1,7 @@
 // Dimensions: travelling between the Overworld, the Nether and the End through portals.
 const DIM_NAME = { 0: '오버월드', '-1': '네더', 1: '디 엔드' };
 function switchDim(to, x, y, z, arrive) {
+  { const d = W.dim === 1 && ENT.find(e => e.type === 'ender_dragon' && !e.dead && !e.remote); if (d && typeof dragonKeep === 'function') { dragonKeep(d); if (typeof MP !== 'undefined' && MP.server && typeof mpSendShared === 'function') mpSendShared(); } } // (leaving the End: the dragon's health goes to the server now)
   saveAll();
   if (PL.riding) { PL.riding = null; }
   for (const c of [...W.chunks.values()]) unloadChunk(c);
