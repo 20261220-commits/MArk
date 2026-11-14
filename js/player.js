@@ -84,7 +84,7 @@ function raycast(reach, fluids) {
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
     const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
-    if (e.boxes) { for (let i = 0; i < e.boxes.length; i++) { const h = rayBox(ox, oy, oz, dx, dy, dz, e.boxes[i]); const pt = e.boxParts && e.boxParts[i]; if (h && h[0] <= lim && (!best || h[0] < best.t || (pt === 'head' && best.e === e && h[0] <= best.t + 0.15))) best = { type: 'ent', e, t: h[0], part: pt }; } continue; } // (the head's face is level with the neck's: aimed there, it is the head) // (a body of several parts: the ender dragon's)
+    if (e.boxes) { for (let i = 0; i < e.boxes.length; i++) { const h = rayBox(ox, oy, oz, dx, dy, dz, e.boxes[i]); const pt = e.boxParts && e.boxParts[i]; if (h && h[0] <= lim && (!best || (h[0] < best.t && !(pt === 'neck' && best.e === e && best.part === 'head')) || (pt === 'head' && best.e === e && best.part === 'neck'))) best = { type: 'ent', e, t: h[0], part: pt }; } continue; } // (the neck's box wraps round the head's: a look that goes through the head is aimed at the head) // (a body of several parts: the ender dragon's)
     const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
