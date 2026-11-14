@@ -20,23 +20,37 @@ function arriveDim() {
   if (a === 'end') {
     for (let x = 98; x <= 102; x++) for (let z = -2; z <= 2; z++) { setBlock(x, 48, z, BID.obsidian, 0, { noUpdate: true }); for (let y = 49; y <= 51; y++) if (getBlock(x, y, z)) setBlock(x, y, z, 0, 0, { noUpdate: true }); }
     PL.x = 100.5; PL.y = 49; PL.z = 0.5; PL.yaw = Math.PI / 2;
-  } else if (a === 'spawn') {
-    const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
-    if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
-    PL.y = y + 1;
-  } else if (a === 'anchor') { anchorArrive();
+  } else if (a === 'spawn') { spawnStand();
+  } else if (a === 'bedspawn') { // beside the bed, if it is still there (else the world spawn), as Java's respawn
+    const sp = PL.spawn;
+    if (sp && getBlock(sp[0], sp[1] - 1, sp[2]) === BID.red_bed) { const w = bedWakeSpot(sp[0], sp[1] - 1, sp[2]); PL.x = w[0]; PL.y = w[1]; PL.z = w[2]; }
+    else { PL.spawn = null; PL.spawnBed = false; UI.flash('집 침대가 없거나 막혀 있습니다'); const ws = W.worldSpawn; PL.x = ws[0] + .5; PL.y = ws[1]; PL.z = ws[2] + .5; spawnStand(); }
+  } else if (a === 'anchor' || a === 'anchorkeep') { anchorArrive(a === 'anchorkeep');
   } else if (a === 'gateway' || a === 'gatehome') {
     const x0 = Math.floor(PL.x), z0 = Math.floor(PL.z); let best = null;
     for (let r = 0; r <= 24 && !best; r += 2) for (let dx = -r; dx <= r && !best; dx += 2) for (let dz = -r; dz <= r && !best; dz += 2) { const t = topY(x0 + dx, z0 + dz); if (t > 30 && getBlock(x0 + dx, t, z0 + dz) === BID.end_stone) best = [x0 + dx, t + 1, z0 + dz]; }
     if (!best) { best = [x0, 71, z0]; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) setBlock(x0 + x, 70, z0 + z, BID.end_stone, 0, { noUpdate: true }); }
     PL.x = best[0] + .5; PL.y = best[1]; PL.z = best[2] + .5;
-    if (a === 'gateway' && !hasGateway(best[0], best[1], best[2])) { const gy = best[1] + 3; setBlock(best[0] + 2, gy - 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy + 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy, best[2], BID.end_portal, 1, { noUpdate: true }); }
+    if (a === 'gateway' && !hasGateway(best[0], best[1], best[2])) buildGateway(best[0] + 2, best[1] + 3, best[2]); // (the way back)
   } else if (a === 'portal') {
     const found = findPortalNear(Math.floor(PL.x), Math.floor(PL.z), W.dim === -1 ? 24 : 96);
     if (found) { PL.x = found[0] + .5; PL.y = found[1]; PL.z = found[2] + .5; }
     else { const p = buildPortal(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); PL.x = p[0] + .5; PL.y = p[1]; PL.z = p[2] + .5; }
   }
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.portalLock = true;
+}
+// on the ground at the spawn: the block given if there is room, else the top of that column
+function spawnStand() {
+  const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
+  if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
+  PL.y = y + 1;
+}
+// back to the player's respawn point from another dimension (the End's exit portal, or respawning): a respawn anchor
+// in the Nether (kept charged when the player walks out of the End alive, as Java), beside the bed, or the world spawn
+function goToRespawn(alive) {
+  if (PL.spawn && PL.spawnDim === -1) { switchDim(-1, PL.spawn[0] + .5, PL.spawn[1] + 1, PL.spawn[2] + .5, alive ? 'anchorkeep' : 'anchor'); return; }
+  if (PL.spawn && PL.spawnBed) { switchDim(0, PL.spawn[0] + .5, PL.spawn[1], PL.spawn[2] + .5, 'bedspawn'); return; }
+  const ws = W.worldSpawn; switchDim(0, ws[0] + .5, ws[1], ws[2] + .5, 'spawn');
 }
 function findPortalNear(cx, cz, rad) {
   let best = null, bd = Infinity;
@@ -75,14 +89,15 @@ function portalTick() {
   if (PL.dead || spectator()) return;
   let inNether = false, inEnd = false;
   let gate = null;
-  inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z]; else inEnd = true; } });
+  inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z, y]; else inEnd = true; } });
   if (gate && !PL.portalLock) { // end gateway: main island <-> outer islands
+    gatewayBeam(gate[0], gate[2], gate[1], 'cool');
     const d = Math.hypot(gate[0], gate[1]) || 1, far = d > 500, k = far ? 100 / d : 1000 / d;
     if (typeof advGrant === 'function') advGrant('end/enter_end_gateway'); switchDim(1, gate[0] * k + 0.5, 90, gate[1] * k + 0.5, far ? 'gatehome' : 'gateway'); return;
   }
   if (!inNether && !inEnd) PL.portalLock = false; // arriving in a portal: step out before it works again
   if (inEnd && !PL.portalLock) {
-    if (W.dim === 1) { const sp = PL.spawn || W.worldSpawn; switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); chatMsg('엔드를 떠났습니다', '#aaaaaa'); }
+    if (W.dim === 1) { goToRespawn(true); chatMsg('엔드를 떠났습니다', '#aaaaaa'); }
     else switchDim(1, 100.5, 49, 0.5, 'end');
     return;
   }
@@ -141,3 +156,32 @@ RANDOM_TICK[BID.lava] = (x, y, z) => { // LavaFluid.onRandomTick
 };
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
 function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }
+// ---------- end gateways (Java's EndGatewayFeature and EndGatewayRenderer) ----------
+// the gateway with bedrock in a plus above and below it and one more at each end, the air around it cleared
+function buildGateway(x, y, z) {
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -1; dz <= 1; dz++) {
+    const sx = !dx, sy = !dy, sz = !dz, ey = Math.abs(dy) === 2;
+    const b = sx && sy && sz ? BID.end_portal : sy ? 0 : ey ? (sx && sz ? BID.bedrock : -1) : (sx || sz ? BID.bedrock : -1);
+    if (b >= 0) setBlock(x + dx, y + dy, z + dz, b, b === BID.end_portal ? 1 : 0, { noUpdate: true });
+  }
+  gatewayBeam(x, y, z, 'spawn');
+}
+// its beam: magenta reaching the whole height for the 10 s after it appears, purple and 50 blocks for 2 s when it is
+// used and every 2 minutes, up and down from it, growing and shrinking
+const GATEWAYS = trackBlocks(BID.end_portal), GW = new Map(), gwGeo = new THREE.BoxGeometry(0.4, 1, 0.4);
+function gatewayBeam(x, y, z, kind) { const k = x + ',' + y + ',' + z, g = GW.get(k) || {}; g[kind] = W.tickN; GW.set(k, g); }
+function gatewayRender() {
+  for (const [k, g] of GW) if (!GATEWAYS.has(k) || W.dim !== 1) { if (g.mesh) { scene.remove(g.mesh); g.mesh.material.dispose(); } GW.delete(k); }
+  if (W.dim !== 1) return;
+  const t = W.tickN + (W.tickFrac || 0);
+  for (const k of GATEWAYS) {
+    const [x, y, z] = k.split(',').map(Number); if (!(getMeta(x, y, z) & 1) || Math.hypot(x - PL.x, z - PL.z) > 160) continue;
+    let g = GW.get(k); if (!g) { g = {}; GW.set(k, g); }
+    const sp = g.spawn != null ? (t - g.spawn) / 200 : 1, per = ((W.tickN + ((x * 31 + z * 17) & 2047)) % 2400) / 40, cl = g.cool != null && t - g.cool < 40 ? (t - g.cool) / 40 : per < 1 ? per : 1;
+    const spawning = sp < 1, f = spawning ? sp : cl, len = f < 1 ? Math.floor(Math.sin(f * Math.PI) * (spawning ? 384 : 50)) : 0;
+    if (!len) { if (g.mesh) g.mesh.visible = false; continue; }
+    if (!g.mesh) { g.mesh = new THREE.Mesh(gwGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, fog: false })); scene.add(g.mesh); }
+    g.mesh.visible = true; g.mesh.material.color.setRGB(...(spawning ? [0.78, 0.31, 0.74] : [0.54, 0.2, 0.72]));
+    g.mesh.position.set(x + .5, y + .5, z + .5); g.mesh.scale.set(1, len * 2, 1);
+  }
+}

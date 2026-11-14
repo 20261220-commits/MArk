@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.14 21:57';
+const NEMO_VERSION = '2026.11.14 22:16';
 
 </script>
 <script>/* js/shared.js */
@@ -8720,7 +8720,7 @@ function buildAtlasMips() {
 R.buildAtlasMips = buildAtlasMips;
 
 const chunkUniforms = () => THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
+  map: { value: null }, uSky: { value: 1 }, uSkyCol: { value: new THREE.Color(1, 1, 1) }, uFlick: { value: 1 }, uGamma: { value: 0.5 }, uTime: { value: 0 }, uEndTile: { value: new THREE.Vector2(-9, -9) }, uMin: { value: 0.035 }, uDyn: { value: [] } }]);
 const CHUNK_VS = `
 attribute vec4 lt; attribute vec4 col;
 uniform float uSky; uniform vec3 uSkyCol; uniform float uFlick; uniform float uGamma; uniform float uMin; uniform vec4 uDyn[6];
@@ -8751,7 +8751,23 @@ varying vec2 vUv; varying vec2 vTile; varying vec3 vLight; varying vec3 vTint;
 // sampled no nearer the tile's edge than the middle of its edge texel: the same texel, but a GPU whose shaders work in
 // low precision (many phones) no longer rounds onto the next tile of the atlas (a line of lava along stone's edge)
 vec4 tileTex(){ return texture2D(map, (floor(vTile + 0.5) * 256.0 + clamp(vUv, 8.0, 248.0)) / 8192.0); }
+uniform vec2 uEndTile; uniform float uTime;
+// the End portal and gateway (Java's end portal shader): a near-black depth with layers of coloured specks drifting
+// each its own way, fixed to the screen rather than the block, unlit
+vec3 endPortal(){
+  vec2 sc = gl_FragCoord.xy / 420.0; vec3 c = vec3(0.03, 0.055, 0.07);
+  for (int i = 0; i < 10; i++) { float fi = float(i), a = fi * 2.39996;
+    vec2 p = mat2(cos(a), -sin(a), sin(a), cos(a)) * sc * (1.0 + fi * 0.45) + vec2(cos(a * 1.3), sin(a * 0.7)) * uTime * (0.006 + fi * 0.002) + fi * 7.31;
+    vec2 g = floor(p * 14.0), f = fract(p * 14.0); float h = fract(sin(dot(g, vec2(12.9898, 78.233)) + fi * 3.1) * 43758.5453);
+    float star = step(0.9, h) * (1.0 - smoothstep(0.08, 0.32, max(abs(f.x - 0.5), abs(f.y - 0.5))));
+    vec3 col = mix(vec3(0.16, 0.55, 0.47), vec3(0.42, 0.33, 0.78), fract(h * 7.0 + fi * 0.19)); col = mix(col, vec3(0.6, 0.85, 0.8), step(0.985, h));
+    c += col * star * (1.1 - fi * 0.08); }
+  return c;
+}
 void main(){
+  if (floor(vTile + 0.5) == uEndTile) { gl_FragColor = vec4(endPortal(), 1.0);
+    #include <fog_fragment>
+    return; }
   vec4 t = tileTex();
   if (t.a < 0.5) discard;
   float tm = step(t.a, 0.97);
@@ -8792,6 +8808,7 @@ const matTrans = new THREE.ShaderMaterial({ uniforms: chunkUniforms(), vertexSha
 for (const m of [matOpaque, matCutout, matTrans]) m.uniforms.uDyn.value = DYN;
 matOpaque.uniforms.map.value = atlasTex; matCutout.uniforms.map.value = atlasTex; matTrans.uniforms.map.value = atlasTex;
 R.matOpaque = matOpaque; R.matTrans = matTrans;
+for (const m of [matOpaque, matCutout]) m.uniforms.uEndTile.value.set(S.T.end_portal % S.TPR, Math.floor(S.T.end_portal / S.TPR));
 
 function makeChunkGeo(d) {
   const g = new THREE.BufferGeometry();
@@ -9332,7 +9349,7 @@ function renderFrame(dt, eye, under) {
   cloudMat.color.setScalar(0.2 + 0.8 * day); cloudMat.opacity = 0.8 * (1 - W.rain * 0.3);
   // lighting uniforms
   const skyF = Math.max(0.18 + 0.82 * day, (W.flash || 0) * 0.9); // a lightning flash lights up the world for a moment
-  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uMin.value = nightVision(); m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
+  for (const m of [matOpaque, matCutout, matTrans]) { m.uniforms.uTime.value = performance.now() / 1000; m.uniforms.uMin.value = nightVision(); m.uniforms.uSky.value = skyF; m.uniforms.uSkyCol.value.setRGB(0.92 + 0.08 * day, 0.92 + 0.08 * day, 1); m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma; }
   updateParticles(dt);
   pMat.uniforms.scale.value = innerHeight * R.basePR * R.pixelScale / (2 * Math.tan(camera.fov * Math.PI / 360));
   renderer.clear();
@@ -9352,7 +9369,7 @@ function renderOtherDim(dt, eye, under) {
   if (effLv(PL, 'blindness')) { fog.color.setRGB(0, 0, 0); fog.near = 1; fog.far = 6; }
   renderer.setClearColor(fog.color); fogCull();
   for (const m of [matOpaque, matCutout, matTrans]) {
-    m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
+    m.uniforms.uTime.value = performance.now() / 1000; m.uniforms.uSky.value = nether ? 0 : 0.92; m.uniforms.uSkyCol.value.setRGB(0.9, 0.86, 1); m.uniforms.uMin.value = Math.max(nether ? 0.24 : 0.08, nightVision()); /* (night vision works in the Nether and the End too) */
     m.uniforms.uFlick.value = 0.95 + 0.04 * Math.sin(performance.now() * 0.01) * Math.sin(performance.now() * 0.0237); m.uniforms.uGamma.value = R.gamma;
   }
   updateParticles(dt);
@@ -10013,9 +10030,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
     if (e.type === 'villager' && typeof vGossip === 'function') vGossip(e, 'mnn', 25); // gossip: minor_negative 25 (villagelife.js)
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
-    if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
-  if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
+  if (e.type === 'enderman' && !attacker && Math.random() < 0.9) endermanTeleport(e); // (Java: hurt by anything but a living thing, it teleports 9 times in 10)
   if (!partial) play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;
@@ -11409,30 +11425,49 @@ function slimeAI(e, dist) {
   if (!e.onGround) { e.vx *= 0.98; e.vz *= 0.98; }
   e.squish = (e.squish || 0) * 0.85;
 }
+// The enderman as Java 1.18 (EnderMan and its goals):
+//  - looking at its head (Java's isLookingAtMe: within 1 - 0.025 / distance of straight at its eyes, nothing between,
+//    no carved pumpkin worn) within 64 blocks provokes it: it screams and comes for you a quarter second later
+//  - while you look at it from within 16 blocks it stands still and stares back (EndermanFreezeWhenLookedAtGoal), and
+//    within 4 blocks it teleports away; looked away, it runs at you half again as fast (+0.15 speed) and hits for 7
+//    when within reach (its width doubled, squared, plus yours: about 1.4 blocks), once a second
+//  - more than 16 blocks off and not looked at, it teleports 16 blocks toward you every 1.5 s (teleportTowards)
+//  - water and rain hurt it and make it teleport; hurt by anything but a living thing it teleports 9 times in 10;
+//    projectiles never touch it (it teleports out of their way)
+function endermanLooked(e) {
+  const helm = INV.armor[3]; if (helm && ITEMS[helm.id] && ITEMS[helm.id].key === 'carved_pumpkin') return false;
+  const [lx, ly, lz] = lookDir(), hx = e.x - PL.x, hy = e.y + 2.55 - (PL.y + PL.eyeH), hz = e.z - PL.z, hl = Math.hypot(hx, hy, hz) || 1;
+  return (lx * hx + ly * hy + lz * hz) / hl > 1 - 0.025 / hl && canSee(PL.x, PL.y + PL.eyeH, PL.z, e.x, e.y + 2.55, e.z);
+}
 function endermanAI(e, dist) {
   const d = e.def;
-  // looking at an enderman's head provokes it
-  if (!e.target && plTargetable() && dist < 64) {
-    const [lx, ly, lz] = lookDir(), hx = e.x - PL.x, hy = e.y + 2.6 - (PL.y + PL.eyeH), hz = e.z - PL.z, hl = Math.hypot(hx, hy, hz);
-    if ((lx * hx + ly * hy + lz * hz) / hl > 1 - 0.025 / hl * 4 && canSee(PL.x, PL.y + PL.eyeH, PL.z, e.x, e.y + 2.6, e.z)) { e.stare = (e.stare || 0) + 1; if (e.stare > 5) { e.target = PL; play('enderman'); } }
-  }
-  if (e.target && (!plTargetable() || dist > 48)) e.target = null;
-  if ((W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(e.x), Math.floor(e.y + 2), Math.floor(e.z)) >> 4) === 15) || e.inWater) { if (e.age % 20 === 0) { if (e.inWater) hurtMob(e, 1, null); endermanTeleport(e); } }
+  if (!e.target && e.provoke == null && plTargetable() && dist < 64 && endermanLooked(e)) { e.provoke = 5; play('enderman'); }
+  if (e.provoke != null && --e.provoke <= 0) { e.provoke = null; if (plTargetable()) { e.target = PL; e.tpT = 0; } }
+  if (e.target && (!plTargetable() || dist > 64)) e.target = null;
+  if ((W.dim === 0 && W.rain > 0.5 && (getLight(Math.floor(e.x), Math.floor(e.y + 2), Math.floor(e.z)) >> 4) === 15) || e.inWater) { if (e.age % 10 === 0) hurtMob(e, 1, null); }
   let mx = 0, mz = 0, speed = d.speed;
   if (e.target) {
-    faceTo(e, PL.x, PL.z); [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); speed = 0.25;
-    if (dist < 1.6 && Math.abs(PL.y - e.y) < 2.5 && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, d.dmg, mx, mz); }
-    if (dist > 12 && Math.random() < 0.02) endermanTeleport(e, PL.x, PL.z);
+    faceTo(e, PL.x, PL.z);
+    if (dist < 16 && endermanLooked(e)) { // stared at: still, staring back; too close and it is gone
+      if (dist < 4) endermanTeleport(e);
+      e.tpT = 0;
+    } else {
+      [mx, mz] = pathDir(e, PL.x, PL.y, PL.z); speed = d.speed * 1.5;
+      const reach = (e.w * 4) ** 2 + 0.6, d2 = (PL.x - e.x) ** 2 + (PL.y - e.y) ** 2 + (PL.z - e.z) ** 2;
+      if (d2 <= reach && e.attackCd <= 0) { e.attackCd = 20; attackPlayer(e, d.dmg, PL.x - e.x, PL.z - e.z); }
+      if (dist > 16 && ++e.tpT >= 30) { const l = dist || 1; if (endermanTeleport(e, e.x + (PL.x - e.x) / l * 16, e.z + (PL.z - e.z) / l * 16, 8)) e.tpT = 0; }
+    }
   } else {
     if (!e.goal && Math.random() < 1 / 100) e.goal = wanderGoal(e, 7);
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) e.goal = null; else { mx = gx / gl; mz = gz / gl; e.yawTarget = Math.atan2(-gx, -gz); } }
   }
   walkPhysics(e, mx, mz, speed);
 }
-function endermanTeleport(e, cx = e.x, cz = e.z) {
+// a teleport to a random spot (Java: 32 blocks each way, 32 up or down) or near a point; it lands on solid ground
+function endermanTeleport(e, cx = e.x, cz = e.z, spread = 64) {
   for (let k = 0; k < 16; k++) {
-    const x = Math.floor(cx + (Math.random() - .5) * 32), z = Math.floor(cz + (Math.random() - .5) * 32); if (!isLoaded(x, z)) continue;
-    let y = Math.floor(e.y + (Math.random() - .5) * 16); for (let i = 0; i < 16 && y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
+    const x = Math.floor(cx + (Math.random() - .5) * spread), z = Math.floor(cz + (Math.random() - .5) * spread); if (!isLoaded(x, z)) continue;
+    let y = Math.floor(e.y + (Math.random() - .5) * 32); for (let i = 0; i < 32 && y > MINY + 1 && !SOLID[getBlock(x, y - 1, z)]; i++) y--;
     if (!SOLID[getBlock(x, y - 1, z)] || FLUID[getBlock(x, y, z)] || SOLID[getBlock(x, y, z)] || SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)]) continue;
     for (let i = 0; i < 12; i++) R.simpleParticle(e.x + (Math.random() - .5), e.y + Math.random() * 3, e.z + (Math.random() - .5), [0.6, 0.2, 0.9], { kind: 'portal', size: 0.12, vy: 0.3, grav: 0 });
     e.x = e.px = x + .5; e.y = e.py = y; e.z = e.pz = z + .5; e.path = null; play('teleport', { vol: 0.5 }); return true;
@@ -11741,8 +11776,7 @@ function dragonDefeated(e) {
   // an end gateway to the outer islands: Java's 20 places on a ring 96 out at y 75, one more each fight, in a shuffled order
   const used = W.meta.gateways || (W.meta.gateways = []), free = [...Array(20).keys()].filter(i => !used.includes(i));
   if (free.length) { const i = free[S.hash32(W.seed, used.length, 0, 7) % free.length], ga = 2 * (-Math.PI + 0.15707963267948966 * i), gx = Math.floor(96 * Math.cos(ga)), gz = Math.floor(96 * Math.sin(ga)); used.push(i);
-    for (const dy of [-1, 1]) setBlock(gx, 75 + dy, gz, BID.bedrock, 0, { noUpdate: true });
-    setBlock(gx, 75, gz, BID.end_portal, 1, { noUpdate: true }); }
+    buildGateway(gx, 75, gz); }
   W.meta.dragon = null; W.meta.dragonKilled = true; W.meta.dragonDone = true; UI.advance && UI.advance('dragon'); chatMsg('엔더 드래곤을 물리쳤습니다!', '#ff55ff');
   play('levelup');
 }
@@ -12305,23 +12339,37 @@ function arriveDim() {
   if (a === 'end') {
     for (let x = 98; x <= 102; x++) for (let z = -2; z <= 2; z++) { setBlock(x, 48, z, BID.obsidian, 0, { noUpdate: true }); for (let y = 49; y <= 51; y++) if (getBlock(x, y, z)) setBlock(x, y, z, 0, 0, { noUpdate: true }); }
     PL.x = 100.5; PL.y = 49; PL.z = 0.5; PL.yaw = Math.PI / 2;
-  } else if (a === 'spawn') {
-    const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
-    if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
-    PL.y = y + 1;
-  } else if (a === 'anchor') { anchorArrive();
+  } else if (a === 'spawn') { spawnStand();
+  } else if (a === 'bedspawn') { // beside the bed, if it is still there (else the world spawn), as Java's respawn
+    const sp = PL.spawn;
+    if (sp && getBlock(sp[0], sp[1] - 1, sp[2]) === BID.red_bed) { const w = bedWakeSpot(sp[0], sp[1] - 1, sp[2]); PL.x = w[0]; PL.y = w[1]; PL.z = w[2]; }
+    else { PL.spawn = null; PL.spawnBed = false; UI.flash('집 침대가 없거나 막혀 있습니다'); const ws = W.worldSpawn; PL.x = ws[0] + .5; PL.y = ws[1]; PL.z = ws[2] + .5; spawnStand(); }
+  } else if (a === 'anchor' || a === 'anchorkeep') { anchorArrive(a === 'anchorkeep');
   } else if (a === 'gateway' || a === 'gatehome') {
     const x0 = Math.floor(PL.x), z0 = Math.floor(PL.z); let best = null;
     for (let r = 0; r <= 24 && !best; r += 2) for (let dx = -r; dx <= r && !best; dx += 2) for (let dz = -r; dz <= r && !best; dz += 2) { const t = topY(x0 + dx, z0 + dz); if (t > 30 && getBlock(x0 + dx, t, z0 + dz) === BID.end_stone) best = [x0 + dx, t + 1, z0 + dz]; }
     if (!best) { best = [x0, 71, z0]; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) setBlock(x0 + x, 70, z0 + z, BID.end_stone, 0, { noUpdate: true }); }
     PL.x = best[0] + .5; PL.y = best[1]; PL.z = best[2] + .5;
-    if (a === 'gateway' && !hasGateway(best[0], best[1], best[2])) { const gy = best[1] + 3; setBlock(best[0] + 2, gy - 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy + 1, best[2], BID.bedrock, 0, { noUpdate: true }); setBlock(best[0] + 2, gy, best[2], BID.end_portal, 1, { noUpdate: true }); }
+    if (a === 'gateway' && !hasGateway(best[0], best[1], best[2])) buildGateway(best[0] + 2, best[1] + 3, best[2]); // (the way back)
   } else if (a === 'portal') {
     const found = findPortalNear(Math.floor(PL.x), Math.floor(PL.z), W.dim === -1 ? 24 : 96);
     if (found) { PL.x = found[0] + .5; PL.y = found[1]; PL.z = found[2] + .5; }
     else { const p = buildPortal(Math.floor(PL.x), Math.floor(PL.y), Math.floor(PL.z)); PL.x = p[0] + .5; PL.y = p[1]; PL.z = p[2] + .5; }
   }
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; PL.portalLock = true;
+}
+// on the ground at the spawn: the block given if there is room, else the top of that column
+function spawnStand() {
+  const x = Math.floor(PL.x), z = Math.floor(PL.z); let y = Math.max(Math.floor(PL.y) - 1, 1);
+  if (SOLID[getBlock(x, y + 1, z)] || SOLID[getBlock(x, y + 2, z)] || !SOLID[getBlock(x, y, z)]) { y = topY(x, z); }
+  PL.y = y + 1;
+}
+// back to the player's respawn point from another dimension (the End's exit portal, or respawning): a respawn anchor
+// in the Nether (kept charged when the player walks out of the End alive, as Java), beside the bed, or the world spawn
+function goToRespawn(alive) {
+  if (PL.spawn && PL.spawnDim === -1) { switchDim(-1, PL.spawn[0] + .5, PL.spawn[1] + 1, PL.spawn[2] + .5, alive ? 'anchorkeep' : 'anchor'); return; }
+  if (PL.spawn && PL.spawnBed) { switchDim(0, PL.spawn[0] + .5, PL.spawn[1], PL.spawn[2] + .5, 'bedspawn'); return; }
+  const ws = W.worldSpawn; switchDim(0, ws[0] + .5, ws[1], ws[2] + .5, 'spawn');
 }
 function findPortalNear(cx, cz, rad) {
   let best = null, bd = Infinity;
@@ -12360,14 +12408,15 @@ function portalTick() {
   if (PL.dead || spectator()) return;
   let inNether = false, inEnd = false;
   let gate = null;
-  inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z]; else inEnd = true; } });
+  inBlock((b, x, y, z) => { if (b === BID.nether_portal) inNether = true; if (b === BID.end_portal) { if (getMeta(x, y, z) & 1) gate = [x, z, y]; else inEnd = true; } });
   if (gate && !PL.portalLock) { // end gateway: main island <-> outer islands
+    gatewayBeam(gate[0], gate[2], gate[1], 'cool');
     const d = Math.hypot(gate[0], gate[1]) || 1, far = d > 500, k = far ? 100 / d : 1000 / d;
     if (typeof advGrant === 'function') advGrant('end/enter_end_gateway'); switchDim(1, gate[0] * k + 0.5, 90, gate[1] * k + 0.5, far ? 'gatehome' : 'gateway'); return;
   }
   if (!inNether && !inEnd) PL.portalLock = false; // arriving in a portal: step out before it works again
   if (inEnd && !PL.portalLock) {
-    if (W.dim === 1) { const sp = PL.spawn || W.worldSpawn; switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); chatMsg('엔드를 떠났습니다', '#aaaaaa'); }
+    if (W.dim === 1) { goToRespawn(true); chatMsg('엔드를 떠났습니다', '#aaaaaa'); }
     else switchDim(1, 100.5, 49, 0.5, 'end');
     return;
   }
@@ -12426,6 +12475,35 @@ RANDOM_TICK[BID.lava] = (x, y, z) => { // LavaFluid.onRandomTick
 };
 RANDOM_TICK[BID.nether_wart] = (x, y, z, b, m) => { if (m < 3 && Math.random() < 0.1) setMeta(x, y, z, m + 1); };
 function hasGateway(x, y, z) { for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -4; dy <= 8; dy++) if (getBlock(x + dx, y + dy, z + dz) === BID.end_portal) return true; return false; }
+// ---------- end gateways (Java's EndGatewayFeature and EndGatewayRenderer) ----------
+// the gateway with bedrock in a plus above and below it and one more at each end, the air around it cleared
+function buildGateway(x, y, z) {
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -2; dy <= 2; dy++) for (let dz = -1; dz <= 1; dz++) {
+    const sx = !dx, sy = !dy, sz = !dz, ey = Math.abs(dy) === 2;
+    const b = sx && sy && sz ? BID.end_portal : sy ? 0 : ey ? (sx && sz ? BID.bedrock : -1) : (sx || sz ? BID.bedrock : -1);
+    if (b >= 0) setBlock(x + dx, y + dy, z + dz, b, b === BID.end_portal ? 1 : 0, { noUpdate: true });
+  }
+  gatewayBeam(x, y, z, 'spawn');
+}
+// its beam: magenta reaching the whole height for the 10 s after it appears, purple and 50 blocks for 2 s when it is
+// used and every 2 minutes, up and down from it, growing and shrinking
+const GATEWAYS = trackBlocks(BID.end_portal), GW = new Map(), gwGeo = new THREE.BoxGeometry(0.4, 1, 0.4);
+function gatewayBeam(x, y, z, kind) { const k = x + ',' + y + ',' + z, g = GW.get(k) || {}; g[kind] = W.tickN; GW.set(k, g); }
+function gatewayRender() {
+  for (const [k, g] of GW) if (!GATEWAYS.has(k) || W.dim !== 1) { if (g.mesh) { scene.remove(g.mesh); g.mesh.material.dispose(); } GW.delete(k); }
+  if (W.dim !== 1) return;
+  const t = W.tickN + (W.tickFrac || 0);
+  for (const k of GATEWAYS) {
+    const [x, y, z] = k.split(',').map(Number); if (!(getMeta(x, y, z) & 1) || Math.hypot(x - PL.x, z - PL.z) > 160) continue;
+    let g = GW.get(k); if (!g) { g = {}; GW.set(k, g); }
+    const sp = g.spawn != null ? (t - g.spawn) / 200 : 1, per = ((W.tickN + ((x * 31 + z * 17) & 2047)) % 2400) / 40, cl = g.cool != null && t - g.cool < 40 ? (t - g.cool) / 40 : per < 1 ? per : 1;
+    const spawning = sp < 1, f = spawning ? sp : cl, len = f < 1 ? Math.floor(Math.sin(f * Math.PI) * (spawning ? 384 : 50)) : 0;
+    if (!len) { if (g.mesh) g.mesh.visible = false; continue; }
+    if (!g.mesh) { g.mesh = new THREE.Mesh(gwGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, fog: false })); scene.add(g.mesh); }
+    g.mesh.visible = true; g.mesh.material.color.setRGB(...(spawning ? [0.78, 0.31, 0.74] : [0.54, 0.2, 0.72]));
+    g.mesh.position.set(x + .5, y + .5, z + .5); g.mesh.scale.set(1, len * 2, 1);
+  }
+}
 
 </script>
 <script>/* js/weather.js */
@@ -15747,13 +15825,13 @@ function blocks6Use(t, h, dry) {
   return null;
 }
 // respawning at an anchor uses up one charge; without a charged anchor the player goes to the world spawn
-function anchorArrive() {
+function anchorArrive(keep) { // (keep: walking out of the End alive takes no charge)
   const sp = PL.spawn, ok = sp && getBlock(sp[0], sp[1], sp[2]) === ANCHOR && (getMeta(sp[0], sp[1], sp[2]) & 7) > 0;
   if (!ok) {
     PL.spawn = null; PL.spawnDim = 0; UI.flash('충전된 리스폰 정박기가 없어요');
     const ws = W.worldSpawn; switchDim(0, ws[0] + .5, ws[1], ws[2] + .5, 'spawn'); return;
   }
-  setMeta(sp[0], sp[1], sp[2], getMeta(sp[0], sp[1], sp[2]) - 1);
+  if (!keep) setMeta(sp[0], sp[1], sp[2], getMeta(sp[0], sp[1], sp[2]) - 1);
   for (let r = 1; r <= 2; r++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) for (let dy = -1; dy <= 1; dy++) {
     const x = sp[0] + dx, y = sp[1] + dy, z = sp[2] + dz;
     if (SOLID[getBlock(x, y - 1, z)] && !SOLID[getBlock(x, y, z)] && !SOLID[getBlock(x, y + 1, z)] && !FLUID[getBlock(x, y, z)]) { PL.x = x + .5; PL.y = y; PL.z = z + .5; PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z; return; }
@@ -17501,7 +17579,7 @@ function respawn() {
     if (W.dim !== -1) switchDim(-1, sp[0] + .5, sp[1] + 1, sp[2] + .5, 'anchor'); else anchorArrive();
     return;
   }
-  if (W.dim !== 0) { PL.health = 20; PL.food = 20; PL.sat = 5; PL.air = 300; PL.fire = 0; PL.dead = false; PL.inv = 60; switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); UI.hudDirty = true; return; }
+  if (W.dim !== 0) { PL.health = 20; PL.food = 20; PL.sat = 5; PL.air = 300; PL.fire = 0; PL.dead = false; PL.inv = 60; if (PL.spawn && PL.spawnBed && !PL.respawnAt) switchDim(0, PL.spawn[0] + .5, PL.spawn[1], PL.spawn[2] + .5, 'bedspawn'); else switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); UI.hudDirty = true; return; } // (a bed: beside it once its chunk is here)
   PL.x = sp[0] + .5; PL.y = sp[1]; PL.z = sp[2] + .5; PL.vx = PL.vy = PL.vz = 0;
   PL.health = 20; PL.food = 20; PL.sat = 5; PL.exh = 0; PL.air = 300; PL.fire = 0; PL.fallDist = 0; PL.dead = false; PL.inv = 60;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
@@ -23051,7 +23129,7 @@ function frame(now) {
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   dynLights(px, py, pz); effSwirls(dt, px, pz);
-  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); // (the enchanting table's book and glyphs)
+  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); if (typeof gatewayRender === 'function') gatewayRender(); // (the enchanting table's book and glyphs)
   } catch (e) { gameErr('scene', e); }
   try {
   // atlas animation (water/lava) ~8 fps

@@ -511,7 +511,7 @@ function frame(now) {
   dollTick();
   R.showHand = view === 0 && !UI.hideHud && !PL.sleeping && !spectator();
   dynLights(px, py, pz); effSwirls(dt, px, pz);
-  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); // (the enchanting table's book and glyphs)
+  t0 = performance.now(); entityRender(alpha, now); pf('ents', t0); if (typeof enchTableRender === 'function') enchTableRender(alpha); if (typeof gatewayRender === 'function') gatewayRender(); // (the enchanting table's book and glyphs)
   } catch (e) { gameErr('scene', e); }
   try {
   // atlas animation (water/lava) ~8 fps

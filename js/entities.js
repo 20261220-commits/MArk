@@ -646,9 +646,8 @@ function hurtMob(e, dmg, attacker, kx = 0, kz = 0, src) {
     if (e.type === 'zombified_piglin') for (const o of ENT) if (o.type === 'zombified_piglin' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 16) o.target = PL;
     if (e.type === 'villager' && typeof vGossip === 'function') vGossip(e, 'mnn', 25); // gossip: minor_negative 25 (villagelife.js)
     if (e.type === 'villager') for (const o of ENT) if (o.type === 'iron_golem' && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 24) o.target = PL;
-    if (e.type === 'enderman' && src !== 'player' && Math.random() < 0.7) endermanTeleport(e);
   } else if (attacker && attacker.kind === 'mob' && (e.type === 'iron_golem' || (e.type === 'wolf' && attacker.type !== 'wolf'))) e.target = attacker;
-  if (e.type === 'enderman' && !attacker && !e.inLava && Math.random() < 0.5) endermanTeleport(e);
+  if (e.type === 'enderman' && !attacker && Math.random() < 0.9) endermanTeleport(e); // (Java: hurt by anything but a living thing, it teleports 9 times in 10)
   if (!partial) play(e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, { vol: 0.8 });
   if (!e.def.hostile) { e.panic = 100; const a = attacker && attacker.x != null ? attacker : (src === 'player' || attacker === PL ? PL : null); e.fleeFrom = a ? [a.x, a.z] : null; e.goal = null; } // Java's PanicGoal: 5 s of running, here away from whoever hit it
   if (attacker === PL && e.def.hostile) e.target = PL;

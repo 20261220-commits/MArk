@@ -228,7 +228,7 @@ function respawn() {
     if (W.dim !== -1) switchDim(-1, sp[0] + .5, sp[1] + 1, sp[2] + .5, 'anchor'); else anchorArrive();
     return;
   }
-  if (W.dim !== 0) { PL.health = 20; PL.food = 20; PL.sat = 5; PL.air = 300; PL.fire = 0; PL.dead = false; PL.inv = 60; switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); UI.hudDirty = true; return; }
+  if (W.dim !== 0) { PL.health = 20; PL.food = 20; PL.sat = 5; PL.air = 300; PL.fire = 0; PL.dead = false; PL.inv = 60; if (PL.spawn && PL.spawnBed && !PL.respawnAt) switchDim(0, PL.spawn[0] + .5, PL.spawn[1], PL.spawn[2] + .5, 'bedspawn'); else switchDim(0, sp[0] + .5, sp[1], sp[2] + .5, 'spawn'); UI.hudDirty = true; return; } // (a bed: beside it once its chunk is here)
   PL.x = sp[0] + .5; PL.y = sp[1]; PL.z = sp[2] + .5; PL.vx = PL.vy = PL.vz = 0;
   PL.health = 20; PL.food = 20; PL.sat = 5; PL.exh = 0; PL.air = 300; PL.fire = 0; PL.fallDist = 0; PL.dead = false; PL.inv = 60;
   PL.px = PL.x; PL.py = PL.y; PL.pz = PL.z;
