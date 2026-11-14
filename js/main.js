@@ -587,7 +587,7 @@ function ambientParticles(dt, px, py, pz) {
     if (Math.random() > dt * 4) continue;
     const x = ambList[k], y = ambList[k + 1], z = ambList[k + 2], b = ambList[k + 3], m = ambList[k + 4];
     if (b === BID.torch) {
-      let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.2; }
+      let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.22; } // (Java's WallTorchBlock: at the top of the leaning torch)
       R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { kind: 'flame', vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
       if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { kind: 'smoke', vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
     } else if (Math.random() < 0.3) {

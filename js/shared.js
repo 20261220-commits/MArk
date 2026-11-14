@@ -3714,14 +3714,16 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.TORCH) {
       flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
-      let ox = 0, oy = 0, oz = 0;
-      if (meta >= 1 && meta <= 4) { const d = DIRS[meta - 1]; ox = d[0] * 5 / 16; oz = d[2] * 5 / 16; oy = 3 / 16; }
-      const bx0 = 7 / 16 + ox, bx1 = 9 / 16 + ox, bz0 = 7 / 16 + oz, bz1 = 9 / 16 + oz, by1 = 10 / 16;
-      const tile = FT[id * 4];
+      const tile = FT[id * 4], wall = meta >= 1 && meta <= 4;
+      // on a wall (Java's template_torch_wall): its foot against the wall 3.5 up, leaning 22.5 degrees out; drawn on the
+      // 1/16 grid as a slanted box, the foot astride the wall's face and the top 4 pixels out from it
+      const d = wall ? DIRS[meta - 1] : null, oa = wall ? (d[0] ? 0 : 2) : 0, sg = wall ? d[oa] : 0, plane = sg > 0 ? 1 : 0;
       for (let f = 0; f < 6; f++) {
-        if (f === 3 && meta) continue;
         const F = FACES[f];
-        for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? bx1 : bx0); CS[k][1] = y + oy + (c[1] ? by1 : 0); CS[k][2] = z + (c[2] ? bz1 : bz0); }
+        for (let k = 0; k < 4; k++) { const c = F.c[k];
+          if (!wall) { CS[k][0] = x + (c[0] ? 9 : 7) / 16; CS[k][1] = y + (c[1] ? 10 : 0) / 16; CS[k][2] = z + (c[2] ? 9 : 7) / 16; continue; }
+          const out = ((c[oa] === 1) === (sg > 0) ? -1 : 1) / 16 + (c[1] ? 4 / 16 : 0), al = (c[2 - oa] ? 9 : 7) / 16; // (out: away from the wall)
+          CS[k][oa] = (oa === 0 ? x : z) + plane - sg * out; CS[k][2 - oa] = (oa === 0 ? z : x) + al; CS[k][1] = y + (c[1] ? 13 : 3) / 16; }
         if (f === 2) quad(Cu, cFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
         else if (f === 3) quad(Cu, cFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
         else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);

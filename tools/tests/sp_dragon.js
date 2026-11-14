@@ -27,6 +27,10 @@ module.exports = async ({ ok, srv, b, lib }) => {
     d.phase = 'hold'; d.phaseT = 0; d.tgt = [0, d.y, -100]; PL.health = 20; PL.inv = 0; d.hurt = 0; PL.dragonHitT = -9;
     const wg = dragonParts(d)[3]; PL.x = (wg[1] + wg[4]) / 2 + 1; PL.z = (wg[3] + wg[6]) / 2; PL.y = d.y; PL.vx = PL.vy = PL.vz = 0;
     dragonAI(d); o.wing = { dmg: +(20 - PL.health).toFixed(1), push: +Math.hypot(PL.vx, PL.vz).toFixed(2), away: Math.sign(PL.x - d.x) === Math.sign(PL.vx) };
+    // sitting, its wings don't push: the player can walk up to it
+    d.phase = 'sit_scan'; d.phaseT = 0; d.scanT = 0; d.hurt = 0; PL.health = 20; PL.inv = 0; d.x = 0; d.z = 0.5; d.y = S.END_PORTAL_Y + 4; d.yaw = 0;
+    const wg2 = dragonParts(d)[3]; PL.x = (wg2[1] + wg2[4]) / 2 + 1; PL.z = (wg2[3] + wg2[6]) / 2 - 3; PL.y = d.y - 1; PL.vx = PL.vy = PL.vz = 0;
+    dragonAI(d); o.sitPush = +Math.hypot(PL.vx, PL.vz).toFixed(2);
     // only the head takes full damage
     d.phase = 'hold'; d.inv = 0; let hp = d.hp; d.hitPart = 'body'; hurtMob(d, 10, PL); o.body = +(hp - d.hp).toFixed(2);
     d.inv = 0; hp = d.hp; d.hitPart = 'head'; hurtMob(d, 10, PL); o.headDmg = +(hp - d.hp).toFixed(2);
@@ -51,6 +55,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
   ok(f.maxTurnDeg < 12 && f.minSp > 0.3 && f.maxSp < 1.6, 'always flying forward, turning gradually (no turning on the spot)', f);
   ok(r.head >= 9 && r.head <= 11, 'its head hits for 10', r.head);
   ok(r.wing && r.wing.dmg >= 4 && r.wing.dmg <= 6 && r.wing.push > 0.3 && r.wing.away, 'its wing throws the player away and hits for 5', r.wing);
+  ok(r.sitPush === 0, 'sitting, its wings push no one away (the player can reach its head)', r.sitPush);
   ok(r.body === 3.5 && r.headDmg === 10, 'the body takes a quarter (plus 1), the head all of it', [r.body, r.headDmg]);
   ok(r.ray === 'head', 'aiming at its head hits the head', r.ray);
   ok(r.sit && ['sit_scan', 'sit_roar', 'sit_flame'].every(k => r.sit.phases.includes(k)) && r.sit.cloud, 'landed, it looks, roars and breathes dragon\'s breath', r.sit);

@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.14 20:27';
+const NEMO_VERSION = '2026.11.14 21:11';
 
 </script>
 <script>/* js/shared.js */
@@ -4124,14 +4124,16 @@ function meshChunk(B, M, L, bio, opts) {
       }
     } else if (rt === RT.TORCH) {
       flatLight(x, y, z); SH4[0] = SH4[1] = SH4[2] = SH4[3] = 1;
-      let ox = 0, oy = 0, oz = 0;
-      if (meta >= 1 && meta <= 4) { const d = DIRS[meta - 1]; ox = d[0] * 5 / 16; oz = d[2] * 5 / 16; oy = 3 / 16; }
-      const bx0 = 7 / 16 + ox, bx1 = 9 / 16 + ox, bz0 = 7 / 16 + oz, bz1 = 9 / 16 + oz, by1 = 10 / 16;
-      const tile = FT[id * 4];
+      const tile = FT[id * 4], wall = meta >= 1 && meta <= 4;
+      // on a wall (Java's template_torch_wall): its foot against the wall 3.5 up, leaning 22.5 degrees out; drawn on the
+      // 1/16 grid as a slanted box, the foot astride the wall's face and the top 4 pixels out from it
+      const d = wall ? DIRS[meta - 1] : null, oa = wall ? (d[0] ? 0 : 2) : 0, sg = wall ? d[oa] : 0, plane = sg > 0 ? 1 : 0;
       for (let f = 0; f < 6; f++) {
-        if (f === 3 && meta) continue;
         const F = FACES[f];
-        for (let k = 0; k < 4; k++) { const c = F.c[k]; CS[k][0] = x + (c[0] ? bx1 : bx0); CS[k][1] = y + oy + (c[1] ? by1 : 0); CS[k][2] = z + (c[2] ? bz1 : bz0); }
+        for (let k = 0; k < 4; k++) { const c = F.c[k];
+          if (!wall) { CS[k][0] = x + (c[0] ? 9 : 7) / 16; CS[k][1] = y + (c[1] ? 10 : 0) / 16; CS[k][2] = z + (c[2] ? 9 : 7) / 16; continue; }
+          const out = ((c[oa] === 1) === (sg > 0) ? -1 : 1) / 16 + (c[1] ? 4 / 16 : 0), al = (c[2 - oa] ? 9 : 7) / 16; // (out: away from the wall)
+          CS[k][oa] = (oa === 0 ? x : z) + plane - sg * out; CS[k][2 - oa] = (oa === 0 ? z : x) + al; CS[k][1] = y + (c[1] ? 13 : 3) / 16; }
         if (f === 2) quad(Cu, cFlip, CS, tile, 7, 6, 9, 8, 0, L4, SH4, false);
         else if (f === 3) quad(Cu, cFlip, CS, tile, 7, 14, 9, 16, 0, L4, SH4, false);
         else quad(Cu, cFlip, CS, tile, 7, 6, 9, 16, 0, L4, SH4, false);
@@ -7930,7 +7932,10 @@ function observerCheck(x, y, z) {
 }
 function getTile(x, y, z) { const c = chunkAt(x >> 4, z >> 4); return c ? c.tiles.get(BI(x, y, z)) : null; }
 function setTile(x, y, z, t) { const c = chunkAt(x >> 4, z >> 4); if (!c) return; c.tiles.set(BI(x, y, z), t); c.modified = c.edited = true; if (t.type === 'furnace' || t.type === 'brewing' || t.type === 'campfire') c.hasFurnace = true; c.noTicking = false; }
-function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z; if (!W.sched.has(k)) W.sched.set(k, W.tickN + delay); }
+// a tick at a block in a while (one per block: the first asked for stands), but a fluid's tick is never held back by a
+// later one already waiting there (Java keeps fluid and block ticks apart: water poured where lava, fire or a chunk
+// still loading had a slow tick waiting sat there unmoving)
+function schedule(x, y, z, delay) { const k = x + ',' + y + ',' + z, t = W.tickN + delay, was = W.sched.get(k); if (was == null || (was > t && FLUID[getBlock(x, y, z)])) W.sched.set(k, t); }
 // support rules of the 1.17 lush-cave plants (plant codes 10+)
 const LUSH_SOIL = new Set([2, 3, 53, 57, 87, 203, 204, 205, 1049]); // grass, dirt, clay, farmland, moss, podzol, mycelium, coarse dirt, rooted dirt
 function plantOK(b, x, y, z, m) {
@@ -7954,6 +7959,8 @@ function plantOK(b, x, y, z, m) {
   }
   return true;
 }
+// what a torch can hang on (Java: a sturdy side face: full blocks, glass, leaves)
+const torchWallOK = id => !!OPQ[id] || id === BID.glass || id === BID.tinted_glass || id === BID.stained_glass || !!S.LEAF[id];
 const supportedBy = id => OPQ[id] || id === BID.farmland || (RTYPE[id] === RT.BOX && id !== BID.snow && id !== BID.ladder && id !== BID.lantern && id !== BID.soul_lantern && id !== BID.vine) || id === BID.glass || S.LEAF[id] || id === BID.stained_glass;
 function breakNaturally(x, y, z, b, m) {
   setBlock(x, y, z, 0, 0);
@@ -7984,7 +7991,7 @@ function neighborUpdate(x, y, z) {
     if (!ok) breakNaturally(x, y, z, b, m);
     return;
   }
-  if (b === BID.torch || b === BID.soul_torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!OPQ[sup] && !(m === 0 && supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
+  if (b === BID.torch || b === BID.soul_torch) { const sup = m >= 1 && m <= 4 ? getBlock(x + DIRS[m - 1][0], y, z + DIRS[m - 1][2]) : below; if (!(m >= 1 && m <= 4 ? torchWallOK(sup) : supportedBy(sup))) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.ladder) { const f = m & 3; if (!OPQ[getBlock(x + DIRS[f][0], y, z + DIRS[f][2])]) breakNaturally(x, y, z, b, m); return; }
   if (b === BID.snow) { if (!OPQ[below] && !S.LEAF[below]) setBlock(x, y, z, 0); return; }
   if (S.DOOR[b]) { const up = m & 8, other = getBlock(x, y + (up ? -1 : 1), z); if (other !== b) setBlock(x, y, z, 0); else if (!up && !supportedBy(below)) breakNaturally(x, y, z, b, m); return; }
@@ -11511,7 +11518,8 @@ function bossBar(e, name) {
 //  - landing on the portal's pillar, then sitting: it looks for a player within 20 and turns to them, roars, and
 //    breathes a cloud of dragon's breath in front of its head; after four breaths it takes off, or with nobody near for
 //    5 seconds it charges the nearest player within 150; a quarter of its health lost while sitting makes it take off
-//  - its body hurts: the head and neck hit for 10, the wings throw anyone near them away and hit for 5 (not while it sits)
+//  - its body hurts: the head and neck hit for 10, the wings throw anyone near them away and hit for 5 (not while it
+//    sits: then players can walk up to its head)
 //  - only the head takes full damage; the rest a quarter (plus up to 1); sitting, arrows glance off
 //  - its health is kept in the world (leaving the End or dying there and coming back no longer heals it)
 const DRAGON_SIT = { sit_scan: 1, sit_roar: 1, sit_flame: 1 };
@@ -11701,10 +11709,12 @@ function dragonAI(e) {
   // its body hurts (only while it isn't flashing from a hit, as Java)
   if (plTargetable() && !(e.hurt > 0)) {
     const B = dragonParts(e), bodyX = (B[2][1] + B[2][4]) / 2, bodyZ = (B[2][3] + B[2][6]) / 2;
-    for (const b of B) if (b[0] === 'wing' && plIn([0, b[1], b[2] - 2, b[3], b[4], b[5] - 2, b[6]], 4, 2, 4)) {
+    // (sitting, its wings don't throw anyone: in Java the push only reaches a player along with the wing's hit, which a
+    // sitting dragon doesn't give, so players walk up to its head)
+    if (!dragonSitting(e)) for (const b of B) if (b[0] === 'wing' && plIn([0, b[1], b[2] - 2, b[3], b[4], b[5] - 2, b[6]], 4, 2, 4)) {
       const d2 = PL.x - bodyX, d3 = PL.z - bodyZ, d4 = Math.max(d2 * d2 + d3 * d3, 0.1);
       PL.vx += d2 / d4 * 4; PL.vy += 0.2; PL.vz += d3 / d4 * 4;
-      if (!dragonSitting(e) && !(PL.dragonHitT > tick - 2)) { PL.dragonHitT = tick; hurtPlayer(diffDmg(5), 'mob', e); }
+      if (!(PL.dragonHitT > tick - 2)) { PL.dragonHitT = tick; hurtPlayer(diffDmg(5), 'mob', e); }
       break;
     }
     for (const b of [B[0], B[1]]) if (plIn(b, 1, 1, 1)) { const cx = (b[1] + b[4]) / 2, cz = (b[3] + b[6]) / 2; attackPlayer(e, 10, PL.x - cx, PL.z - cz); break; }
@@ -17307,6 +17317,20 @@ function rayBox(ox, oy, oz, dx, dy, dz, b) {
   return [Math.max(0, tmin), face];
 }
 const FACE_N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]; // face idx from rayBox: a*2+1 = min side (negative normal)
+// where a torch goes (Java's StandingAndWallBlockItem): first against the face clicked (unless the clicked block is
+// being replaced, like grass or snow), then the other ways in the order the player is looking: down onto the floor,
+// or against a wall; up is never a way. -> 0 standing, 1-4 on a wall (toward it: north, east, south, west), -1 nowhere
+const TORCH_WALLS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function torchPlace(t, x, y, z, replaced) {
+  const l = lookDir(), dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].sort((a, b) => (b[0] * l[0] + b[1] * l[1] + b[2] * l[2]) - (a[0] * l[0] + a[1] * l[1] + a[2] * l[2]));
+  if (!replaced) dirs.unshift([-t.nx, -t.ny, -t.nz]);
+  for (const [dx, dy, dz] of dirs) {
+    if (dy === 1) continue;
+    if (dy === -1) { if (supportedBy(getBlock(x, y - 1, z))) return 0; continue; }
+    if (torchWallOK(getBlock(x + dx, y, z + dz))) return TORCH_WALLS.findIndex(([a, c]) => a === dx && c === dz) + 1;
+  }
+  return -1;
+}
 function lookDir() { const cp = Math.cos(PL.pitch); return [-Math.sin(PL.yaw) * cp, Math.sin(PL.pitch), -Math.cos(PL.yaw) * cp]; }
 function raycast(reach, fluids) {
   const [dx, dy, dz] = lookDir();
@@ -18143,7 +18167,7 @@ function placeBlock(t, d) {
     if (!ok) return;
     if (id === BID.cactus && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => SOLID[getBlock(x + dx, y, z + dz)])) return;
   }
-  if (id === BID.torch || id === BID.soul_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
+  if (id === BID.torch || id === BID.soul_torch || id === BID.redstone_torch) { const tm = torchPlace(t, x, y, z, x === t.x && y === t.y && z === t.z); if (tm < 0) return; meta = tm; }
   if (id === BID.ladder) { if (t.ny !== 0) return; meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz); if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; }
   if (id === BID.lantern || id === BID.soul_lantern) meta = t.ny === -1 ? 1 : 0;
   if (isCampfire(id)) meta = fd | 4; // placed lit
@@ -18156,7 +18180,6 @@ function placeBlock(t, d) {
   if (id === BID.oak_trapdoor) meta = ((fd + 2) & 3) | (t.ny === -1 || (t.ny === 0 && t.hy > 0.5) ? 8 : 0);
   if (id === BID.vine && (t.ny !== 0 || !OPQ[getBlock(x - t.nx, y, z - t.nz)])) return;
   if (id === BID.lily_pad && below !== 27) return;
-  if (id === BID.redstone_torch) { if (t.ny === 1 && supportedBy(below)) meta = 0; else if (t.ny === 0) { meta = [[0, -1], [1, 0], [0, 1], [-1, 0]].findIndex(([dx, dz]) => dx === -t.nx && dz === -t.nz) + 1; if (!OPQ[getBlock(x - t.nx, y, z - t.nz)]) return; } else return; }
   if (id === BID.lever || id === BID.stone_button) { const a = S.DIR6.findIndex(v => v[0] === -t.nx && v[1] === -t.ny && v[2] === -t.nz); if (a < 0 || !SOLID[getBlock(x - t.nx, y - t.ny, z - t.nz)]) return; meta = a; }
   if ((id === BID.redstone_wire || id === BID.repeater || id === BID.stone_pressure_plate || S.isRail(id)) && !supportedBy(below)) return;
   if (id === BID.repeater) meta = fd;
@@ -20653,7 +20676,7 @@ function mpStop() {
   if (MP.link) { const l = MP.link; if (MP.server && MIR.host) { const done = () => { if (MIR.closing === done) MIR.closing = null; l.close(); }; MIR.closing = done; l.send({ t: 'flush' }); setTimeout(done, 5000); } else if (MP.server) setTimeout(() => l.close(), 600); else l.close(); } /* a server world: wait for the final copy */ MP.link = null; /* the last stored chunks get through before the connection closes */ if (MP.rtcGuest) { try { MP.rtcGuest.close(); } catch (e) {} MP.rtcGuest = null; }
   for (const p of MP.peers.values()) mpDropAvatar(p); MP.peers.clear();
   for (const e of ENT) if (e.remote) removeEnt(e);
-  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = []; MP.pdataOk = false;
+  MP.on = false; MP.role = null; MP.rtc = null; MP.server = false; MP.roomCode = null; MP.auth = {}; MP.rolePending = false; MP.queue = []; MP.pdataOk = false; MP.pend = null;
   if (host && !ran && W.active) mpDropChunks(); // you were following someone else's run of this dimension
 }
 function mpLost(why) {
@@ -20761,7 +20784,7 @@ function mpHandle(m, from) {
     case 'bye': mpLost('호스트가 세계를 닫았습니다'); return;
     case 'pl': { const id = MP.server ? m.from : host ? from : m.id; if (id === MP.id) return; const p = MP.peers.get(id); if (!p) return; p.s = m; p.at = performance.now(); { const H0 = p.hist || (p.hist = []), g = H0.length ? Math.min(300, p.at - H0[H0.length - 1][0]) : 50; p.gap = Math.min(600, (p.gap || 50) * 0.8 + g * 0.2); H0.push([p.at, +m.x, +m.y, +m.z]); } if (p.hist.length > 6) p.hist.shift(); if (mpRelay()) mpSend({ ...m, id }); return; }
     case 'chat': chatMsg('<' + String(m.name).slice(0, 16) + '> ' + String(m.text).slice(0, 256)); if (mpRelay()) for (const id of MP.peers.keys()) if (id !== from) mpSend(m, id); return;
-    case 'set': mpApplySet(m); return;
+    case 'set': mpApplyGuestSets([m]); mpGackTo(from, m.seq); return;
     case 'proj': mpGotProj(m, from); return;
     case 'deco': mpGotDeco(m, from); return;
     case 'tie': if (host && [m.x, m.y, m.z].every(Number.isInteger) && FENCES.has(getBlock(m.x, m.y, m.z))) { const id = MP.server ? m.from : from; for (const e of ENT) if (e.leash && e.leash.p === id && !e.dead) e.leash = [m.x, m.y, m.z]; } return; // a guest ties up what it leads
@@ -20772,7 +20795,8 @@ function mpHandle(m, from) {
     case 'primed': mpGotPrimed(m, from); return;
     case 'prime': if (host && [m.x, m.y, m.z].every(isFinite)) { primeTNT(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), Math.max(1, Math.min(200, +m.fuse || 80))); } return;
     case 'blast': if (host && [m.x, m.y, m.z, m.p].every(isFinite)) explode(+m.x, +m.y, +m.z, Math.max(0.5, Math.min(6, +m.p)), !!m.fire); return;
-    case 'setl': if (Array.isArray(m.l)) mpApplyGuestSets(m.l.slice(0, 4096).filter(e => e && e.dim === m.dim)); return;
+    case 'setl': if (Array.isArray(m.l)) mpApplyGuestSets(m.l.slice(0, 4096).filter(e => e && e.dim === m.dim)); mpGackTo(from, m.seq); return;
+    case 'gack': mpGack(+m.seq || 0); return;
     case 'sets': if (!host) mpApplySets(m); return;
     case 'chunk': if (host && !MP.server) mpServeChunk(m, from); return;
     case 'chunkdata': if (!host || MP.server) mpGotChunk(m); return;
@@ -20954,17 +20978,33 @@ function mpBlockChanged(x, y, z, id, m, metaOnly) {
   if (MP.role === 'host') { if (MP.peers.size || MP.server) (MP.batch || (MP.batch = [])).push(e); return; } // a server world keeps every change
   // everything one action changes goes together (both halves of a door or bed): the runner applies them all before
   // any block checks its neighbours, or the first half would find no partner and break
+  const seq = MP.gseq = (MP.gseq || 0) + 1; (MP.pend || (MP.pend = new Map())).set(x + ',' + y + ',' + z, { seq, t: performance.now(), late: null }); // (what the player did here stands until the runner says it has it: see mpApplySets)
   (MP.gsets || (MP.gsets = [])).push({ x, y, z, id, m, mo: metaOnly ? 1 : 0, dim: W.dim, dk: dkey(x >> 4, z >> 4) });
   if (MP.gsets.length === 1) queueMicrotask(mpFlushSets);
 }
-function mpFlushSets() { const l = MP.gsets; MP.gsets = null; if (!l || !MP.on) return; if (l.length === 1) mpToAuth({ t: 'set', ...l[0] }); else mpToAuth({ t: 'setl', dim: l[0].dim, l }); }
+function mpFlushSets() { const l = MP.gsets; MP.gsets = null; if (!l || !MP.on) return; const seq = MP.gseq; if (l.length === 1) mpToAuth({ t: 'set', ...l[0], seq }); else mpToAuth({ t: 'setl', dim: l[0].dim, l, seq }); }
 function mpApplySets(m) { // guests: the host's changes
   if (m.dim !== W.dim) return;
   MP.applying = true;
-  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; } if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); } }
+  try { for (const [x, y, z, id, mt, mo] of m.l) { if (!isLoaded(x, z)) { W.saved.add(dkey(x >> 4, z >> 4)); continue; }
+      // a block this player just changed: the runner's news about it from before it had the change (water flowing there, the
+      // block before it was taken...) doesn't undo it; once the runner says it has the change (gack), or after 3 s, its word goes
+      const p = MP.pend && MP.pend.get(x + ',' + y + ',' + z);
+      if (p) { if (performance.now() - p.t < 3000) { p.late = [x, y, z, id, mt, mo]; continue; } MP.pend.delete(x + ',' + y + ',' + z); }
+      mpPutSet(x, y, z, id, mt, mo); } }
   finally { MP.applying = false; }
 }
+function mpPutSet(x, y, z, id, mt, mo) { if (mo && getBlock(x, y, z) === id) setMeta(x, y, z, mt); else setBlock(x, y, z, id, mt, { noUpdate: true, keepTile: true }); }
+// the runner has this player's changes up to seq: what it says from now on about those blocks is newer than them
+function mpGack(seq) { if (!MP.pend) return; for (const [k, p] of MP.pend) if (p.seq <= seq) MP.pend.delete(k); }
+// the runner never answered (an older version of the game): its last word about those blocks goes (checked every tick)
+function mpPendFlush() {
+  if (!MP.pend || !MP.pend.size) return; const now = performance.now();
+  for (const [k, p] of MP.pend) if (now - p.t >= 3000) { MP.pend.delete(k); if (p.late && isLoaded(p.late[0], p.late[2])) { MP.applying = true; try { mpPutSet(...p.late); } finally { MP.applying = false; } } }
+}
 function mpApplySet(m) { mpApplyGuestSets([m]); } // the host: a guest's action
+// the host: tell the guest its changes are in, after everything sent before them (so the guest knows what is older)
+function mpGackTo(from, seq) { if (MP.role !== 'host' || !seq || from == null) return; if (MP.batch && MP.batch.length) { mpSend({ t: 'sets', dim: W.dim, l: MP.batch }); MP.batch = []; } mpSend({ t: 'gack', seq }, from); }
 function mpApplyGuestSets(l) {
   if (MP.role !== 'host') return;
   const here = l.filter(m => m.dim === W.dim && isLoaded(m.x, m.z)), away = l.filter(m => !here.includes(m));
@@ -21054,6 +21094,7 @@ function mpPoseOut() { // how the arms are held (bow drawn, shield up, eating...
   return o;
 }
 function mpTick() {
+  mpPendFlush();
   if (!MP.on || !W.active) return; MP.sndN = 0;
   if (MP.soft || MP.holdChunk) { // held where it stands while connecting again, and until the ground under it is back
     if (MP.holdChunk && !MP.soft) { const c = chunkAt(Math.floor(PL.x) >> 4, Math.floor(PL.z) >> 4); if (c && c.mesh) MP.holdChunk = false; }
@@ -23086,7 +23127,7 @@ function ambientParticles(dt, px, py, pz) {
     if (Math.random() > dt * 4) continue;
     const x = ambList[k], y = ambList[k + 1], z = ambList[k + 2], b = ambList[k + 3], m = ambList[k + 4];
     if (b === BID.torch) {
-      let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.2; }
+      let ox = 0.5, oy = 0.7, oz = 0.5; if (m >= 1 && m <= 4) { ox += DIRS[m - 1][0] * 0.27; oz += DIRS[m - 1][2] * 0.27; oy += 0.22; } // (Java's WallTorchBlock: at the top of the leaning torch)
       R.simpleParticle(x + ox, y + oy, z + oz, [1, 0.7, 0.25], { kind: 'flame', vx: 0, vz: 0, vy: 0.05, size: 0.06, life: 0.35, grav: 0 });
       if (Math.random() < 0.5) R.simpleParticle(x + ox, y + oy + 0.08, z + oz, [0.25, 0.25, 0.25], { kind: 'smoke', vx: (Math.random() - .5) * 0.1, vz: (Math.random() - .5) * 0.1, vy: 0.5, size: 0.08, life: 0.9, grav: 0 });
     } else if (Math.random() < 0.3) {
