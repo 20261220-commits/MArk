@@ -7,13 +7,13 @@ module.exports = async ({ ok, srv, b, lib }) => {
   const r = await p.evaluate(async () => { const out = {};
     const X = Math.floor(PL.x), Y = 120, Z = Math.floor(PL.z);
     const room = (lit) => { for (let a = -7; a <= 7; a++) for (let c = -7; c <= 7; c++) for (let k = -2; k <= 7; k++) setBlock(X + a, Y + k, Z + c, (Math.abs(a) === 7 || Math.abs(c) === 7 || k === -2 || k === 7) ? BID.stone : 0);
-      setBlock(X, Y, Z, BID.spawner); if (lit) setBlock(X + 2, Y, Z, BID.torch); };
+      setBlock(X, Y, Z, BID.spawner); if (lit) setBlock(X + 2, Y - 1, Z, BID.torch); }; // (the torch on the floor, which is at Y - 2)
     const reset = (mob, lit) => { W.meta.gamerules = { ...(W.meta.gamerules || {}), doMobSpawning: false }; for (const e of [...ENT]) if (e !== PL) removeEnt(e); room(lit); setTile(X, Y, Z, { type: 'spawner', mob, delay: 20 }); W.time = 6000; PL.difficulty = 2; PL.mode = 'creative'; PL.x = X + 5.5; PL.y = Y - 1; PL.z = Z + .5; PL.vx = PL.vy = PL.vz = 0; UI.paused = false; };
     const run = async (n, f) => { for (let i = 0; i < n; i++) { UI.paused = false; PL.x = X + 5.5; PL.y = Y - 1; PL.z = Z + .5; PL.vy = 0; if (f) f(i); gameTick(); if (i % 10 === 0) await new Promise(r => setTimeout(r, 0)); } };
     const kind = t => ENT.filter(e => e.kind === 'mob' && !e.dead && e.type === t && e.fromSpawner);
     // timing and cap: the spawned ones are taken away at once so the cap never stops it
-    reset('zombie', false); const times = []; let firstSpawn = -1;
-    await run(2600, i => { const z = kind('zombie'); if (z.length) { if (firstSpawn < 0) firstSpawn = i; times.push(i); for (const e of z) removeEnt(e); } });
+    reset('zombie', false); const times = []; let firstSpawn = -1; const T0 = W.tickN; // (the game's own tick count: its loop also ticks between the test's steps)
+    await run(2600, i => { const z = kind('zombie'); if (z.length) { const t = W.tickN - T0; if (firstSpawn < 0) firstSpawn = t; times.push(t); for (const e of z) removeEnt(e); } });
     const waves = times.filter((t, k) => k === 0 || t - times[k - 1] > 1), gaps = waves.slice(1).map((t, k) => t - waves[k]);
     out.first = firstSpawn; out.gaps = gaps; out.waves = waves.length;
     // the cap: left alone (made to stand still), at most 6
@@ -29,7 +29,7 @@ module.exports = async ({ ok, srv, b, lib }) => {
     const t0 = W.tickN; let tries = -1; await run(200, i => { if (tries < 0 && kind('zombie').length) tries = i; }); out.cramped = tries;
     return out; });
   console.log(JSON.stringify(r));
-  ok(r.first >= 18 && r.first <= 25, 'the first spawn about a second after a player comes near (20 ticks)', r.first);
+  ok(r.first >= 19 && r.first <= 24, 'the first spawn about a second after a player comes near (20 ticks)', r.first);
   ok(r.gaps.length >= 2 && r.gaps.every(g => g >= 199 && g <= 801), 'then 200-799 ticks between spawns', r.gaps);
   ok(r.cap === 6, 'never more than 6 of its kind around it', r.cap);
   ok(r.away === 0, 'nothing with no player within 16 blocks', r.away);
