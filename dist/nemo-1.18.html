@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.14 20:27';
+const NEMO_VERSION = '2026.11.14 21:35';
 
 </script>
 <script>/* js/shared.js */
@@ -11511,7 +11511,8 @@ function bossBar(e, name) {
 //  - landing on the portal's pillar, then sitting: it looks for a player within 20 and turns to them, roars, and
 //    breathes a cloud of dragon's breath in front of its head; after four breaths it takes off, or with nobody near for
 //    5 seconds it charges the nearest player within 150; a quarter of its health lost while sitting makes it take off
-//  - its body hurts: the head and neck hit for 10, the wings throw anyone near them away and hit for 5 (not while it sits)
+//  - its body hurts: the head and neck hit for 10, the wings throw anyone near them away and hit for 5 (not while it
+//    sits: then players can walk up to its head)
 //  - only the head takes full damage; the rest a quarter (plus up to 1); sitting, arrows glance off
 //  - its health is kept in the world (leaving the End or dying there and coming back no longer heals it)
 const DRAGON_SIT = { sit_scan: 1, sit_roar: 1, sit_flame: 1 };
@@ -11701,10 +11702,12 @@ function dragonAI(e) {
   // its body hurts (only while it isn't flashing from a hit, as Java)
   if (plTargetable() && !(e.hurt > 0)) {
     const B = dragonParts(e), bodyX = (B[2][1] + B[2][4]) / 2, bodyZ = (B[2][3] + B[2][6]) / 2;
-    for (const b of B) if (b[0] === 'wing' && plIn([0, b[1], b[2] - 2, b[3], b[4], b[5] - 2, b[6]], 4, 2, 4)) {
+    // (sitting, its wings don't throw anyone: in Java the push only reaches a player along with the wing's hit, which a
+    // sitting dragon doesn't give, so players walk up to its head)
+    if (!dragonSitting(e)) for (const b of B) if (b[0] === 'wing' && plIn([0, b[1], b[2] - 2, b[3], b[4], b[5] - 2, b[6]], 4, 2, 4)) {
       const d2 = PL.x - bodyX, d3 = PL.z - bodyZ, d4 = Math.max(d2 * d2 + d3 * d3, 0.1);
       PL.vx += d2 / d4 * 4; PL.vy += 0.2; PL.vz += d3 / d4 * 4;
-      if (!dragonSitting(e) && !(PL.dragonHitT > tick - 2)) { PL.dragonHitT = tick; hurtPlayer(diffDmg(5), 'mob', e); }
+      if (!(PL.dragonHitT > tick - 2)) { PL.dragonHitT = tick; hurtPlayer(diffDmg(5), 'mob', e); }
       break;
     }
     for (const b of [B[0], B[1]]) if (plIn(b, 1, 1, 1)) { const cx = (b[1] + b[4]) / 2, cz = (b[3] + b[6]) / 2; attackPlayer(e, 10, PL.x - cx, PL.z - cz); break; }
@@ -17333,7 +17336,7 @@ function raycast(reach, fluids) {
   for (const e of ENT) {
     if ((e.kind !== 'mob' && !e.hittable) || e.dead || e.deathT || e === PL.riding) continue;
     const lim = creative() ? 6 : 3; // (Java: 3 blocks to hit a mob, 6 in creative)
-    if (e.boxes) { for (let i = 0; i < e.boxes.length; i++) { const h = rayBox(ox, oy, oz, dx, dy, dz, e.boxes[i]); if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0], part: e.boxParts && e.boxParts[i] }; } continue; } // (a body of several parts: the ender dragon's)
+    if (e.boxes) { for (let i = 0; i < e.boxes.length; i++) { const h = rayBox(ox, oy, oz, dx, dy, dz, e.boxes[i]); const pt = e.boxParts && e.boxParts[i]; if (h && h[0] <= lim && (!best || (h[0] < best.t && !(pt === 'neck' && best.e === e && best.part === 'head')) || (pt === 'head' && best.e === e && best.part === 'neck'))) best = { type: 'ent', e, t: h[0], part: pt }; } continue; } // (the neck's box wraps round the head's: a look that goes through the head is aimed at the head) // (a body of several parts: the ender dragon's)
     const pr = e.pickR || 0, h = rayBox(ox, oy, oz, dx, dy, dz, e.box || [e.x - e.w - .05 - pr, e.y - pr, e.z - e.w - .05 - pr, e.x + e.w + .05 + pr, e.y + e.h + pr, e.z + e.w + .05 + pr]);
     if (h && h[0] <= lim && (!best || h[0] < best.t)) best = { type: 'ent', e, t: h[0] };
   }
