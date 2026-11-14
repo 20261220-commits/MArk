@@ -9,7 +9,7 @@ INV.add = function (st) { // returns leftover count; mutates nothing on success 
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
   if (!ITEMS[st.id].dur) for (const i of order) { const s = INV.slots[i]; if (s && same(s, st) && s.n < max) { const m = Math.min(n, max - s.n); s.n += m; n -= m; if (!n) break; } }
   if (n) for (const i of order) if (!INV.slots[i]) { const m = Math.min(n, max); INV.slots[i] = { ...st, n: m }; n -= m; if (!n) break; } // keeps enchantments, names and other data
-  UI.hudDirty = true; if (UI.screen) UI.renderScreen();
+  UI.hudDirty = true; if (UI.screen && !UI.closing) UI.renderScreen();
   return n;
 };
 INV.count = id => INV.slots.reduce((a, s) => a + (s && s.id === id ? s.n : 0), 0);
@@ -141,24 +141,24 @@ function clickSlot(i, btn, shift) {
 }
 function quickMove(i) {
   const sl = GUI.slots[i], st = sl.get(); if (!st) return;
-  const g = sl.group, T = GUI.type;
+  const g = sl.group, T = GUI.type, acc = (s, it) => !s.accepts || s.accepts(it); // (a slot with no rule takes anything)
   let targets;
   const idx = f => GUI.slots.map((s, k) => f(s) ? k : -1).filter(k => k >= 0);
   if (g === 'main' || g === 'hot') {
     const d = ITEMS[st.id];
     if (T === 'chest' || T === 'hopper' || T === 'dispenser') targets = idx(s => s.group === 'cont');
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
-    else if (T === 'brewing') targets = idx(s => s.accepts(st) && (s.group === 'bbottle' ? d.potion != null || st.id === IID.glass_bottle : s.group === 'bfuel' ? !GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64 : !(st.id === IID.blaze_powder && (!GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64))));
-    else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
+    else if (T === 'brewing') targets = idx(s => acc(s, st) && (s.group === 'bbottle' ? d.potion != null || st.id === IID.glass_bottle : s.group === 'bfuel' ? !GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64 : !(st.id === IID.blaze_powder && (!GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64))));
+    else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && acc(s, st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
     else if (T === 'anvil') targets = idx(s => s.group === (GUI.ctx.items[0] ? 'a1' : 'a0'));
-    else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
+    else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && acc(s, st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
     else if (T === 'stonecutter') targets = idx(s => s.group === 'scin');
-    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && s.accepts(st));
-    else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
-    else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
+    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && acc(s, st));
+    else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && acc(s, st));
+    else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && acc(s, st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
     if (T === 'creative') targets = [];
   } else targets = [...idx(s => s.group === 'hot').reverse(), ...idx(s => s.group === 'main').reverse()].reverse();
@@ -174,11 +174,16 @@ function collectToCursor() {
   for (const s of GUI.slots) { if (s.output) continue; const t = s.get(); if (t && same(t, c) && c.n < maxStack(c.id)) { const m = Math.min(t.n, maxStack(c.id) - c.n); c.n += m; t.n -= m; if (!t.n) s.set(null); } }
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
+// closing a window: what its work slots, the crafting grids and the cursor hold goes back to the player. Everything is
+// taken out of its slot first and only then handed over, without drawing the half-closed window in between - an error
+// part-way (a window drawn with its slots already gone) used to leave things both in the window and in the inventory
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
-  if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
-  for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
-  if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
+  const give = [], c = GUI.ctx;
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && c && c.items) { for (let i = 0; i < c.items.length; i++) if (c.items[i]) { give.push(c.items[i]); c.items[i] = null; } }
+  if (GUI.type === 'trade' && c && c.e) c.e.trading = false;
+  for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { give.push(g[i]); g[i] = null; }
+  if (INV.cursor) { give.push(INV.cursor); INV.cursor = null; }
+  UI.closing = true; try { for (const st of give) { try { INV.giveOrDrop(st); } catch (e) { try { dropStack(PL.x, PL.y + 1, PL.z, st); } catch (e2) {} } } } finally { UI.closing = false; }
 }
 // ---------- anvil (repair, combine, rename) ----------
 const REPAIR_MAT = { chainmail: 'iron_ingot', wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };

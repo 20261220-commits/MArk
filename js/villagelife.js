@@ -83,6 +83,12 @@ function villagerDay(e) {
   const act = vActivity(e); e.act = act;
   if (e.sleeping) { if (act !== 'rest' || e.panic > 0 || !e.bed || e.hurt > 0) vWake(e); else { vSleepHold(e); return; } }
   if (e.panic > 0 || e.trading || e.rider) return;
+  if (e.heardBell > W.tickN) { // the bell: home (its bed) or under a roof, and stay there till it is over
+    vDoors(e);
+    if (e.bed) { const [x, , z] = e.bed; if (!nearA(e, e.bed, 1.6)) { if (!e.goal || Math.hypot(e.goal[0] - x - .5, e.goal[1] - z - .5) > 1) { e.goal = [x + .5, z + .5]; e.path = null; } } else e.goal = null; }
+    else vShelter(e);
+    e.hiding = 1; return; }
+  if (e.hiding) { e.hiding = 0; e.goal = null; }
   vDoors(e);
   if (act === 'work') {
     if (e.crop || W.tickN - (e.farmGoal ?? -1e9) < 200) { /* a farmer out on its field */ }

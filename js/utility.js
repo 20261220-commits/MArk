@@ -49,7 +49,7 @@ function ringBell(x, y, z) {
   if (AU.ctx) { const t = AU.ctx.currentTime; tone(t, 2.4, 880, 870, 'sine', 0.35); tone(t, 1.6, 1760, 1750, 'sine', 0.12); tone(t, 1.2, 2637, 2630, 'triangle', 0.05); }
   for (const e of ENT) {
     if (e.kind !== 'mob' || e.dead || Math.hypot(e.x - x, e.z - z) > 48) continue;
-    if (e.type === 'villager') e.panic = 120; // villagers scatter
+    if (e.type === 'villager' && Math.hypot(e.x - x, e.z - z) <= 32) { e.heardBell = W.tickN + 300; e.goal = null; e.path = null; if (e.sleeping && typeof vWake === 'function') vWake(e); } // villagers who hear it hide at home for a while (Java's ReactToBell: the HIDE activity)
     if (e.def.raider) addEffect(e, 'glowing', 60, 0); // raiders are revealed (raids)
   }
   vibrate(x + .5, y + .5, z + .5);

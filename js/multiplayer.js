@@ -656,6 +656,9 @@ function mpTick() {
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s && !s.hid ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 100 === 0) mpSendPdata(true); // every 5 s (not when nothing changed)
+  // what you carry changed (put in a chest, dropped, picked up, died): the server world hears of it within half a second,
+  // not at the next 5 s save - a connection lost in between used to bring the old inventory back beside what had left it
+  if (MP.server && W.tickN % 10 === 5) { const sig = JSON.stringify([INV.slots, INV.armor, INV.off, INV.cursor]); if (sig !== MP.invSig) { if (MP.invSig != null) mpSendPdata(); MP.invSig = sig; } }
   if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();

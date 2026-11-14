@@ -556,7 +556,7 @@ function enchantOptions() {
   const r = S.rng(PL.enchSeed), b = shelves, lapis = c.items[1] ? c.items[1].n : 0;
   const costs = [0, 1, 2].map(i => { const j = 1 + r.int(8) + (b >> 1) + r.int(b + 1), v = i === 0 ? Math.max(Math.floor(j / 3), 1) : i === 1 ? Math.floor(j * 2 / 3) + 1 : Math.max(j, b * 2); return v < i + 1 ? 0 : v; });
   costs.forEach((cost, i) => {
-    const e = cost ? rollEnchant(st.id, cost, PL.enchSeed + i * 7919) : {}, ks = Object.keys(e); if (!ks.length) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
+    const e = cost ? rollEnchant(st.id, cost, PL.enchSeed + i * 7919 + st.id * 104729) : {}, ks /* (each kind of item rolls its own: a helmet, chestplate, leggings and boots put on the table in turn don't all get the same) */ = Object.keys(e); if (!ks.length) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
     const clue = ks[r.int(ks.length)];
     list.push({ cost, e, text: ENCH[clue][0] + (ENCH[clue][1] > 1 ? ' ' + ROMAN[e[clue]] : '') + ' . . . ?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
   });

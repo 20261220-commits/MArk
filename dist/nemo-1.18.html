@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.13 18:56';
+const NEMO_VERSION = '2026.11.14 09:18';
 
 </script>
 <script>/* js/shared.js */
@@ -10098,6 +10098,7 @@ function mobTick(e) {
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
     if (e.goal && jv && e.parGoal > W.tickN && !(e.panic > 0)) speed = jsp(jv.parent);
+    if (e.heardBell > W.tickN && jv && !(e.panic > 0)) speed = jsp(0.75); // (hiding from the bell: at a run)
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
     // (looking at a player nearby: the head does it, mobLookTick, as Java's LookAtPlayerGoal)
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
@@ -12907,7 +12908,7 @@ function ringBell(x, y, z) {
   if (AU.ctx) { const t = AU.ctx.currentTime; tone(t, 2.4, 880, 870, 'sine', 0.35); tone(t, 1.6, 1760, 1750, 'sine', 0.12); tone(t, 1.2, 2637, 2630, 'triangle', 0.05); }
   for (const e of ENT) {
     if (e.kind !== 'mob' || e.dead || Math.hypot(e.x - x, e.z - z) > 48) continue;
-    if (e.type === 'villager') e.panic = 120; // villagers scatter
+    if (e.type === 'villager' && Math.hypot(e.x - x, e.z - z) <= 32) { e.heardBell = W.tickN + 300; e.goal = null; e.path = null; if (e.sleeping && typeof vWake === 'function') vWake(e); } // villagers who hear it hide at home for a while (Java's ReactToBell: the HIDE activity)
     if (e.def.raider) addEffect(e, 'glowing', 60, 0); // raiders are revealed (raids)
   }
   vibrate(x + .5, y + .5, z + .5);
@@ -16662,7 +16663,7 @@ INV.add = function (st) { // returns leftover count; mutates nothing on success 
   const order = [...Array(9).keys(), ...Array.from({ length: 27 }, (_, i) => i + 9)];
   if (!ITEMS[st.id].dur) for (const i of order) { const s = INV.slots[i]; if (s && same(s, st) && s.n < max) { const m = Math.min(n, max - s.n); s.n += m; n -= m; if (!n) break; } }
   if (n) for (const i of order) if (!INV.slots[i]) { const m = Math.min(n, max); INV.slots[i] = { ...st, n: m }; n -= m; if (!n) break; } // keeps enchantments, names and other data
-  UI.hudDirty = true; if (UI.screen) UI.renderScreen();
+  UI.hudDirty = true; if (UI.screen && !UI.closing) UI.renderScreen();
   return n;
 };
 INV.count = id => INV.slots.reduce((a, s) => a + (s && s.id === id ? s.n : 0), 0);
@@ -16794,24 +16795,24 @@ function clickSlot(i, btn, shift) {
 }
 function quickMove(i) {
   const sl = GUI.slots[i], st = sl.get(); if (!st) return;
-  const g = sl.group, T = GUI.type;
+  const g = sl.group, T = GUI.type, acc = (s, it) => !s.accepts || s.accepts(it); // (a slot with no rule takes anything)
   let targets;
   const idx = f => GUI.slots.map((s, k) => f(s) ? k : -1).filter(k => k >= 0);
   if (g === 'main' || g === 'hot') {
     const d = ITEMS[st.id];
     if (T === 'chest' || T === 'hopper' || T === 'dispenser') targets = idx(s => s.group === 'cont');
     else if (T === 'furnace' && SMELT[st.id]) targets = idx(s => s.group === 'fin');
-    else if (T === 'brewing') targets = idx(s => s.accepts(st) && (s.group === 'bbottle' ? d.potion != null || st.id === IID.glass_bottle : s.group === 'bfuel' ? !GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64 : !(st.id === IID.blaze_powder && (!GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64))));
-    else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && s.accepts(st));
+    else if (T === 'brewing') targets = idx(s => acc(s, st) && (s.group === 'bbottle' ? d.potion != null || st.id === IID.glass_bottle : s.group === 'bfuel' ? !GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64 : !(st.id === IID.blaze_powder && (!GUI.ctx.tile.items[4] || GUI.ctx.tile.items[4].n < 64))));
+    else if (T === 'enchant') targets = idx(s => s.group === (st.id === IID.lapis_lazuli ? 'elapis' : 'ein') && acc(s, st));
     else if (T === 'furnace' && d.fuel) targets = idx(s => s.group === 'ffuel');
     else if (T === 'anvil') targets = idx(s => s.group === (GUI.ctx.items[0] ? 'a1' : 'a0'));
-    else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && s.accepts(st));
+    else if (T === 'smithing') targets = idx(s => s.group === (st.id === IID.netherite_ingot ? 's1' : 's0') && acc(s, st));
     else if (T === 'trade') targets = idx(s => s.group === 'tpay');
     else if (T === 'beacon' && BEACON_PAY().has(st.id)) targets = idx(s => s.group === 'bpay');
     else if (T === 'stonecutter') targets = idx(s => s.group === 'scin');
-    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && s.accepts(st));
-    else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && s.accepts(st));
-    else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && s.accepts(st));
+    else if (T === 'cartography' || T === 'grindstone') targets = idx(s => (s.group === 'cmap' || s.group === 'cadd' || s.group === 'g0' || s.group === 'g1') && acc(s, st));
+    else if (T === 'loom') targets = idx(s => (s.group === 'lban' || s.group === 'ldye') && acc(s, st));
+    else if (T === 'inv' && d.armor && !INV.armor[d.armor.slot]) targets = idx(s => s.group === 'armor' && acc(s, st));
     else targets = idx(s => s.group === (g === 'main' ? 'hot' : 'main'));
     if (T === 'creative') targets = [];
   } else targets = [...idx(s => s.group === 'hot').reverse(), ...idx(s => s.group === 'main').reverse()].reverse();
@@ -16827,11 +16828,16 @@ function collectToCursor() {
   for (const s of GUI.slots) { if (s.output) continue; const t = s.get(); if (t && same(t, c) && c.n < maxStack(c.id)) { const m = Math.min(t.n, maxStack(c.id) - c.n); c.n += m; t.n -= m; if (!t.n) s.set(null); } }
 }
 function afterClick() { UI.hudDirty = true; UI.renderScreen(); const c = GUI.ctx; if (c && c.x != null && typeof rsNotify === 'function') { rsNotify(c.x, c.y, c.z); const ch = chunkAt(c.x >> 4, c.z >> 4); if (ch) ch.modified = ch.edited = true; } }
+// closing a window: what its work slots, the crafting grids and the cursor hold goes back to the player. Everything is
+// taken out of its slot first and only then handed over, without drawing the half-closed window in between - an error
+// part-way (a window drawn with its slots already gone) used to leave things both in the window and in the inventory
 function closeScreenItems() {
-  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && GUI.ctx.items) { for (const st of GUI.ctx.items) if (st) INV.giveOrDrop(st); GUI.ctx.items = null; }
-  if (GUI.type === 'trade' && GUI.ctx.e) GUI.ctx.e.trading = false;
-  for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { INV.giveOrDrop(g[i]); g[i] = null; }
-  if (INV.cursor) { INV.giveOrDrop(INV.cursor); INV.cursor = null; }
+  const give = [], c = GUI.ctx;
+  if ((GUI.type === 'enchant' || GUI.type === 'anvil' || GUI.type === 'smithing' || GUI.type === 'trade' || GUI.type === 'beacon' || GUI.type === 'loom' || GUI.type === 'stonecutter' || GUI.type === 'cartography' || GUI.type === 'grindstone') && c && c.items) { for (let i = 0; i < c.items.length; i++) if (c.items[i]) { give.push(c.items[i]); c.items[i] = null; } }
+  if (GUI.type === 'trade' && c && c.e) c.e.trading = false;
+  for (const g of [INV.craft2, INV.craft3]) for (let i = 0; i < g.length; i++) if (g[i]) { give.push(g[i]); g[i] = null; }
+  if (INV.cursor) { give.push(INV.cursor); INV.cursor = null; }
+  UI.closing = true; try { for (const st of give) { try { INV.giveOrDrop(st); } catch (e) { try { dropStack(PL.x, PL.y + 1, PL.z, st); } catch (e2) {} } } } finally { UI.closing = false; }
 }
 // ---------- anvil (repair, combine, rename) ----------
 const REPAIR_MAT = { chainmail: 'iron_ingot', wooden: 'planks', stone: 'stone_crafting', iron: 'iron_ingot', golden: 'gold_ingot', diamond: 'diamond', netherite: 'netherite_ingot', leather: 'leather' };
@@ -18139,7 +18145,7 @@ function statsHtml() {
 // input key: outputs (key or key*count), as in vanilla 1.17
 const STONECUT = {};
 for (const row of 'andesite:andesite_slab*2,andesite_stairs,andesite_wall,polished_andesite,polished_andesite_slab*2,polished_andesite_stairs;blackstone:blackstone_slab*2,blackstone_stairs,blackstone_wall,chiseled_polished_blackstone,polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall,polished_blackstone_bricks,polished_blackstone,polished_blackstone_slab*2,polished_blackstone_stairs,polished_blackstone_wall;bricks:brick_slab*2,brick_stairs,brick_wall;cobbled_deepslate:chiseled_deepslate,cobbled_deepslate_slab*2,cobbled_deepslate_stairs,cobbled_deepslate_wall,deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_bricks,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles,polished_deepslate,polished_deepslate_slab*2,polished_deepslate_stairs,polished_deepslate_wall;nether_bricks:chiseled_nether_bricks,nether_brick_slab*2,nether_brick_stairs,nether_brick_wall;polished_blackstone:chiseled_polished_blackstone,polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall,polished_blackstone_bricks,polished_blackstone_slab*2,polished_blackstone_stairs,polished_blackstone_wall;quartz_block:chiseled_quartz_block,quartz_bricks,quartz_pillar,quartz_slab*2,quartz_stairs;red_sandstone:chiseled_red_sandstone,cut_red_sandstone,cut_red_sandstone_slab*2,red_sandstone_slab*2,red_sandstone_stairs,red_sandstone_wall;sandstone:chiseled_sandstone,cut_sandstone,cut_sandstone_slab*2,sandstone_slab*2,sandstone_stairs,sandstone_wall;stone_bricks:chiseled_stone_bricks,stone_brick_slab*2,stone_brick_stairs,stone_brick_wall;stone:chiseled_stone_bricks,stone_brick_slab*2,stone_brick_stairs,stone_brick_wall,stone_bricks,stone_slab*2,stone_stairs;cobblestone:cobblestone_slab*2,cobblestone_stairs,cobblestone_wall;copper_block:cut_copper,cut_copper_slab*2,cut_copper_stairs;cut_copper:cut_copper_slab*2,cut_copper_stairs;cut_red_sandstone:cut_red_sandstone_slab*2;cut_sandstone:cut_sandstone_slab*2;dark_prismarine:dark_prismarine_slab*2,dark_prismarine_stairs;deepslate_bricks:deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles;polished_deepslate:deepslate_brick_slab*2,deepslate_brick_stairs,deepslate_brick_wall,deepslate_bricks,deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall,deepslate_tiles,polished_deepslate_slab*2,polished_deepslate_stairs,polished_deepslate_wall;deepslate_tiles:deepslate_tile_slab*2,deepslate_tile_stairs,deepslate_tile_wall;diorite:diorite_slab*2,diorite_stairs,diorite_wall,polished_diorite,polished_diorite_slab*2,polished_diorite_stairs;end_stone_bricks:end_stone_brick_slab*2,end_stone_brick_stairs,end_stone_brick_wall;end_stone:end_stone_brick_slab*2,end_stone_brick_stairs,end_stone_brick_wall,end_stone_bricks;exposed_copper:exposed_cut_copper,exposed_cut_copper_slab*2,exposed_cut_copper_stairs;exposed_cut_copper:exposed_cut_copper_slab*2,exposed_cut_copper_stairs;granite:granite_slab*2,granite_stairs,granite_wall,polished_granite,polished_granite_slab*2,polished_granite_stairs;mossy_cobblestone:mossy_cobblestone_slab*2,mossy_cobblestone_stairs,mossy_cobblestone_wall;mossy_stone_bricks:mossy_stone_brick_slab*2,mossy_stone_brick_stairs,mossy_stone_brick_wall;oxidized_copper:oxidized_cut_copper,oxidized_cut_copper_slab*2,oxidized_cut_copper_stairs;oxidized_cut_copper:oxidized_cut_copper_slab*2,oxidized_cut_copper_stairs;polished_andesite:polished_andesite_slab*2,polished_andesite_stairs;basalt:polished_basalt;polished_blackstone_bricks:polished_blackstone_brick_slab*2,polished_blackstone_brick_stairs,polished_blackstone_brick_wall;polished_diorite:polished_diorite_slab*2,polished_diorite_stairs;polished_granite:polished_granite_slab*2,polished_granite_stairs;prismarine_bricks:prismarine_brick_slab*2,prismarine_brick_stairs;prismarine:prismarine_slab*2,prismarine_stairs,prismarine_wall;purpur_block:purpur_pillar,purpur_slab*2,purpur_stairs;red_nether_bricks:red_nether_brick_slab*2,red_nether_brick_stairs,red_nether_brick_wall;smooth_quartz:smooth_quartz_slab*2,smooth_quartz_stairs;smooth_red_sandstone:smooth_red_sandstone_slab*2,smooth_red_sandstone_stairs;smooth_sandstone:smooth_sandstone_slab*2,smooth_sandstone_stairs;smooth_stone:smooth_stone_slab*2;waxed_copper_block:waxed_cut_copper,waxed_cut_copper_slab*2,waxed_cut_copper_stairs;waxed_cut_copper:waxed_cut_copper_slab*2,waxed_cut_copper_stairs;waxed_exposed_copper:waxed_exposed_cut_copper,waxed_exposed_cut_copper_slab*2,waxed_exposed_cut_copper_stairs;waxed_exposed_cut_copper:waxed_exposed_cut_copper_slab*2,waxed_exposed_cut_copper_stairs;waxed_oxidized_copper:waxed_oxidized_cut_copper,waxed_oxidized_cut_copper_slab*2,waxed_oxidized_cut_copper_stairs;waxed_oxidized_cut_copper:waxed_oxidized_cut_copper_slab*2,waxed_oxidized_cut_copper_stairs;waxed_weathered_copper:waxed_weathered_cut_copper,waxed_weathered_cut_copper_slab*2,waxed_weathered_cut_copper_stairs;waxed_weathered_cut_copper:waxed_weathered_cut_copper_slab*2,waxed_weathered_cut_copper_stairs;weathered_copper:weathered_cut_copper,weathered_cut_copper_slab*2,weathered_cut_copper_stairs;weathered_cut_copper:weathered_cut_copper_slab*2,weathered_cut_copper_stairs'.split(';')) { const [k, outs] = row.split(':'); STONECUT[k] = outs.split(',').map(o => { const [out, n] = o.split('*'); return [out, +(n || 1)]; }); }
-const stonecutOptions = ctx => { const s = ctx.items[0]; return s ? (STONECUT[ITEMS[s.id].key] || []).filter(([o]) => IID[o] != null) : []; };
+const stonecutOptions = ctx => { const s = ctx.items && ctx.items[0]; return s ? (STONECUT[ITEMS[s.id].key] || []).filter(([o]) => IID[o] != null) : []; };
 function stonecutResult(ctx) { const o = stonecutOptions(ctx)[ctx.sel]; return o ? { id: IID[o[0]], n: o[1] } : null; }
 function stonecutTake(ctx) { const s = ctx.items[0]; s.n--; if (!s.n) ctx.items[0] = null; play('click', { vol: 0.5 }); }
 function stonecutHtml() {
@@ -18755,7 +18761,7 @@ function enchantOptions() {
   const r = S.rng(PL.enchSeed), b = shelves, lapis = c.items[1] ? c.items[1].n : 0;
   const costs = [0, 1, 2].map(i => { const j = 1 + r.int(8) + (b >> 1) + r.int(b + 1), v = i === 0 ? Math.max(Math.floor(j / 3), 1) : i === 1 ? Math.floor(j * 2 / 3) + 1 : Math.max(j, b * 2); return v < i + 1 ? 0 : v; });
   costs.forEach((cost, i) => {
-    const e = cost ? rollEnchant(st.id, cost, PL.enchSeed + i * 7919) : {}, ks = Object.keys(e); if (!ks.length) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
+    const e = cost ? rollEnchant(st.id, cost, PL.enchSeed + i * 7919 + st.id * 104729) : {}, ks /* (each kind of item rolls its own: a helmet, chestplate, leggings and boots put on the table in turn don't all get the same) */ = Object.keys(e); if (!ks.length) { list.push({ cost, e, text: '', ok: false }); return; } // (nothing at this level: the slot stays, greyed)
     const clue = ks[r.int(ks.length)];
     list.push({ cost, e, text: ENCH[clue][0] + (ENCH[clue][1] > 1 ? ' ' + ROMAN[e[clue]] : '') + ' . . . ?', ok: creative() || (PL.level >= cost && lapis >= i + 1) });
   });
@@ -20793,6 +20799,9 @@ function mpTick() {
     sneak: PL.sneaking && !PL.flying ? 1 : 0, swing: R.hand.swing > 0 ? +(1 - R.hand.swing).toFixed(2) : 0, held: h ? h.id : 0, off: off ? off.id : 0, fly: PL.flying ? 1 : 0, dead: PL.dead ? 1 : 0, mode: PL.mode, h: PL.h, sleep: PL.sleeping ? 1 : 0, pose: PL.pose || 'stand', glide: PL.gliding ? 1 : 0, ride: PL.riding ? 1 : 0,
     armor: INV.armor.map(s => s && !s.hid ? (s.col != null ? [s.id, s.e ? 1 : 0, s.col] : [s.id, s.e ? 1 : 0]) : 0), inv: effLv(PL, 'invisibility') ? 1 : 0, ...mpPoseOut() }); }
   if (MP.server && W.tickN % 100 === 0) mpSendPdata(true); // every 5 s (not when nothing changed)
+  // what you carry changed (put in a chest, dropped, picked up, died): the server world hears of it within half a second,
+  // not at the next 5 s save - a connection lost in between used to bring the old inventory back beside what had left it
+  if (MP.server && W.tickN % 10 === 5) { const sig = JSON.stringify([INV.slots, INV.armor, INV.off, INV.cursor]); if (sig !== MP.invSig) { if (MP.invSig != null) mpSendPdata(); MP.invSig = sig; } }
   if (W.tickN % 40 === 0) mpRetryChunks();
   if (MP.role !== 'host') { if (W.tickN % 200 === 0 && !MP.server) mpGuestSave(); return; }
   if (MP.server && W.tickN % 600 === 0) mpSendShared();
@@ -22037,6 +22046,12 @@ function villagerDay(e) {
   const act = vActivity(e); e.act = act;
   if (e.sleeping) { if (act !== 'rest' || e.panic > 0 || !e.bed || e.hurt > 0) vWake(e); else { vSleepHold(e); return; } }
   if (e.panic > 0 || e.trading || e.rider) return;
+  if (e.heardBell > W.tickN) { // the bell: home (its bed) or under a roof, and stay there till it is over
+    vDoors(e);
+    if (e.bed) { const [x, , z] = e.bed; if (!nearA(e, e.bed, 1.6)) { if (!e.goal || Math.hypot(e.goal[0] - x - .5, e.goal[1] - z - .5) > 1) { e.goal = [x + .5, z + .5]; e.path = null; } } else e.goal = null; }
+    else vShelter(e);
+    e.hiding = 1; return; }
+  if (e.hiding) { e.hiding = 0; e.goal = null; }
   vDoors(e);
   if (act === 'work') {
     if (e.crop || W.tickN - (e.farmGoal ?? -1e9) < 200) { /* a farmer out on its field */ }

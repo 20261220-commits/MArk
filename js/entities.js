@@ -796,6 +796,7 @@ function mobTick(e) {
     else if (e.love > 0) { let mate = null; for (const o of ENT) if (o !== e && (o.type === e.type || (d.mates && d.mates[o.type])) && o.love > 0 && !o.dead && Math.hypot(o.x - e.x, o.z - e.z) < 8) { mate = o; break; } if (mate) { e.goal = [mate.x, mate.z]; if (Math.hypot(mate.x - e.x, mate.z - e.z) < 1.5) { e.love = mate.love = 0; const kid = spawnMob(mate.type === e.type ? e.type : d.mates[mate.type], e.x, e.y, e.z, { baby: true, owner: e.owner && mate.owner ? e.owner : null }); if (d.onBred) d.onBred(kid, e, mate); ADVT.bred(e.type); spawnXP(e.x, e.y + .5, e.z, 1 + Math.floor(Math.random() * 7)); } } }
     else if (!e.goal && Math.random() < 1 / 120) { const g = wanderGoal(e, 10); if (g) e.goal = g; } // (Java's water-avoiding stroll: somewhere on land)
     if (e.goal && jv && e.parGoal > W.tickN && !(e.panic > 0)) speed = jsp(jv.parent);
+    if (e.heardBell > W.tickN && jv && !(e.panic > 0)) speed = jsp(0.75); // (hiding from the bell: at a run)
     if (e.goal) { const gx = e.goal[0] - e.x, gz = e.goal[1] - e.z, gl = Math.hypot(gx, gz); if (gl < 0.6) { e.goal = null; e.path = null; } else { const pd = gl > 2.5 && !food ? pathDir(e, e.goal[0], e.y, e.goal[1]) : [gx / gl, gz / gl]; mx = pd[0]; mz = pd[1]; if (mx || mz) e.yawTarget = Math.atan2(-mx, -mz); else e.goal = null; } if (Math.random() < 1 / 400) e.goal = null; } // around walls and holes, as Java's stroll does
     // (looking at a player nearby: the head does it, mobLookTick, as Java's LookAtPlayerGoal)
     if (d.flap && !e.onGround && e.vy < 0) e.vy *= 0.6;
