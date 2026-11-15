@@ -269,7 +269,11 @@ function heldTransform(id, left, isBlock) {
   // display: block [75,45,0] [0,2.5,0] 0.375 · handheld [0,-90,55] [0,4,0.5] 0.85 · generated [0,0,0] [0,3,1] 0.55
   const [rot, tr, sc] = id === IID.shield ? [[0, 90, 0], left ? [10, 6, 12] : [10, 6, -4], 1] : isBlock ? [[75, 45, 0], [0, 2.5, 0], 0.375] : HANDHELD(id) ? [[0, -90, 55], [0, 4, 0.5], 0.85] : [[0, 0, 0], [0, 3, 1], 0.55]; // shield.json thirdperson_*hand
   M.multiply(t.makeTranslation(s * tr[0] / 16, tr[1] / 16, tr[2] / 16));
-  M.multiply(t.makeRotationFromEuler(new THREE.Euler(rot[0] * DEG, s * rot[1] * DEG, s * rot[2] * DEG, 'XYZ')));
+  // (Transformation.apply(leftHanded) turns the left hand's display round; a tool's model (item/handheld.json) gives its
+  // left hand the right's turned round already, so the two cancel: held in the left hand it is turned like in the right,
+  // not mirrored (mirrored, a sword hung down along the leg))
+  const rs = !isBlock && id !== IID.shield && HANDHELD(id) ? 1 : s;
+  M.multiply(t.makeRotationFromEuler(new THREE.Euler(rot[0] * DEG, rs * rot[1] * DEG, rs * rot[2] * DEG, 'XYZ')));
   M.multiply(t.makeScale(sc, sc, sc));
   return M;
 }
