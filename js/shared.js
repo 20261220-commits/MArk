@@ -2725,6 +2725,8 @@ function endIslandValue(seed, wx, wz) {
   for (const [a, b, st] of endIslandPts(seed, wx >> 4, wz >> 4)) { const g = 100 - Math.hypot(ex - a * 2, ez - b * 2) * st; if (g > f) f = Math.min(80, g); }
   return f;
 }
+// (the outer islands before they were Java's: kept to tell, in a saved chunk, the old ground from what a player did)
+const endIslandTopOld = (nA, nB, wx, wz) => { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; return v > 0.5 ? 58 + Math.floor((v - 0.5) / 0.5 * 12) : -1; };
 // the top of the outer islands' ground there, or -1
 const endIslandTop = (seed, nB, wx, wz) => { const f = endIslandValue(seed, wx, wz); if (f <= 0 || Math.hypot(wx, wz) < 700) return -1; return 52 + Math.floor(f * 0.22 + nB.n2(wx / 24, wz / 24) * 2); };
 // an end city in each 20-chunk region (Java: spacing 20, separation 11, a triangular spread over 9 chunks) where the
@@ -2732,6 +2734,7 @@ const endIslandTop = (seed, nB, wx, wz) => { const f = endIslandValue(seed, wx, 
 // in the region before giving up (Java always finds land nearly everywhere out there). The old rule's cities stand.
 function endCityAt(seed, a, b, nA, nB) {
   const r = rng(hash32(seed, a, b, 63)), old = r() <= 0.55, ox = (a * 20 + 3 + r.int(14)) * 16 + 8, oz = (b * 20 + 3 + r.int(14)) * 16 + 8, oh = 18 + r.int(8);
+  if (LEGACY.endisl) { if (!old || Math.hypot(ox, oz) < 900) return null; const top = endIslandTopOld(nA, nB, ox, oz); return top >= 60 ? { x: ox, z: oz, y: top + 1, h: oh } : null; } // (the old rule on the old ground)
   if (old && Math.hypot(ox, oz) >= 900) { const top = endIslandTop(seed, nB, ox, oz); if (top >= 60) return { x: ox, z: oz, y: top + 1, h: oh }; }
   const q = rng(hash32(seed, a, b, 10387313));
   for (let k = 0; k < 10; k++) {
@@ -2775,6 +2778,7 @@ function genEnd(seed, cx, cz) {
     let top = -1, bot = 0;
     const r = 82 + nA.n2(wx / 50, wz / 50) * 10;
     if (d < r) { const t = 1 - d / r; top = 56 + Math.floor(t * 9 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(Math.sqrt(t) * 44 + 3 + nB.n2(wx / 13, wz / 13) * 3); }
+    else if (d > 700 && LEGACY.endisl) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; biome[z * 16 + x] = v > 0.75 ? BIOK.end_highlands : v > 0.6 ? BIOK.end_midlands : v > 0.5 ? BIOK.end_barrens : BIOK.small_end_islands; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
     else if (d > 700) { const f = endIslandValue(seed, wx, wz); biome[z * 16 + x] = f > 40 ? BIOK.end_highlands : f >= 0 ? BIOK.end_midlands : f >= -20 ? BIOK.end_barrens : BIOK.small_end_islands; // (Java's TheEndBiomeSource: by the island value)
       if (f > 0) { top = 52 + Math.floor(f * 0.22 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(f * 0.45 + 2 + nB.n2(wx / 13, wz / 13) * 3); } }
     for (let y = Math.max(1, bot); y <= top; y++) blocks[I(x, y, z)] = 166;
@@ -5146,6 +5150,12 @@ function fixSaved(m) {
       if (M[i] !== 0 && neu.blocks[i] !== 28) { B[i] = 0; M[i] = 0; changed++; } // (running lava: it runs again from the sources that stay)
       else if (M[i] === 0 && old.blocks[i] === 28 && neu.blocks[i] !== 28) { B[i] = neu.blocks[i]; M[i] = neu.meta[i]; changed++; } } // (a spring the old count added)
     for (let i = 0; i < B.length; i++) if (B[i] === 28 && M[i] === 0) { const x = i & 15, z = (i >> 4) & 15; if ((x > 0 && B[i - 1] === 0) || (x < 15 && B[i + 1] === 0) || (z > 0 && B[i - 16] === 0) || (z < 15 && B[i + 16] === 0) || (i >= 256 && B[i - 256] === 0)) srcs.push(i); }
+  }
+  if (m.dim === 1 && Math.hypot(m.cx * 16 + 8, m.cz * 16 + 8) > 640) { // the outer islands, now Java's: every cell still as the old ground made it takes the new ground; what a player changed stays
+    let O, N; LEGACY = { endisl: 1 }; try { O = genChunk(m.seed, m.cx, m.cz, 1, m.exp); } finally { LEGACY = {}; } N = genChunk(m.seed, m.cx, m.cz, 1, m.exp);
+    for (let i = 0; i < B.length; i++) if (B[i] === O.blocks[i] && M[i] === O.meta[i] && (B[i] !== N.blocks[i] || M[i] !== N.meta[i])) { B[i] = N.blocks[i]; M[i] = N.meta[i]; changed++; }
+    const ch = r => r.tiles.filter(t => t.t === 'chest').map(t => [t.i, t.loot, t.loot.table || null]);
+    return { blocks: B, meta: M, changed, srcs, oldChests: ch(O), newChests: ch(N), addChests: changed ? ch(N).filter(([i]) => !O.tiles.some(t => t.t === 'chest' && t.i === i) && B[i] === N.blocks[i]) : [] };
   }
   const chests = r => r.tiles.filter(t => t.t === 'chest').map(t => [t.i, t.loot, t.loot.table || null]);
   return { blocks: B, meta: M, changed, srcs, oldChests: chests(old), newChests: chests(neu) };
