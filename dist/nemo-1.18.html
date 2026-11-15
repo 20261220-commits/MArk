@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.15 16:37';
+const NEMO_VERSION = '2026.11.15 19:38';
 
 </script>
 <script>/* js/shared.js */
@@ -12148,8 +12148,9 @@ function shulkerAI(e, dist) {
   e.vx = e.vy = e.vz = 0;
   e.peekT = (e.peekT || 0) - 1;
   if (e.peekT <= 0) { e.peekWant = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? 0.3 : 1; e.peekT = 40 + Math.floor(Math.random() * 80); }
-  const see = plTargetable() && dist < 16 && canSee(e.x, e.y + 0.6, e.z, PL.x, PL.y + 1.2, PL.z);
-  if (see) { e.peekWant = 1; e.atk = (e.atk || 0) + 1; if (e.atk % (20 + Math.floor(Math.random() * 40)) === 0) spawnShulkerBullet(e); }
+  // Java's ShulkerAttackGoal: a target within 20 blocks, a bullet when the count runs out, then 20-110 ticks to the next
+  const see20 = plTargetable() && dist < 20 && canSee(e.x, e.y + 0.6, e.z, PL.x, PL.y + 1.2, PL.z);
+  if (see20) { e.peekWant = 1; if (e.atk == null) e.atk = 20; if (--e.atk <= 0) { e.atk = 20 + Math.floor(Math.random() * 10) * 10; spawnShulkerBullet(e); } } else e.atk = null;
   e.peek = (e.peek || 0) + ((e.peekWant || 0) - (e.peek || 0)) * 0.1;
 }
 function shulkerAnim(e, P) { if (P.lid) { P.lid.position.y = (24 - 24) / 16 + (e.peek || 0) * 0.5; P.lid.rotation.y = (e.peek || 0) * 0.5; } if (P.head) P.head.position.y = (24 - 12) / 16 + (e.peek || 0) * 0.3; }
@@ -17851,10 +17852,10 @@ function playerTick() {
       fallLanded();
       PL.fallDist = 0;
     } else if (PL.y < oy) { if (!PL.fallDist) PL.fallFrom = oy; PL.fallDist += oy - PL.y; }
-    if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
+    { const lv = !PL.flying && effLv(PL, 'levitation'); if (lv) PL.vy = (PL.vy + (0.05 * lv - PL.vy) * 0.2) * 0.98; /* (levitation instead of gravity, as Java's travel: up about a block a second) */ else if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98; }
     PL.vx *= fr; PL.vz *= fr;
   }
-  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) { PL.vy += (0.05 * lev - PL.vy) * 0.2; PL.fallDist = 0; } // shulker bullets
+  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) PL.fallDist = 0; // (shulker bullets: lifted as above)
   else if (effLv(PL, 'slow_falling') && PL.vy < -0.05 && !PL.flying) { PL.vy = Math.max(PL.vy, -0.08); PL.fallDist = 0; }
   IN.jumpWas = IN.jump;
   if (USE.jumpCd > 0) USE.jumpCd--;
