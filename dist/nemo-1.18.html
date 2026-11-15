@@ -404,7 +404,7 @@ async function pwaInstall() {
 </script>
 <script>/* js/version.js */
 // written by tools/build.js: when this game was built (Korean time)
-const NEMO_VERSION = '2026.11.15 11:32';
+const NEMO_VERSION = '2026.11.15 14:12';
 
 </script>
 <script>/* js/shared.js */
@@ -3118,13 +3118,38 @@ function genNether(seed, cx, cz) {
 // ---------- the End ----------
 const END_PILLARS = (() => { const out = []; for (let i = 0; i < 10; i++) { const a = 2 * (-Math.PI + Math.PI / 10 * i); out.push([Math.floor(42 * Math.cos(a)), Math.floor(42 * Math.sin(a)), 2 + ((i * 7) % 10) / 3 | 0, 76 + ((i * 7) % 10) * 3, ((i * 7) % 10) < 2]); } return out; })();
 const END_PORTAL_Y = 63;
-const endIslandTop = (nA, nB, wx, wz) => { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; return v > 0.5 ? 58 + Math.floor((v - 0.5) / 0.5 * 12) : -1; };
+// the outer islands as Java 1.18 shapes them (EndIslandDensityFunction.getHeightValue): here and there on the chunk grid,
+// more than 64 chunks out, an island centre (a simplex value under a threshold); each raises the ground within about
+// 100 / (9..21) eight-block steps of it (40 to 90 blocks), the highest of them counting, so neighbours merge into great
+// highlands. That value (up to 80) sets how high the island's top stands and how deep it reaches.
+const END_ISL = new Map();
+function endIslandPts(seed, cx, cz) { // the island centres near a chunk: [chunk x, chunk z, steepness]
+  const k = seed + ':' + cx + ':' + cz; let l = END_ISL.get(k); if (l) return l; l = [];
+  const N = END_ISL.noise && END_ISL.noise.s === seed ? END_ISL.noise : (END_ISL.noise = Object.assign(makeNoise(seed + 203), { s: seed }));
+  for (let a = cx - 13; a <= cx + 13; a++) for (let b = cz - 13; b <= cz + 13; b++) if (a * a + b * b > 4096 && N.n2(a * 0.87, b * 0.87) < END_ISL_T) l.push([a, b, (Math.abs(a) * 3439 + Math.abs(b) * 147) % 13 + 9]);
+  if (END_ISL.size > 4096) END_ISL.clear(); END_ISL.set(k, l); return l;
+}
+let END_ISL_T = -0.8; // (this noise's values spread wider than Java's simplex: the threshold that gives as many centres)
+function endIslandValue(seed, wx, wz) {
+  const ex = wx / 8, ez = wz / 8; let f = Math.max(-100, Math.min(80, 100 - Math.hypot(ex, ez) * 8));
+  for (const [a, b, st] of endIslandPts(seed, wx >> 4, wz >> 4)) { const g = 100 - Math.hypot(ex - a * 2, ez - b * 2) * st; if (g > f) f = Math.min(80, g); }
+  return f;
+}
+// the top of the outer islands' ground there, or -1
+const endIslandTop = (seed, nB, wx, wz) => { const f = endIslandValue(seed, wx, wz); if (f <= 0 || Math.hypot(wx, wz) < 700) return -1; return 52 + Math.floor(f * 0.22 + nB.n2(wx / 24, wz / 24) * 2); };
+// an end city in each 20-chunk region (Java: spacing 20, separation 11, a triangular spread over 9 chunks) where the
+// island there stands 60 high or more. These outer islands are sparser than Java's, so a low spot tries a few more
+// in the region before giving up (Java always finds land nearly everywhere out there). The old rule's cities stand.
 function endCityAt(seed, a, b, nA, nB) {
-  const r = rng(hash32(seed, a, b, 63)); if (r() > 0.55) return null;
-  const x = (a * 20 + 3 + r.int(14)) * 16 + 8, z = (b * 20 + 3 + r.int(14)) * 16 + 8;
-  if (Math.hypot(x, z) < 900) return null;
-  const top = endIslandTop(nA, nB, x, z); if (top < 60) return null;
-  return { x, z, y: top + 1, h: 18 + r.int(8) };
+  const r = rng(hash32(seed, a, b, 63)), old = r() <= 0.55, ox = (a * 20 + 3 + r.int(14)) * 16 + 8, oz = (b * 20 + 3 + r.int(14)) * 16 + 8, oh = 18 + r.int(8);
+  if (old && Math.hypot(ox, oz) >= 900) { const top = endIslandTop(seed, nB, ox, oz); if (top >= 60) return { x: ox, z: oz, y: top + 1, h: oh }; }
+  const q = rng(hash32(seed, a, b, 10387313));
+  for (let k = 0; k < 10; k++) {
+    const x = (a * 20 + ((q.int(9) + q.int(9)) >> 1)) * 16 + 8, z = (b * 20 + ((q.int(9) + q.int(9)) >> 1)) * 16 + 8;
+    if (Math.hypot(x, z) < 900) continue;
+    const top = endIslandTop(seed, nB, x, z); if (top >= 60) return { x, z, y: top + 1, h: 18 + q.int(8) };
+  }
+  return null;
 }
 function stampEndCity(c, st, R, tiles) {
   const P = 213, PIL = 214, ROD = 215, SLAB = 250, tileAt = (x, y, z) => ((y << 8) | ((z & 15) << 4) | (x & 15));
@@ -3160,7 +3185,8 @@ function genEnd(seed, cx, cz) {
     let top = -1, bot = 0;
     const r = 82 + nA.n2(wx / 50, wz / 50) * 10;
     if (d < r) { const t = 1 - d / r; top = 56 + Math.floor(t * 9 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(Math.sqrt(t) * 44 + 3 + nB.n2(wx / 13, wz / 13) * 3); }
-    else if (d > 700) { const v = nA.n2(wx / 70, wz / 70) + nB.n2(wx / 25, wz / 25) * 0.15; biome[z * 16 + x] = v > 0.75 ? BIOK.end_highlands : v > 0.6 ? BIOK.end_midlands : v > 0.5 ? BIOK.end_barrens : BIOK.small_end_islands; if (v > 0.5) { const t = (v - 0.5) / 0.5; top = 58 + Math.floor(t * 12); bot = top - Math.floor(t * 34 + 2); } }
+    else if (d > 700) { const f = endIslandValue(seed, wx, wz); biome[z * 16 + x] = f > 40 ? BIOK.end_highlands : f >= 0 ? BIOK.end_midlands : f >= -20 ? BIOK.end_barrens : BIOK.small_end_islands; // (Java's TheEndBiomeSource: by the island value)
+      if (f > 0) { top = 52 + Math.floor(f * 0.22 + nB.n2(wx / 24, wz / 24) * 2); bot = top - Math.floor(f * 0.45 + 2 + nB.n2(wx / 13, wz / 13) * 3); } }
     for (let y = Math.max(1, bot); y <= top; y++) blocks[I(x, y, z)] = 166;
   }
   const st = makeStamp(blocks, meta, x0, z0), R = rng(hash32(seed, cx, cz, 61));
@@ -5537,7 +5563,7 @@ function fixSaved(m) {
 const tileFor = (id, meta, slot) => HASV[id] ? VT[id * 16 + ((meta >> VSH[id]) & 15)] : FT[id * 4 + slot];
 return { rollLoot, isLushCaves, isDripstoneCaves, vanillaState, jMd5, jBiomeKey, jClimateFor, connectsTo, assembleEndCity, setStructs, hasStructs, outpostAt, OREG, oceanSite, TP_KIND, RPREG, ruinedPortalAt, BB, BIOK, caveBiomeAt, SLABS3, SLABS4, STAIRS34, WALLS2, WOOD8, BED_COLORS, bastionAt, BREG, BASTION_KIND, mansionAt, MREG, POT_PLANTS, templeAt, WLOG, isWet, isOceanBio, treasureAt, monumentAt, OCREG, RAIL_ENDS, isRail, railShape, NB, NEWB, CW, CH, SEA, CVOL, MINY, MAXY, CH0, CVOL0, TI, deepFill, noiseCave, ATL, TPR, RT, TOOL, TILES, T, BLOCKS, BID, RTYPE, OPQ, LOP, LEM, SOLID, TINT, FLUID, REPL, FACING, LOGAX, FT, BIOMES, BIO, DIRS, DIR6,
   COLORS, COLKO, VT, VSH, HASV, LEAF, DOOR, BUD, tileFor, candleOf, candleBlock, isRod, emitOf,
-  shapes, collide, hash32, rng, makeNoise, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, fixSaved, setLegacy: o => { LEGACY = o || {}; }, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
+  shapes, collide, hash32, rng, makeNoise, endIslandValue, setEndIslT: t => { END_ISL_T = t; END_ISL.clear(); }, makeGen, setGenVersion, makeBiomeMap, JBN, genChunk, strongholdsOf, fixSaved, setLegacy: o => { LEGACY = o || {}; }, inStrongholdPieces, inFortressPieces, assembleStronghold, assembleFortress, assembleMineshaft, endCityAt, villageAt, VREG, outpostAt, OREG, fortressAt, FREG, END_PILLARS, END_PORTAL_Y, NETHER_BIO, growTree, lightChunk, meshChunk, pidx, PW, PA, PH };
 };
 
 function workerMain(S) {
