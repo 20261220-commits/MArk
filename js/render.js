@@ -601,7 +601,7 @@ function updateHand(dt, mainId, light, bobX, bobY, offId = 0, active = 0) {
       // the item model's first-person display transform, mirrored for the left hand like Transformation.apply(leftHanded)
       if (H.mesh.userData.shield) { const L = f < 0; hT(f * (L ? 10 : -10) / 16, (L ? 0 : 2) / 16, -10 / 16); hY(f * 180); hZ(f * 5); hmul(HT.makeScale(1.25, 1.25, 1.25)); } // shield.json firstperson_*hand
       else if (H.mesh.userData.isBlock) { hY(f > 0 ? 45 : -225); hmul(HT.makeScale(0.4, 0.4, 0.4)); }
-      else { hT(f * 1.13 / 16, 3.2 / 16, 1.13 / 16); hY(f * -90); hZ(f * 25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
+      else { const rs = typeof HANDHELD === 'function' && HANDHELD(H.id) ? 1 : f; /* (a tool: item/handheld.json's left-hand display is the right's turned round, which apply() turns back) */ hT(f * 1.13 / 16, 3.2 / 16, 1.13 / 16); hY(rs * -90); hZ(rs * 25); hmul(HT.makeScale(0.68, 0.68, 0.68)); }
       H.mesh.matrix.identity();
     }
     H.g.matrix.copy(HM);
