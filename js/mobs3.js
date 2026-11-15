@@ -128,8 +128,9 @@ function shulkerAI(e, dist) {
   e.vx = e.vy = e.vz = 0;
   e.peekT = (e.peekT || 0) - 1;
   if (e.peekT <= 0) { e.peekWant = Math.random() < 0.5 ? 0 : Math.random() < 0.5 ? 0.3 : 1; e.peekT = 40 + Math.floor(Math.random() * 80); }
-  const see = plTargetable() && dist < 16 && canSee(e.x, e.y + 0.6, e.z, PL.x, PL.y + 1.2, PL.z);
-  if (see) { e.peekWant = 1; e.atk = (e.atk || 0) + 1; if (e.atk % (20 + Math.floor(Math.random() * 40)) === 0) spawnShulkerBullet(e); }
+  // Java's ShulkerAttackGoal: a target within 20 blocks, a bullet when the count runs out, then 20-110 ticks to the next
+  const see20 = plTargetable() && dist < 20 && canSee(e.x, e.y + 0.6, e.z, PL.x, PL.y + 1.2, PL.z);
+  if (see20) { e.peekWant = 1; if (e.atk == null) e.atk = 20; if (--e.atk <= 0) { e.atk = 20 + Math.floor(Math.random() * 10) * 10; spawnShulkerBullet(e); } } else e.atk = null;
   e.peek = (e.peek || 0) + ((e.peekWant || 0) - (e.peek || 0)) * 0.1;
 }
 function shulkerAnim(e, P) { if (P.lid) { P.lid.position.y = (24 - 24) / 16 + (e.peek || 0) * 0.5; P.lid.rotation.y = (e.peek || 0) * 0.5; } if (P.head) P.head.position.y = (24 - 12) / 16 + (e.peek || 0) * 0.3; }

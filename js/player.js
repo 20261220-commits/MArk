@@ -366,10 +366,10 @@ function playerTick() {
       fallLanded();
       PL.fallDist = 0;
     } else if (PL.y < oy) { if (!PL.fallDist) PL.fallFrom = oy; PL.fallDist += oy - PL.y; }
-    if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98;
+    { const lv = !PL.flying && effLv(PL, 'levitation'); if (lv) PL.vy = (PL.vy + (0.05 * lv - PL.vy) * 0.2) * 0.98; /* (levitation instead of gravity, as Java's travel: up about a block a second) */ else if (!(PL.vy > 0 && PL.onGround)) PL.vy = (PL.vy - 0.08) * 0.98; }
     PL.vx *= fr; PL.vz *= fr;
   }
-  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) { PL.vy += (0.05 * lev - PL.vy) * 0.2; PL.fallDist = 0; } // shulker bullets
+  const lev = effLv(PL, 'levitation'); if (lev && !PL.flying) PL.fallDist = 0; // (shulker bullets: lifted as above)
   else if (effLv(PL, 'slow_falling') && PL.vy < -0.05 && !PL.flying) { PL.vy = Math.max(PL.vy, -0.08); PL.fallDist = 0; }
   IN.jumpWas = IN.jump;
   if (USE.jumpCd > 0) USE.jumpCd--;
