@@ -712,7 +712,7 @@ function mpTick() {
   if (W.tickN % 40 === 0 && !MP.server) mpSend({ t: 'time', time: W.time, rain: W.rainTarget, thunder: W.thunderOn });
   if (W.tickN % 2 === 0) for (const p of MP.peers.values()) { // mobs and vehicles near each guest 10 times a second, items 5
     if (!p.s || p.s.dim !== W.dim) continue; const l = [];
-    for (const e of ENT) { if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > 64 || Math.abs(e.z - p.s.z) > 64) continue; if (!e.mpid) e.mpid = mpNewId();
+    for (const e of ENT) { const rg = e.def && e.def.boss ? 160 : 64; /* (Java tracks the dragon 10 chunks out: it circles wider than 64) */ if (e.dead || e.kind !== 'mob' || Math.abs(e.x - p.s.x) > rg || Math.abs(e.z - p.s.z) > rg) continue; if (!e.mpid) e.mpid = mpNewId();
       l.push([e.mpid, e.type, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), e.baby ? 1 : 0, e.hurt > 0 ? 1 : 0, e.variant != null ? e.variant : null, e.size || 0, e.vtype || null, e.prof || null, e.sheared ? 1 : 0, e.deathT ? 1 : 0, e.saddle ? 1 : 0, e.owner === 'player' ? 1 : 0, e.chest ? 1 : 0, e.spd || 0, e.jumpS || 0, e.rider === PL ? -1 : e.mpRider || 0, e.harmor || null, e.leash === 'player' ? { p: MP.id } : e.leash || 0, mpMobVis(e)]); }
     mpSend({ t: 'mobs', l }, p.id);
     mpSendVehicles(p);
@@ -733,7 +733,10 @@ function mpMirrorMobs(l) {
     seen.add(id); let e = ENT.find(q => q.remote && q.rid === id && !q.dead && q.kind === 'mob'); const v = vis && typeof vis === 'object' ? vis : {};
     if (e && PL.riding !== e && ((variant != null && e.variant !== variant) || !!baby !== !!e.baby || (size && e.size !== size) || (prof && e.prof !== prof) || (vtype && e.vtype !== vtype) || (!sheared && e.sheared))) { removeEnt(e); e = null; } // it grew up, changed job or colour: built again
     if (!e && MOBDEF[type] && !dying) { MP.allowSpawn = true; try { e = spawnMob(type, x, y, z, { baby, variant, size, vtype, prof, sheared, captain: v.captain, carpet: v.carpet, gene: v.gene, gene2: v.gene2 }); } finally { MP.allowSpawn = false; } e.remote = true; e.idleSnd = 100 + Math.random() * 400; e.rid = id; e.persistent = true; e.yaw = yaw; }
-    if (!e) continue; e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) { e.hurt = 10; mpMobSound(e, e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, 0.8); } if (dying && !e.deathT) e.deathT = 1;
+    if (!e) continue;
+    // its speed from the last two places (for running on smoothly between them; a jump of more than 8 blocks is a teleport)
+    { const now = W.tickN; if (e.rx != null && now > e.rAt) { const dt = now - e.rAt, jx = x - e.rx, jy = y - e.ry, jz = z - e.rz; if (Math.hypot(jx, jy, jz) > 8) { e.tvx = e.tvy = e.tvz = 0; e.x = e.px = x; e.y = e.py = y; e.z = e.pz = z; } else { e.tvx = jx / dt; e.tvy = jy / dt; e.tvz = jz / dt; } } e.rx = x; e.ry = y; e.rz = z; e.rAt = now; }
+    e.tx = x; e.ty = y; e.tz = z; e.tyaw = yaw; if (hurt && !e.hurt) { e.hurt = 10; mpMobSound(e, e.def.snd === 'groan' || e.def.snd === 'rattle' || e.def.snd === 'hiss' || e.def.snd === 'spider' ? 'hurt' : e.def.snd, 0.8); } if (dying && !e.deathT) e.deathT = 1;
     if (sheared && !e.sheared && e.type === 'sheep') setSheared(e);
     mpApplyMobVis(e, v);
     // what riding needs: saddle, tame, chest and the horse's own speed and jump
@@ -746,7 +749,9 @@ function mpMirrorMobs(l) {
 function mpPuppetTick(e) {
   if (e.rider === PL) { if (e.def.ride) e.def.ride(e, 0); mpRideSend(e); return; } // you ride it: it goes where you steer, and the runner follows
   if (e.mpWas) mpRideOff(e);
-  if (e.tx == null) return; const dx = e.tx - e.x, dz = e.tz - e.z;
+  if (e.tx == null) return;
+  if (e.tvx && W.tickN - e.rAt <= 4) { e.tx += e.tvx; e.ty += e.tvy; e.tz += e.tvz; } // (between updates it runs on at the speed it had: a fast mob, the dragon above all, no longer moves in jerks)
+  const dx = e.tx - e.x, dz = e.tz - e.z;
   e.x += dx * 0.5; e.y += (e.ty - e.y) * 0.5; e.z += dz * 0.5; e.yaw += wrapA(e.tyaw - e.yaw) * 0.5;
   const sp = Math.hypot(dx, dz); e.walkAmt = Math.min(1, sp * 6); e.walk = (e.walk || 0) + sp * 3; if (e.hurt > 0) e.hurt--; if (e.deathT) e.deathT++;
   if (--e.idleSnd <= 0 && !e.deathT) { e.idleSnd = 300 + Math.random() * 500; mpMobSound(e, e.def.snd, 0.6); } // its own noises, heard here

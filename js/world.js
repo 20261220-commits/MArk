@@ -207,12 +207,27 @@ function breakNaturally(x, y, z, b, m) {
   setBlock(x, y, z, 0, 0);
   if (W.onDrop) { const d = blockDrops(b, m, null); W.onDrop(x, y, z, d.items, 0); }
 }
+// what holds a chorus plant up (Java's ChorusPlantBlock.canSurvive): the stem or end stone under it, or a stem beside it
+// that stands on stem or end stone (only with air above or below it); a flower: stem or end stone under it, or air
+// under it and a single stem beside it with nothing else around
+function chorusOK(x, y, z, b) {
+  const P = BID.chorus_plant, E = BID.end_stone, below = getBlock(x, y - 1, z);
+  if (b === BID.chorus_flower) {
+    if (below === P || below === E) return true; if (below !== 0) return false;
+    let stems = 0; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = getBlock(x + dx, y, z + dz); if (n === P) stems++; else if (n !== 0) return false; }
+    return stems === 1;
+  }
+  const airAbove = getBlock(x, y + 1, z) === 0, airBelow = below === 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (getBlock(x + dx, y, z + dz) === P) { if (!airAbove && !airBelow) return false; const u = getBlock(x + dx, y - 1, z + dz); if (u === P || u === E) return true; }
+  return below === P || below === E;
+}
 function neighborUpdate(x, y, z) {
   if (y < MINY || y >= MAXY) return;
   const b = getBlock(x, y, z); if (!b) return;
   const m = getMeta(x, y, z), below = getBlock(x, y - 1, z), d = BLOCKS[b];
   if (FLUID[b]) { schedule(x, y, z, b === 27 ? 5 : W.dim === -1 ? 10 : 30); return; }
   if (b === BID.fire) schedule(x, y, z, 30 + ((Math.random() * 10) | 0)); // fire ticks (dims.js)
+  if ((b === BID.chorus_plant || b === BID.chorus_flower) && !chorusOK(x, y, z, b)) { schedule(x, y, z, 1); return; } // (a chorus plant cut from its stem breaks, and what grew on it after)
   if (d.fall) { if (below === 0 || FLUID[below] || (REPL[below] && below !== b)) schedule(x, y, z, 2); return; }
   if (d.plant) {
     let ok = true;
@@ -314,6 +329,7 @@ function joinConnections(c) {
 const TRACKED = new Map();
 function trackBlocks(id) { if (!TRACKED.has(id)) TRACKED.set(id, new Set()); return TRACKED.get(id); }
 const SCHED_TICK = []; // scheduled block ticks of non-fluid blocks (big dripleaf tilting)
+SCHED_TICK[216] = SCHED_TICK[217] = (x, y, z, b) => { if (!chorusOK(x, y, z, b)) breakNaturally(x, y, z, b, getMeta(x, y, z)); };
 // Java's FlowingFluid: a fluid's amount is 8 for a source or a falling column, 8 - level when flowing (meta: 0 source,
 // 1-7 flowing, 8 falling). Each tick a flowing block first works out what it should be from its neighbours
 // (getNewLiquid), then spreads: down when it can, else (or a source with 3 source neighbours) sideways toward the
@@ -337,6 +353,11 @@ function fluidUpdate(x, y, z) {
   F.spread(x, y, z, m);
 }
 const H4 = [[0, -1], [0, 1], [-1, 0], [1, 0]]; // north, south, west, east (Java's horizontal order)
+// what running water or lava washes away (Java's FlowingFluid.canHoldFluid): any block nothing bumps into (cobwebs,
+// flowers, torches, rails, buttons, redstone dust...), but not doors, signs, ladders, sugar cane, portals, sea plants,
+// bubble columns or scaffolding
+const NO_WASH = new Set([BID.ladder, BID.sugar_cane, BID.nether_portal, BID.end_portal, BID.kelp, BID.kelp_plant, BID.seagrass, BID.tall_seagrass, BID.scaffolding, BID.oak_sign, BID.bubble_column, BID.barrier].filter(v => v != null));
+const fluidWashes = t => t > 0 && !SOLID[t] && !FLUID[t] && !NO_WASH.has(t) && !S.DOOR[t] && !(S.WLOG[t]) && BLOCKS[t] && BLOCKS[t].hard >= 0;
 function fluidRules(b) {
   const water = b === 27, other = water ? 28 : 27, drop = water || W.dim === -1 ? 1 : 2, slope = water || W.dim === -1 ? 4 : 2, delay = water ? 5 : W.dim === -1 ? 10 : 30;
   const same = (t, mm) => t === b || (water && S.WLOG[t] && S.isWet(t, mm)); // (waterlogged blocks count as water sources)
@@ -344,7 +365,7 @@ function fluidRules(b) {
   const amt = mm => mm === 0 || (mm & 8) ? 8 : 8 - (mm & 7);
   const amtAt = (px, py, pz) => { const t = getBlock(px, py, pz), mm = getMeta(px, py, pz); return t === b ? amt(mm) : same(t, mm) ? 8 : 0; };
   // canHoldFluid: air, a fluid, or a block that doesn't stop movement (plants, torches...)
-  const holds = t => t === 0 || !!FLUID[t] || (!!REPL[t] && !FLUID[t]);
+  const holds = t => t === 0 || !!FLUID[t] || (!!REPL[t] && !FLUID[t]) || fluidWashes(t);
   const newLiquid = (px, py, pz) => { // -> meta, or -1 for none
     let i = 0, j = 0;
     for (const [dx, dz] of H4) { const t = getBlock(px + dx, py, pz + dz); if (!same(t, getMeta(px + dx, py, pz + dz))) continue; if (isSrc(px + dx, py, pz + dz)) j++; i = Math.max(i, amtAt(px + dx, py, pz + dz)); }
@@ -372,7 +393,7 @@ function fluidRules(b) {
       if (down) { setBlock(px, py, pz, BID.stone); fizz(px, py, pz); } return; // lava pouring onto water: stone; from the side water holds
     }
     if (!holds(t)) return;
-    if (t && W.onDrop) { if (water) W.onDrop(px, py, pz, blockDrops(t, getMeta(px, py, pz), null).items, 0); else fizz(px, py, pz); } // (water washes a plant off as an item; lava burns it)
+    if (t && W.onDrop) { if (water) W.onDrop(px, py, pz, t === BID.cobweb ? [[IID.string, 1]] : blockDrops(t, getMeta(px, py, pz), null).items, 0); else fizz(px, py, pz); } /* (a cobweb washed away leaves string, its loot without a tool) */ // (water washes a plant off as an item; lava burns it)
     setBlock(px, py, pz, b, nm);
     if (!water) lavaTouch(px, py, pz);
   };
