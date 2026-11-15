@@ -35,6 +35,6 @@ module.exports = async ({ ok, srv, b, lib }) => {
     return out; });
   ok(!r.none, 'found an old cane chunk to test with', r);
   if (r.none) return;
-  ok(r.cane[1] < r.cane[0] && r.cane[2] && r.cane[3] === 1, 'old generated cane is gone after loading, the planted cane stays, the chunk is marked fixed', r.cane);
-  ok(Array.isArray(r.nether) && !r.nether[0] && !r.nether[1] && r.nether[2] === 1, "an old Nether spring the new count doesn't make is closed and its running lava is gone", r.nether);
+  ok(r.cane[1] < r.cane[0] && r.cane[2] && r.cane[3] >= 1, 'old generated cane is gone after loading, the planted cane stays, the chunk is marked fixed', r.cane);
+  ok(Array.isArray(r.nether) && !r.nether[0] && !r.nether[1] && r.nether[2] >= 1, "an old Nether spring the new count doesn't make is closed and its running lava is gone", r.nether);
 };

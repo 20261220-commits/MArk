@@ -685,7 +685,7 @@ function addChunk(cx, cz, d, tiles) {
 // the chunk with the old rules and the new: what the save still holds exactly as the old rules made it (cane, springs and
 // their running lava, a chest no one has opened) is replaced by what the new rules make; anything the player built,
 // planted, poured or opened stays
-const FIX_VER = 1, FIXP = new Map();
+const FIX_VER = 2, FIXP = new Map(); // 2: the End's outer islands as Java's
 function chestItemsFrom(cx, cz, i, loot) { const items = new Array(27).fill(null), wx = cx * 16 + (i & 15), wz = cz * 16 + ((i >> 4) & 15); for (const [slot, key, n, x] of loot) items[slot] = lootStack(key, n, x, wx, wz, (wx * 31 + wz) * 27 + slot); return items; }
 function fixSavedChunk(d, dim) {
   const w = idleWorker(3) || workers[0]; if (!w) return Promise.resolve();
@@ -699,6 +699,7 @@ function fixSavedChunk(d, dim) {
       if (!t || t.type !== 'chest' || !oldC.has(i) || !newC.has(i)) return [i, t];
       if (!same(t.items, chestItemsFrom(d.cx, d.cz, i, oldC.get(i)))) return [i, t];
       const [loot, tb] = newC.get(i), nt = { ...t, items: chestItemsFrom(d.cx, d.cz, i, loot) }; if (tb) nt.lt = tb; r.changed++; return [i, nt]; });
+    for (const [i, loot, tb] of r.addChests || []) if (!d.tileList.some(([j]) => j === i)) { const t = { type: 'chest', items: chestItemsFrom(d.cx, d.cz, i, loot) }; if (tb) t.lt = tb; d.tileList.push([i, t]); } // (an end city that now stands here: its chests)
     d.fx = FIX_VER; d.fixed = true; res(); });
     w.postMessage({ type: 'fix', id, seed: W.seed, gen: W.gen || 1, cx: d.cx, cz: d.cz, dim, exp: W.exp, blocks: d.blocks, meta: d.meta }, [d.blocks.buffer, d.meta.buffer]);
   });
@@ -814,7 +815,7 @@ async function loadChunk(cx, cz) {
     fitRows(d, rec.my || 0, oldH, dim); unshiftRows(d, dim); }
   catch (e) { console.warn('chunk ' + dk + ' could not be read; generated again', e); W.saved.delete(dk); return; }
   d.fx = rec.fx || 0;
-  if (d.fx < FIX_VER && (dim === 0 || dim === -1)) { W.pending.set(key, 'fix'); try { await fixSavedChunk(d, dim); } catch (e) { console.warn('chunk fix failed', e); } if (W.pending.get(key) !== 'fix' || wid !== W.id || dim !== W.dim) return; W.pending.delete(key); }
+  if ((d.fx < 1 && (dim === 0 || dim === -1)) || (d.fx < 2 && dim === 1)) { /* (fix 1: the Overworld and Nether; fix 2: the End only) */ W.pending.set(key, 'fix'); try { await fixSavedChunk(d, dim); } catch (e) { console.warn('chunk fix failed', e); } if (W.pending.get(key) !== 'fix' || wid !== W.id || dim !== W.dim) return; W.pending.delete(key); }
   W.inbox.push(d);
 }
 // a chunk saved with another world height (before 1.18: y 0..255, or 128 high) put into this world's rows (-64..319):
