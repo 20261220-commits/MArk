@@ -2953,6 +2953,10 @@ function caveBiomes(blocks, meta, seed, cx, cz) {
   const ri = (a, b) => a + R.int(b - a + 1);
   // a random spot in a cave in the biome (well under the surface)
   const spot = (want, pad = 0) => { const x = pad + R.int(16 - 2 * pad), z = pad + R.int(16 - 2 * pad), c = z * 16 + x; if (!want[c]) return null; const lim = Math.min(tops[c] - 8, 120); if (lim <= MINY + 8) return null; const y = MINY + 6 + R.int(lim - MINY - 6); return air(x, y, z) ? [x, y, z] : null; };
+  // the dripstone features as Java places them: a height anywhere from the bottom of the world to 256, so most tries miss
+  const spotJ = (want, pad = 0) => { const x = pad + R.int(16 - 2 * pad), z = pad + R.int(16 - 2 * pad), c = z * 16 + x, y = MINY + R.int(256 - MINY); if (!want[c] || y > tops[c] - 8) return null; return air(x, y, z) ? [x, y, z] : null; };
+  const clampedMap = (v, a, b, lo, hi) => lo + (hi - lo) * Math.max(0, Math.min(1, (v - a) / (b - a)));
+  const normal = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   const floorOf = (x, y, z, r) => { for (let k = 0; k <= r; k++) { if (!air(x, y - k, z)) return k ? y - k + 1 : null; } return null; }; // the lowest air cell above solid ground
   const ceilOf = (x, y, z, r) => { for (let k = 0; k <= r; k++) { if (!air(x, y + k, z)) return k ? y + k - 1 : null; } return null; };
   // the floor (air over solid) or ceiling (air under solid) nearest a height, for the columns of a patch
@@ -2961,7 +2965,7 @@ function caveBiomes(blocks, meta, seed, cx, cz) {
   if (anyD) {
     const DB = 85, PD = 86;
     // large_dripstone
-    for (let n = ri(10, 48); n-- > 0;) { const s = spot(dripAt, 3); if (!s) continue; const [ox, oy, oz] = s, fl = floorOf(ox, oy, oz, 30), ce = ceilOf(ox, oy, oz, 30); if (fl == null || ce == null) continue;
+    for (let n = ri(10, 48); n-- > 0;) { const s = spotJ(dripAt, 3); if (!s) continue; const [ox, oy, oz] = s, fl = floorOf(ox, oy, oz, 30), ce = ceilOf(ox, oy, oz, 30); if (fl == null || ce == null) continue;
       const gap = ce - fl + 1; if (gap < 6) continue; const rad = Math.max(1, Math.min(ri(3, 19), Math.floor(gap * 0.33), Math.min(ox, 15 - ox, oz, 15 - oz) + 1));
       const hs = 0.4 + R() * 1.6, bluntT = 0.3 + R() * 0.6, bluntG = 0.4 + R() * 0.6, Ht = Math.min(gap, rad * hs * 2.2 + 1), Hg = Math.min(gap, rad * hs * 2.0 + 1);
       for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) { const d = Math.hypot(dx, dz); if (d > rad + 0.3) continue; const x = ox + dx, z = oz + dz; if (!inC(x, z)) continue;
@@ -2969,21 +2973,25 @@ function caveBiomes(blocks, meta, seed, cx, cz) {
         const ht = Math.round(Ht * Math.pow(f, 1 / (1 + bluntT))), hg = Math.round(Hg * Math.pow(f, 1 / (1 + bluntG)));
         for (let k = 0; k < ht; k++) set(x, cTop - k, z, DB); for (let k = 0; k < hg; k++) set(x, cBot + k, z, DB);
         if (rocky(get(x, cTop + 1, z))) set(x, cTop + 1, z, DB); if (rocky(get(x, cBot - 1, z))) set(x, cBot - 1, z, DB); } }
-    // dripstone_cluster
-    for (let n = ri(48, 96); n-- > 0;) { const s = spot(dripAt, 1); if (!s) continue; const [ox, oy, oz] = s, fl = floorOf(ox, oy, oz, 12), ce = ceilOf(ox, oy, oz, 12); if (fl == null || ce == null) continue;
-      const rx = ri(2, 8), rz = ri(2, 8), hBase = ri(3, 6), wet = 0.5 + R() * 0.3, dens = 0.3 + R() * 0.4, layer = ri(2, 4);
-      for (let dx = -rx; dx <= rx; dx++) for (let dz = -rz; dz <= rz; dz++) { const x = ox + dx, z = oz + dz; if (!inC(x, z)) continue; const e = Math.hypot(dx / (rx + 0.5), dz / (rz + 0.5)); if (e > 1) continue;
+    // dripstone_cluster (Java's DripstoneClusterFeature: radius 2-8, height 3-6, density 0.3-0.7, wetness about 0.3,
+    // a column's chance 0.1 at the edge up to 1 four in; its spikes half the height at the middle, none 8 out, 3 either way)
+    for (let n = ri(48, 96); n-- > 0;) { const s = spotJ(dripAt, 1); if (!s) continue; const [ox, oy, oz] = s, fl = floorOf(ox, oy, oz, 12), ce = ceilOf(ox, oy, oz, 12); if (fl == null || ce == null) continue;
+      const rx = ri(2, 8), rz = ri(2, 8), hMax = ri(3, 6), wet = Math.max(0.1, Math.min(0.9, 0.3 + normal() * 0.1)), dens = 0.3 + R() * 0.4, layer = ri(2, 4);
+      const spike = (dx, dz) => { if (R() > dens) return 0; const mean = clampedMap(Math.abs(dx) + Math.abs(dz), 0, 8, hMax / 2, 0); return Math.floor(Math.max(0, Math.min(hMax, mean + normal() * 3))); };
+      for (let dx = -rx; dx <= rx; dx++) for (let dz = -rz; dz <= rz; dz++) { const x = ox + dx, z = oz + dz; if (!inC(x, z)) continue;
+        const chance = clampedMap(Math.min(rx - Math.abs(dx), rz - Math.abs(dz)), 0, 4, 0.1, 1);
         const cTop = ceilOf(x, oy, z, 12), cBot = floorOf(x, oy, z, 12); if (cTop == null || cBot == null) continue;
-        const th = Math.max(1, layer - Math.round(e * 2));
+        const th = Math.max(1, Math.round(layer * chance));
         for (let k = 1; k <= th; k++) { if (rocky(get(x, cTop + k, z))) set(x, cTop + k, z, DB); if (rocky(get(x, cBot - k, z))) set(x, cBot - k, z, DB); }
-        // a puddle in the floor where it can't leak
-        if (R() < wet * (1 - e) * 0.35 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, c]) => inC(x + a, z + c) && !air(x + a, cBot - 1, z + c))) { set(x, cBot - 1, z, 27); continue; }
-        if (R() > dens) continue;
-        const gapC = cTop - cBot + 1, bias = Math.round((1 - e) * 3), hT = Math.max(0, Math.min(gapC, hBase + bias + ri(-3, 1))), hG = Math.max(0, Math.min(gapC, hT + ri(-1, 1)));
-        if (hT + hG >= gapC) { const a = Math.max(1, Math.floor(gapC / 2)); for (let k = 0; k < gapC; k++) set(x, cTop - k, z, PD, k < a ? 0 : 1); } // meeting: hanging half and standing half, tip to tip
-        else { for (let k = 0; k < hT; k++) set(x, cTop - k, z, PD, 0); for (let k = 0; k < hG; k++) set(x, cBot + k, z, PD, 1); } } }
+        if (R() >= chance) continue;
+        // a puddle in the floor where it can't leak (and no stalagmite in it)
+        const pool = R() < wet && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, c]) => inC(x + a, z + c) && !air(x + a, cBot - 1, z + c) && get(x + a, cBot - 1, z + c) !== 0);
+        if (pool) set(x, cBot - 1, z, 27);
+        const gapC = cTop - cBot + 1, hT = spike(dx, dz), hG = pool ? 0 : Math.max(0, hT + ri(-1, 1)); /* (a stalagmite within one of the stalactite over it) */
+        if (hT && hG && hT + hG >= gapC) { const a = Math.max(1, Math.floor(gapC / 2)); for (let k = 0; k < gapC; k++) set(x, cTop - k, z, PD, k < a ? 0 : 1); } // meeting: hanging half and standing half, tip to tip
+        else { for (let k = 0; k < Math.min(hT, gapC - 1); k++) set(x, cTop - k, z, PD, 0); for (let k = 0; k < Math.min(hG, gapC - 1 - hT); k++) set(x, cBot + k, z, PD, 1); } } }
     // pointed_dripstone
-    for (let n = ri(256, 512); n-- > 0;) { const s = spot(dripAt, 1); if (!s) continue; const [ox, oy, oz] = s, up = R() < 0.5, at = up ? floorOf(ox, oy, oz, 12) : ceilOf(ox, oy, oz, 12); if (at == null) continue;
+    for (let n = ri(256, 512); n-- > 0;) { const s = spotJ(dripAt, 1); if (!s) continue; const [ox, oy, oz] = s, up = R() < 0.5, at = up ? floorOf(ox, oy, oz, 12) : ceilOf(ox, oy, oz, 12); if (at == null) continue;
       const base = up ? at - 1 : at + 1; if (!rocky(get(ox, base, oz))) continue; set(ox, base, oz, DB);
       for (const [a, c] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (R() < 0.7 && rocky(get(ox + a, base, oz + c))) set(ox + a, base, oz + c, DB);
       const len = R() < 0.2 ? 2 : 1; for (let k = 0; k < len; k++) { const y = up ? at + k : at - k; if (!air(ox, y, oz) || !air(ox, y + (up ? 1 : -1), oz) && k + 1 < len) break; set(ox, y, oz, PD, up ? 1 : 0); } }
